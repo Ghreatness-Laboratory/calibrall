@@ -79,12 +79,33 @@ export async function POST() {
   }
 
   // 4. Supabase
-  results['supabase'] = {
-    provider: 'Supabase PostgreSQL',
-    isConfigured: isSupabaseConfigured,
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL || 'Not configured',
-    status: isSupabaseConfigured ? 'CONNECTED' : 'LOCAL_DEV_SEED_MODE',
-  };
+  if (isSupabaseConfigured && supabase) {
+    const t0 = Date.now();
+    try {
+      const auth = await supabase.auth.getSession();
+      results['supabase'] = {
+        provider: 'Supabase PostgreSQL',
+        isConfigured: true,
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        status: auth.error ? 'ERROR' : 'ONLINE',
+        latencyMs: Date.now() - t0,
+      };
+    } catch (e: any) {
+      results['supabase'] = {
+        provider: 'Supabase PostgreSQL',
+        isConfigured: true,
+        status: 'OFFLINE_FALLBACK',
+        error: e.message,
+      };
+    }
+  } else {
+    results['supabase'] = {
+      provider: 'Supabase PostgreSQL',
+      isConfigured: false,
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL || 'Not configured',
+      status: 'LOCAL_DEV_SEED_MODE',
+    };
+  }
 
   return NextResponse.json({
     success: true,

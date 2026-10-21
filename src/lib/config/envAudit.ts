@@ -66,11 +66,14 @@ export function checkAndLogStartupEnv(): void {
   // Database check
   const hasDb = Boolean(
     process.env.DATABASE_URL?.trim() ||
-    (process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() && 
-     (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()))
+    ((process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || process.env.SUPABASE_URL?.trim()) && 
+     (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || 
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || 
+      process.env.SUPABASE_ANON_KEY?.trim() || 
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()))
   );
   if (!hasDb) {
-    missingRecommended.push('DATABASE_URL or NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    missingRecommended.push('DATABASE_URL or NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY/PUBLISHABLE_KEY');
   }
 
   if (missingRequired.length > 0) {
@@ -149,7 +152,14 @@ export function getProductionEnvList(): EnvStatus[] {
       isPresent: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || process.env.SUPABASE_ANON_KEY?.trim()),
       isSecret: true,
       category: 'database',
-      description: 'Supabase anonymous/publishable client API key',
+      description: 'Supabase anonymous client API key',
+    },
+    {
+      name: 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+      isPresent: Boolean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim()),
+      isSecret: true,
+      category: 'database',
+      description: 'Supabase publishable client API key',
     },
     {
       name: 'SUPABASE_SERVICE_ROLE_KEY',
