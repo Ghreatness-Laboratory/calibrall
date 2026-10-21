@@ -25,6 +25,66 @@ export type QualificationStatus =
 
 export type SettlementStatus = 'PENDING' | 'WON' | 'LOST' | 'PUSH' | 'VOID';
 
+export type StateTag = 
+  | 'high-stakes' 
+  | 'derby' 
+  | 'dead-rubber' 
+  | 'fixture-congested' 
+  | 'key-absences' 
+  | 'new-manager' 
+  | 'low-sample' 
+  | 'lineup-unconfirmed';
+
+export type FactorCode = 
+  | 'team_form' 
+  | 'squad_state' 
+  | 'match_stakes' 
+  | 'schedule_fatigue' 
+  | 'tactical_matchup' 
+  | 'referee_rules' 
+  | 'environment' 
+  | 'head_to_head' 
+  | 'managerial_changes' 
+  | 'market_signals';
+
+export interface FactorContribution {
+  factorCode: FactorCode;
+  factorName: string;
+  weight: number;
+  direction: 'positive' | 'negative' | 'neutral';
+  impactDescription: string;
+  magnitude: number;
+}
+
+export interface MissingFactorFlag {
+  factorCode: FactorCode;
+  factorName: string;
+  reason: string;
+  uncertaintyPenalty: number;
+}
+
+export interface ContextFactorMeasurement {
+  factorCode: FactorCode;
+  factorName: string;
+  category: 'form' | 'squad' | 'stakes' | 'fatigue' | 'tactics' | 'referee' | 'environment' | 'h2h' | 'management' | 'market';
+  homeValue: string | number;
+  awayValue: string | number;
+  description: string;
+  marketWeights: Partial<Record<MarketCategory, number>>;
+  isMeasured: boolean;
+  isMissing: boolean;
+  shrinkageApplied: number;
+}
+
+export interface FixtureStateTagInfo {
+  tag: StateTag;
+  label: string;
+  description: string;
+  uncertaintyMultiplier: number;
+  affectedMarkets: MarketCategory[];
+  hypothesis: string;
+}
+
 export interface FixtureContext {
   fixtureId: string;
   homeTeamName: string;
@@ -43,6 +103,10 @@ export interface FixtureContext {
   uncertaintyScore: number;
   dataCoverageScore: number;
   sampleSizeMatches: number;
+  stateTags?: StateTag[];
+  lineupConfirmed?: boolean;
+  factors?: Record<FactorCode, ContextFactorMeasurement>;
+  missingFactors?: MissingFactorFlag[];
   verifiedOdds?: {
     homeWin?: number;
     draw?: number;
@@ -147,6 +211,17 @@ export interface MarketPrediction {
   rankingScore: number;
   isTopPick: boolean;
   settlementStatus: SettlementStatus;
+  evidenceTier: string; // Plain-text tier e.g. "Tier 1: Qualified Value", "Tier 2: High Probability", "Unqualified: High Uncertainty"
+  dataQualityScore: number; // Combined verified data completeness score 0.0 - 1.0
+  stateTags: StateTag[]; // Verified state tags that affected this prediction
+  lineupStatus: 'confirmed' | 'pre-lineup';
+  topFactorContributions: FactorContribution[]; // Top 3 measured factors contributing to this line
+  correlationWarnings?: string[]; // Warnings regarding intra-fixture line correlations
+  alternativesRejected?: {
+    alternative: string;
+    modelProbability: number;
+    reasonRejected: string;
+  }[];
   explanation?: PredictionExplanation;
 }
 
@@ -184,6 +259,8 @@ export interface PredictionRun {
   expectedCardsTotal: number;
   modelUncertaintyScore: number;
   dataCoverageScore: number;
+  stateTags: StateTag[];
+  lineupStatus: 'confirmed' | 'pre-lineup';
   scorelineProbabilities: { home: number; away: number; probability: number }[];
   predictions: MarketPrediction[];
   topQualifiedRecommendation?: MarketPrediction | null;
@@ -225,6 +302,16 @@ export interface PerformanceReport {
     sampleSize: number;
     hitRate: number;
     brierScore: number;
+  }[];
+  byStateTag: {
+    tag: StateTag;
+    label: string;
+    sampleSize: number;
+    hitRate: number;
+    brierScore: number;
+    avgEdge: number;
+    roi: number;
+    calibrationSlope: number;
   }[];
 }
 

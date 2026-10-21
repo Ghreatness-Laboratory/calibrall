@@ -149,7 +149,7 @@ export default function FixtureCard({
         {/* Top Recommendation Bar */}
         <div className="mt-3.5 pt-3 border-t border-border-subtle/80 flex items-center justify-between text-xs">
           {topPrediction ? (
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-brand-emerald/10 text-brand-emerald border border-brand-emerald/30">
                 <CheckCircle2 className="w-3 h-3 mr-1 shrink-0" />
                 TOP PICK: {topPrediction.selection}
@@ -158,6 +158,16 @@ export default function FixtureCard({
                 {(topPrediction.modelProbability * 100).toFixed(1)}% prob
                 {topPrediction.expectedValue ? ` (+${(topPrediction.expectedValue * 100).toFixed(1)}% EV)` : ''}
               </span>
+              {topPrediction.stateTags && topPrediction.stateTags.length > 0 && (
+                <span className="hidden sm:inline-flex text-[9px] font-mono text-gray-400 bg-surface-100 px-1.5 py-0.5 rounded border border-border">
+                  #{topPrediction.stateTags[0]}
+                </span>
+              )}
+              {topPrediction.lineupStatus === 'pre-lineup' && (
+                <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1 rounded border border-amber-500/20">
+                  Pre-Lineup
+                </span>
+              )}
             </div>
           ) : (
             <div className="flex items-center space-x-1.5 text-gray-400 text-[11px]">

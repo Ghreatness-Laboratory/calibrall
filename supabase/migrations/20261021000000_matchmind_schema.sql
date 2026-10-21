@@ -209,6 +209,49 @@ CREATE TABLE IF NOT EXISTS public.prediction_explanations (
 );
 
 -- ====================================================================
+-- 4.B CONTEXT FACTORS, STATE TAGS & FACTOR CONTRIBUTIONS
+-- ====================================================================
+
+CREATE TABLE IF NOT EXISTS public.factor_definitions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL CHECK (category IN ('form', 'squad', 'stakes', 'fatigue', 'tactics', 'referee', 'environment', 'h2h', 'management', 'market')),
+    description TEXT NOT NULL,
+    default_shrinkage NUMERIC(4, 3) NOT NULL DEFAULT 0.100,
+    ablation_gain_brier NUMERIC(6, 4) NOT NULL DEFAULT 0.0100,
+    market_weights JSONB NOT NULL DEFAULT '{}'::JSONB,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.match_state_tags (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    fixture_id UUID NOT NULL REFERENCES public.fixtures(id) ON DELETE CASCADE,
+    tag TEXT NOT NULL CHECK (tag IN ('high-stakes', 'derby', 'dead-rubber', 'fixture-congested', 'key-absences', 'new-manager', 'low-sample', 'lineup-unconfirmed')),
+    source TEXT NOT NULL DEFAULT 'pre_match_verified',
+    uncertainty_multiplier NUMERIC(4, 2) NOT NULL DEFAULT 1.00,
+    confidence NUMERIC(4, 3) NOT NULL DEFAULT 0.950,
+    metadata JSONB DEFAULT '{}'::JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(fixture_id, tag)
+);
+
+CREATE TABLE IF NOT EXISTS public.prediction_factor_contributions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    prediction_id UUID NOT NULL REFERENCES public.market_predictions(id) ON DELETE CASCADE,
+    factor_code TEXT NOT NULL REFERENCES public.factor_definitions(code),
+    weight NUMERIC(5, 4) NOT NULL,
+    direction TEXT NOT NULL CHECK (direction IN ('positive', 'negative', 'neutral')),
+    impact_description TEXT NOT NULL,
+    magnitude NUMERIC(5, 4) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_match_state_tags_fixture ON public.match_state_tags(fixture_id);
+CREATE INDEX IF NOT EXISTS idx_factor_contrib_pred ON public.prediction_factor_contributions(prediction_id);
+
+-- ====================================================================
 -- 5. SAVED FIXTURES, SUBSCRIPTIONS, NOTIFICATIONS, AUDIT
 -- ====================================================================
 
@@ -274,6 +317,13 @@ ALTER TABLE public.saved_fixtures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.provider_sync_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.factor_definitions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.match_state_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prediction_factor_contributions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read-only factor definitions" ON public.factor_definitions FOR SELECT USING (true);
+CREATE POLICY "Public read-only match state tags" ON public.match_state_tags FOR SELECT USING (true);
+CREATE POLICY "Public read-only factor contributions" ON public.prediction_factor_contributions FOR SELECT USING (true);
 
 -- 1. Profiles: Users can view and edit only their own profile
 CREATE POLICY "Users can view own profile" ON public.profiles

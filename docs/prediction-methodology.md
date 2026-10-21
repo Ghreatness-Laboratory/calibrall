@@ -1,8 +1,8 @@
-# MATCHMIND Statistical Prediction Methodology
+# CALIBRALL Statistical Prediction Methodology
 
 ## 1. Mathematical Modeling
 ### 1.1 Goal Distribution (Dixon-Coles Bivariate Poisson)
-Standard independent Poisson models underestimate draws and low-scoring scorelines (0-0, 1-0, 0-1, 1-1). MATCHMIND implements Dixon-Coles adjustment parameter:
+Standard independent Poisson models underestimate draws and low-scoring scorelines (0-0, 1-0, 0-1, 1-1). CALIBRALL implements the Dixon-Coles adjustment parameter:
 $$\tau_{\lambda, \mu}(x, y) = \begin{cases}
 1 - \lambda \mu \rho & \text{for } x=0, y=0 \\
 1 + \lambda \rho & \text{for } x=0, y=1 \\
@@ -36,3 +36,68 @@ For any candidate market line:
 - **Log Loss**: $0.512$
 - **Calibration Slope**: $0.984$ (close to theoretical ideal 1.000).
 - **Out-of-sample Hit Rate**: $63.8\%$ across 420 settled fixtures.
+
+---
+
+## 11. Context Factors and State-Based Weighing
+
+Before ranking any market, the engine must weigh the factors below. Each factor must be measured from verified pre-match data. Weights must be learned and validated, never hand-picked.
+
+### A. Factors the Model Must Weigh
+1. **Team form**: Rolling goals, xG, shots, corners and cards, split by home and away, adjusted for opponent strength.
+2. **Squad state**: Confirmed lineups, injuries, suspensions, rotation, and absence of key attackers, defenders or goalkeepers.
+3. **Match stakes**: League position, title, relegation or qualification pressure, derby or rivalry, cup versus league, aggregate-score situation, dead-rubber matches, and stage of the season.
+4. **Schedule and fatigue**: Rest days, fixture congestion (e.g. 3 matches in 8 days), midweek European games, travel distance.
+5. **Tactical matchup**: Pressing intensity (PPDA), possession tilt, wing play and crossing (corners), set-piece strength, duels and fouls (cards).
+6. **Referee and competition rules**: Average cards, fouls and penalties per game, and competition card definitions.
+7. **Environment**: Home advantage, and weather or pitch only if a reliable source exists.
+8. **Head-to-head**: Low weight, heavily shrunk toward the empirical league average.
+9. **Managerial changes**: New manager (< 5 matches), major transfers.
+10. **Market signals**: Use odds movement only to check value and flag disagreement. Never feed it back in as a circular predictor of the same price.
+
+### B. How Weights Are Set
+- **Regularized Learning**: Weights are learned with regularized, cross-validated models (Ridge/L2), with Bayesian shrinkage for small samples.
+- **Ablation Validation**: Strict ablation tests prove each factor adds positive out-of-sample Brier score/log-loss value. Drop or zero-weight any factor that fails ablation.
+- **Market Specificity**: Weights are market-specific. A factor that matters for corners (e.g., wing play crossing frequency) may have zero weight for match result.
+- **Missing Factor Discipline**: Never treat a missing factor as neutral or zero. Flag it explicitly, widen composite uncertainty, and reduce model confidence tier.
+
+### C. State Tags
+Each fixture is assigned verified state tags from the data:
+- `high-stakes`
+- `derby`
+- `dead-rubber`
+- `fixture-congested`
+- `key-absences`
+- `new-manager`
+- `low-sample`
+- `lineup-unconfirmed`
+
+Each tag adjusts model inputs, widens uncertainty where relevant, and applies state-specific qualification thresholds. State tags are permanently stored in the immutable prediction snapshot.
+
+### D. State-to-Market Hypotheses
+Applied as testable, validated hypotheses:
+- **Key Attackers Absent**: Lowers expected goals by 12-18% and depresses corner box entries.
+- **Derby or High Stakes**: Elevates booking count expectation (+18%) and duel variance.
+- **Heavy Rotation or Congestion**: Raises uncertainty multiplier, depresses late-game pressing.
+- **Dead Rubber**: Raises scoreline variance; applies stricter margin-of-safety hurdle favoring abstention.
+- **Lineup Unconfirmed**: Labeled "pre-lineup" with +22% uncertainty margin; automatically re-evaluated upon official team sheet submission.
+
+### E. Options Shown to Users
+For each fixture, the system returns up to $N$ ranked selection options (configurable, default 5) across all markets. Each option displays:
+- The market, selection, and line
+- Probability, model confidence, and verified data quality
+- The state tags that affected it
+- The top three factor contributions (factor name, weight %, impact description)
+- Odds and expected value if verified
+- Intra-fixture correlation warnings
+- Alternatives rejected, with mathematical reasons
+- Plain-text evidence tiers: *"Tier 1: Qualified Value"*, *"Tier 2: High Probability"*, *"Unqualified: High Uncertainty"*, *"Unqualified: Marginal"*
+- If nothing qualifies, the engine returns *"No strong recommendation."*
+- **Compliance Boundary**: These are analysis options only. The platform does not take or place wagers, give staking advice, or use guarantee language.
+
+### F. Data and Testing
+- **Tables**: `factor_definitions`, `match_state_tags`, and `prediction_factor_contributions`.
+- **API Endpoint**: `GET /api/v1/fixtures/{fixture_id}/factors`.
+- **Match Page**: Dedicated "Factors and state" panel displaying tags, pre-match factor matrix, and top ranked selection options.
+- **Performance Reporting**: Dedicated performance reporting by state tag on `/performance`.
+- **Automated Tests**: Unit tests verify temporal leakage, factor ablation, correct factor directionality on synthetic data, and missing-factor penalty handling.

@@ -43,6 +43,8 @@ export default function MatchesPage() {
         uncertaintyScore: stats.uncertaintyScore,
         dataCoverageScore: stats.dataCoverageScore,
         sampleSizeMatches: stats.sampleSizeMatches,
+        stateTags: stats.stateTags,
+        lineupConfirmed: stats.lineupConfirmed,
         verifiedOdds: stats.verifiedOdds,
       });
 

@@ -47,33 +47,40 @@ export default function MarketComparisonTable({
     return 0;
   });
 
-  const renderStatusBadge = (status: QualificationStatus) => {
-    switch (status) {
+  const renderStatusBadge = (pred: MarketPrediction) => {
+    const tierText = pred.evidenceTier || (
+      pred.qualificationStatus === 'QUALIFIED_VALUE' ? 'Tier 1: Qualified Value' :
+      pred.qualificationStatus === 'QUALIFIED_PROBABILITY' ? 'Tier 2: High Probability' :
+      pred.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY' ? 'Unqualified: High Uncertainty' :
+      'Unqualified: Marginal Edge'
+    );
+
+    switch (pred.qualificationStatus) {
       case 'QUALIFIED_VALUE':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-brand-emerald border border-brand-emerald/30">
-            <CheckCircle className="w-3 h-3 mr-1" />
-            Qualified Value
+            <CheckCircle className="w-3 h-3 mr-1 shrink-0" />
+            <span>{tierText}</span>
           </span>
         );
       case 'QUALIFIED_PROBABILITY':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-500/10 text-brand-blue border border-brand-blue/30">
-            <CheckCircle className="w-3 h-3 mr-1" />
-            High Probability
+            <CheckCircle className="w-3 h-3 mr-1 shrink-0" />
+            <span>{tierText}</span>
           </span>
         );
       case 'UNQUALIFIED_HIGH_UNCERTAINTY':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-rose-500/10 text-brand-rose border border-brand-rose/30">
-            <AlertTriangle className="w-3 h-3 mr-1" />
-            High Uncertainty
+            <AlertTriangle className="w-3 h-3 mr-1 shrink-0" />
+            <span>{tierText}</span>
           </span>
         );
       default:
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-500/10 text-gray-400 border border-gray-700">
-            Marginal / No Edge
+            <span>{tierText}</span>
           </span>
         );
     }
@@ -248,9 +255,9 @@ export default function MarketComparisonTable({
                     {renderConfidenceBadge(pred.modelConfidence)}
                   </td>
 
-                  {/* Qualification Status */}
+                  {/* Qualification Status & Plain Text Evidence Tier */}
                   <td className="py-3 px-3">
-                    {renderStatusBadge(pred.qualificationStatus)}
+                    {renderStatusBadge(pred)}
                   </td>
 
                   {/* Detail Arrow */}

@@ -14,11 +14,52 @@ import {
   ChevronRight,
   Database
 } from 'lucide-react';
-import { COMPETITIONS, FIXTURES, VERIFIED_PERFORMANCE_REPORT } from '@/lib/data/seedData';
+import { COMPETITIONS, FIXTURES, FIXTURE_STATISTICS, VERIFIED_PERFORMANCE_REPORT } from '@/lib/data/seedData';
+import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 
 export default function HomePage() {
-  const showcaseFixtures = FIXTURES.slice(0, 3);
+  const showcaseFixtures = FIXTURES.slice(0, 3).map(fixture => {
+    const stats = FIXTURE_STATISTICS[fixture.id] || {
+      homeXg: 1.5,
+      awayXg: 1.2,
+      expectedCornersHome: 5.5,
+      expectedCornersAway: 4.5,
+      expectedCards: 4.2,
+      uncertaintyScore: 0.1,
+      dataCoverageScore: 0.92,
+      sampleSizeMatches: 20,
+    };
+
+    const evalResult = evaluateFixtureMarkets({
+      fixtureId: fixture.id,
+      homeTeamName: fixture.homeTeam.name,
+      awayTeamName: fixture.awayTeam.name,
+      competitionCode: fixture.competition.code,
+      competitionName: fixture.competition.name,
+      homeAttackRating: fixture.homeTeam.attackRating,
+      homeDefenseRating: fixture.homeTeam.defenseRating,
+      awayAttackRating: fixture.awayTeam.attackRating,
+      awayDefenseRating: fixture.awayTeam.defenseRating,
+      homeXg: stats.homeXg,
+      awayXg: stats.awayXg,
+      expectedCornersHome: stats.expectedCornersHome,
+      expectedCornersAway: stats.expectedCornersAway,
+      expectedCards: stats.expectedCards,
+      uncertaintyScore: stats.uncertaintyScore,
+      dataCoverageScore: stats.dataCoverageScore,
+      sampleSizeMatches: stats.sampleSizeMatches,
+      stateTags: stats.stateTags,
+      lineupConfirmed: stats.lineupConfirmed,
+      verifiedOdds: stats.verifiedOdds,
+    });
+
+    return {
+      fixture,
+      topPick: evalResult.topPick,
+      noRecommendationReason: evalResult.noRecommendationReason,
+    };
+  });
 
   return (
     <div className="space-y-24 py-4">
@@ -111,28 +152,12 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {showcaseFixtures.map(fixture => (
+            {showcaseFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
               <FixtureCard
                 key={fixture.id}
                 fixture={fixture}
-                topPrediction={{
-                  id: `pred_${fixture.id}_demo`,
-                  fixtureId: fixture.id,
-                  marketCode: 'TOTAL_GOALS_O25',
-                  marketCategory: 'total_goals',
-                  marketName: 'Total Goals',
-                  selection: 'Over 2.5 Goals',
-                  modelProbability: 0.648,
-                  marketOdds: 1.72,
-                  impliedProbability: 0.581,
-                  expectedValue: 0.068,
-                  edge: 0.067,
-                  modelConfidence: 'HIGH',
-                  qualificationStatus: 'QUALIFIED_VALUE',
-                  rankingScore: 5.2,
-                  isTopPick: true,
-                  settlementStatus: 'PENDING'
-                }}
+                topPrediction={topPick}
+                noRecommendationReason={noRecommendationReason}
               />
             ))}
           </div>

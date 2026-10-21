@@ -8,6 +8,7 @@ import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import MarketComparisonTable from '@/components/MarketComparisonTable';
 import ExplanationCard from '@/components/ExplanationCard';
 import ScorelineMatrix from '@/components/ScorelineMatrix';
+import FactorsAndStatePanel from '@/components/FactorsAndStatePanel';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -72,6 +73,8 @@ export default function MatchAnalysisPage() {
       uncertaintyScore: stats.uncertaintyScore,
       dataCoverageScore: stats.dataCoverageScore,
       sampleSizeMatches: stats.sampleSizeMatches,
+      stateTags: stats.stateTags,
+      lineupConfirmed: stats.lineupConfirmed,
       verifiedOdds: stats.verifiedOdds,
     });
   }, [fixture, stats]);
@@ -311,6 +314,14 @@ export default function MatchAnalysisPage() {
         awayTeamName={fixture.awayTeam.name}
         homeXg={stats.homeXg}
         awayXg={stats.awayXg}
+      />
+
+      {/* Factors and State-Based Weighing Panel */}
+      <FactorsAndStatePanel
+        contextEvaluation={evaluation.contextEvaluation}
+        rankedOptions={evaluation.rankedOptions}
+        selectedOptionId={selectedPrediction?.id}
+        onSelectOption={(p) => setSelectedPrediction(p)}
       />
 
       {/* Main Split: Market Comparison Table (Left 7 cols) & Explanation Engine (Right 5 cols) */}
