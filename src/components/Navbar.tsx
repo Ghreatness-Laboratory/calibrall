@@ -16,7 +16,8 @@ import {
   User,
   CheckCircle2,
   Lock,
-  ChevronDown
+  ChevronDown,
+  Contrast
 } from 'lucide-react';
 import { getStoredUser, setStoredUser, isSupabaseConfigured } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
@@ -26,6 +27,7 @@ export default function Navbar() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [timeStr, setTimeStr] = useState<string>('');
+  const [isMonochrome, setIsMonochrome] = useState<boolean>(false);
 
   useEffect(() => {
     setUser(getStoredUser());
@@ -35,8 +37,36 @@ export default function Navbar() {
     };
     updateTime();
     const interval = setInterval(updateTime, 10000);
+
+    // Initialize Black & White state
+    try {
+      const saved = localStorage.getItem('calibrall_monochrome_mode') === 'true';
+      setIsMonochrome(saved);
+      if (saved) {
+        document.documentElement.classList.add('monochrome');
+      }
+    } catch (e) {
+      // safe fallback
+    }
+
     return () => clearInterval(interval);
   }, []);
+
+  const toggleMonochrome = () => {
+    const next = !isMonochrome;
+    setIsMonochrome(next);
+    try {
+      if (next) {
+        document.documentElement.classList.add('monochrome');
+        localStorage.setItem('calibrall_monochrome_mode', 'true');
+      } else {
+        document.documentElement.classList.remove('monochrome');
+        localStorage.setItem('calibrall_monochrome_mode', 'false');
+      }
+    } catch (e) {
+      console.error('Failed to save monochrome state', e);
+    }
+  };
 
   const navItems = [
     { label: 'Dashboard', href: '/dashboard', icon: Layers },
@@ -72,9 +102,9 @@ export default function Navbar() {
           </span>
         </div>
         <div className="flex items-center space-x-4 font-mono text-[11px]">
-          <span className="flex items-center space-x-1">
+          <span className="flex items-center space-x-1" suppressHydrationWarning>
             <Clock className="w-3 h-3 text-gray-500" />
-            <span>{timeStr || '12:00 UTC'}</span>
+            <span suppressHydrationWarning>{timeStr || '12:00 UTC'}</span>
           </span>
           <Link href="/pricing" className="text-brand-amber hover:underline flex items-center space-x-1">
             <span>Tier:</span>
@@ -129,7 +159,7 @@ export default function Navbar() {
           </div>
 
           {/* Right Action Tools */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2.5">
             <Link 
               href="/matches" 
               className="hidden sm:flex items-center space-x-1.5 text-xs text-gray-400 bg-surface-200 border border-border px-2.5 py-1.5 rounded hover:text-white"
@@ -138,6 +168,20 @@ export default function Navbar() {
               <span>Search fixtures...</span>
               <kbd className="font-mono text-[10px] bg-surface-50 px-1 rounded text-gray-400">⌘K</kbd>
             </Link>
+
+            {/* Black & White Mode Toggle Button */}
+            <button
+              onClick={toggleMonochrome}
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded border text-xs font-mono transition-all ${
+                isMonochrome
+                  ? 'bg-white text-black border-white font-bold shadow-md'
+                  : 'bg-surface-200 border-border text-gray-300 hover:text-white hover:border-gray-500'
+              }`}
+              title={isMonochrome ? 'Switch to Color Mode' : 'Switch to Black & White (Noir Terminal) Mode'}
+            >
+              <Contrast className="w-3.5 h-3.5" />
+              <span>{isMonochrome ? 'B&W ON' : 'B&W'}</span>
+            </button>
 
             <Link
               href="/admin"

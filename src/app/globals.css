@@ -45,3 +45,42 @@ body {
 .glow-border-blue {
   box-shadow: 0 0 16px -3px rgba(56, 189, 248, 0.25);
 }
+
+/* ==========================================================================
+   BLACK & WHITE (MONOCHROME / NOIR TERMINAL) MODE
+   High-contrast, zero-distraction statistical paper terminal aesthetic
+   ========================================================================== */
+
+html.monochrome {
+  filter: grayscale(100%) contrast(110%);
+}
+
+html.monochrome body {
+  background-color: #080808;
+  color: #f3f3f3;
+}
+
+html.monochrome img {
+  filter: grayscale(100%) contrast(120%);
+}
+
+html.monochrome .shadow-glow-lime,
+html.monochrome .shadow-glow-emerald {
+  box-shadow: 0 0 16px -2px rgba(255, 255, 255, 0.3) !important;
+}
+
+html.monochrome .bg-brand-emerald,
+html.monochrome .bg-brand-accent {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+html.monochrome .text-brand-emerald,
+html.monochrome .text-brand-accent {
+  color: #ffffff !important;
+}
+
+html.monochrome .border-brand-emerald,
+html.monochrome .border-brand-accent {
+  border-color: #ffffff !important;
+}

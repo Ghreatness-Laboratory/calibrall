@@ -264,12 +264,12 @@ export const FIXTURES: Fixture[] = [
     seasonYear: '2025/2026',
     homeTeam: TEAMS.arsenal,
     awayTeam: TEAMS.liverpool,
-    kickoffTime: new Date(Date.now() + 4 * 3600 * 1000).toISOString(), // in 4 hours
+    kickoffTime: '2026-10-21T16:30:00.000Z',
     matchday: 28,
     status: 'TIMED',
     venue: 'Emirates Stadium',
     referee: 'Anthony Taylor',
-    dataFreshness: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    dataFreshness: '2026-10-21T05:00:00.000Z',
     isDemo: true
   },
   // Today's marquee match 2
@@ -280,12 +280,12 @@ export const FIXTURES: Fixture[] = [
     seasonYear: '2025/2026',
     homeTeam: TEAMS.barcelona,
     awayTeam: TEAMS.realmadrid,
-    kickoffTime: new Date(Date.now() + 7 * 3600 * 1000).toISOString(), // in 7 hours
+    kickoffTime: '2026-10-21T20:00:00.000Z',
     matchday: 29,
     status: 'TIMED',
     venue: 'Estadi Olímpic Lluís Companys',
     referee: 'Jesús Gil Manzano',
-    dataFreshness: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+    dataFreshness: '2026-10-21T05:00:00.000Z',
     isDemo: true
   },
   // Upcoming fixture 3
@@ -296,12 +296,12 @@ export const FIXTURES: Fixture[] = [
     seasonYear: '2025/2026',
     homeTeam: TEAMS.mancity,
     awayTeam: TEAMS.tottenham,
-    kickoffTime: new Date(Date.now() + 24 * 3600 * 1000).toISOString(), // tomorrow
+    kickoffTime: '2026-10-22T15:00:00.000Z',
     matchday: 28,
     status: 'TIMED',
     venue: 'Etihad Stadium',
     referee: 'Michael Oliver',
-    dataFreshness: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
+    dataFreshness: '2026-10-21T05:00:00.000Z',
     isDemo: true
   },
   // Upcoming fixture 4
@@ -312,12 +312,12 @@ export const FIXTURES: Fixture[] = [
     seasonYear: '2025/2026',
     homeTeam: TEAMS.bayern,
     awayTeam: TEAMS.leverkusen,
-    kickoffTime: new Date(Date.now() + 28 * 3600 * 1000).toISOString(),
+    kickoffTime: '2026-10-22T17:30:00.000Z',
     matchday: 27,
     status: 'TIMED',
     venue: 'Allianz Arena',
     referee: 'Felix Zwayer',
-    dataFreshness: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    dataFreshness: '2026-10-21T05:00:00.000Z',
     isDemo: true
   },
   // Upcoming fixture 5
@@ -328,12 +328,12 @@ export const FIXTURES: Fixture[] = [
     seasonYear: '2025/2026',
     homeTeam: TEAMS.inter,
     awayTeam: TEAMS.juventus,
-    kickoffTime: new Date(Date.now() + 52 * 3600 * 1000).toISOString(),
+    kickoffTime: '2026-10-23T19:45:00.000Z',
     matchday: 29,
     status: 'TIMED',
     venue: 'San Siro',
     referee: 'Daniele Orsato',
-    dataFreshness: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    dataFreshness: '2026-10-21T05:00:00.000Z',
     isDemo: true
   },
   // Upcoming fixture 6
@@ -344,12 +344,12 @@ export const FIXTURES: Fixture[] = [
     seasonYear: '2025/2026',
     homeTeam: TEAMS.chelsea,
     awayTeam: TEAMS.astonvilla,
-    kickoffTime: new Date(Date.now() + 56 * 3600 * 1000).toISOString(),
+    kickoffTime: '2026-10-23T20:00:00.000Z',
     matchday: 28,
     status: 'TIMED',
     venue: 'Stamford Bridge',
     referee: 'Paul Tierney',
-    dataFreshness: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+    dataFreshness: '2026-10-21T05:00:00.000Z',
     isDemo: true
   },
   // Recent finished match 1 (settled for performance audit)
@@ -360,7 +360,7 @@ export const FIXTURES: Fixture[] = [
     seasonYear: '2025/2026',
     homeTeam: TEAMS.mancity,
     awayTeam: TEAMS.chelsea,
-    kickoffTime: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
+    kickoffTime: '2026-10-19T16:30:00.000Z',
     matchday: 27,
     status: 'FINISHED',
     homeScore: 3,
@@ -379,7 +379,7 @@ export const FIXTURES: Fixture[] = [
     awayShotsOnTarget: 2,
     venue: 'Etihad Stadium',
     referee: 'Simon Hooper',
-    dataFreshness: new Date(Date.now() - 44 * 3600 * 1000).toISOString(),
+    dataFreshness: '2026-10-19T19:00:00.000Z',
     isDemo: true
   },
   // Recent finished match 2
@@ -390,7 +390,7 @@ export const FIXTURES: Fixture[] = [
     seasonYear: '2025/2026',
     homeTeam: TEAMS.atletico,
     awayTeam: TEAMS.barcelona,
-    kickoffTime: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
+    kickoffTime: '2026-10-18T20:00:00.000Z',
     matchday: 28,
     status: 'FINISHED',
     homeScore: 1,
@@ -409,7 +409,7 @@ export const FIXTURES: Fixture[] = [
     awayShotsOnTarget: 5,
     venue: 'Cívitas Metropolitano',
     referee: 'José María Sánchez Martínez',
-    dataFreshness: new Date(Date.now() - 68 * 3600 * 1000).toISOString(),
+    dataFreshness: '2026-10-18T22:30:00.000Z',
     isDemo: true
   }
 ];

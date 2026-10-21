@@ -116,7 +116,9 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
         {/* Data Limitations & Sample Size */}
         <div className="pt-2 border-t border-border-subtle flex flex-wrap items-center justify-between text-[11px] text-gray-400">
           <span>Sample basis: {explanation?.sampleSize || 20} matches</span>
-          <span>Timestamp: {new Date(explanation?.generatedAt || Date.now()).toLocaleTimeString()} UTC</span>
+          <span suppressHydrationWarning>
+            Timestamp: {explanation?.generatedAt ? new Date(explanation.generatedAt).toISOString().slice(11, 16) + ' UTC' : '12:00 UTC'}
+          </span>
         </div>
       </div>
     </div>

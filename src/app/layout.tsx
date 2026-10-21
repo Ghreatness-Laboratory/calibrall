@@ -17,8 +17,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-[#0a0d14] text-gray-100 flex flex-col antialiased selection:bg-brand-emerald selection:text-black">
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('calibrall_monochrome_mode')==='true'){document.documentElement.classList.add('monochrome')}}catch(e){}`,
+          }}
+        />
+      </head>
+      <body className="min-h-screen bg-[#071510] text-[#eeede3] flex flex-col antialiased selection:bg-brand-accent selection:text-black">
         <Navbar />
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {children}

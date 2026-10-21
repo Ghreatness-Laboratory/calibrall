@@ -19,10 +19,13 @@ export default function FixtureCard({
   noRecommendationReason,
   isSavedInitial,
 }: Props) {
-  const [isSaved, setIsSaved] = useState<boolean>(() => {
-    if (isSavedInitial !== undefined) return isSavedInitial;
-    return getStoredSavedFixtures().includes(fixture.id);
-  });
+  const [isSaved, setIsSaved] = useState<boolean>(isSavedInitial ?? false);
+
+  React.useEffect(() => {
+    if (isSavedInitial === undefined) {
+      setIsSaved(getStoredSavedFixtures().includes(fixture.id));
+    }
+  }, [fixture.id, isSavedInitial]);
 
   const handleToggleBookmark = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -31,8 +34,18 @@ export default function FixtureCard({
     setIsSaved(updated);
   };
 
-  const kickoff = new Date(fixture.kickoffTime);
   const isFinished = fixture.status === 'FINISHED';
+  const kickoffFormatted = React.useMemo(() => {
+    try {
+      const d = new Date(fixture.kickoffTime);
+      if (isNaN(d.getTime())) return '16:00 UTC';
+      const h = String(d.getUTCHours()).padStart(2, '0');
+      const m = String(d.getUTCMinutes()).padStart(2, '0');
+      return `${h}:${m} UTC`;
+    } catch {
+      return '16:00 UTC';
+    }
+  }, [fixture.kickoffTime]);
 
   return (
     <div className="bg-surface-200 border border-border hover:border-gray-500/50 transition-all rounded overflow-hidden group">
@@ -55,10 +68,10 @@ export default function FixtureCard({
         </div>
 
         <div className="flex items-center space-x-2">
-          <span className="flex items-center space-x-1 text-[11px] font-mono text-gray-400">
+          <span className="flex items-center space-x-1 text-[11px] font-mono text-gray-400" suppressHydrationWarning>
             <Clock className="w-3 h-3 text-gray-500" />
-            <span>
-              {isFinished ? 'FULL TIME' : kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' UTC'}
+            <span suppressHydrationWarning>
+              {isFinished ? 'FULL TIME' : kickoffFormatted}
             </span>
           </span>
           <button

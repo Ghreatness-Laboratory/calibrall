@@ -22,20 +22,39 @@ import {
   Save, 
   CheckCircle2, 
   Trash2,
-  Lock
+  Lock,
+  Contrast
 } from 'lucide-react';
 
 export default function SettingsPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [prefs, setPrefs] = useState<UserPreferences | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>('');
+  const [isMonochrome, setIsMonochrome] = useState<boolean>(false);
 
   useEffect(() => {
     setUser(getStoredUser());
     setPrefs(getStoredPreferences());
+    try {
+      const saved = localStorage.getItem('calibrall_monochrome_mode') === 'true';
+      setIsMonochrome(saved);
+    } catch (e) {}
   }, []);
 
   if (!user || !prefs) return null;
+
+  const handleToggleMonochrome = (enabled: boolean) => {
+    setIsMonochrome(enabled);
+    try {
+      if (enabled) {
+        document.documentElement.classList.add('monochrome');
+        localStorage.setItem('calibrall_monochrome_mode', 'true');
+      } else {
+        document.documentElement.classList.remove('monochrome');
+        localStorage.setItem('calibrall_monochrome_mode', 'false');
+      }
+    } catch (e) {}
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,6 +138,59 @@ export default function SettingsPage() {
               <span>Subscription Tier:</span>
               <span className="font-mono uppercase font-bold text-brand-blue">{user.subscriptionTier}</span>
             </div>
+          </div>
+        </div>
+
+        {/* Terminal Theme & Black & White Mode */}
+        <div className="bg-surface-200 border border-border rounded-lg p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-white flex items-center space-x-2">
+              <Contrast className="w-4 h-4 text-brand-accent" />
+              <span>Terminal Display & Color Mode</span>
+            </h2>
+            <span className="text-[11px] font-mono text-gray-400">
+              Current: <strong className="text-white">{isMonochrome ? 'Black & White (Noir)' : 'Calibrall Pine & Lime'}</strong>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => handleToggleMonochrome(false)}
+              className={`p-3.5 rounded border text-left transition-all ${
+                !isMonochrome
+                  ? 'bg-surface-100 border-brand-accent ring-1 ring-brand-accent shadow-glow-lime'
+                  : 'bg-surface-100 border-border opacity-70 hover:opacity-100'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-bold text-xs text-white">Signature Pine & Lime</span>
+                {!isMonochrome && <CheckCircle2 className="w-4 h-4 text-brand-accent" />}
+              </div>
+              <p className="text-[11px] text-gray-300">
+                Official dark pine background (#0b2e22) with electric chartreuse/lime accents (#bae534).
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleToggleMonochrome(true)}
+              className={`p-3.5 rounded border text-left transition-all ${
+                isMonochrome
+                  ? 'bg-white text-black border-white ring-1 ring-white shadow-md'
+                  : 'bg-surface-100 border-border opacity-70 hover:opacity-100'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`font-bold text-xs ${isMonochrome ? 'text-black' : 'text-white'}`}>
+                  Black & White (Noir Terminal)
+                </span>
+                {isMonochrome && <CheckCircle2 className="w-4 h-4 text-black" />}
+              </div>
+              <p className={`text-[11px] ${isMonochrome ? 'text-gray-800' : 'text-gray-300'}`}>
+                Zero-distraction high-contrast monochrome view with pure white highlights and grayscale charts.
+              </p>
+            </button>
           </div>
         </div>
 

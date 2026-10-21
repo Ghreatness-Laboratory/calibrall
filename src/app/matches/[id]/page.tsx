@@ -141,13 +141,17 @@ export default function MatchAnalysisPage() {
           </div>
 
           <div className="flex items-center space-x-4 text-gray-400 font-mono text-[11px]">
-            <span className="flex items-center space-x-1">
+            <span className="flex items-center space-x-1" suppressHydrationWarning>
               <Calendar className="w-3.5 h-3.5" />
-              <span>{kickoff.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+              <span suppressHydrationWarning>
+                {kickoff.toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })}
+              </span>
             </span>
-            <span className="flex items-center space-x-1">
+            <span className="flex items-center space-x-1" suppressHydrationWarning>
               <Clock className="w-3.5 h-3.5" />
-              <span>{kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} UTC</span>
+              <span suppressHydrationWarning>
+                {String(kickoff.getUTCHours()).padStart(2, '0')}:{String(kickoff.getUTCMinutes()).padStart(2, '0')} UTC
+              </span>
             </span>
             {fixture.venue && (
               <span className="hidden sm:flex items-center space-x-1">
