@@ -184,7 +184,7 @@ export default function HomePage() {
             </div>
             <h3 className="text-base font-bold text-white">Abstention Discipline</h3>
             <p className="text-xs text-gray-400 leading-relaxed">
-              When data coverage is low, tactical uncertainty is high, or market prices are perfectly efficient, CALIBRALL proudly outputs <em>"No strong recommendation"</em>.
+              When data coverage is low, tactical uncertainty is high, or market prices are perfectly efficient, CALIBRALL proudly outputs <em>&quot;No strong recommendation&quot;</em>.
             </p>
           </div>
         </div>
@@ -383,7 +383,7 @@ export default function HomePage() {
           <span>Commitment to Statistical Integrity</span>
         </div>
         <p className="text-xs text-gray-300 leading-relaxed">
-          CALIBRALL was created as an antidote to unsubstantiated "guaranteed lock" tipping websites. Sports outcomes are subject to irreducible randomness. Our algorithms quantify uncertainty, disclose small sample warnings, and never alter past results retrospectively.
+          CALIBRALL was created as an antidote to unsubstantiated &quot;guaranteed lock&quot; tipping websites. Sports outcomes are subject to irreducible randomness. Our algorithms quantify uncertainty, disclose small sample warnings, and never alter past results retrospectively.
         </p>
       </section>
     </div>

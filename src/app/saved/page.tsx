@@ -111,7 +111,7 @@ export default function SavedMatchesPage() {
           <Bookmark className="w-10 h-10 mx-auto text-gray-600" />
           <h3 className="text-white font-bold text-base">Your Watchlist is Empty</h3>
           <p className="text-xs text-gray-400 max-w-md mx-auto">
-            You haven't bookmarked any fixtures yet. Click the bookmark icon on any fixture card or analysis page to monitor line updates.
+            You haven&apos;t bookmarked any fixtures yet. Click the bookmark icon on any fixture card or analysis page to monitor line updates.
           </p>
           <div className="pt-2">
             <Link

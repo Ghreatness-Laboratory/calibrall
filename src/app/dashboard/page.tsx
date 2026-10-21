@@ -212,7 +212,7 @@ export default function DashboardPage() {
             <span className="text-[10px] font-mono text-gray-400">Cards Line: 4.5</span>
           </div>
           <p className="text-xs text-gray-300">
-            Derby d'Italia (Inter vs Juventus) ref Daniele Orsato averages 5.60 cards/match; elevated probability on Over 4.5 Bookings.
+            Derby d&apos;Italia (Inter vs Juventus) ref Daniele Orsato averages 5.60 cards/match; elevated probability on Over 4.5 Bookings.
           </p>
         </div>
       </div>
