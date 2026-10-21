@@ -9,34 +9,45 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: '#0a0d14',
+        background: '#071510',
         surface: {
-          50: '#1e2433',
-          100: '#171c28',
-          200: '#121620',
-          300: '#0e121a',
-          DEFAULT: '#121620',
+          50: '#143d2f',
+          100: '#0f3427',
+          200: '#0b261c',
+          300: '#071b14',
+          DEFAULT: '#0b261c',
         },
         border: {
-          subtle: '#1e2638',
-          DEFAULT: '#252f44',
-          strong: '#36425d',
+          subtle: '#143c2e',
+          DEFAULT: '#1c4e3b',
+          strong: '#296b52',
         },
         brand: {
-          emerald: '#10b981',
-          accent: '#059669',
-          glow: '#10b98120',
-          blue: '#3b82f6',
+          accent: '#bae534', // Exact electric chartreuse/lime from Calibrall logo
+          lime: '#bae534',
+          limeHover: '#c8ee47',
+          pine: '#0b2e22',   // Signature dark pine green background of the logo
+          ivory: '#eeede3',  // Signature warm off-white from the logo wordmark
+          emerald: '#bae534', // Aliased so all existing emerald accents match the brand lime
+          glow: 'rgba(186, 229, 52, 0.22)',
+          blue: '#38bdf8',
           amber: '#f59e0b',
           rose: '#ef4444',
           cyan: '#06b6d4',
         },
+        pine: {
+          950: '#05100c',
+          900: '#071812',
+          800: '#0b261c',
+          700: '#0f3427',
+          600: '#144232',
+        },
         navy: {
-          950: '#07090e',
-          900: '#0b0f19',
-          800: '#111726',
-          700: '#1a2238',
-          600: '#25304e',
+          950: '#05100c',
+          900: '#071812',
+          800: '#0b261c',
+          700: '#0f3427',
+          600: '#144232',
         }
       },
       fontFamily: {
@@ -44,8 +55,9 @@ module.exports = {
         mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace'],
       },
       boxShadow: {
-        'terminal': '0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-        'glow-emerald': '0 0 25px -5px rgba(16, 185, 129, 0.25)',
+        'terminal': '0 4px 24px -2px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(186, 229, 52, 0.12)',
+        'glow-lime': '0 0 25px -4px rgba(186, 229, 52, 0.35)',
+        'glow-emerald': '0 0 25px -4px rgba(186, 229, 52, 0.35)',
       }
     },
   },

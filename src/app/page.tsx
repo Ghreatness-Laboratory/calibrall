@@ -25,9 +25,19 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative pt-6 pb-12 overflow-hidden border-b border-border-subtle">
         <div className="max-w-4xl mx-auto text-center space-y-6">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-emerald/10 border border-brand-emerald/30 text-brand-emerald text-xs font-mono">
-            <span className="w-2 h-2 rounded-full bg-brand-emerald animate-pulse" />
-            <span>INTELLIGENT FOOTBALL MARKET SELECTION ENGINE</span>
+          <div className="inline-flex items-center space-x-2.5 px-4 py-1.5 rounded-full bg-surface-100 border border-border shadow-glow-lime">
+            <div className="w-5 h-5 rounded-full overflow-hidden bg-[#f4f1ea] shrink-0 border border-border/80">
+              <img
+                src="/assets/aistudio/calibrall-profile-light_3415fbe5.png"
+                alt="Calibrall"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <span className="font-extrabold text-white text-xs tracking-tight">Calibrall</span>
+            <span className="text-gray-500">•</span>
+            <span className="text-brand-accent text-xs font-mono font-bold tracking-wide">
+              Every call, on record.
+            </span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
@@ -82,15 +92,20 @@ export default function HomePage() {
         {/* Live Terminal Preview Card */}
         <div className="mt-12 bg-surface-200 border border-border rounded-lg shadow-terminal p-4 sm:p-6 max-w-5xl mx-auto">
           <div className="flex items-center justify-between pb-4 mb-4 border-b border-border">
-            <div className="flex items-center space-x-2">
-              <span className="w-3 h-3 rounded-full bg-rose-500/80" />
-              <span className="w-3 h-3 rounded-full bg-amber-500/80" />
-              <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
-              <span className="font-mono text-xs text-gray-400 ml-2">calibrall-terminal // live-fixtures-feed</span>
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+                <span className="w-2.5 h-2.5 rounded-full bg-brand-accent shadow-glow-lime" />
+              </div>
+              <span className="font-mono text-xs text-gray-400">calibrall-terminal // live-fixtures-feed</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-[10px] font-mono text-brand-emerald bg-brand-emerald/10 px-2 py-0.5 rounded border border-brand-emerald/30">
-                ACTIVE DEMO DATASET
+            <div className="flex items-center space-x-3">
+              <span className="hidden sm:inline font-mono text-[10px] text-brand-accent tracking-wider font-bold">
+                EVERY CALL, ON RECORD.
+              </span>
+              <span className="text-[10px] font-mono text-brand-accent bg-brand-accent/10 px-2 py-0.5 rounded border border-brand-accent/30 font-bold">
+                ACTIVE VERIFICATION
               </span>
             </div>
           </div>

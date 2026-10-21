@@ -88,13 +88,20 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <div className="flex items-center space-x-8">
-            <Link href="/" className="flex items-center space-x-2.5 group">
-              <div className="w-8 h-8 rounded bg-gradient-to-br from-brand-emerald to-emerald-800 flex items-center justify-center font-bold text-white shadow-glow-emerald font-mono">
-                C
+            <Link href="/" className="flex items-center space-x-3 group">
+              <div className="w-8 h-8 rounded-lg overflow-hidden border border-border flex items-center justify-center bg-[#f4f1ea] shadow-glow-lime">
+                <img
+                  src="/assets/aistudio/calibrall-profile-light_3415fbe5.png"
+                  alt="Calibrall logo"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div>
-                <span className="font-extrabold tracking-tight text-white text-base">CALIBR<span className="text-brand-emerald">ALL</span></span>
-                <span className="block text-[9px] uppercase tracking-widest text-gray-400 -mt-1 font-mono">Market Intel</span>
+                <div className="flex items-center space-x-1.5">
+                  <span className="font-extrabold tracking-tight text-white text-base">Calibrall</span>
+                  <span className="w-2 h-2 rounded-full bg-brand-accent shadow-glow-lime" title="Live Model Active" />
+                </div>
+                <span className="block text-[9px] uppercase tracking-wider text-gray-400 -mt-0.5 font-mono">Every call, on record.</span>
               </div>
             </Link>
 

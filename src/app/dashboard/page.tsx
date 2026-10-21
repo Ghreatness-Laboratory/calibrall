@@ -147,11 +147,12 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-extrabold text-white flex items-center space-x-2">
             <span>Market Intelligence Dashboard</span>
-            <span className="text-xs font-mono font-normal text-brand-emerald bg-brand-emerald/10 border border-brand-emerald/30 px-2 py-0.5 rounded">
+            <span className="text-xs font-mono font-bold text-brand-accent bg-brand-accent/10 border border-brand-accent/30 px-2 py-0.5 rounded">
               LIVE
             </span>
           </h1>
           <p className="text-xs text-gray-400 mt-1">
+            <span className="font-mono text-brand-accent font-semibold mr-1.5">Every call, on record.</span>
             Real-time multi-market evaluation, Poisson probability distributions, and expected value ranking.
           </p>
         </div>

@@ -17,10 +17,17 @@ export default function Footer() {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <div className="flex items-center space-x-2 font-bold text-white text-sm mb-3">
-              <span className="w-5 h-5 rounded bg-brand-emerald flex items-center justify-center text-[10px] text-white font-mono">C</span>
-              <span>CALIBRALL</span>
+            <div className="flex items-center space-x-2.5 font-bold text-white text-sm mb-1.5">
+              <div className="w-6 h-6 rounded overflow-hidden border border-border bg-[#f4f1ea]">
+                <img
+                  src="/assets/aistudio/calibrall-profile-light_3415fbe5.png"
+                  alt="Calibrall"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <span className="font-extrabold tracking-tight">Calibrall</span>
             </div>
+            <p className="text-[11px] font-mono text-brand-accent mb-2 font-semibold">Every call, on record.</p>
             <p className="text-gray-400 text-xs leading-relaxed">
               Institutional-grade market intelligence terminal for European football fixtures. Multi-market evaluation across goals, corners, cards, and match results.
             </p>

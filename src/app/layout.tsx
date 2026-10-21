@@ -3,11 +3,11 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata = {
-  title: 'CALIBRALL | Football Prediction & Market Intelligence Platform',
-  description: 'Institutional-grade football analytics terminal. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.',
+  title: 'CALIBRALL | Every call, on record.',
+  description: 'CALIBRALL is an institutional-grade football prediction and market intelligence terminal. Multi-market statistical evaluation, expected value discovery, and verifiable calibration. Every call, on record.',
   openGraph: {
-    title: 'CALIBRALL | Football Prediction & Market Intelligence Platform',
-    description: 'Institutional-grade football analytics terminal. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.',
+    title: 'CALIBRALL | Every call, on record.',
+    description: 'CALIBRALL is an institutional-grade football prediction and market intelligence terminal. Multi-market statistical evaluation, expected value discovery, and verifiable calibration. Every call, on record.',
   },
 };
 

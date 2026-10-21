@@ -29,6 +29,7 @@ export default function PerformancePage() {
             <span>Audited Historical Performance & Calibration</span>
           </h1>
           <p className="text-xs text-gray-400 mt-1">
+            <span className="font-mono text-brand-accent font-semibold mr-1.5">Every call, on record.</span>
             Empirical out-of-sample backtesting and forward walk-origin evaluation. Immutable prediction log verification.
           </p>
         </div>
