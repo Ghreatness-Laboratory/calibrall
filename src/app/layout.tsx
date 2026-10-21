@@ -17,13 +17,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Calibrall | Football Prediction & Market Intelligence Platform',
-  description: 'Every call, on record. Probabilistic football analytics.',
+  title: 'MATCHMIND | Football Prediction & Market Intelligence Platform',
+  description: 'Football Prediction & Market Intelligence Platform. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Calibrall',
+    title: 'MATCHMIND',
   },
   icons: {
     icon: [
@@ -36,8 +36,8 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: 'Calibrall | Football Prediction & Market Intelligence Platform',
-    description: 'Every call, on record. Probabilistic football analytics.',
+    title: 'MATCHMIND | Football Prediction & Market Intelligence Platform',
+    description: 'Football Prediction & Market Intelligence Platform. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.',
     type: 'website',
   },
 };
