@@ -1,4 +1,7 @@
 {
-  "/matches/[id]/page": "app/matches/[id]/page.js",
-  "/predictions/page": "app/predictions/page.js"
+  "/api/v1/health/route": "app/api/v1/health/route.js",
+  "/page": "app/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/predictions/page": "app/predictions/page.js",
+  "/performance/page": "app/performance/page.js"
 }

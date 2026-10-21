@@ -4,11 +4,11 @@ import Footer from '@/components/Footer';
 import BottomNav from '@/components/BottomNav';
 
 export const metadata = {
-  title: 'Calibrall | Every call, on record.',
-  description: 'Calibrall is an institutional-grade sports analytics and market intelligence terminal. Multi-market statistical evaluation, expected value discovery, and verifiable calibration.',
+  title: 'MATCHMIND | Football Prediction & Market Intelligence Platform',
+  description: 'Football Prediction & Market Intelligence Platform. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.',
   openGraph: {
-    title: 'Calibrall | Every call, on record.',
-    description: 'Calibrall is an institutional-grade sports analytics and market intelligence terminal. Multi-market statistical evaluation, expected value discovery, and verifiable calibration.',
+    title: 'MATCHMIND | Football Prediction & Market Intelligence Platform',
+    description: 'Football Prediction & Market Intelligence Platform. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.',
   },
 };
 
