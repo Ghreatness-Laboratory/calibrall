@@ -6,12 +6,7 @@ import PerformanceChart from '@/components/PerformanceChart';
 import { 
   BarChart3, 
   ShieldCheck, 
-  CheckCircle2, 
-  AlertCircle, 
-  TrendingUp, 
   Calendar,
-  Layers,
-  Database,
   Lock
 } from 'lucide-react';
 
@@ -22,32 +17,31 @@ export default function PerformancePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
         <div>
-          <h1 className="text-2xl font-extrabold text-white flex items-center space-x-2">
-            <BarChart3 className="w-6 h-6 text-brand-emerald" />
-            <span>Audited Historical Performance &amp; Calibration</span>
+          <h1 className="text-[18px] font-[500] text-[#e8efe9] flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-[#b8e63a]" />
+            <span>Audited historical performance & calibration</span>
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            <span className="font-mono text-brand-accent font-semibold mr-1.5">Every call, on record.</span>
-            Empirical out-of-sample backtesting, forward walk-origin evaluation, and state-tag hypothesis validation.
+          <p className="text-[12px] text-[#8fa69a] mt-0.5">
+            Empirical out-of-sample backtesting, forward walk-origin evaluation, and state-tag validation. Every call, on record.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 text-xs font-mono text-gray-400 bg-surface-200 border border-border px-3 py-1.5 rounded">
-          <Calendar className="w-3.5 h-3.5 text-brand-blue" />
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#8fa69a] bg-[#0f2219] border border-white/[0.08] px-2.5 py-1 rounded-[6px]">
+          <Calendar className="w-3.5 h-3.5 text-[#8fa69a]" />
           <span>Window: {report.outOfSampleValidationWindow.split(' ')[0]} to present</span>
         </div>
       </div>
 
       {/* Probabilistic Rigor Manifesto */}
-      <div className="bg-[#0b1019] border border-border rounded-lg p-4 text-xs text-gray-300 space-y-2">
-        <div className="flex items-center space-x-2 text-brand-emerald font-bold">
+      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 text-[12px] text-[#8fa69a] space-y-1.5">
+        <div className="flex items-center gap-2 text-[#b8e63a] font-[500]">
           <ShieldCheck className="w-4 h-4" />
-          <span>The CALIBRALL Verification Charter</span>
+          <span>The Calibrall verification charter</span>
         </div>
-        <p className="leading-relaxed">
-          Unlike tipping services that quote misleading win rates on arbitrarily selected bets, CALIBRALL evaluates all pre-match predictions against settled scores using standardized probabilistic metrics: <strong>Brier Score</strong> (mean squared error of probability forecasts) and <strong>Logarithmic Loss</strong>. No prediction is ever retroactively omitted, altered, or replaced.
+        <p className="leading-normal">
+          Unlike tipping services that quote selective win rates on arbitrary bets, Calibrall evaluates all pre-match predictions against settled scores using standardized probabilistic metrics: <span className="text-[#e8efe9]">Brier Score</span> (mean squared error of probability forecasts) and <span className="text-[#e8efe9]">Logarithmic Loss</span>. No prediction is ever retroactively omitted, altered, or replaced.
         </p>
       </div>
 
@@ -60,129 +54,108 @@ export default function PerformancePage() {
         roi={report.averageYieldRoi}
       />
 
-      {/* Secondary Tabs: Performance by State Tag vs Market Category vs Competition */}
-      <div className="bg-surface-200 border border-border rounded overflow-hidden">
-        <div className="p-3.5 bg-surface-100 border-b border-border flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center space-x-2">
+      {/* Secondary Tabs */}
+      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] overflow-hidden">
+        <div className="p-3 bg-[#0a1812]/50 border-b border-white/[0.08] flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1 text-[11px]">
             <button
               onClick={() => setActiveTab('state_tags')}
-              className={`px-3 py-1 rounded text-xs transition-colors font-semibold ${
-                activeTab === 'state_tags' ? 'bg-surface-50 text-white border border-border' : 'text-gray-400 hover:text-white'
+              type="button"
+              className={`px-2.5 py-1 rounded-[4px] transition-colors font-[500] ${
+                activeTab === 'state_tags' ? 'bg-[#b8e63a] text-[#0a1812]' : 'text-[#8fa69a] hover:text-[#e8efe9]'
               }`}
             >
-              Performance by State Tag
+              Performance by state tag
             </button>
             <button
               onClick={() => setActiveTab('markets')}
-              className={`px-3 py-1 rounded text-xs transition-colors ${
-                activeTab === 'markets' ? 'bg-surface-50 text-white font-semibold border border-border' : 'text-gray-400 hover:text-white'
+              type="button"
+              className={`px-2.5 py-1 rounded-[4px] transition-colors font-[500] ${
+                activeTab === 'markets' ? 'bg-[#b8e63a] text-[#0a1812]' : 'text-[#8fa69a] hover:text-[#e8efe9]'
               }`}
             >
-              Breakdown by Market Category
+              Breakdown by market
             </button>
             <button
               onClick={() => setActiveTab('competitions')}
-              className={`px-3 py-1 rounded text-xs transition-colors ${
-                activeTab === 'competitions' ? 'bg-surface-50 text-white font-semibold border border-border' : 'text-gray-400 hover:text-white'
+              type="button"
+              className={`px-2.5 py-1 rounded-[4px] transition-colors font-[500] ${
+                activeTab === 'competitions' ? 'bg-[#b8e63a] text-[#0a1812]' : 'text-[#8fa69a] hover:text-[#e8efe9]'
               }`}
             >
-              Breakdown by Competition
+              Breakdown by competition
             </button>
           </div>
-          <span className="text-[11px] font-mono text-gray-400">Sample size: {report.settledPredictions} settled bets</span>
+          <span className="text-[11px] font-mono text-[#8fa69a]">{report.settledPredictions} settled bets</span>
         </div>
 
         {activeTab === 'state_tags' ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#0c1017] text-gray-400 font-mono text-[10px] uppercase border-b border-border">
+            <table className="w-full text-left text-[12px]">
+              <thead className="bg-[#0a1812]/80 text-[#8fa69a] font-mono text-[10px] uppercase border-b border-white/[0.06]">
                 <tr>
-                  <th className="py-2.5 px-4">State Tag</th>
-                  <th className="py-2.5 px-4">Sample Size</th>
-                  <th className="py-2.5 px-4">Hit Rate</th>
-                  <th className="py-2.5 px-4">Brier Score</th>
-                  <th className="py-2.5 px-4">Average Edge</th>
-                  <th className="py-2.5 px-4">Realized Yield</th>
-                  <th className="py-2.5 px-4">Calibration Slope</th>
-                  <th className="py-2.5 px-4">Hypothesis Audit</th>
+                  <th className="py-2 px-3">State tag</th>
+                  <th className="py-2 px-3">Sample</th>
+                  <th className="py-2 px-3">Hit rate</th>
+                  <th className="py-2 px-3">Brier score</th>
+                  <th className="py-2 px-3">Average edge</th>
+                  <th className="py-2 px-3">ROI</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-subtle">
-                {(report.byStateTag || []).map((tagItem, idx) => {
-                  const isDeadRubber = tagItem.tag === 'dead-rubber';
-                  return (
-                    <tr key={idx} className="hover:bg-surface-100 transition-colors">
-                      <td className="py-3 px-4 font-bold text-white flex items-center space-x-2">
-                        <span className={`w-2 h-2 rounded-full ${isDeadRubber ? 'bg-rose-500' : 'bg-brand-emerald'}`} />
-                        <div>
-                          <span>{tagItem.label}</span>
-                          <span className="text-[10px] text-gray-500 font-mono block">#{tagItem.tag}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-gray-300">n = {tagItem.sampleSize}</td>
-                      <td className={`py-3 px-4 font-mono font-bold ${isDeadRubber ? 'text-amber-400' : 'text-brand-emerald'}`}>
-                        {(tagItem.hitRate * 100).toFixed(1)}%
-                      </td>
-                      <td className="py-3 px-4 font-mono text-white">
-                        {tagItem.brierScore.toFixed(3)}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-brand-blue">
-                        +{ (tagItem.avgEdge * 100).toFixed(1)}%
-                      </td>
-                      <td className={`py-3 px-4 font-mono font-bold ${tagItem.roi >= 0 ? 'text-brand-emerald' : 'text-brand-rose'}`}>
-                        {tagItem.roi >= 0 ? '+' : ''}{(tagItem.roi * 100).toFixed(1)}%
-                      </td>
-                      <td className="py-3 px-4 font-mono text-gray-300">
-                        {tagItem.calibrationSlope.toFixed(3)}
-                      </td>
-                      <td className="py-3 px-4 text-[11px] text-gray-400">
-                        {isDeadRubber ? (
-                          <span className="text-amber-400 font-medium">Elevated variance; platform abstains</span>
-                        ) : tagItem.tag === 'derby' ? (
-                          <span className="text-brand-emerald">High card accuracy; R² &gt; 0.96</span>
-                        ) : tagItem.tag === 'high-stakes' ? (
-                          <span className="text-brand-emerald">Strong market efficiency capture</span>
-                        ) : (
-                          <span className="text-gray-300">Shrinkage bounds validated</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+              <tbody className="divide-y divide-white/[0.05]">
+                {report.byStateTag.map((tag, idx) => (
+                  <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">
+                      #{tag.tag}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[#8fa69a]">n = {tag.sampleSize}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#b8e63a] font-[500] tabular-nums">
+                      {(tag.hitRate * 100).toFixed(1)}%
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums">
+                      {tag.brierScore.toFixed(3)}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[#8fa69a] tabular-nums">
+                      +{(tag.avgEdge * 100).toFixed(1)}%
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-[500] text-[#b8e63a] tabular-nums">
+                      +{(tag.roi * 100).toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         ) : activeTab === 'markets' ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#0c1017] text-gray-400 font-mono text-[10px] uppercase border-b border-border">
+            <table className="w-full text-left text-[12px]">
+              <thead className="bg-[#0a1812]/80 text-[#8fa69a] font-mono text-[10px] uppercase border-b border-white/[0.06]">
                 <tr>
-                  <th className="py-2.5 px-4">Market Category</th>
-                  <th className="py-2.5 px-4">Sample Size</th>
-                  <th className="py-2.5 px-4">Hit Rate</th>
-                  <th className="py-2.5 px-4">Brier Score</th>
-                  <th className="py-2.5 px-4">Average Statistical Edge</th>
-                  <th className="py-2.5 px-4">Realized Yield</th>
+                  <th className="py-2 px-3">Market category</th>
+                  <th className="py-2 px-3">Sample</th>
+                  <th className="py-2 px-3">Hit rate</th>
+                  <th className="py-2 px-3">Brier score</th>
+                  <th className="py-2 px-3">Average edge</th>
+                  <th className="py-2 px-3">ROI</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-subtle">
+              <tbody className="divide-y divide-white/[0.05]">
                 {report.byMarketCategory.map((cat, idx) => (
-                  <tr key={idx} className="hover:bg-surface-100 transition-colors">
-                    <td className="py-3 px-4 font-bold text-white flex items-center space-x-2">
-                      <span className="w-2 h-2 rounded-full bg-brand-emerald" />
-                      <span>{cat.name}</span>
+                  <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">
+                      {cat.name}
                     </td>
-                    <td className="py-3 px-4 font-mono text-gray-300">n = {cat.sampleSize}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-brand-emerald">
+                    <td className="py-2.5 px-3 font-mono text-[#8fa69a]">n = {cat.sampleSize}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#b8e63a] font-[500] tabular-nums">
                       {(cat.hitRate * 100).toFixed(1)}%
                     </td>
-                    <td className="py-3 px-4 font-mono text-white">
+                    <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums">
                       {cat.brierScore.toFixed(3)}
                     </td>
-                    <td className="py-3 px-4 font-mono text-brand-blue">
+                    <td className="py-2.5 px-3 font-mono text-[#8fa69a] tabular-nums">
                       +{(cat.avgEdge * 100).toFixed(1)}%
                     </td>
-                    <td className="py-3 px-4 font-mono font-bold text-brand-emerald">
+                    <td className="py-2.5 px-3 font-mono font-[500] text-[#b8e63a] tabular-nums">
                       +{(cat.roi * 100).toFixed(1)}%
                     </td>
                   </tr>
@@ -192,32 +165,32 @@ export default function PerformancePage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#0c1017] text-gray-400 font-mono text-[10px] uppercase border-b border-border">
+            <table className="w-full text-left text-[12px]">
+              <thead className="bg-[#0a1812]/80 text-[#8fa69a] font-mono text-[10px] uppercase border-b border-white/[0.06]">
                 <tr>
-                  <th className="py-2.5 px-4">Competition</th>
-                  <th className="py-2.5 px-4">Code</th>
-                  <th className="py-2.5 px-4">Sample Size</th>
-                  <th className="py-2.5 px-4">Hit Rate</th>
-                  <th className="py-2.5 px-4">Brier Score</th>
-                  <th className="py-2.5 px-4">Model Reliability</th>
+                  <th className="py-2 px-3">Competition</th>
+                  <th className="py-2 px-3">Code</th>
+                  <th className="py-2 px-3">Sample</th>
+                  <th className="py-2 px-3">Hit rate</th>
+                  <th className="py-2 px-3">Brier score</th>
+                  <th className="py-2 px-3">Reliability</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-subtle">
+              <tbody className="divide-y divide-white/[0.05]">
                 {report.byCompetition.map((comp, idx) => (
-                  <tr key={idx} className="hover:bg-surface-100 transition-colors">
-                    <td className="py-3 px-4 font-bold text-white">{comp.competitionName}</td>
-                    <td className="py-3 px-4 font-mono text-gray-400">{comp.competitionCode}</td>
-                    <td className="py-3 px-4 font-mono text-gray-300">n = {comp.sampleSize}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-brand-emerald">
+                  <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">{comp.competitionName}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#8fa69a]">{comp.competitionCode}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#8fa69a]">n = {comp.sampleSize}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#b8e63a] font-[500] tabular-nums">
                       {(comp.hitRate * 100).toFixed(1)}%
                     </td>
-                    <td className="py-3 px-4 font-mono text-white">
+                    <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums">
                       {comp.brierScore.toFixed(3)}
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="text-[10px] font-mono text-brand-emerald bg-brand-emerald/10 border border-brand-emerald/30 px-2 py-0.5 rounded">
-                        High Fit (R² &gt; 0.94)
+                    <td className="py-2.5 px-3">
+                      <span className="text-[10px] font-mono text-[#b8e63a] bg-[#b8e63a]/15 border border-[#b8e63a]/30 px-1.5 py-0.5 rounded-[4px]">
+                        High fit (R² &gt; 0.94)
                       </span>
                     </td>
                   </tr>
@@ -229,12 +202,12 @@ export default function PerformancePage() {
       </div>
 
       {/* Audit Log Guarantee */}
-      <div className="p-4 bg-surface-100 border border-border rounded flex items-center justify-between text-xs text-gray-400">
-        <div className="flex items-center space-x-2">
-          <Lock className="w-4 h-4 text-brand-blue" />
-          <span>Every prediction snapshot is cryptographically stamped with UTC kickoff timestamp prior to ball roll.</span>
+      <div className="p-3 bg-[#0f2219] border border-white/[0.08] rounded-[8px] flex items-center justify-between text-[11px] text-[#8fa69a]">
+        <div className="flex items-center gap-2">
+          <Lock className="w-3.5 h-3.5 text-[#b8e63a]" />
+          <span>Every prediction snapshot is cryptographically stamped prior to kickoff.</span>
         </div>
-        <span className="font-mono text-[11px] text-gray-500">PostgreSQL SHA-256 Verified</span>
+        <span className="font-mono">SHA-256 verified</span>
       </div>
     </div>
   );

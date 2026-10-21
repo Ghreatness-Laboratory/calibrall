@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   UserProfile, 
   UserPreferences, 
-  MarketCategory,
   SupportedOptionType 
 } from '@/types';
 import { 
@@ -19,13 +18,10 @@ import {
   Sliders, 
   User, 
   Clock, 
-  Bell, 
-  ShieldCheck, 
   Save, 
   CheckCircle2, 
-  Trash2,
-  Lock,
-  Contrast
+  Contrast,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -40,7 +36,7 @@ export default function SettingsPage() {
     try {
       const saved = localStorage.getItem('calibrall_monochrome_mode') === 'true';
       setIsMonochrome(saved);
-    } catch (e) {}
+    } catch {}
   }, []);
 
   if (!user || !prefs) return null;
@@ -55,14 +51,14 @@ export default function SettingsPage() {
         document.documentElement.classList.remove('monochrome');
         localStorage.setItem('calibrall_monochrome_mode', 'false');
       }
-    } catch (e) {}
+    } catch {}
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setStoredUser(user);
     setStoredPreferences(prefs);
-    setSaveStatus('Preferences saved successfully!');
+    setSaveStatus('Preferences saved successfully.');
     setTimeout(() => setSaveStatus(''), 3000);
   };
 
@@ -71,13 +67,6 @@ export default function SettingsPage() {
       ? prefs.preferredCompetitions.filter(c => c !== code)
       : [...prefs.preferredCompetitions, code];
     setPrefs({ ...prefs, preferredCompetitions: list });
-  };
-
-  const toggleMarket = (cat: MarketCategory) => {
-    const list = prefs.preferredMarkets.includes(cat)
-      ? prefs.preferredMarkets.filter(m => m !== cat)
-      : [...prefs.preferredMarkets, cat];
-    setPrefs({ ...prefs, preferredMarkets: list });
   };
 
   const toggleOptionType = (type: SupportedOptionType) => {
@@ -92,133 +81,130 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
         <div>
-          <h1 className="text-2xl font-extrabold text-white flex items-center space-x-2">
-            <Sliders className="w-6 h-6 text-brand-emerald" />
-            <span>Analytical Settings & Preferences</span>
+          <h1 className="text-[18px] font-[500] text-[#e8efe9]">
+            Analytical settings & preferences
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            Configure default statistical thresholds, favorite leagues, model uncertainty bounds, and account profile.
+          <p className="text-[12px] text-[#8fa69a] mt-0.5">
+            Configure default statistical thresholds, competition scopes, model bounds, and catalog filters.
           </p>
         </div>
 
         {saveStatus && (
-          <div className="flex items-center space-x-1.5 text-xs font-mono text-brand-emerald bg-brand-emerald/10 border border-brand-emerald/30 px-3 py-1.5 rounded">
-            <CheckCircle2 className="w-4 h-4" />
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#b8e63a] bg-[#b8e63a]/15 border border-[#b8e63a]/30 px-2.5 py-1 rounded-[6px]">
+            <CheckCircle2 className="w-3.5 h-3.5" />
             <span>{saveStatus}</span>
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6 text-xs">
+      <form onSubmit={handleSave} className="space-y-5 text-[12px]">
         {/* Profile Card */}
-        <div className="bg-surface-200 border border-border rounded-lg p-5 space-y-4">
-          <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-            <User className="w-4 h-4 text-brand-blue" />
-            <span>Profile & Account Credentials</span>
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
+          <h2 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
+            <User className="w-4 h-4 text-[#e8efe9]" />
+            <span>Profile & account tier</span>
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-gray-400 mb-1">Full Name</label>
+              <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Full name</label>
               <input
                 type="text"
                 value={user.fullName}
                 onChange={(e) => setUser({ ...user, fullName: e.target.value })}
-                className="w-full bg-surface-100 border border-border px-3 py-2 rounded text-white focus:outline-hidden focus:border-brand-emerald"
+                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
               />
             </div>
             <div>
-              <label className="block text-gray-400 mb-1">Email Address</label>
+              <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Email address</label>
               <input
                 type="email"
                 value={user.email}
                 disabled
-                className="w-full bg-surface-100 border border-border px-3 py-2 rounded text-gray-400 cursor-not-allowed"
+                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#8fa69a] opacity-70 cursor-not-allowed"
               />
             </div>
           </div>
 
-          <div className="pt-2 flex items-center justify-between text-[11px] text-gray-400 border-t border-border-subtle">
-            <div className="flex items-center space-x-2">
-              <span>Current Role:</span>
-              <span className="font-mono uppercase font-bold text-brand-emerald">{user.role}</span>
+          <div className="pt-2 flex items-center justify-between text-[11px] text-[#8fa69a] border-t border-white/[0.06]">
+            <div>
+              Role: <span className="font-mono text-[#e8efe9] uppercase">{user.role}</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <span>Subscription Tier:</span>
-              <span className="font-mono uppercase font-bold text-brand-blue">{user.subscriptionTier}</span>
+            <div>
+              Subscription: <span className="font-mono text-[#b8e63a] uppercase">{user.subscriptionTier}</span>
             </div>
           </div>
         </div>
 
-        {/* Terminal Theme & Black & White Mode */}
-        <div className="bg-surface-200 border border-border rounded-lg p-5 space-y-4">
+        {/* Display Mode */}
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-              <Contrast className="w-4 h-4 text-brand-accent" />
-              <span>Terminal Display & Color Mode</span>
+            <h2 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
+              <Contrast className="w-4 h-4 text-[#b8e63a]" />
+              <span>Terminal display mode</span>
             </h2>
-            <span className="text-[11px] font-mono text-gray-400">
-              Current: <strong className="text-white">{isMonochrome ? 'Black & White (Noir)' : 'Calibrall Pine & Lime'}</strong>
+            <span className="text-[11px] font-mono text-[#8fa69a]">
+              {isMonochrome ? 'Black & white active' : 'Color active'}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => handleToggleMonochrome(false)}
-              className={`p-3.5 rounded border text-left transition-all ${
+              className={`p-3 rounded-[8px] border text-left transition-all ${
                 !isMonochrome
-                  ? 'bg-surface-100 border-brand-accent ring-1 ring-brand-accent shadow-glow-lime'
-                  : 'bg-surface-100 border-border opacity-70 hover:opacity-100'
+                  ? 'bg-[#0a1812] border-[#b8e63a] ring-1 ring-[#b8e63a]'
+                  : 'bg-[#0a1812] border-white/[0.08] opacity-70 hover:opacity-100'
               }`}
             >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="font-bold text-xs text-white">Signature Pine & Lime</span>
-                {!isMonochrome && <CheckCircle2 className="w-4 h-4 text-brand-accent" />}
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-[500] text-[13px] text-[#e8efe9]">Color mode</span>
+                {!isMonochrome && <CheckCircle2 className="w-3.5 h-3.5 text-[#b8e63a]" />}
               </div>
-              <p className="text-[11px] text-gray-300">
-                Official dark pine background (#0b2e22) with electric chartreuse/lime accents (#bae534).
+              <p className="text-[11px] text-[#8fa69a] leading-normal">
+                Fintech dark green palette (#0a1812, #0f2219) with lime accents (#b8e63a) and official club crests.
               </p>
             </button>
 
             <button
               type="button"
               onClick={() => handleToggleMonochrome(true)}
-              className={`p-3.5 rounded border text-left transition-all ${
+              className={`p-3 rounded-[8px] border text-left transition-all ${
                 isMonochrome
-                  ? 'bg-white text-black border-white ring-1 ring-white shadow-md'
-                  : 'bg-surface-100 border-border opacity-70 hover:opacity-100'
+                  ? 'bg-white text-black border-white'
+                  : 'bg-[#0a1812] border-white/[0.08] opacity-70 hover:opacity-100'
               }`}
             >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className={`font-bold text-xs ${isMonochrome ? 'text-black' : 'text-white'}`}>
-                  Black & White (Noir Terminal)
+              <div className="flex items-center justify-between mb-1">
+                <span className={`font-[500] text-[13px] ${isMonochrome ? 'text-black' : 'text-[#e8efe9]'}`}>
+                  Black & white (Noir terminal)
                 </span>
-                {isMonochrome && <CheckCircle2 className="w-4 h-4 text-black" />}
+                {isMonochrome && <CheckCircle2 className="w-3.5 h-3.5 text-black" />}
               </div>
-              <p className={`text-[11px] ${isMonochrome ? 'text-gray-800' : 'text-gray-300'}`}>
-                Zero-distraction high-contrast monochrome view with pure white highlights and grayscale charts.
+              <p className={`text-[11px] leading-normal ${isMonochrome ? 'text-gray-700' : 'text-[#8fa69a]'}`}>
+                High-contrast monochrome paper view with pure grayscale highlights.
               </p>
             </button>
           </div>
         </div>
 
         {/* Statistical Thresholds */}
-        <div className="bg-surface-200 border border-border rounded-lg p-5 space-y-4">
-          <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-            <ShieldCheck className="w-4 h-4 text-brand-emerald" />
-            <span>Model Qualification Thresholds</span>
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
+          <h2 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-[#b8e63a]" />
+            <span>Model qualification thresholds</span>
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-gray-300 font-medium">Minimum Probability Cutoff</span>
-                <span className="font-mono font-bold text-brand-emerald">{(prefs.minProbabilityThreshold * 100).toFixed(1)}%</span>
+                <span className="text-[#8fa69a] font-[500]">Minimum probability cutoff</span>
+                <span className="font-mono font-[500] text-[#b8e63a]">{(prefs.minProbabilityThreshold * 100).toFixed(1)}%</span>
               </div>
               <input
                 type="range"
@@ -227,15 +213,14 @@ export default function SettingsPage() {
                 step="0.01"
                 value={prefs.minProbabilityThreshold}
                 onChange={(e) => setPrefs({ ...prefs, minProbabilityThreshold: parseFloat(e.target.value) })}
-                className="w-full accent-brand-emerald cursor-pointer"
+                className="w-full accent-[#b8e63a] cursor-pointer"
               />
-              <span className="text-[10px] text-gray-500 block mt-1">Markets below this model probability will be flagged as marginal.</span>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-gray-300 font-medium">Minimum Statistical Edge (EV Margin)</span>
-                <span className="font-mono font-bold text-brand-blue">+{(prefs.minEdgeThreshold * 100).toFixed(1)}%</span>
+                <span className="text-[#8fa69a] font-[500]">Minimum statistical edge (EV margin)</span>
+                <span className="font-mono font-[500] text-[#e8efe9]">+{(prefs.minEdgeThreshold * 100).toFixed(1)}%</span>
               </div>
               <input
                 type="range"
@@ -244,16 +229,15 @@ export default function SettingsPage() {
                 step="0.005"
                 value={prefs.minEdgeThreshold}
                 onChange={(e) => setPrefs({ ...prefs, minEdgeThreshold: parseFloat(e.target.value) })}
-                className="w-full accent-brand-blue cursor-pointer"
+                className="w-full accent-[#b8e63a] cursor-pointer"
               />
-              <span className="text-[10px] text-gray-500 block mt-1">Required margin over bookmaker implied probability for value qualification.</span>
             </div>
           </div>
         </div>
 
         {/* Preferred Competitions */}
-        <div className="bg-surface-200 border border-border rounded-lg p-5 space-y-3">
-          <h2 className="text-sm font-bold text-white">Preferred Competitions</h2>
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
+          <h2 className="text-[14px] font-[500] text-[#e8efe9]">Preferred competitions</h2>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {COMPETITIONS.map(c => {
               const active = prefs.preferredCompetitions.includes(c.code);
@@ -262,12 +246,12 @@ export default function SettingsPage() {
                   type="button"
                   key={c.code}
                   onClick={() => toggleCompetition(c.code)}
-                  className={`p-2.5 rounded border text-left flex items-center justify-between transition-colors ${
-                    active ? 'bg-brand-emerald/10 border-brand-emerald text-white' : 'bg-surface-100 border-border text-gray-400'
+                  className={`p-2.5 rounded-[8px] border text-left flex items-center justify-between transition-colors ${
+                    active ? 'bg-[#b8e63a]/15 border-[#b8e63a] text-[#e8efe9]' : 'bg-[#0a1812] border-white/[0.08] text-[#8fa69a]'
                   }`}
                 >
-                  <span className="font-bold text-xs">{c.code}</span>
-                  {active && <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald" />}
+                  <span className="font-[500] text-[12px]">{c.code}</span>
+                  {active && <CheckCircle2 className="w-3.5 h-3.5 text-[#b8e63a]" />}
                 </button>
               );
             })}
@@ -275,21 +259,18 @@ export default function SettingsPage() {
         </div>
 
         {/* Supported Options Catalogue */}
-        <div className="bg-surface-200 border border-border rounded-lg p-5 space-y-4">
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-              <span className="w-2 h-2 rounded-full bg-brand-emerald"></span>
-              <span>Supported Options Catalogue (Launch Allowed Options)</span>
+            <h2 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#b8e63a]" />
+              <span>Supported options catalogue</span>
             </h2>
-            <span className="text-[11px] font-mono text-gray-400">
-              Only authorized options enabled. All other markets disabled.
+            <span className="text-[11px] font-mono text-[#8fa69a]">
+              10 authorized launch types
             </span>
           </div>
-          <p className="text-[11px] text-gray-400">
-            Select which of the 10 mathematically verified option types you want evaluated across match feeds.
-          </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {Object.entries(SUPPORTED_OPTIONS_CATALOGUE).map(([key, opt]) => {
               const optType = key as SupportedOptionType;
               const activeList = prefs.preferredOptionTypes || [
@@ -303,24 +284,24 @@ export default function SettingsPage() {
                   type="button"
                   key={optType}
                   onClick={() => toggleOptionType(optType)}
-                  className={`p-3 rounded border text-left transition-all ${
+                  className={`p-2.5 rounded-[8px] border text-left transition-all ${
                     isSelected
-                      ? 'bg-surface-100 border-brand-emerald ring-1 ring-brand-emerald/40 text-white'
-                      : 'bg-surface-100/50 border-border text-gray-400 opacity-60 hover:opacity-100'
+                      ? 'bg-[#0a1812] border-[#b8e63a] ring-1 ring-[#b8e63a]/40 text-[#e8efe9]'
+                      : 'bg-[#0a1812]/50 border-white/[0.06] text-[#8fa69a] opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2 mb-1">
+                  <div className="flex items-start justify-between gap-2 mb-0.5">
                     <div>
-                      <div className="font-bold text-xs text-white flex items-center space-x-1.5">
-                        <span>{opt.title}</span>
+                      <div className="font-[500] text-[12px] text-[#e8efe9]">
+                        {opt.title}
                       </div>
-                      <span className="text-[10px] font-mono text-brand-accent uppercase">
+                      <span className="text-[10px] font-mono text-[#b8e63a]">
                         Period: {opt.period}
                       </span>
                     </div>
-                    {isSelected && <CheckCircle2 className="w-4 h-4 text-brand-emerald shrink-0" />}
+                    {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-[#b8e63a] shrink-0" />}
                   </div>
-                  <p className="text-[10px] text-gray-400 line-clamp-2 mt-1">
+                  <p className="text-[11px] text-[#8fa69a] line-clamp-2 mt-0.5">
                     {opt.settlementRule}
                   </p>
                 </button>
@@ -330,51 +311,50 @@ export default function SettingsPage() {
         </div>
 
         {/* Notifications & Timezone */}
-        <div className="bg-surface-200 border border-border rounded-lg p-5 space-y-4">
-          <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-            <Clock className="w-4 h-4 text-brand-amber" />
-            <span>Timezone & Notification Dispatch</span>
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
+          <h2 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
+            <Clock className="w-4 h-4 text-[#e3b341]" />
+            <span>Timezone & alerts</span>
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-gray-400 mb-1">Display Timezone</label>
+              <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Display timezone</label>
               <select
                 value={prefs.timezone}
                 onChange={(e) => setPrefs({ ...prefs, timezone: e.target.value })}
-                className="w-full bg-surface-100 border border-border px-3 py-2 rounded text-white focus:outline-hidden focus:border-brand-emerald"
+                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
               >
                 <option value="UTC">UTC (Universal Coordinated Time)</option>
                 <option value="Europe/London">Europe / London (BST/GMT)</option>
                 <option value="America/New_York">America / New York (EST)</option>
                 <option value="Europe/Berlin">Europe / Berlin (CET)</option>
-                <option value="Asia/Tokyo">Asia / Tokyo (JST)</option>
               </select>
             </div>
 
-            <div className="flex items-center space-x-3 pt-4 sm:pt-6">
+            <div className="flex items-center gap-2 pt-4 sm:pt-6">
               <input
                 type="checkbox"
                 id="emailNotifs"
                 checked={prefs.emailNotificationsEnabled}
                 onChange={(e) => setPrefs({ ...prefs, emailNotificationsEnabled: e.target.checked })}
-                className="rounded bg-surface-100 border-border text-brand-emerald focus:ring-0 w-4 h-4"
+                className="rounded bg-[#0a1812] border-white/20 text-[#b8e63a] focus:ring-0 w-3.5 h-3.5"
               />
-              <label htmlFor="emailNotifs" className="text-xs text-gray-300 cursor-pointer">
-                Enable pre-match odds movement alerts for saved fixtures
+              <label htmlFor="emailNotifs" className="text-[12px] text-[#8fa69a] cursor-pointer">
+                Enable line movement alerts for saved fixtures
               </label>
             </div>
           </div>
         </div>
 
         {/* Save button */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between pt-1">
           <button
             type="submit"
-            className="px-6 py-2.5 rounded bg-brand-emerald hover:bg-emerald-600 text-navy-950 font-bold text-xs flex items-center space-x-2 shadow-glow-emerald transition-colors"
+            className="h-[42px] px-5 rounded-[8px] bg-[#b8e63a] hover:bg-[#c8ee47] text-[#0a1812] font-[500] text-[14px] flex items-center gap-2 transition-colors"
           >
             <Save className="w-4 h-4" />
-            <span>Save Preferences</span>
+            <span>Save preferences</span>
           </button>
         </div>
       </form>

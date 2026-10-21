@@ -6,26 +6,20 @@ import {
   COMPETITIONS, 
   FIXTURES, 
   FIXTURE_STATISTICS, 
-  VERIFIED_PERFORMANCE_REPORT 
 } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
+import TeamCrest from '@/components/TeamCrest';
 import { 
-  Activity, 
   Search, 
-  Filter, 
-  CheckCircle2, 
-  TrendingUp, 
-  AlertTriangle, 
   Zap, 
-  Calendar,
-  Layers,
-  ArrowUpRight,
-  ShieldCheck,
-  BarChart2,
-  Bookmark
+  TrendingUp, 
+  AlertCircle, 
+  ArrowUpRight, 
+  Layers 
 } from 'lucide-react';
 import { getStoredSavedFixtures } from '@/lib/supabase/client';
+import { Team } from '@/types';
 
 export default function DashboardPage() {
   const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
@@ -83,11 +77,9 @@ export default function DashboardPage() {
   // Filter fixtures
   const filteredList = useMemo(() => {
     return evaluatedFixtures.filter(({ fixture }) => {
-      // League filter
       if (selectedLeague !== 'ALL' && fixture.competition.code !== selectedLeague) {
         return false;
       }
-      // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesHome = fixture.homeTeam.name.toLowerCase().includes(q);
@@ -95,7 +87,6 @@ export default function DashboardPage() {
         const matchesComp = fixture.competition.name.toLowerCase().includes(q);
         if (!matchesHome && !matchesAway && !matchesComp) return false;
       }
-      // Tab filter
       if (activeTab === 'completed') {
         return fixture.status === 'FINISHED';
       } else if (activeTab === 'today') {
@@ -109,6 +100,8 @@ export default function DashboardPage() {
   const topOpportunities = useMemo(() => {
     const qualified: {
       fixtureId: string;
+      homeTeam: Team;
+      awayTeam: Team;
       matchName: string;
       compCode: string;
       marketName: string;
@@ -117,7 +110,6 @@ export default function DashboardPage() {
       odds?: number;
       expectedValue?: number;
       edge?: number;
-      confidence: string;
     }[] = [];
 
     evaluatedFixtures.forEach(({ fixture, predictions }) => {
@@ -125,7 +117,9 @@ export default function DashboardPage() {
         if (p.qualificationStatus === 'QUALIFIED_VALUE' || p.qualificationStatus === 'QUALIFIED_PROBABILITY') {
           qualified.push({
             fixtureId: fixture.id,
-            matchName: `${fixture.homeTeam.shortName} vs ${fixture.awayTeam.shortName}`,
+            homeTeam: fixture.homeTeam,
+            awayTeam: fixture.awayTeam,
+            matchName: `${fixture.homeTeam.shortName || fixture.homeTeam.name} vs ${fixture.awayTeam.shortName || fixture.awayTeam.name}`,
             compCode: fixture.competition.code,
             marketName: p.marketName,
             selection: p.selection,
@@ -133,7 +127,6 @@ export default function DashboardPage() {
             odds: p.marketOdds,
             expectedValue: p.expectedValue,
             edge: p.edge,
-            confidence: p.modelConfidence,
           });
         }
       });
@@ -144,132 +137,134 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Top Header & Data Freshness Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle">
+      {/* Top Header & Search */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
         <div>
-          <h1 className="text-2xl font-extrabold text-white flex items-center space-x-2">
-            <span>Market Intelligence Dashboard</span>
-            <span className="text-xs font-mono font-bold text-brand-accent bg-brand-accent/10 border border-brand-accent/30 px-2 py-0.5 rounded">
-              LIVE
+          <h1 className="text-[18px] font-[500] text-[#e8efe9] flex items-center gap-2">
+            <span>Market intelligence dashboard</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] border border-[#b8e63a]/40 text-[#b8e63a]">
+              Live
             </span>
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            <span className="font-mono text-brand-accent font-semibold mr-1.5">Every call, on record.</span>
-            Real-time multi-market evaluation, Poisson probability distributions, and expected value ranking.
+          <p className="text-[12px] text-[#8fa69a] mt-0.5">
+            Real-time multi-market evaluation across the 10 authorized catalog types. Every call, on record.
           </p>
         </div>
 
-        {/* Global Controls & Filters */}
-        <div className="flex items-center space-x-2">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Search team or league..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-surface-200 border border-border pl-8 pr-3 py-1.5 rounded text-xs text-white placeholder-gray-500 focus:outline-hidden focus:border-brand-emerald w-48 sm:w-60"
-            />
-          </div>
+        {/* Search */}
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#8fa69a]" />
+          <input
+            type="text"
+            placeholder="Search club or league..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-[#0f2219] border border-white/[0.08] pl-8 pr-3 py-1.5 rounded-[8px] text-[12px] text-[#e8efe9] placeholder-[#8fa69a]/50 focus:outline-hidden focus:border-[#b8e63a] w-52 sm:w-60"
+          />
         </div>
       </div>
 
-      {/* Top 3 Analytical Insights Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Goal Market Sentiment */}
-        <div className="bg-surface-200 border border-border rounded p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-white flex items-center space-x-1.5">
-              <Zap className="w-3.5 h-3.5 text-brand-emerald" />
-              <span>Goal Markets (Over/Under)</span>
+      {/* Top Analytical Insights Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-3.5 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-[500] text-[#e8efe9] flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-[#b8e63a]" />
+              <span>Goal lines (over / under)</span>
             </span>
-            <span className="text-[10px] font-mono text-gray-400">Mean: 2.85 xG</span>
+            <span className="font-mono text-[#8fa69a]">Mean: 2.85 xG</span>
           </div>
-          <p className="text-xs text-gray-300">
-            High offensive generation identified in Barcelona vs Real Madrid (3.60 combined xG). Arsenal vs Liverpool exhibits balanced 1.62 - 1.48 expectation.
+          <p className="text-[12px] text-[#8fa69a] leading-normal">
+            Elevated offensive volume in Barcelona vs Real Madrid (3.60 combined xG). Arsenal vs Liverpool exhibits balanced 1.62 - 1.48 expectation.
           </p>
         </div>
 
-        {/* Corner Market Sentiment */}
-        <div className="bg-surface-200 border border-border rounded p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-white flex items-center space-x-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-brand-blue" />
-              <span>Corner Volume Trends</span>
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-3.5 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-[500] text-[#e8efe9] flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-[#e8efe9]" />
+              <span>Corner volume distribution</span>
             </span>
-            <span className="text-[10px] font-mono text-gray-400">Mean: 10.8 Corners</span>
+            <span className="font-mono text-[#8fa69a]">Mean: 10.8</span>
           </div>
-          <p className="text-xs text-gray-300">
-            Manchester City vs Tottenham corner expectation (11.0 total) offers qualified statistical support on Over 9.5 corners.
+          <p className="text-[12px] text-[#8fa69a] leading-normal">
+            Man City vs Tottenham corner expectation (11.0 total) offers qualified statistical support on Over 9.5 corners.
           </p>
         </div>
 
-        {/* Disciplinary Intensity */}
-        <div className="bg-surface-200 border border-border rounded p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-white flex items-center space-x-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-brand-amber" />
-              <span>Disciplinary Bookings</span>
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-3.5 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-[500] text-[#e8efe9] flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 text-[#e3b341]" />
+              <span>Disciplinary bookings</span>
             </span>
-            <span className="text-[10px] font-mono text-gray-400">Cards Line: 4.5</span>
+            <span className="font-mono text-[#8fa69a]">Line: 4.5</span>
           </div>
-          <p className="text-xs text-gray-300">
+          <p className="text-[12px] text-[#8fa69a] leading-normal">
             Derby d&apos;Italia (Inter vs Juventus) ref Daniele Orsato averages 5.60 cards/match; elevated probability on Over 4.5 Bookings.
           </p>
         </div>
       </div>
 
-      {/* Leading Value Opportunities Table across all games */}
-      <div className="bg-surface-200 border border-border rounded overflow-hidden">
-        <div className="p-3.5 bg-surface-100 border-b border-border flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <CheckCircle2 className="w-4 h-4 text-brand-emerald" />
-            <h2 className="text-sm font-bold text-white">Best-Supported Market Opportunities</h2>
-          </div>
-          <span className="text-[11px] font-mono text-gray-400">Ranked by Expected Value (EV)</span>
+      {/* Leading Value Opportunities Table */}
+      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] overflow-hidden">
+        <div className="p-3 bg-[#0a1812]/50 border-b border-white/[0.08] flex items-center justify-between text-[12px]">
+          <h2 className="font-[500] text-[#e8efe9]">Best-supported market opportunities</h2>
+          <span className="font-mono text-[11px] text-[#8fa69a]">Ranked by expected value (EV)</span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#0c1017] text-gray-400 font-mono text-[10px] uppercase border-b border-border">
+          <table className="w-full text-left text-[12px]">
+            <thead className="bg-[#0a1812]/80 text-[#8fa69a] font-mono text-[10px] uppercase border-b border-white/[0.06]">
               <tr>
-                <th className="py-2.5 px-3">Match</th>
-                <th className="py-2.5 px-3">Market Line</th>
-                <th className="py-2.5 px-3">Selection</th>
-                <th className="py-2.5 px-3">Model Prob</th>
-                <th className="py-2.5 px-3">Odds</th>
-                <th className="py-2.5 px-3">Edge</th>
-                <th className="py-2.5 px-3">Est. EV</th>
-                <th className="py-2.5 px-3">Action</th>
+                <th className="py-2 px-3">Match</th>
+                <th className="py-2 px-3">Market</th>
+                <th className="py-2 px-3">Selection</th>
+                <th className="py-2 px-3">Prob</th>
+                <th className="py-2 px-3">Odds</th>
+                <th className="py-2 px-3">Edge</th>
+                <th className="py-2 px-3">Est. EV</th>
+                <th className="py-2 px-3 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border-subtle">
+            <tbody className="divide-y divide-white/[0.05]">
               {topOpportunities.map((item, idx) => (
-                <tr key={idx} className="hover:bg-surface-50 transition-colors">
-                  <td className="py-2.5 px-3 font-semibold text-white flex items-center space-x-2">
-                    <span className="px-1.5 py-0.5 rounded bg-surface-50 text-[10px] font-mono text-gray-400">
-                      {item.compCode}
-                    </span>
-                    <span>{item.matchName}</span>
+                <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="py-2.5 px-3 text-[#e8efe9]">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center -space-x-1 shrink-0">
+                        <TeamCrest
+                          crestUrl={item.homeTeam.crestUrl}
+                          teamName={item.homeTeam.shortName || item.homeTeam.name}
+                          size={20}
+                        />
+                        <TeamCrest
+                          crestUrl={item.awayTeam.crestUrl}
+                          teamName={item.awayTeam.shortName || item.awayTeam.name}
+                          size={20}
+                        />
+                      </div>
+                      <span className="font-[500] truncate max-w-[140px] sm:max-w-none">{item.matchName}</span>
+                    </div>
                   </td>
-                  <td className="py-2.5 px-3 text-gray-400">{item.marketName}</td>
-                  <td className="py-2.5 px-3 font-medium text-brand-emerald">{item.selection}</td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-white tabular-nums">
+                  <td className="py-2.5 px-3 text-[#8fa69a]">{item.marketName}</td>
+                  <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">{item.selection}</td>
+                  <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums">
                     {(item.probability * 100).toFixed(1)}%
                   </td>
-                  <td className="py-2.5 px-3 font-mono text-gray-300">
+                  <td className="py-2.5 px-3 font-mono text-[#8fa69a]">
                     {item.odds ? item.odds.toFixed(2) : '—'}
                   </td>
-                  <td className="py-2.5 px-3 font-mono text-brand-blue tabular-nums">
+                  <td className="py-2.5 px-3 font-mono text-[#8fa69a] tabular-nums">
                     {item.edge ? `+${(item.edge * 100).toFixed(1)}%` : '—'}
                   </td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-brand-emerald tabular-nums">
+                  <td className="py-2.5 px-3 font-mono text-[#b8e63a] font-[500] tabular-nums">
                     {item.expectedValue ? `+${(item.expectedValue * 100).toFixed(1)}%` : '—'}
                   </td>
-                  <td className="py-2.5 px-3">
+                  <td className="py-2.5 px-3 text-right">
                     <Link
                       href={`/matches/${item.fixtureId}`}
-                      className="inline-flex items-center space-x-1 text-xs text-brand-emerald hover:underline font-medium"
+                      className="inline-flex items-center gap-0.5 text-[11px] text-[#b8e63a] hover:underline font-[500]"
                     >
                       <span>Analyze</span>
                       <ArrowUpRight className="w-3 h-3" />
@@ -282,61 +277,64 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main Fixtures Explorer Section */}
-      <div className="space-y-4">
-        {/* League and Tab Filters */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-100 p-2.5 rounded border border-border">
-          {/* League Pills */}
-          <div className="flex items-center space-x-1 overflow-x-auto text-xs">
+      {/* Main Fixtures Section */}
+      <div className="space-y-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-[#0f2219] p-2 rounded-[8px] border border-white/[0.08]">
+          {/* League Filter Buttons */}
+          <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
             <button
               onClick={() => setSelectedLeague('ALL')}
-              className={`px-2.5 py-1 rounded text-xs transition-colors ${
+              type="button"
+              className={`px-2.5 py-1 rounded-[6px] transition-colors ${
                 selectedLeague === 'ALL'
-                  ? 'bg-brand-emerald text-navy-950 font-semibold'
-                  : 'text-gray-400 hover:text-white hover:bg-surface-50'
+                  ? 'bg-[#b8e63a] text-[#0a1812] font-[500]'
+                  : 'text-[#8fa69a] hover:text-[#e8efe9]'
               }`}
             >
-              All Competitions
+              All leagues
             </button>
             {COMPETITIONS.map(c => (
               <button
                 key={c.code}
                 onClick={() => setSelectedLeague(c.code)}
-                className={`px-2.5 py-1 rounded text-xs transition-colors flex items-center space-x-1.5 ${
+                type="button"
+                className={`px-2.5 py-1 rounded-[6px] transition-colors ${
                   selectedLeague === c.code
-                    ? 'bg-brand-emerald text-navy-950 font-semibold'
-                    : 'text-gray-400 hover:text-white hover:bg-surface-50'
+                    ? 'bg-[#b8e63a] text-[#0a1812] font-[500]'
+                    : 'text-[#8fa69a] hover:text-[#e8efe9]'
                 }`}
               >
-                <span>{c.code}</span>
+                {c.code}
               </button>
             ))}
           </div>
 
           {/* Status Tabs */}
-          <div className="flex items-center space-x-1 bg-surface-200 p-1 rounded border border-border text-xs">
+          <div className="flex items-center gap-1 bg-[#0a1812] p-0.5 rounded-[6px] border border-white/[0.06] text-[11px]">
             <button
               onClick={() => setActiveTab('today')}
-              className={`px-3 py-1 rounded transition-colors ${
-                activeTab === 'today' ? 'bg-surface-50 text-white font-medium' : 'text-gray-400 hover:text-white'
+              type="button"
+              className={`px-2.5 py-1 rounded-[4px] transition-colors ${
+                activeTab === 'today' ? 'bg-white/[0.08] text-[#e8efe9] font-[500]' : 'text-[#8fa69a] hover:text-[#e8efe9]'
               }`}
             >
-              Today & Upcoming
+              Today & upcoming
             </button>
             <button
               onClick={() => setActiveTab('completed')}
-              className={`px-3 py-1 rounded transition-colors ${
-                activeTab === 'completed' ? 'bg-surface-50 text-white font-medium' : 'text-gray-400 hover:text-white'
+              type="button"
+              className={`px-2.5 py-1 rounded-[4px] transition-colors ${
+                activeTab === 'completed' ? 'bg-white/[0.08] text-[#e8efe9] font-[500]' : 'text-[#8fa69a] hover:text-[#e8efe9]'
               }`}
             >
-              Recent Completed
+              Completed
             </button>
           </div>
         </div>
 
-        {/* Fixture Cards Grid */}
+        {/* Fixtures Grid */}
         {filteredList.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {filteredList.map(({ fixture, topPick, noRecommendationReason }) => (
               <FixtureCard
                 key={fixture.id}
@@ -348,10 +346,10 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="p-12 text-center bg-surface-200 border border-border rounded text-gray-400">
-            <Layers className="w-10 h-10 mx-auto text-gray-600 mb-3" />
-            <h3 className="text-white font-medium text-sm">No Fixtures Match Your Filter</h3>
-            <p className="text-xs mt-1">Try clearing your search query or selecting a different competition.</p>
+          <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] text-[#8fa69a]">
+            <Layers className="w-8 h-8 mx-auto text-[#8fa69a]/40 mb-2" />
+            <h3 className="text-[#e8efe9] font-[500] text-[14px]">No fixtures match your filter</h3>
+            <p className="text-[12px] mt-0.5">Try clearing your search query or selecting a different competition.</p>
           </div>
         )}
       </div>

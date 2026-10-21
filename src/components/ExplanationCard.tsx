@@ -4,13 +4,11 @@ import React from 'react';
 import { MarketPrediction } from '@/types';
 import { 
   ShieldCheck, 
-  AlertTriangle, 
+  AlertCircle, 
   TrendingUp, 
   HelpCircle, 
-  CheckCircle2, 
-  XCircle,
-  FileText,
-  BarChart2
+  Check, 
+  X
 } from 'lucide-react';
 
 interface Props {
@@ -21,10 +19,10 @@ interface Props {
 export default function ExplanationCard({ prediction, noRecommendationReason }: Props) {
   if (!prediction) {
     return (
-      <div className="bg-surface-200 border border-border rounded p-6 text-center text-gray-400">
-        <HelpCircle className="w-8 h-8 mx-auto mb-2 text-gray-600" />
-        <h4 className="text-white font-medium text-sm">No Market Selected</h4>
-        <p className="text-xs mt-1">Click any market row in the comparison table to inspect the statistical audit and model explanation.</p>
+      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-6 text-center text-[#8fa69a]">
+        <HelpCircle className="w-7 h-7 mx-auto mb-2 text-[#8fa69a]/40" />
+        <h4 className="text-[#e8efe9] font-[500] text-[14px]">No market selected</h4>
+        <p className="text-[12px] mt-1">Select any row in the comparison table to audit evidence and model rationale.</p>
       </div>
     );
   }
@@ -32,51 +30,49 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
   const { explanation } = prediction;
 
   return (
-    <div className="bg-surface-200 border border-border rounded overflow-hidden">
+    <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] overflow-hidden">
       {/* Header */}
-      <div className="bg-[#0e131d] border-b border-border p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-brand-emerald flex items-center space-x-1">
+      <div className="bg-[#0a1812]/70 border-b border-white/[0.08] p-4 space-y-1">
+        <div className="flex items-center justify-between text-[11px] font-mono text-[#8fa69a]">
+          <span className="text-[#b8e63a] flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Statistical Evidence Audit</span>
+            <span>Evidence audit</span>
           </span>
-          <span className="text-[10px] font-mono text-gray-400">
-            Model: {explanation?.modelType || 'Dixon-Coles v2.4'}
-          </span>
+          <span>{explanation?.modelType || 'Dixon-Coles v2.4'}</span>
         </div>
 
-        <h3 className="text-base font-bold text-white mt-1">
+        <h3 className="text-[15px] font-[500] text-[#e8efe9]">
           {explanation?.headline || `${prediction.selection} (${(prediction.modelProbability * 100).toFixed(1)}%)`}
         </h3>
 
-        <p className="text-xs text-gray-300 mt-2 leading-relaxed">
+        <p className="text-[12px] text-[#8fa69a] leading-normal pt-0.5">
           {explanation?.summary}
         </p>
       </div>
 
-      <div className="p-4 space-y-4 text-xs">
+      <div className="p-4 space-y-4 text-[12px]">
         {/* Key Supporting Factors */}
         <div>
-          <h4 className="font-semibold text-white flex items-center space-x-1.5 mb-2">
-            <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald" />
-            <span>Key Quantitative Evidence</span>
+          <h4 className="font-[500] text-[#e8efe9] flex items-center gap-1.5 mb-2">
+            <Check className="w-3.5 h-3.5 text-[#b8e63a]" />
+            <span>Key quantitative evidence</span>
           </h4>
-          <ul className="space-y-1.5 pl-5 list-disc text-gray-300">
+          <ul className="space-y-1 pl-4 list-disc text-[#8fa69a]">
             {explanation?.keySupportingFactors.map((factor, idx) => (
-              <li key={idx} className="leading-relaxed">{factor}</li>
+              <li key={idx} className="leading-normal">{factor}</li>
             ))}
           </ul>
         </div>
 
-        {/* Counterarguments & Invalidation Factors */}
-        <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded">
-          <h4 className="font-semibold text-amber-400 flex items-center space-x-1.5 mb-1.5">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Risk Factors & Model Invalidation Triggers</span>
+        {/* Counterarguments */}
+        <div className="p-3 bg-[#0a1812]/50 border border-white/[0.06] rounded-[8px]">
+          <h4 className="font-[500] text-[#e3b341] flex items-center gap-1.5 mb-1.5">
+            <AlertCircle className="w-3.5 h-3.5" />
+            <span>Risk factors & invalidation triggers</span>
           </h4>
-          <ul className="space-y-1 pl-4 list-disc text-gray-300">
+          <ul className="space-y-1 pl-4 list-disc text-[#8fa69a]">
             {explanation?.counterarguments.map((item, idx) => (
-              <li key={idx} className="leading-relaxed">{item}</li>
+              <li key={idx} className="leading-normal">{item}</li>
             ))}
           </ul>
         </div>
@@ -84,11 +80,11 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
         {/* Why Ranked Above Alternatives */}
         {explanation?.whyRankedAboveAlternatives && (
           <div>
-            <h4 className="font-semibold text-white flex items-center space-x-1.5 mb-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-brand-blue" />
-              <span>Cross-Market Priority Rationale</span>
+            <h4 className="font-[500] text-[#e8efe9] flex items-center gap-1.5 mb-1">
+              <TrendingUp className="w-3.5 h-3.5 text-[#b8e63a]" />
+              <span>Cross-market priority rationale</span>
             </h4>
-            <p className="text-gray-300 bg-surface-100 p-2.5 rounded border border-border leading-relaxed">
+            <p className="text-[#8fa69a] bg-[#0a1812]/50 p-2.5 rounded-[8px] border border-white/[0.06] leading-normal">
               {explanation.whyRankedAboveAlternatives}
             </p>
           </div>
@@ -97,27 +93,27 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
         {/* Alternative Comparisons */}
         {explanation?.alternativeComparisons && explanation.alternativeComparisons.length > 0 && (
           <div>
-            <h4 className="font-semibold text-gray-300 mb-2">Evaluated & Rejected Alternative Lines:</h4>
+            <h4 className="font-[500] text-[#e8efe9] mb-1.5">Evaluated & rejected alternative lines:</h4>
             <div className="space-y-1.5">
               {explanation.alternativeComparisons.map((alt, idx) => (
-                <div key={idx} className="bg-surface-100 p-2 rounded border border-border flex items-start justify-between text-[11px]">
+                <div key={idx} className="bg-[#0a1812]/50 p-2 rounded-[8px] border border-white/[0.06] flex items-start justify-between text-[11px]">
                   <div>
-                    <span className="font-medium text-white">{alt.alternative}</span>
-                    <span className="text-gray-500 font-mono ml-2">({(alt.modelProbability * 100).toFixed(1)}% prob)</span>
-                    <p className="text-gray-400 mt-0.5">{alt.reasonRejected}</p>
+                    <span className="font-[500] text-[#e8efe9]">{alt.alternative}</span>
+                    <span className="text-[#8fa69a] font-mono ml-2">({(alt.modelProbability * 100).toFixed(1)}%)</span>
+                    <p className="text-[#8fa69a] mt-0.5">{alt.reasonRejected}</p>
                   </div>
-                  <XCircle className="w-4 h-4 text-gray-500 shrink-0 mt-0.5 ml-2" />
+                  <X className="w-3.5 h-3.5 text-[#8fa69a] shrink-0 mt-0.5 ml-2" />
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Data Limitations & Sample Size */}
-        <div className="pt-2 border-t border-border-subtle flex flex-wrap items-center justify-between text-[11px] text-gray-400">
+        {/* Limitations & Sample Size */}
+        <div className="pt-2 border-t border-white/[0.06] flex flex-wrap items-center justify-between text-[11px] text-[#8fa69a] font-mono">
           <span>Sample basis: {explanation?.sampleSize || 20} matches</span>
           <span suppressHydrationWarning>
-            Timestamp: {explanation?.generatedAt ? new Date(explanation.generatedAt).toISOString().slice(11, 16) + ' UTC' : '12:00 UTC'}
+            UTC timestamp: {explanation?.generatedAt ? new Date(explanation.generatedAt).toISOString().slice(11, 16) + ' UTC' : '16:00 UTC'}
           </span>
         </div>
       </div>

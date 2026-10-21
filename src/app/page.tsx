@@ -2,21 +2,18 @@ import React from 'react';
 import Link from 'next/link';
 import { 
   ArrowRight, 
-  CheckCircle2, 
-  ShieldCheck, 
+  Check, 
   BarChart3, 
   TrendingUp, 
-  Activity, 
-  Sliders, 
   Zap, 
-  AlertTriangle,
-  Lock,
+  AlertCircle,
   ChevronRight,
-  Database
+  ShieldCheck
 } from 'lucide-react';
 import { COMPETITIONS, FIXTURES, FIXTURE_STATISTICS, VERIFIED_PERFORMANCE_REPORT } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
+import TeamCrest from '@/components/TeamCrest';
 
 export default function HomePage() {
   const showcaseFixtures = FIXTURES.slice(0, 3).map(fixture => {
@@ -61,97 +58,89 @@ export default function HomePage() {
     };
   });
 
+  const featureChecklist = [
+    { title: 'Dixon-Coles goals model', desc: 'Bivariate Poisson joint distributions' },
+    { title: 'NegBinomial corner lines', desc: 'Volume variance and game-state adjustments' },
+    { title: 'Grounded explanations', desc: 'Quantitative audits with zero generated hype' },
+    { title: 'No forced picks', desc: 'Engine abstains whenever edges are marginal' },
+  ];
+
   return (
-    <div className="space-y-24 py-4">
+    <div className="space-y-16 py-2">
       {/* Hero Section */}
-      <section className="relative pt-6 pb-12 overflow-hidden border-b border-border-subtle">
-        <div className="max-w-4xl mx-auto text-center space-y-6">
-          <div className="inline-flex items-center space-x-2.5 px-4 py-1.5 rounded-full bg-surface-100 border border-border shadow-glow-lime">
-            <div className="w-5 h-5 rounded-full overflow-hidden bg-[#f4f1ea] shrink-0 border border-border/80">
-              <img
-                src="/assets/aistudio/calibrall-profile-light_3415fbe5.png"
-                alt="Calibrall"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <span className="font-extrabold text-white text-xs tracking-tight">Calibrall</span>
-            <span className="text-gray-500">•</span>
-            <span className="text-brand-accent text-xs font-mono font-bold tracking-wide">
-              Every call, on record.
-            </span>
-          </div>
-
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
-            Stop Guessing Match Winners. <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-emerald via-emerald-400 to-blue-400">
-              Find Where The Statistical Edge Lies.
-            </span>
-          </h1>
-
-          <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            CALIBRALL independently evaluates all available football markets—Total Goals, Corners, Both Teams to Score, Cards, and 1X2 lines—to identify qualified probability and verified expected value. When the data is insufficient, it abstains.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Link
-              href="/dashboard"
-              className="w-full sm:w-auto px-6 py-3 rounded bg-brand-emerald hover:bg-emerald-600 text-navy-950 font-bold text-sm flex items-center justify-center space-x-2 transition-all shadow-glow-emerald"
-            >
-              <span>Launch Analytics Terminal</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-
-            <Link
-              href="/performance"
-              className="w-full sm:w-auto px-6 py-3 rounded bg-surface-100 hover:bg-surface-50 border border-border text-gray-200 font-semibold text-sm flex items-center justify-center space-x-2 transition-all"
-            >
-              <BarChart3 className="w-4 h-4 text-brand-blue" />
-              <span>Verify Track Record (Brier 0.176)</span>
-            </Link>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-6 pt-4 text-xs font-mono text-gray-400">
-            <span className="flex items-center space-x-1.5">
-              <CheckCircle2 className="w-4 h-4 text-brand-emerald" />
-              <span>Dixon-Coles Goals Model</span>
-            </span>
-            <span className="flex items-center space-x-1.5">
-              <CheckCircle2 className="w-4 h-4 text-brand-emerald" />
-              <span>NegBinomial Corners Lines</span>
-            </span>
-            <span className="flex items-center space-x-1.5">
-              <CheckCircle2 className="w-4 h-4 text-brand-emerald" />
-              <span>Grounded Statistical Explanations</span>
-            </span>
-            <span className="flex items-center space-x-1.5">
-              <CheckCircle2 className="w-4 h-4 text-brand-emerald" />
-              <span>No Forced Picks Policy</span>
-            </span>
-          </div>
+      <section className="space-y-6 pt-2 pb-8 border-b border-white/[0.08]">
+        {/* Outlined pill */}
+        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-[6px] border border-white/[0.08] bg-[#0f2219] text-[11px] text-[#8fa69a]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#b8e63a]" />
+          <span>Quantitative sports intelligence</span>
+          <span className="text-white/20">|</span>
+          <span className="font-mono text-[#b8e63a]">Every call, on record</span>
         </div>
 
-        {/* Live Terminal Preview Card */}
-        <div className="mt-12 bg-surface-200 border border-border rounded-lg shadow-terminal p-4 sm:p-6 max-w-5xl mx-auto">
-          <div className="flex items-center justify-between pb-4 mb-4 border-b border-border">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                <span className="w-2.5 h-2.5 rounded-full bg-brand-accent shadow-glow-lime" />
+        {/* Hero headline: 26px mobile / 34px desktop, 500 weight, line-height 1.2, line 1 white, line 2 solid lime */}
+        <div className="space-y-3">
+          <h1 className="text-[26px] sm:text-[34px] font-[500] leading-[1.2] text-[#e8efe9]">
+            Stop guessing match winners.<br />
+            <span className="text-[#b8e63a]">Find where the statistical edge lies.</span>
+          </h1>
+
+          <p className="text-[13px] leading-[1.6] text-[#8fa69a] max-w-xl">
+            Calibrall independently evaluates all available football markets—total goals, corners, both teams to score, cards, and 1X2 lines—to identify qualified probability and verified expected value. When data is insufficient, it abstains.
+          </p>
+        </div>
+
+        {/* CTA buttons */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
+          <Link
+            href="/dashboard"
+            className="h-[44px] px-5 rounded-[8px] bg-[#b8e63a] hover:bg-[#c8ee47] text-[#0a1812] text-[14px] font-[500] flex items-center justify-center gap-2 transition-colors"
+          >
+            <span>Launch analytics terminal</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+
+          <Link
+            href="/performance"
+            className="h-[42px] px-4 rounded-[8px] border border-white/[0.08] bg-[#0f2219] hover:bg-white/[0.04] text-[#e8efe9] text-[14px] font-[500] flex items-center justify-between sm:justify-center gap-3 transition-colors"
+          >
+            <span>Verify track record</span>
+            <span className="font-mono text-[11px] text-[#b8e63a]">Brier 0.176</span>
+          </Link>
+        </div>
+
+        {/* Feature checklist: 2-column grid of compact cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-xl pt-2">
+          {featureChecklist.map((item, idx) => (
+            <div
+              key={idx}
+              className="p-[10px] rounded-[8px] bg-[#0f2219] border border-white/[0.08] flex items-start gap-2.5"
+            >
+              <div className="w-4 h-4 rounded-[4px] bg-[#b8e63a]/15 flex items-center justify-center shrink-0 mt-0.5">
+                <Check className="w-3 h-3 text-[#b8e63a]" />
               </div>
-              <span className="font-mono text-xs text-gray-400">calibrall-terminal // live-fixtures-feed</span>
+              <div className="min-w-0">
+                <div className="text-[12px] font-[500] text-[#e8efe9] leading-tight">
+                  {item.title}
+                </div>
+                <div className="text-[11px] text-[#8fa69a] leading-tight mt-0.5 truncate">
+                  {item.desc}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <span className="hidden sm:inline font-mono text-[10px] text-brand-accent tracking-wider font-bold">
-                EVERY CALL, ON RECORD.
-              </span>
-              <span className="text-[10px] font-mono text-brand-accent bg-brand-accent/10 px-2 py-0.5 rounded border border-brand-accent/30 font-bold">
-                ACTIVE VERIFICATION
-              </span>
-            </div>
+          ))}
+        </div>
+
+        {/* Live Fixtures Section */}
+        <div className="pt-8">
+          {/* Section header row */}
+          <div className="flex items-center justify-between pb-3 border-b border-white/[0.08] mb-4">
+            <span className="text-[13px] font-[500] text-[#e8efe9]">Live fixtures</span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-[4px] border border-white/[0.1] text-[#b8e63a]">
+              Active verification
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
             {showcaseFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
               <FixtureCard
                 key={fixture.id}
@@ -162,254 +151,139 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-gray-400">
+          <div className="mt-3.5 pt-3 border-t border-white/[0.06] flex items-center justify-between text-[12px] text-[#8fa69a]">
             <span>Displaying 3 of 6 live evaluated fixtures for today</span>
-            <Link href="/matches" className="text-brand-emerald hover:underline flex items-center">
+            <Link href="/matches" className="text-[#b8e63a] hover:underline flex items-center gap-1 font-[500]">
               <span>View all available fixtures & markets</span>
-              <ChevronRight className="w-3.5 h-3.5 ml-1" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Core Paradigm: Intelligent Market Selection */}
-      <section className="space-y-8">
-        <div className="text-center max-w-3xl mx-auto space-y-3">
-          <span className="text-xs font-mono uppercase tracking-widest text-brand-blue">Architecture Philosophy</span>
-          <h2 className="text-3xl font-extrabold text-white">Why Match Winners Are Often The Worst Market</h2>
-          <p className="text-gray-300 text-sm leading-relaxed">
-            Most prediction tools force a 1X2 pick on every game regardless of efficiency. CALIBRALL scans up to 18 market lines per fixture to find statistical mispricings where the evidence is overwhelmingly concentrated.
+      {/* Core Methodology Section */}
+      <section className="space-y-6">
+        <div className="space-y-1.5 max-w-xl">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-[#b8e63a]">
+            Architecture
+          </span>
+          <h2 className="text-[20px] font-[500] text-[#e8efe9]">
+            Why match winners are often the least efficient market
+          </h2>
+          <p className="text-[13px] leading-[1.6] text-[#8fa69a]">
+            Standard prediction tools force a 1X2 pick on every match regardless of efficiency. Calibrall scans up to 18 market lines across the 10 authorized catalog types to isolate statistical mispricings.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 bg-surface-200 border border-border rounded-lg space-y-3">
-            <div className="w-10 h-10 rounded bg-emerald-500/10 border border-brand-emerald/30 flex items-center justify-center text-brand-emerald">
-              <Zap className="w-5 h-5" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          <div className="p-4 bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-2">
+            <div className="w-8 h-8 rounded-[6px] bg-[#b8e63a]/10 border border-[#b8e63a]/20 flex items-center justify-center text-[#b8e63a]">
+              <Zap className="w-4 h-4" />
             </div>
-            <h3 className="text-base font-bold text-white">Multi-Market Ranking</h3>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              We compute exact joint probability distributions for Goals (Over/Under 1.5, 2.5, 3.5), Both Teams to Score, Total Corners (8.5, 9.5, 10.5), and Disciplinary Bookings.
+            <h3 className="text-[14px] font-[500] text-[#e8efe9]">Multi-market ranking</h3>
+            <p className="text-[12px] leading-[1.6] text-[#8fa69a]">
+              Exact joint probability distributions for goals (over/under), both teams to score, corners, cards, and half splits.
             </p>
           </div>
 
-          <div className="p-6 bg-surface-200 border border-border rounded-lg space-y-3">
-            <div className="w-10 h-10 rounded bg-blue-500/10 border border-brand-blue/30 flex items-center justify-center text-brand-blue">
-              <TrendingUp className="w-5 h-5" />
+          <div className="p-4 bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-2">
+            <div className="w-8 h-8 rounded-[6px] bg-white/[0.06] border border-white/[0.1] flex items-center justify-center text-[#e8efe9]">
+              <TrendingUp className="w-4 h-4" />
             </div>
-            <h3 className="text-base font-bold text-white">Mathematical Expected Value</h3>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              We calculate <span className="font-mono text-gray-200">EV = (p × Odds) - 1</span> and adjust for bookmaker overround. A 70% probability is disqualified if the price implies 75%.
+            <h3 className="text-[14px] font-[500] text-[#e8efe9]">Expected value edge</h3>
+            <p className="text-[12px] leading-[1.6] text-[#8fa69a]">
+              Calculates EV = (p × odds) - 1 adjusted for overround. A 70% model probability is disqualified if the market already implies 75%.
             </p>
           </div>
 
-          <div className="p-6 bg-surface-200 border border-border rounded-lg space-y-3">
-            <div className="w-10 h-10 rounded bg-amber-500/10 border border-brand-amber/30 flex items-center justify-center text-brand-amber">
-              <AlertTriangle className="w-5 h-5" />
+          <div className="p-4 bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-2">
+            <div className="w-8 h-8 rounded-[6px] bg-[#e3b341]/10 border border-[#e3b341]/20 flex items-center justify-center text-[#e3b341]">
+              <AlertCircle className="w-4 h-4" />
             </div>
-            <h3 className="text-base font-bold text-white">Abstention Discipline</h3>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              When data coverage is low, tactical uncertainty is high, or market prices are perfectly efficient, CALIBRALL proudly outputs <em>&quot;No strong recommendation&quot;</em>.
+            <h3 className="text-[14px] font-[500] text-[#e8efe9]">Abstention discipline</h3>
+            <p className="text-[12px] leading-[1.6] text-[#8fa69a]">
+              When coverage is scarce, tactical variance is high, or prices are fair, Calibrall returns &quot;No strong recommendation&quot;.
             </p>
           </div>
         </div>
       </section>
 
       {/* Model Performance Overview */}
-      <section className="bg-surface-200 border border-border rounded-xl p-8 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border">
+      <section className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-5 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.08]">
           <div>
-            <span className="text-xs font-mono uppercase tracking-widest text-brand-emerald">Audited Track Record</span>
-            <h2 className="text-2xl font-bold text-white mt-1">Walk-Forward Model Calibration</h2>
-            <p className="text-xs text-gray-400 mt-1">
-              Evaluated on 420 out-of-sample European fixtures across Premier League, Champions League, La Liga, and Bundesliga.
+            <span className="text-[11px] font-mono uppercase text-[#b8e63a]">Audited calibration</span>
+            <h2 className="text-[18px] font-[500] text-[#e8efe9] mt-0.5">Walk-forward validation track record</h2>
+            <p className="text-[12px] text-[#8fa69a] mt-0.5">
+              Evaluated on 420 out-of-sample fixtures across Premier League, Champions League, La Liga, and Bundesliga.
             </p>
           </div>
           <Link
             href="/performance"
-            className="px-4 py-2 rounded bg-surface-100 hover:bg-surface-50 border border-border text-xs font-semibold text-white flex items-center space-x-1.5 self-start md:self-auto"
+            className="h-[36px] px-3.5 rounded-[8px] bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-[12px] font-[500] text-[#e8efe9] flex items-center gap-1.5 self-start sm:self-auto transition-colors"
           >
-            <span>View Full Calibration Plot</span>
-            <ArrowRight className="w-3.5 h-3.5 text-brand-emerald" />
+            <span>Full track record</span>
+            <ArrowRight className="w-3.5 h-3.5 text-[#b8e63a]" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center font-mono">
-          <div className="p-4 bg-surface-100 rounded border border-border">
-            <span className="text-xs text-gray-400 block mb-1">Settled Predictions</span>
-            <span className="text-2xl font-bold text-white">{VERIFIED_PERFORMANCE_REPORT.settledPredictions}</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 font-mono">
+          <div className="p-3 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+            <span className="text-[11px] text-[#8fa69a] block mb-0.5">Settled predictions</span>
+            <span className="text-[18px] font-[500] text-[#e8efe9]">{VERIFIED_PERFORMANCE_REPORT.settledPredictions}</span>
           </div>
-          <div className="p-4 bg-surface-100 rounded border border-border">
-            <span className="text-xs text-gray-400 block mb-1">Overall Hit Rate</span>
-            <span className="text-2xl font-bold text-brand-emerald">
+          <div className="p-3 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+            <span className="text-[11px] text-[#8fa69a] block mb-0.5">Overall hit rate</span>
+            <span className="text-[18px] font-[500] text-[#b8e63a]">
               {(VERIFIED_PERFORMANCE_REPORT.hitRate * 100).toFixed(1)}%
             </span>
           </div>
-          <div className="p-4 bg-surface-100 rounded border border-border">
-            <span className="text-xs text-gray-400 block mb-1">Brier Calibration</span>
-            <span className="text-2xl font-bold text-white">{VERIFIED_PERFORMANCE_REPORT.brierScore.toFixed(3)}</span>
+          <div className="p-3 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+            <span className="text-[11px] text-[#8fa69a] block mb-0.5">Brier calibration</span>
+            <span className="text-[18px] font-[500] text-[#e8efe9]">{VERIFIED_PERFORMANCE_REPORT.brierScore.toFixed(3)}</span>
           </div>
-          <div className="p-4 bg-surface-100 rounded border border-border">
-            <span className="text-xs text-gray-400 block mb-1">Level-Stake ROI</span>
-            <span className="text-2xl font-bold text-brand-emerald">
+          <div className="p-3 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+            <span className="text-[11px] text-[#8fa69a] block mb-0.5">Level-stake ROI</span>
+            <span className="text-[18px] font-[500] text-[#b8e63a]">
               +{(VERIFIED_PERFORMANCE_REPORT.averageYieldRoi * 100).toFixed(1)}%
             </span>
           </div>
         </div>
       </section>
 
-      {/* Supported Leagues */}
-      <section className="space-y-6">
-        <div className="text-center max-w-xl mx-auto">
-          <h2 className="text-xl font-bold text-white">Tier-1 European League Coverage</h2>
-          <p className="text-xs text-gray-400 mt-1">Continuous team attack & defense ratings with shrinkage toward league baselines</p>
+      {/* Supported Leagues: 24x24 fixed box crests */}
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-[16px] font-[500] text-[#e8efe9]">Tier-1 European league coverage</h2>
+          <p className="text-[12px] text-[#8fa69a]">Continuous team ratings with shrinkage toward verified competition baselines</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
           {COMPETITIONS.map(comp => (
-            <div key={comp.id} className="p-4 bg-surface-200 border border-border rounded text-center space-y-2">
-              <img src={comp.emblemUrl} alt={comp.name} className="w-8 h-8 mx-auto object-contain" />
-              <div className="font-bold text-white text-xs">{comp.name}</div>
-              <div className="text-[10px] text-gray-400 font-mono">
-                Avg {comp.avgGoalsPerGame} goals/g
+            <div key={comp.id} className="p-3 bg-[#0f2219] border border-white/[0.08] rounded-[10px] flex items-center gap-2.5">
+              <TeamCrest
+                crestUrl={comp.emblemUrl}
+                teamName={comp.name}
+                size={24}
+              />
+              <div className="min-w-0">
+                <div className="text-[13px] font-[500] text-[#e8efe9] truncate">{comp.name}</div>
+                <div className="text-[11px] text-[#8fa69a] font-mono truncate">
+                  Avg {comp.avgGoalsPerGame} g/m
+                </div>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Subscription Plans Section */}
-      <section className="space-y-8">
-        <div className="text-center max-w-xl mx-auto space-y-2">
-          <span className="text-xs font-mono uppercase tracking-widest text-brand-emerald">Transparent Pricing</span>
-          <h2 className="text-3xl font-extrabold text-white">Choose Your Analytical Depth</h2>
-          <p className="text-xs text-gray-400">Upgrade or downgrade anytime. No hidden lock-in.</p>
+      {/* Commitment to Integrity */}
+      <section className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 flex items-start gap-3">
+        <ShieldCheck className="w-4 h-4 text-[#b8e63a] shrink-0 mt-0.5" />
+        <div className="space-y-1 text-[12px] text-[#8fa69a] leading-[1.6]">
+          <span className="font-[500] text-[#e8efe9] block">Statistical integrity policy</span>
+          Calibrall was created as a transparent antidote to unsubstantiated tipping claims. Sports outcomes are subject to irreducible randomness. Our engine strictly quantifies uncertainty, provides grounded data audits, and never alters historical benchmarks retrospectively.
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {/* Free Tier */}
-          <div className="p-6 bg-surface-200 border border-border rounded-lg flex flex-col justify-between space-y-6">
-            <div>
-              <span className="text-xs font-mono text-gray-400 uppercase font-semibold">Starter / Research</span>
-              <h3 className="text-xl font-bold text-white mt-1">Free Tier</h3>
-              <div className="text-2xl font-bold text-white mt-3 font-mono">$0 <span className="text-xs text-gray-400 font-normal">/ month</span></div>
-              <p className="text-xs text-gray-400 mt-2">Essential match result distributions and basic goal line models.</p>
-
-              <ul className="mt-6 space-y-2.5 text-xs text-gray-300">
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald shrink-0" />
-                  <span>3 European match analyses per day</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald shrink-0" />
-                  <span>Basic Poisson goal distributions</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald shrink-0" />
-                  <span>Public performance tracking</span>
-                </li>
-              </ul>
-            </div>
-
-            <Link
-              href="/dashboard"
-              className="w-full py-2.5 rounded bg-surface-100 hover:bg-surface-50 border border-border text-center text-xs font-semibold text-white block transition-colors"
-            >
-              Start Free Exploration
-            </Link>
-          </div>
-
-          {/* Pro Tier (Featured) */}
-          <div className="p-6 bg-surface-200 border-2 border-brand-emerald rounded-lg flex flex-col justify-between space-y-6 relative shadow-glow-emerald">
-            <div className="absolute -top-3 right-6 bg-brand-emerald text-navy-950 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider">
-              Most Popular
-            </div>
-
-            <div>
-              <span className="text-xs font-mono text-brand-emerald uppercase font-semibold">Pro Analyst</span>
-              <h3 className="text-xl font-bold text-white mt-1">Pro Terminal</h3>
-              <div className="text-2xl font-bold text-white mt-3 font-mono">$29 <span className="text-xs text-gray-400 font-normal">/ month</span></div>
-              <p className="text-xs text-gray-400 mt-2">Complete multi-market ranking, expected value analysis, and corner lines.</p>
-
-              <ul className="mt-6 space-y-2.5 text-xs text-gray-300">
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald shrink-0" />
-                  <span>Unlimited European fixture evaluations</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald shrink-0" />
-                  <span>Full Market Selection Engine ranking</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald shrink-0" />
-                  <span>Expected Value (EV) & Edge calculations</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald shrink-0" />
-                  <span>Corners & Disciplinary Bookings models</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald shrink-0" />
-                  <span>Saved fixtures & watchlist alerts</span>
-                </li>
-              </ul>
-            </div>
-
-            <Link
-              href="/pricing"
-              className="w-full py-2.5 rounded bg-brand-emerald hover:bg-emerald-600 text-center text-xs font-bold text-navy-950 block transition-colors"
-            >
-              Get Pro Access
-            </Link>
-          </div>
-
-          {/* Premium Tier */}
-          <div className="p-6 bg-surface-200 border border-border rounded-lg flex flex-col justify-between space-y-6">
-            <div>
-              <span className="text-xs font-mono text-brand-blue uppercase font-semibold">Institutional / Syndicate</span>
-              <h3 className="text-xl font-bold text-white mt-1">Premium Terminal</h3>
-              <div className="text-2xl font-bold text-white mt-3 font-mono">$79 <span className="text-xs text-gray-400 font-normal">/ month</span></div>
-              <p className="text-xs text-gray-400 mt-2">API endpoints, custom model parameter tuning, and raw Poisson matrices.</p>
-
-              <ul className="mt-6 space-y-2.5 text-xs text-gray-300">
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-blue shrink-0" />
-                  <span>Everything in Pro Terminal</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-blue shrink-0" />
-                  <span>REST API programmatic access (/api/v1)</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-blue shrink-0" />
-                  <span>Custom shrinkage & Dixon-Coles rho tuning</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-blue shrink-0" />
-                  <span>Historical raw CSV exports</span>
-                </li>
-              </ul>
-            </div>
-
-            <Link
-              href="/pricing"
-              className="w-full py-2.5 rounded bg-surface-100 hover:bg-surface-50 border border-border text-center text-xs font-semibold text-white block transition-colors"
-            >
-              Explore Premium
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Responsible Gaming & Probabilistic Integrity */}
-      <section className="bg-surface-100 border border-border rounded-lg p-6 max-w-4xl mx-auto space-y-3">
-        <div className="flex items-center space-x-2 text-brand-amber font-semibold text-sm">
-          <ShieldCheck className="w-5 h-5" />
-          <span>Commitment to Statistical Integrity</span>
-        </div>
-        <p className="text-xs text-gray-300 leading-relaxed">
-          CALIBRALL was created as an antidote to unsubstantiated &quot;guaranteed lock&quot; tipping websites. Sports outcomes are subject to irreducible randomness. Our algorithms quantify uncertainty, disclose small sample warnings, and never alter past results retrospectively.
-        </p>
       </section>
     </div>
   );

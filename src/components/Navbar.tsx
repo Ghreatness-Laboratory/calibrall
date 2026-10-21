@@ -8,18 +8,14 @@ import {
   Layers, 
   BarChart3, 
   Bookmark, 
-  ShieldAlert, 
   Sliders, 
-  Search, 
-  Clock, 
-  Database,
-  User,
-  CheckCircle2,
-  Lock,
-  ChevronDown,
-  Contrast
+  User, 
+  CheckCircle2, 
+  Lock, 
+  Contrast,
+  Search
 } from 'lucide-react';
-import { getStoredUser, setStoredUser, isSupabaseConfigured } from '@/lib/supabase/client';
+import { getStoredUser, setStoredUser } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
 
 export default function Navbar() {
@@ -38,14 +34,13 @@ export default function Navbar() {
     updateTime();
     const interval = setInterval(updateTime, 10000);
 
-    // Initialize Black & White state
     try {
       const saved = localStorage.getItem('calibrall_monochrome_mode') === 'true';
       setIsMonochrome(saved);
       if (saved) {
         document.documentElement.classList.add('monochrome');
       }
-    } catch (e) {
+    } catch {
       // safe fallback
     }
 
@@ -71,9 +66,9 @@ export default function Navbar() {
   const navItems = [
     { label: 'Dashboard', href: '/dashboard', icon: Layers },
     { label: 'Fixtures', href: '/matches', icon: Activity },
-    { label: 'Today’s Picks', href: '/predictions', icon: CheckCircle2 },
-    { label: 'Market Explorer', href: '/markets', icon: Sliders },
-    { label: 'Performance', href: '/performance', icon: BarChart3 },
+    { label: 'Predictions', href: '/predictions', icon: CheckCircle2 },
+    { label: 'Markets', href: '/markets', icon: Sliders },
+    { label: 'Track record', href: '/performance', icon: BarChart3 },
     { label: 'Saved', href: '/saved', icon: Bookmark },
   ];
 
@@ -87,70 +82,59 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-[#0c1017]/95 backdrop-blur border-b border-border-subtle">
-      {/* Top micro-bar: Environment & Engine Freshness */}
-      <div className="bg-[#07090e] border-b border-border-subtle/60 px-4 py-1 text-xs flex items-center justify-between text-gray-400">
-        <div className="flex items-center space-x-3">
-          <span className="flex items-center space-x-1 font-mono text-[11px] text-brand-emerald">
-            <span className="w-2 h-2 rounded-full bg-brand-emerald animate-pulse"></span>
-            <span>MODEL ENGINE: DIXON-COLES v2.4 ONLINE</span>
-          </span>
-          <span className="hidden md:inline-block text-gray-600">|</span>
-          <span className="hidden md:flex items-center space-x-1 text-gray-400">
-            <Database className="w-3 h-3 text-brand-blue" />
-            <span>{isSupabaseConfigured ? 'Supabase Connected' : 'Development Seed Mode (Isolated)'}</span>
-          </span>
+    <header className="sticky top-0 z-50 bg-[#0a1812]/95 backdrop-blur-sm border-b border-white/[0.08]">
+      {/* Top status bar: slim (about 32px), 11px mono, left "Dixon-Coles v2.4 online" with a small green dot, right "06:48 UTC" and a small outlined PRO chip. No wrapping onto two lines. */}
+      <div className="h-8 bg-[#07130e] border-b border-white/[0.06] px-4 text-[11px] font-mono flex items-center justify-between text-[#8fa69a] whitespace-nowrap overflow-hidden">
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#b8e63a] shrink-0" />
+          <span className="text-[#e8efe9]">Dixon-Coles v2.4 online</span>
         </div>
-        <div className="flex items-center space-x-4 font-mono text-[11px]">
-          <span className="flex items-center space-x-1" suppressHydrationWarning>
-            <Clock className="w-3 h-3 text-gray-500" />
-            <span suppressHydrationWarning>{timeStr || '12:00 UTC'}</span>
+
+        <div className="flex items-center gap-3">
+          <span suppressHydrationWarning>{timeStr || '06:48 UTC'}</span>
+          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded-[4px] border border-[#e3b341]/60 text-[#e3b341] tracking-wide">
+            {user?.subscriptionTier ? user.subscriptionTier.toUpperCase() : 'PRO'}
           </span>
-          <Link href="/pricing" className="text-brand-amber hover:underline flex items-center space-x-1">
-            <span>Tier:</span>
-            <span className="uppercase font-bold tracking-wider">{user?.subscriptionTier || 'PRO'}</span>
-          </Link>
         </div>
       </div>
 
-      {/* Main navigation */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Main header: 30px logo, "Calibrall" 15px/500, tagline 11px muted in sentence case. Right side: icon-only 30px buttons (theme toggle, avatar). */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
-          {/* Logo */}
-          <div className="flex items-center space-x-8">
-            <Link href="/" className="flex items-center space-x-3 group">
-              <div className="w-8 h-8 rounded-lg overflow-hidden border border-border flex items-center justify-center bg-[#f4f1ea] shadow-glow-lime">
+          {/* Logo & Brand */}
+          <div className="flex items-center gap-6">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="w-[30px] h-[30px] min-w-[30px] min-h-[30px] rounded-[6px] overflow-hidden border border-white/[0.1] flex items-center justify-center bg-[#f4f1ea] shrink-0">
                 <img
                   src="/assets/aistudio/calibrall-profile-light_3415fbe5.png"
                   alt="Calibrall logo"
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="font-extrabold tracking-tight text-white text-base">Calibrall</span>
-                  <span className="w-2 h-2 rounded-full bg-brand-accent shadow-glow-lime" title="Live Model Active" />
-                </div>
-                <span className="block text-[9px] uppercase tracking-wider text-gray-400 -mt-0.5 font-mono">Every call, on record.</span>
+              <div className="flex flex-col">
+                <span className="text-[15px] font-[500] text-[#e8efe9] leading-tight group-hover:text-[#b8e63a] transition-colors">
+                  Calibrall
+                </span>
+                <span className="text-[11px] text-[#8fa69a] leading-tight">
+                  Every call, on record.
+                </span>
               </div>
             </Link>
 
             {/* Nav links */}
-            <nav className="hidden lg:flex items-center space-x-1">
+            <nav className="hidden lg:flex items-center gap-1 ml-2">
               {navItems.map((item) => {
-                const Icon = item.icon;
                 const active = pathname === item.href;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-[6px] text-[13px] font-[400] transition-colors ${
                       active
-                        ? 'bg-surface-50 text-brand-emerald border border-border'
-                        : 'text-gray-300 hover:text-white hover:bg-surface-100'
+                        ? 'bg-white/[0.06] text-[#b8e63a]'
+                        : 'text-[#8fa69a] hover:text-[#e8efe9] hover:bg-white/[0.03]'
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
                     <span>{item.label}</span>
                   </Link>
                 );
@@ -158,68 +142,57 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* Right Action Tools */}
-          <div className="flex items-center space-x-2.5">
-            <Link 
-              href="/matches" 
-              className="hidden sm:flex items-center space-x-1.5 text-xs text-gray-400 bg-surface-200 border border-border px-2.5 py-1.5 rounded hover:text-white"
+          {/* Right side: icon-only 30px buttons (theme toggle, avatar) */}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/matches"
+              className="w-[30px] h-[30px] rounded-[6px] border border-white/[0.08] bg-[#0f2219] text-[#8fa69a] hover:text-[#e8efe9] flex items-center justify-center transition-colors"
+              title="Search fixtures"
+              aria-label="Search fixtures"
             >
               <Search className="w-3.5 h-3.5" />
-              <span>Search fixtures...</span>
-              <kbd className="font-mono text-[10px] bg-surface-50 px-1 rounded text-gray-400">⌘K</kbd>
             </Link>
 
-            {/* Black & White Mode Toggle Button */}
+            {/* Theme toggle: icon-only 30px button */}
             <button
               onClick={toggleMonochrome}
-              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded border text-xs font-mono transition-all ${
+              type="button"
+              className={`w-[30px] h-[30px] rounded-[6px] border flex items-center justify-center transition-colors ${
                 isMonochrome
-                  ? 'bg-white text-black border-white font-bold shadow-md'
-                  : 'bg-surface-200 border-border text-gray-300 hover:text-white hover:border-gray-500'
+                  ? 'bg-white text-black border-white'
+                  : 'bg-[#0f2219] border-white/[0.08] text-[#8fa69a] hover:text-[#e8efe9] hover:border-white/20'
               }`}
-              title={isMonochrome ? 'Switch to Color Mode' : 'Switch to Black & White (Noir Terminal) Mode'}
+              title={isMonochrome ? 'Switch to color mode' : 'Switch to black & white mode'}
+              aria-label="Toggle monochrome mode"
             >
               <Contrast className="w-3.5 h-3.5" />
-              <span>{isMonochrome ? 'B&W ON' : 'B&W'}</span>
             </button>
 
-            <Link
-              href="/admin"
-              className={`p-1.5 rounded border text-xs transition-colors ${
-                pathname === '/admin'
-                  ? 'bg-surface-50 text-white border-brand-emerald'
-                  : 'bg-surface-200 border-border text-gray-400 hover:text-white'
-              }`}
-              title="Admin Terminal"
-            >
-              <Lock className="w-3.5 h-3.5" />
-            </Link>
-
-            {/* User Account / Tier Switcher */}
+            {/* Avatar / Account: icon-only 30px button */}
             <div className="relative">
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center space-x-2 bg-surface-200 border border-border hover:border-gray-600 px-2.5 py-1 rounded text-xs text-gray-200"
+                type="button"
+                className="w-[30px] h-[30px] rounded-[6px] border border-white/[0.08] bg-[#0f2219] text-[#e8efe9] hover:border-white/20 flex items-center justify-center text-[12px] font-mono font-[500] transition-colors"
+                title="Account menu"
+                aria-label="Account menu"
               >
-                <div className="w-5 h-5 rounded-full bg-brand-blue/30 text-brand-blue flex items-center justify-center font-bold text-[10px]">
-                  {user?.fullName ? user.fullName[0] : 'U'}
-                </div>
-                <span className="hidden sm:inline font-medium">{user?.fullName.split(' ')[0] || 'Analyst'}</span>
-                <ChevronDown className="w-3 h-3 text-gray-400" />
+                {user?.fullName ? user.fullName[0].toUpperCase() : 'A'}
               </button>
 
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-surface-100 border border-border rounded shadow-xl py-2 z-50 text-xs">
-                  <div className="px-3 py-2 border-b border-border/70">
-                    <p className="font-semibold text-white">{user?.fullName}</p>
-                    <p className="text-gray-400 truncate">{user?.email}</p>
+                <div className="absolute right-0 mt-2 w-56 bg-[#0f2219] border border-white/[0.1] rounded-[8px] py-1.5 z-50 text-[12px] shadow-lg">
+                  <div className="px-3 py-2 border-b border-white/[0.06]">
+                    <p className="font-[500] text-[#e8efe9]">{user?.fullName || 'Analyst'}</p>
+                    <p className="text-[11px] text-[#8fa69a] truncate">{user?.email || 'analyst@calibrall.io'}</p>
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-[11px] text-gray-400">Current Tier:</span>
+                      <span className="text-[11px] text-[#8fa69a]">Tier:</span>
                       <button
                         onClick={cycleTier}
-                        className="px-2 py-0.5 rounded bg-brand-emerald/10 text-brand-emerald border border-brand-emerald/30 font-mono text-[10px] uppercase font-bold hover:bg-brand-emerald/20"
+                        type="button"
+                        className="px-2 py-0.5 rounded-[4px] bg-[#b8e63a]/15 text-[#b8e63a] border border-[#b8e63a]/30 font-mono text-[10px] uppercase font-[500] hover:bg-[#b8e63a]/25"
                       >
-                        {user?.subscriptionTier} (Click to toggle)
+                        {user?.subscriptionTier || 'pro'} (click to change)
                       </button>
                     </div>
                   </div>
@@ -227,26 +200,26 @@ export default function Navbar() {
                     <Link
                       href="/settings"
                       onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center px-3 py-1.5 text-gray-300 hover:bg-surface-50 hover:text-white"
+                      className="flex items-center px-3 py-1.5 text-[#8fa69a] hover:bg-white/[0.04] hover:text-[#e8efe9]"
                     >
                       <Sliders className="w-3.5 h-3.5 mr-2" />
-                      Preferences & Models
+                      Settings & model filters
                     </Link>
                     <Link
                       href="/pricing"
                       onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center px-3 py-1.5 text-gray-300 hover:bg-surface-50 hover:text-white"
+                      className="flex items-center px-3 py-1.5 text-[#8fa69a] hover:bg-white/[0.04] hover:text-[#e8efe9]"
                     >
-                      <ShieldAlert className="w-3.5 h-3.5 mr-2" />
-                      Subscription Plans
+                      <User className="w-3.5 h-3.5 mr-2" />
+                      Subscription tier
                     </Link>
                     <Link
                       href="/admin"
                       onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center px-3 py-1.5 text-gray-300 hover:bg-surface-50 hover:text-white"
+                      className="flex items-center px-3 py-1.5 text-[#8fa69a] hover:bg-white/[0.04] hover:text-[#e8efe9]"
                     >
                       <Lock className="w-3.5 h-3.5 mr-2" />
-                      System Admin
+                      System admin
                     </Link>
                   </div>
                 </div>

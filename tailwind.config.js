@@ -9,45 +9,48 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: '#071510',
+        background: '#0a1812',
         surface: {
-          50: '#143d2f',
-          100: '#0f3427',
-          200: '#0b261c',
-          300: '#071b14',
-          DEFAULT: '#0b261c',
+          50: '#142c21',
+          100: '#11261d',
+          200: '#0f2219',
+          300: '#0a1812',
+          DEFAULT: '#0f2219',
         },
         border: {
-          subtle: '#143c2e',
-          DEFAULT: '#1c4e3b',
-          strong: '#296b52',
+          subtle: 'rgba(255, 255, 255, 0.05)',
+          DEFAULT: 'rgba(255, 255, 255, 0.08)',
+          strong: 'rgba(255, 255, 255, 0.16)',
         },
         brand: {
-          accent: '#bae534', // Exact electric chartreuse/lime from Calibrall logo
-          lime: '#bae534',
+          accent: '#b8e63a',
+          lime: '#b8e63a',
           limeHover: '#c8ee47',
-          pine: '#0b2e22',   // Signature dark pine green background of the logo
-          ivory: '#eeede3',  // Signature warm off-white from the logo wordmark
-          emerald: '#bae534', // Aliased so all existing emerald accents match the brand lime
-          glow: 'rgba(186, 229, 52, 0.22)',
+          pine: '#0a1812',
+          ivory: '#e8efe9',
+          emerald: '#b8e63a',
           blue: '#38bdf8',
-          amber: '#f59e0b',
+          amber: '#e3b341',
           rose: '#ef4444',
           cyan: '#06b6d4',
         },
+        text: {
+          primary: '#e8efe9',
+          secondary: '#8fa69a',
+        },
         pine: {
-          950: '#05100c',
-          900: '#071812',
-          800: '#0b261c',
-          700: '#0f3427',
-          600: '#144232',
+          950: '#07120d',
+          900: '#0a1812',
+          800: '#0f2219',
+          700: '#142c21',
+          600: '#1a372a',
         },
         navy: {
-          950: '#05100c',
-          900: '#071812',
-          800: '#0b261c',
-          700: '#0f3427',
-          600: '#144232',
+          950: '#07120d',
+          900: '#0a1812',
+          800: '#0f2219',
+          700: '#142c21',
+          600: '#1a372a',
         }
       },
       fontFamily: {
@@ -55,9 +58,8 @@ module.exports = {
         mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace'],
       },
       boxShadow: {
-        'terminal': '0 4px 24px -2px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(186, 229, 52, 0.12)',
-        'glow-lime': '0 0 25px -4px rgba(186, 229, 52, 0.35)',
-        'glow-emerald': '0 0 25px -4px rgba(186, 229, 52, 0.35)',
+        'flat': 'none',
+        'terminal': '0 2px 8px -2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08)',
       }
     },
   },

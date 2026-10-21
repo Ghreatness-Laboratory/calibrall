@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { FIXTURES, FIXTURE_STATISTICS } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
-import { getStoredSavedFixtures, toggleStoredSavedFixture } from '@/lib/supabase/client';
-import { Bookmark, ArrowRight, Bell, Trash2, Layers } from 'lucide-react';
+import { getStoredSavedFixtures } from '@/lib/supabase/client';
+import { Bookmark, ArrowRight, Trash2 } from 'lucide-react';
 
 export default function SavedMatchesPage() {
   const [savedIds, setSavedIds] = useState<string[]>([]);
@@ -71,56 +71,55 @@ export default function SavedMatchesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
         <div>
-          <h1 className="text-2xl font-extrabold text-white flex items-center space-x-2">
-            <Bookmark className="w-6 h-6 text-brand-amber fill-brand-amber" />
-            <span>Saved Fixtures Watchlist</span>
+          <h1 className="text-[18px] font-[500] text-[#e8efe9] flex items-center gap-2">
+            <Bookmark className="w-4 h-4 text-[#e3b341] fill-[#e3b341]" />
+            <span>Saved fixtures watchlist</span>
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            Track prioritized matches, monitor pre-match market movements, and receive line edge notifications.
+          <p className="text-[12px] text-[#8fa69a] mt-0.5">
+            Track prioritized matches, monitor pre-match market movements, and receive line updates.
           </p>
         </div>
 
         {savedIds.length > 0 && (
           <button
             onClick={handleClearAll}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-surface-200 hover:bg-surface-100 border border-border text-xs text-rose-400 transition-colors"
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[#0f2219] hover:bg-white/[0.04] border border-white/[0.08] text-[12px] font-[500] text-[#8fa69a] hover:text-[#e8efe9] transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear Watchlist</span>
+            <span>Clear watchlist</span>
           </button>
         )}
       </div>
 
       {/* Content */}
       {isLoaded && savedFixtures.length > 0 ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {savedFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
-              <FixtureCard
-                key={fixture.id}
-                fixture={fixture}
-                topPrediction={topPick}
-                noRecommendationReason={noRecommendationReason}
-                isSavedInitial={true}
-              />
-            ))}
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {savedFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
+            <FixtureCard
+              key={fixture.id}
+              fixture={fixture}
+              topPrediction={topPick}
+              noRecommendationReason={noRecommendationReason}
+              isSavedInitial={true}
+            />
+          ))}
         </div>
       ) : (
-        <div className="p-16 text-center bg-surface-200 border border-border rounded-lg space-y-3">
-          <Bookmark className="w-10 h-10 mx-auto text-gray-600" />
-          <h3 className="text-white font-bold text-base">Your Watchlist is Empty</h3>
-          <p className="text-xs text-gray-400 max-w-md mx-auto">
+        <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-3">
+          <Bookmark className="w-8 h-8 mx-auto text-[#8fa69a]/40" />
+          <h3 className="text-[#e8efe9] font-[500] text-[15px]">Your watchlist is empty</h3>
+          <p className="text-[12px] text-[#8fa69a] max-w-sm mx-auto">
             You haven&apos;t bookmarked any fixtures yet. Click the bookmark icon on any fixture card or analysis page to monitor line updates.
           </p>
-          <div className="pt-2">
+          <div className="pt-1">
             <Link
               href="/matches"
-              className="inline-flex items-center space-x-1.5 px-4 py-2 rounded bg-brand-emerald text-navy-950 font-bold text-xs"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[8px] bg-[#b8e63a] hover:bg-[#c8ee47] text-[#0a1812] font-[500] text-[13px] transition-colors"
             >
-              <span>Explore European Fixtures</span>
+              <span>Explore fixtures</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>

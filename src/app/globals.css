@@ -3,14 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --background: #071510;
-  --foreground: #eeede3;
+  --background: #0a1812;
+  --foreground: #e8efe9;
 }
 
 body {
-  background-color: #071510;
-  color: #eeede3;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #0a1812;
+  color: #e8efe9;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 400;
   overflow-x: hidden;
 }
 
@@ -20,39 +21,35 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #071b14;
+  background: #0a1812;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1c4e3b;
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #296b52;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* Monospace statistical numbers for tabular alignment */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', Menlo, Monaco, 'Courier New', monospace;
 }
 
-/* Subtle glow effects matching Calibrall lime */
-.glow-border-lime {
-  box-shadow: 0 0 16px -3px rgba(186, 229, 52, 0.3);
-}
-.glow-border-emerald {
-  box-shadow: 0 0 16px -3px rgba(186, 229, 52, 0.3);
-}
-.glow-border-blue {
-  box-shadow: 0 0 16px -3px rgba(56, 189, 248, 0.25);
+/* Focus ring in lime */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid #b8e63a;
+  outline-offset: 2px;
 }
 
 /* ==========================================================================
    BLACK & WHITE (MONOCHROME / NOIR TERMINAL) MODE
-   High-contrast, zero-distraction statistical paper terminal aesthetic
+   High-contrast, zero-distraction statistical terminal
    ========================================================================== */
 
 html.monochrome {
-  filter: grayscale(100%) contrast(110%);
+  filter: grayscale(100%) contrast(105%);
 }
 
 html.monochrome body {
@@ -61,26 +58,5 @@ html.monochrome body {
 }
 
 html.monochrome img {
-  filter: grayscale(100%) contrast(120%);
-}
-
-html.monochrome .shadow-glow-lime,
-html.monochrome .shadow-glow-emerald {
-  box-shadow: 0 0 16px -2px rgba(255, 255, 255, 0.3) !important;
-}
-
-html.monochrome .bg-brand-emerald,
-html.monochrome .bg-brand-accent {
-  background-color: #ffffff !important;
-  color: #000000 !important;
-}
-
-html.monochrome .text-brand-emerald,
-html.monochrome .text-brand-accent {
-  color: #ffffff !important;
-}
-
-html.monochrome .border-brand-emerald,
-html.monochrome .border-brand-accent {
-  border-color: #ffffff !important;
+  filter: grayscale(100%);
 }

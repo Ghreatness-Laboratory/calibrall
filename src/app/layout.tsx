@@ -3,11 +3,11 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata = {
-  title: 'CALIBRALL | Every call, on record.',
-  description: 'CALIBRALL is an institutional-grade football prediction and market intelligence terminal. Multi-market statistical evaluation, expected value discovery, and verifiable calibration. Every call, on record.',
+  title: 'Calibrall | Every call, on record.',
+  description: 'Calibrall is an institutional-grade sports analytics and market intelligence terminal. Multi-market statistical evaluation, expected value discovery, and verifiable calibration.',
   openGraph: {
-    title: 'CALIBRALL | Every call, on record.',
-    description: 'CALIBRALL is an institutional-grade football prediction and market intelligence terminal. Multi-market statistical evaluation, expected value discovery, and verifiable calibration. Every call, on record.',
+    title: 'Calibrall | Every call, on record.',
+    description: 'Calibrall is an institutional-grade sports analytics and market intelligence terminal. Multi-market statistical evaluation, expected value discovery, and verifiable calibration.',
   },
 };
 
@@ -25,9 +25,9 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen bg-[#071510] text-[#eeede3] flex flex-col antialiased selection:bg-brand-accent selection:text-black">
+      <body className="min-h-screen bg-[#0a1812] text-[#e8efe9] flex flex-col antialiased selection:bg-[#b8e63a] selection:text-black">
         <Navbar />
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-[18px] sm:px-6 lg:px-8 py-5">
           {children}
         </main>
         <Footer />

@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { COMPETITIONS, FIXTURES, FIXTURE_STATISTICS } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
-import { Search, Filter, SlidersHorizontal, Activity, Calendar, ArrowUpDown } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 export default function MatchesPage() {
   const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
@@ -80,45 +80,44 @@ export default function MatchesPage() {
   return (
     <div className="space-y-6">
       {/* Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
         <div>
-          <h1 className="text-2xl font-extrabold text-white flex items-center space-x-2">
-            <Activity className="w-6 h-6 text-brand-emerald" />
-            <span>Fixtures & Market Intelligence Explorer</span>
+          <h1 className="text-[18px] font-[500] text-[#e8efe9]">
+            Fixtures & market intelligence explorer
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-[12px] text-[#8fa69a] mt-0.5">
             Search, filter, and inspect scheduled European fixtures and quantitative prediction outputs.
           </p>
         </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-surface-200 border border-border rounded p-4 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-[12px]">
           {/* Team Search */}
           <div>
-            <label className="block text-gray-400 mb-1 text-[11px] font-medium">Team or Club Search</label>
+            <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Team search</label>
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-500" />
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#8fa69a]" />
               <input
                 type="text"
-                placeholder="e.g. Arsenal, Real Madrid..."
+                placeholder="Search club name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-surface-100 border border-border pl-8 pr-3 py-1.5 rounded text-xs text-white placeholder-gray-500 focus:outline-hidden focus:border-brand-emerald"
+                className="w-full bg-[#0a1812] border border-white/[0.08] pl-8 pr-3 py-1.5 rounded-[8px] text-[12px] text-[#e8efe9] placeholder-[#8fa69a]/50 focus:outline-hidden focus:border-[#b8e63a]"
               />
             </div>
           </div>
 
           {/* League Filter */}
           <div>
-            <label className="block text-gray-400 mb-1 text-[11px] font-medium">Competition</label>
+            <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Competition</label>
             <select
               value={selectedLeague}
               onChange={(e) => setSelectedLeague(e.target.value)}
-              className="w-full bg-surface-100 border border-border px-3 py-1.5 rounded text-xs text-white focus:outline-hidden focus:border-brand-emerald"
+              className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[12px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
             >
-              <option value="ALL">All Competitions (5 Tier-1)</option>
+              <option value="ALL">All competitions (5 Tier-1)</option>
               {COMPETITIONS.map(c => (
                 <option key={c.code} value={c.code}>
                   {c.name} ({c.country})
@@ -129,23 +128,23 @@ export default function MatchesPage() {
 
           {/* Status Filter */}
           <div>
-            <label className="block text-gray-400 mb-1 text-[11px] font-medium">Fixture Status</label>
+            <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Fixture status</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full bg-surface-100 border border-border px-3 py-1.5 rounded text-xs text-white focus:outline-hidden focus:border-brand-emerald"
+              className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[12px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
             >
-              <option value="ALL">All Scheduled & Completed</option>
-              <option value="TIMED">Upcoming / Pre-Match Only</option>
-              <option value="FINISHED">Completed / Settled Results</option>
+              <option value="ALL">All fixtures</option>
+              <option value="TIMED">Upcoming only</option>
+              <option value="FINISHED">Completed results</option>
             </select>
           </div>
 
           {/* Min Probability Slider */}
           <div>
             <div className="flex items-center justify-between text-[11px] mb-1">
-              <span className="text-gray-400 font-medium">Min Model Probability</span>
-              <span className="font-mono text-brand-emerald font-bold">{(minProbability * 100).toFixed(0)}%</span>
+              <span className="text-[#8fa69a] font-[500]">Min probability</span>
+              <span className="font-mono text-[#b8e63a]">{(minProbability * 100).toFixed(0)}%</span>
             </div>
             <input
               type="range"
@@ -154,12 +153,12 @@ export default function MatchesPage() {
               step="0.05"
               value={minProbability}
               onChange={(e) => setMinProbability(parseFloat(e.target.value))}
-              className="w-full accent-brand-emerald cursor-pointer"
+              className="w-full accent-[#b8e63a] cursor-pointer"
             />
           </div>
         </div>
 
-        <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-gray-400">
+        <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-[12px] text-[#8fa69a]">
           <span>Found {filtered.length} matching fixtures</span>
           <button
             onClick={() => {
@@ -168,15 +167,16 @@ export default function MatchesPage() {
               setStatusFilter('ALL');
               setMinProbability(0.50);
             }}
-            className="text-brand-emerald hover:underline"
+            type="button"
+            className="text-[#b8e63a] hover:underline"
           >
-            Reset Filters
+            Reset filters
           </button>
         </div>
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
         {filtered.map(({ fixture, topPick, noRecommendationReason }) => (
           <FixtureCard
             key={fixture.id}
