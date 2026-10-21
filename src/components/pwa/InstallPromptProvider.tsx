@@ -147,7 +147,7 @@ export function InstallPromptProvider({ children }: { children: React.ReactNode 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('load', registerSW);
+      window.removeEventListener('load', handleServiceWorker);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
