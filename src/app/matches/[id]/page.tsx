@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
 import { MarketPrediction } from '@/types';
+import { formatExpectedValue, formatSelectionName } from '@/lib/prediction/marketCatalog';
 
 export default function MatchAnalysisPage() {
   const params = useParams();
@@ -307,8 +308,8 @@ export default function MatchAnalysisPage() {
               <span>Primary qualified recommendation</span>
             </div>
             <h3 className="text-[15px] font-[500] text-[#e8efe9]">
-              {evaluation.topPick.selection} — {(evaluation.topPick.modelProbability * 100).toFixed(1)}% probability
-              {evaluation.topPick.expectedValue ? ` (+${(evaluation.topPick.expectedValue * 100).toFixed(1)}% EV)` : ''}
+              {formatSelectionName(evaluation.topPick.selection)} — {(evaluation.topPick.modelProbability * 100).toFixed(1)}% probability
+              {evaluation.topPick.expectedValue !== undefined ? ` (${formatExpectedValue(evaluation.topPick.expectedValue).text} EV)` : ''}
             </h3>
             <p className="text-[12px] text-[#8fa69a] mt-0.5 max-w-2xl leading-normal">
               Ranked highest across {evaluation.predictions.length} candidate lines. Passes minimum sample size ({stats.sampleSizeMatches} matches) and margin-of-safety filters.
@@ -352,13 +353,6 @@ export default function MatchAnalysisPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Table */}
         <div className="lg:col-span-7 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-[15px] font-[500] text-[#e8efe9]">
-              All evaluated market lines ({evaluation.predictions.length})
-            </h3>
-            <span className="text-[11px] text-[#8fa69a]">Tap a row for audit</span>
-          </div>
-
           <MarketComparisonTable
             predictions={evaluation.predictions}
             selectedPredictionId={selectedPrediction?.id}

@@ -12,6 +12,13 @@ import {
   ShieldCheck, 
   AlertCircle 
 } from 'lucide-react';
+import { 
+  formatExpectedValue, 
+  formatOdds, 
+  formatSelectionName, 
+  getOptionTypeLabel, 
+  getPeriodLabel 
+} from '@/lib/prediction/marketCatalog';
 
 export default function PredictionsPage() {
   const [selectedComp, setSelectedComp] = useState<string>('ALL');
@@ -275,13 +282,13 @@ export default function PredictionsPage() {
                       </div>
                     </td>
                     <td className="py-2.5 px-3 text-[#8fa69a]">
-                      <span className="font-mono text-[11px] text-[#b8e63a]">
-                        {p.optionType.replace(/_/g, ' ')}
+                      <span className="text-[12px] text-[#e8efe9]">
+                        {getOptionTypeLabel(p.optionType)}
                       </span>
                     </td>
                     <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">
                       <div className="flex items-center gap-1.5">
-                        <span>{p.selection}</span>
+                        <span>{formatSelectionName(p.selection)}</span>
                         {isTop && (
                           <span className="text-[9px] bg-[#b8e63a]/20 text-[#b8e63a] px-1 rounded-[3px] font-mono">
                             Top pick
@@ -294,15 +301,15 @@ export default function PredictionsPage() {
                         )}
                       </div>
                     </td>
-                    <td className="py-2.5 px-3 text-[#8fa69a] font-mono text-[11px]">
+                    <td className="py-2.5 px-3 text-[#8fa69a] text-[12px]">
                       {getPeriodLabel(p.period)}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums font-[500]">
                       {(p.modelProbability * 100).toFixed(1)}%
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-[11px]">
+                    <td className="py-2.5 px-3 font-mono text-[12px]">
                       {p.marketOdds ? (
-                        <span className="bg-[#0a1812] px-1.5 py-0.5 rounded-[4px] border border-white/[0.08] text-[#e8efe9]">
+                        <span className="bg-[#0a1812] px-1.5 py-0.5 rounded-[4px] border border-white/[0.08] text-[#e8efe9] tabular-nums">
                           {p.marketOdds.toFixed(2)}
                         </span>
                       ) : (
@@ -312,15 +319,15 @@ export default function PredictionsPage() {
                       )}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#8fa69a] tabular-nums">
-                      {p.edge ? `+${(p.edge * 100).toFixed(1)}%` : '—'}
+                      {p.edge ? `+${(p.edge * 100).toFixed(1)}%` : 'n/a'}
                     </td>
                     <td className="py-2.5 px-3 font-mono tabular-nums">
                       {p.expectedValue !== undefined ? (
-                        <span className={(p.expectedValue ?? 0) > 0 ? 'text-[#b8e63a] font-[500]' : 'text-[#8fa69a]'}>
-                          +{((p.expectedValue ?? 0) * 100).toFixed(1)}%
+                        <span className={`font-[500] ${formatExpectedValue(p.expectedValue).colorClass}`}>
+                          {formatExpectedValue(p.expectedValue).text}
                         </span>
                       ) : (
-                        <span className="text-[#8fa69a]/60 text-[11px]">No odds</span>
+                        <span className="text-[#8fa69a] text-[12px]">n/a</span>
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-right">

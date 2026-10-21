@@ -6,6 +6,7 @@ import { Fixture, MarketPrediction } from '@/types';
 import { Bookmark, Clock, ArrowUpRight, AlertCircle } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
 import TeamCrest from '@/components/TeamCrest';
+import { formatExpectedValue, formatSelectionName } from '@/lib/prediction/marketCatalog';
 
 interface Props {
   fixture: Fixture;
@@ -144,20 +145,20 @@ export default function FixtureCard({
         <div className="mt-3">
           {topPrediction ? (
             <div className="bg-[#0a1812]/70 rounded-[8px] border border-[#b8e63a]/25 p-2.5 space-y-1.5">
-              {/* Row 1: "Top pick" (11px muted), EV "+6.8% EV" in lime mono at right */}
+              {/* Row 1: "Top pick" (11px muted), EV in mono at right */}
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-[#8fa69a]">Top pick</span>
                 {topPrediction.expectedValue !== undefined && (
-                  <span className="font-mono text-[#b8e63a]">
-                    +{((topPrediction.expectedValue ?? 0) * 100).toFixed(1)}% EV
+                  <span className={`font-mono ${formatExpectedValue(topPrediction.expectedValue).colorClass}`}>
+                    {formatExpectedValue(topPrediction.expectedValue).text} EV
                   </span>
                 )}
               </div>
 
-              {/* Row 2: pick name (14px/500), probability "64.8%" in mono at right */}
+              {/* Row 2: pick name (14px/500), probability in mono at right */}
               <div className="flex items-center justify-between">
                 <span className="text-[14px] font-[500] text-[#e8efe9] truncate mr-2">
-                  {topPrediction.selection}
+                  {formatSelectionName(topPrediction.selection)}
                 </span>
                 <span className="font-mono text-[12px] text-[#e8efe9] shrink-0">
                   {(topPrediction.modelProbability * 100).toFixed(1)}%

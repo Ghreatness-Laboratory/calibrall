@@ -9,6 +9,13 @@ import {
   FACTOR_DEFINITIONS, 
   ContextEvaluationResult 
 } from '@/lib/prediction/contextFactors';
+import {
+  getOptionTypeLabel,
+  getPeriodLabel,
+  formatSelectionName,
+  formatExpectedValue,
+  formatOdds
+} from '@/lib/prediction/marketCatalog';
 import { 
   Cpu, 
   CheckCircle2, 
@@ -171,85 +178,115 @@ export default function FactorsAndStatePanel({
 
       {/* Top Ranked Options */}
       <div className="space-y-2.5 pt-1">
-        <div className="flex items-center justify-between text-[12px]">
-          <h3 className="font-[500] text-[#e8efe9] flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-[#b8e63a]" />
-            <span>Top {rankedOptions.length} ranked options (Across authorized catalogue)</span>
+        {/* Section header: "Top 5 ranked options" 15px/500 left, "Authorized catalogue" 11px muted right, on one line */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-[15px] font-[500] text-[#e8efe9]">
+            Top {rankedOptions.length} ranked options
           </h3>
-          <span className="font-mono text-[11px] text-[#8fa69a]">
-            Max: N={rankedOptions.length}
+          <span className="text-[11px] text-[#8fa69a]">
+            Authorized catalogue
           </span>
         </div>
 
+        {/* Cards list: 8px gap between cards */}
         <div className="space-y-2">
           {rankedOptions.map((opt, idx) => {
             const isSelected = selectedOptionId === opt.id;
-            const isTop = opt.isTopPick;
+            const isQualified = opt.qualificationStatus === 'QUALIFIED_VALUE' || opt.qualificationStatus === 'QUALIFIED_PROBABILITY';
+            const showHighlight = opt.isTopPick && isQualified;
+
+            const selectionName = formatSelectionName(opt.selection);
+            const optionTypeLabel = getOptionTypeLabel(opt.optionType);
+            const periodLabel = getPeriodLabel(opt.period);
+            const evFormatted = formatExpectedValue(opt.expectedValue);
+            const oddsFormatted = formatOdds(opt.marketOdds);
+
+            // Subline reason
+            let sublineReason = 'High uncertainty';
+            const tierLower = (opt.evidenceTier || '').toLowerCase();
+            if (opt.qualificationStatus === 'QUALIFIED_VALUE') {
+              sublineReason = 'Qualified value';
+            } else if (opt.qualificationStatus === 'QUALIFIED_PROBABILITY') {
+              sublineReason = 'Statistical edge';
+            } else if (tierLower.includes('inadequate data')) {
+              sublineReason = 'Inadequate data';
+            } else if (tierLower.includes('draw')) {
+              sublineReason = 'Draw variance';
+            } else if (opt.qualificationStatus === 'UNQUALIFIED_MARGINAL' || tierLower.includes('marginal')) {
+              sublineReason = 'Marginal edge';
+            } else if (tierLower.includes('sub-')) {
+              sublineReason = 'Sub-threshold probability';
+            }
 
             return (
               <div
                 key={opt.id}
                 onClick={() => onSelectOption && onSelectOption(opt)}
-                className={`p-3 rounded-[8px] border transition-colors cursor-pointer ${
-                  isSelected
-                    ? 'bg-[#0a1812] border-[#b8e63a] ring-1 ring-[#b8e63a]'
-                    : isTop
-                    ? 'bg-[#0a1812]/70 border-[#b8e63a]/30 hover:border-[#b8e63a]/60'
-                    : 'bg-[#0a1812]/40 border-white/[0.06] hover:border-white/20'
+                className={`p-[12px_14px] rounded-[12px] transition-colors cursor-pointer ${
+                  showHighlight
+                    ? 'bg-[#0f2219] border-[0.5px] border-white/[0.08] border-l-2 border-l-[#b8e63a]'
+                    : isSelected
+                    ? 'bg-[#0f2219] border-[0.5px] border-white/20 ring-1 ring-white/20'
+                    : 'bg-[#0f2219] border-[0.5px] border-white/[0.08] hover:border-white/20'
                 }`}
               >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-[11px] text-[#8fa69a] w-5">#{idx + 1}</span>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-[500] text-[#e8efe9] text-[13px]">{opt.selection}</span>
-                        {isTop && (
-                          <span className="text-[9px] bg-[#b8e63a] text-[#0a1812] font-[500] px-1.5 py-0.5 rounded-[3px] font-mono">
-                            Top recommendation
-                          </span>
-                        )}
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[3px] border border-white/[0.08] text-[#8fa69a]">
-                          {opt.evidenceTier}
-                        </span>
-                        {opt.pushProbability !== undefined && (
-                          <span className="text-[9px] bg-white/10 text-[#8fa69a] px-1 py-0.5 rounded-[3px] font-mono">
-                            Push if {opt.line}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#8fa69a] font-mono mt-0.5">
-                        <span className="text-[#b8e63a]">Option: {opt.optionType ? opt.optionType.replace(/_/g, ' ') : opt.marketName}</span>
-                        <span>·</span>
-                        <span>Period: {opt.period ?? 'REGULAR_TIME'}</span>
-                        <span>·</span>
-                        <span>Quality: {(opt.dataQualityScore * 100).toFixed(0)}%</span>
-                      </div>
-                    </div>
+                {/* Row 1: Rank (#1) in 11px mono muted, selection name at 14px/500, status chip on the right */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-[11px] text-[#8fa69a] shrink-0 w-5">
+                      #{idx + 1}
+                    </span>
+                    <span className="font-[500] text-[#e8efe9] text-[14px] leading-tight truncate">
+                      {selectionName}
+                    </span>
                   </div>
 
-                  {/* Odds & Prob Metrics */}
-                  <div className="flex items-center gap-4 text-[12px] font-mono">
-                    <div>
-                      <span className="text-[10px] text-[#8fa69a] block">Prob</span>
-                      <span className="font-[500] text-[#b8e63a]">
-                        {(opt.modelProbability * 100).toFixed(1)}%
+                  {/* Status chip: small 11px chip, Abstain (amber outline) or Qualified (lime outline) */}
+                  <div className="shrink-0">
+                    {isQualified ? (
+                      <span className="inline-block text-[11px] font-[500] px-2 py-0.5 rounded-[4px] border border-[#b8e63a]/60 text-[#b8e63a] tracking-wide">
+                        Qualified
                       </span>
-                    </div>
+                    ) : (
+                      <span className="inline-block text-[11px] font-[500] px-2 py-0.5 rounded-[4px] border border-[#e3b341]/60 text-[#e3b341] tracking-wide">
+                        Abstain
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-                    <div>
-                      <span className="text-[10px] text-[#8fa69a] block">Odds</span>
-                      <span className="text-[#e8efe9]">
-                        {opt.marketOdds ? opt.marketOdds.toFixed(2) : '—'}
-                      </span>
-                    </div>
+                {/* Row 2: subline, 11px muted, indented under the name */}
+                <div className="pl-7 mt-1 text-[11px] text-[#8fa69a] leading-tight truncate">
+                  <span>{optionTypeLabel}</span>
+                  <span className="mx-1.5 text-white/20">·</span>
+                  <span>{periodLabel}</span>
+                  <span className="mx-1.5 text-white/20">·</span>
+                  <span>Quality {(opt.dataQualityScore * 100).toFixed(0)}%</span>
+                  <span className="mx-1.5 text-white/20">·</span>
+                  <span>{sublineReason}</span>
+                </div>
 
-                    <div>
-                      <span className="text-[10px] text-[#8fa69a] block">EV</span>
-                      <span className="font-[500] text-[#b8e63a]">
-                        {opt.expectedValue !== undefined ? `+${(opt.expectedValue * 100).toFixed(1)}%` : '—'}
-                      </span>
-                    </div>
+                {/* Row 3: 3 equal columns (Prob, Odds, EV). Labels 11px muted, values mono 13px, tabular-nums */}
+                <div className="grid grid-cols-3 gap-2 pt-2.5 mt-2.5 border-t border-white/[0.06] text-left">
+                  <div>
+                    <span className="text-[11px] text-[#8fa69a] block">Prob</span>
+                    <span className="font-mono text-[13px] tabular-nums font-[500] text-[#e8efe9]">
+                      {(opt.modelProbability * 100).toFixed(1)}%
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] text-[#8fa69a] block">Odds</span>
+                    <span className={`font-mono text-[13px] tabular-nums ${opt.marketOdds ? 'text-[#e8efe9]' : 'text-[#8fa69a]'}`}>
+                      {oddsFormatted}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] text-[#8fa69a] block">EV</span>
+                    <span className={`font-mono text-[13px] tabular-nums font-[500] ${evFormatted.colorClass}`}>
+                      {evFormatted.text}
+                    </span>
                   </div>
                 </div>
               </div>

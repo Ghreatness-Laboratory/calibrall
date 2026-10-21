@@ -256,25 +256,134 @@ export function isOptionTypeEnabled(type: string): boolean {
 }
 
 /**
- * Returns user-facing label and styling badge for option types
+ * Returns user-facing clean label for option types
  */
-export function getOptionTypeLabel(type: SupportedOptionType): string {
-  return SUPPORTED_OPTIONS_CATALOGUE[type]?.title || type;
+export function getOptionTypeLabel(type: SupportedOptionType | string): string {
+  switch (type) {
+    case 'win':
+      return 'Win';
+    case 'draw':
+      return 'Draw';
+    case 'double_chance':
+      return 'Double chance';
+    case 'over_under_goals':
+      return 'Over / under goals';
+    case 'both_teams_to_score':
+      return 'Both teams to score';
+    case 'corners':
+      return 'Corners';
+    case 'bookings':
+      return 'Bookings';
+    case 'highest_scoring_half':
+      return 'Highest scoring half';
+    case 'first_half_goals':
+      return '1st half goals';
+    case 'second_half_result':
+      return '2nd half result';
+    default:
+      return type ? type.replace(/_/g, ' ') : '';
+  }
 }
 
 /**
  * Returns human-readable period label
  */
-export function getPeriodLabel(period: MarketPeriod): string {
+export function getPeriodLabel(period?: MarketPeriod | string): string {
   switch (period) {
     case 'FIRST_HALF':
-      return '1st Half (45m)';
+      return '1st half';
     case 'SECOND_HALF':
-      return '2nd Half Only (45m)';
+      return '2nd half';
     case 'FULL_TIME':
-      return 'Full Time (90m)';
+      return 'Full time';
     case 'REGULAR_TIME':
     default:
-      return 'Regular Time (90m)';
+      return 'Regular time';
   }
+}
+
+/**
+ * Clean selection name into readable sentence case with short team names, dropping "FC", "CF", etc.
+ */
+export function formatSelectionName(name: string): string {
+  if (!name) return '';
+  let cleaned = name
+    .replace(/\bFootball Club\b/gi, '')
+    .replace(/\bFC\b/gi, '')
+    .replace(/\bCF\b/gi, '')
+    .replace(/\bAFC\b/gi, '')
+    .replace(/\bBSC\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Sentence case for Win outcomes
+  if (/ to Win 2nd Half$/i.test(cleaned)) {
+    cleaned = cleaned.replace(/ to Win 2nd Half$/i, ' win (2nd half)');
+  } else if (/ to Win$/i.test(cleaned)) {
+    cleaned = cleaned.replace(/ to Win$/i, ' win');
+  } else if (/ Win$/i.test(cleaned)) {
+    cleaned = cleaned.replace(/ Win$/i, ' win');
+  } else if (/ or Draw$/i.test(cleaned)) {
+    cleaned = cleaned.replace(/ or Draw$/i, ' or draw');
+  } else if (/ or Away$/i.test(cleaned)) {
+    cleaned = cleaned.replace(/ or Away$/i, ' or away');
+  }
+
+  // Draw
+  if (/^Draw/i.test(cleaned)) {
+    cleaned = 'Draw';
+  }
+
+  // Both teams to score
+  if (/^BTTS - Yes/i.test(cleaned) || /^BTTS Yes/i.test(cleaned)) {
+    cleaned = 'BTTS: yes';
+  } else if (/^BTTS - No/i.test(cleaned) || /^BTTS No/i.test(cleaned)) {
+    cleaned = 'BTTS: no';
+  }
+
+  // Total lines: lowercase "goals", "corners", "bookings"
+  cleaned = cleaned
+    .replace(/Over ([0-9.]+) Goals/gi, 'Over $1 goals')
+    .replace(/Under ([0-9.]+) Goals/gi, 'Under $1 goals')
+    .replace(/Over ([0-9.]+) Corners/gi, 'Over $1 corners')
+    .replace(/Under ([0-9.]+) Corners/gi, 'Under $1 corners')
+    .replace(/Over ([0-9.]+) Bookings/gi, 'Over $1 bookings')
+    .replace(/Under ([0-9.]+) Bookings/gi, 'Under $1 bookings')
+    .replace(/Highest Scoring Half: 2nd Half/gi, 'Highest scoring half: 2nd half')
+    .replace(/Highest Scoring Half: 1st Half/gi, 'Highest scoring half: 1st half')
+    .replace(/1st Half Over ([0-9.]+) Goals/gi, '1st half over $1 goals')
+    .replace(/1st Half Under ([0-9.]+) Goals/gi, '1st half under $1 goals');
+
+  return cleaned;
+}
+
+/**
+ * Format signed Expected Value:
+ * Positive: "+23.5%" in lime (#b8e63a)
+ * Negative: "−27.5%" in soft red (#e06a5f) using true minus
+ * Zero: "0.0%" in muted (#8fa69a)
+ * Missing: "n/a" in muted (#8fa69a)
+ */
+export function formatExpectedValue(ev?: number | null): { text: string; colorClass: string } {
+  if (ev === undefined || ev === null || isNaN(ev)) {
+    return { text: 'n/a', colorClass: 'text-[#8fa69a]' };
+  }
+  const pct = ev * 100;
+  if (pct > 0.05) {
+    return { text: `+${pct.toFixed(1)}%`, colorClass: 'text-[#b8e63a]' };
+  } else if (pct < -0.05) {
+    return { text: `−${Math.abs(pct).toFixed(1)}%`, colorClass: 'text-[#e06a5f]' };
+  } else {
+    return { text: `${pct.toFixed(1)}%`, colorClass: 'text-[#8fa69a]' };
+  }
+}
+
+/**
+ * Format decimal odds, returning "n/a" if unavailable
+ */
+export function formatOdds(odds?: number | null): string {
+  if (odds === undefined || odds === null || isNaN(odds)) {
+    return 'n/a';
+  }
+  return odds.toFixed(2);
 }

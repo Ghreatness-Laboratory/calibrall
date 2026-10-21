@@ -83,24 +83,24 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 bg-[#0a1812]/95 backdrop-blur-sm border-b border-white/[0.08]">
-      {/* Top status bar: slim (28px), 11px mono, left "Dixon-Coles v2.4 online" with a small green dot, right "06:48 UTC" and a small outlined Pro chip. Strictly one line without wrapping. */}
-      <div className="h-7 bg-[#07130e] border-b border-white/[0.06] px-4 text-[11px] font-mono flex items-center justify-between text-[#8fa69a] whitespace-nowrap overflow-hidden">
+      {/* Top status bar: 32px (h-8), 11px mono, left "Dixon-Coles v2.4 online" with green dot, right "08:32 UTC" and small PRO chip */}
+      <div className="h-8 bg-[#07130e] border-b border-white/[0.06] px-4 text-[11px] font-mono flex items-center justify-between text-[#8fa69a] whitespace-nowrap overflow-hidden">
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#b8e63a] shrink-0" />
           <span className="text-[#e8efe9]">Dixon-Coles v2.4 online</span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span suppressHydrationWarning>{timeStr || '06:48 UTC'}</span>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] border border-[#e3b341]/60 text-[#e3b341] tracking-wide">
-            {user?.subscriptionTier ? user.subscriptionTier.charAt(0).toUpperCase() + user.subscriptionTier.slice(1).toLowerCase() : 'Pro'}
+        <div className="flex items-center gap-2.5">
+          <span suppressHydrationWarning>{timeStr || '08:32 UTC'}</span>
+          <span className="text-[10px] font-mono font-[500] px-1.5 py-0.5 rounded-[4px] border border-[#e3b341]/60 text-[#e3b341] tracking-wide">
+            PRO
           </span>
         </div>
       </div>
 
-      {/* Main header: 30px logo, "Calibrall" 15px/500, tagline 11px muted single line. Mobile right: avatar only. Desktop right: search, B&W icon button, avatar. Total height under 88px on mobile. */}
+      {/* Main header: 30px logo, "Calibrall" 15px/500, tagline 11px muted. Search & theme icons 30px. Avatar as 30px circle. Total height < 88px */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-[52px] md:h-14">
+        <div className="flex items-center justify-between h-[52px]">
           {/* Logo & Brand */}
           <div className="flex items-center gap-4 sm:gap-6">
             <Link href="/" className="flex items-center gap-2.5 group">
@@ -142,7 +142,7 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* Right side: On mobile, avatar only! On desktop, search + theme toggle + avatar. */}
+          {/* Right side: On mobile, avatar only. On desktop, search + theme toggle + avatar */}
           <div className="flex items-center gap-2">
             <Link
               href="/matches"
@@ -153,7 +153,7 @@ export default function Navbar() {
               <Search className="w-3.5 h-3.5" />
             </Link>
 
-            {/* Theme toggle: icon-only 30px button (hidden on mobile, accessible via avatar menu or desktop header) */}
+            {/* Theme toggle: icon-only 30px button */}
             <button
               onClick={toggleMonochrome}
               type="button"
@@ -168,16 +168,16 @@ export default function Navbar() {
               <Contrast className="w-3.5 h-3.5" />
             </button>
 
-            {/* Avatar / Account: icon-only 30px button */}
+            {/* Avatar: 30px circle button */}
             <div className="relative">
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 type="button"
-                className="w-[30px] h-[30px] rounded-[6px] border border-white/[0.08] bg-[#0f2219] text-[#e8efe9] hover:border-white/20 flex items-center justify-center text-[12px] font-mono font-[500] transition-colors"
+                className="w-[30px] h-[30px] rounded-full border border-white/[0.1] bg-[#0f2219] text-[#e8efe9] hover:border-[#b8e63a]/50 flex items-center justify-center text-[12px] font-mono font-[500] transition-colors"
                 title="Account menu"
                 aria-label="Account menu"
               >
-                {user?.fullName ? user.fullName[0].toUpperCase() : 'A'}
+                {user?.fullName ? user.fullName[0].toUpperCase() : 'M'}
               </button>
 
               {userDropdownOpen && (

@@ -7,6 +7,7 @@ import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { ArrowUpRight, Clock } from 'lucide-react';
 import { SupportedOptionType } from '@/types';
 import TeamCrest from '@/components/TeamCrest';
+import { formatExpectedValue, formatOdds } from '@/lib/prediction/marketCatalog';
 
 const MARKET_OPTIONS: {
   code: string;
@@ -250,19 +251,15 @@ export default function MarketExplorerPage() {
                     {p.marketOdds ? (
                       <span className="text-[#e8efe9]">{p.marketOdds.toFixed(2)}</span>
                     ) : (
-                      <span className="text-[10px] text-[#8fa69a]">Analysis</span>
+                      <span className="text-[10px] text-[#8fa69a]">n/a</span>
                     )}
                   </div>
 
                   {/* EV */}
                   <div className="text-right min-w-[65px]">
-                    {p.expectedValue !== undefined ? (
-                      <span className={p.expectedValue > 0 ? 'text-[#b8e63a] font-[500]' : 'text-[#8fa69a]'}>
-                        {p.expectedValue > 0 ? '+' : ''}{(p.expectedValue * 100).toFixed(1)}%
-                      </span>
-                    ) : (
-                      <span className="text-[#8fa69a]/50 text-[11px]">—</span>
-                    )}
+                    <span className={`font-[500] ${formatExpectedValue(p.expectedValue).colorClass}`}>
+                      {formatExpectedValue(p.expectedValue).text}
+                    </span>
                   </div>
 
                   {/* Action Link */}

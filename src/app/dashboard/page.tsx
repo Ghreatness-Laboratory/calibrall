@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getStoredSavedFixtures } from '@/lib/supabase/client';
 import { Team } from '@/types';
+import { formatExpectedValue, formatOdds, formatSelectionName } from '@/lib/prediction/marketCatalog';
 
 export default function DashboardPage() {
   const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
@@ -247,19 +248,21 @@ export default function DashboardPage() {
                       <span className="font-[500] truncate max-w-[140px] sm:max-w-none">{item.matchName}</span>
                     </div>
                   </td>
-                  <td className="py-2.5 px-3 text-[#8fa69a]">{item.marketName}</td>
-                  <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">{item.selection}</td>
+                  <td className="py-2.5 px-3 text-[#8fa69a] text-[12px]">{item.marketName}</td>
+                  <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">{formatSelectionName(item.selection)}</td>
                   <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums">
                     {(item.probability * 100).toFixed(1)}%
                   </td>
                   <td className="py-2.5 px-3 font-mono text-[#8fa69a]">
-                    {item.odds ? item.odds.toFixed(2) : '—'}
+                    {formatOdds(item.odds)}
                   </td>
                   <td className="py-2.5 px-3 font-mono text-[#8fa69a] tabular-nums">
-                    {item.edge ? `+${(item.edge * 100).toFixed(1)}%` : '—'}
+                    {item.edge ? `+${(item.edge * 100).toFixed(1)}%` : 'n/a'}
                   </td>
-                  <td className="py-2.5 px-3 font-mono text-[#b8e63a] font-[500] tabular-nums">
-                    {item.expectedValue ? `+${(item.expectedValue * 100).toFixed(1)}%` : '—'}
+                  <td className="py-2.5 px-3 font-mono tabular-nums font-[500]">
+                    <span className={formatExpectedValue(item.expectedValue).colorClass}>
+                      {formatExpectedValue(item.expectedValue).text}
+                    </span>
                   </td>
                   <td className="py-2.5 px-3 text-right">
                     <Link
