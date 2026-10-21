@@ -2,6 +2,8 @@
 
 export type MatchStatus = 'TIMED' | 'SCHEDULED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | 'POSTPONED' | 'CANCELED';
 
+export type RiskTier = 'SAFE' | 'MODERATE' | 'RISKY' | 'LONGSHOT';
+
 export type MarketCategory = 
   | 'match_result' 
   | 'total_goals' 
@@ -12,7 +14,10 @@ export type MarketCategory =
   | 'bookings' 
   | 'half_time'
   | 'double_chance'
-  | 'draw_no_bet';
+  | 'draw_no_bet'
+  | 'handicap'
+  | 'goal_bounds'
+  | 'combos';
 
 export type SupportedOptionType = 
   | 'win'
@@ -24,7 +29,16 @@ export type SupportedOptionType =
   | 'bookings'
   | 'highest_scoring_half'
   | 'first_half_goals'
-  | 'second_half_result';
+  | 'second_half_result'
+  | 'draw_no_bet'
+  | 'asian_handicap'
+  | 'european_handicap'
+  | 'goal_bounds'
+  | 'team_goal_bounds'
+  | 'corner_handicap'
+  | 'team_bookings'
+  | 'booking_points'
+  | 'win_draw_combo';
 
 export type MarketPeriod = 'REGULAR_TIME' | 'FIRST_HALF' | 'SECOND_HALF' | 'FULL_TIME';
 
@@ -211,6 +225,17 @@ export interface Fixture {
   referee?: string;
   dataFreshness: string;
   isDemo?: boolean;
+  isDerby?: boolean;
+  derbyName?: string;
+  hasCoachChange?: boolean;
+  coachChangeNote?: string;
+  h2hSummary?: string;
+  h2hMatchCount?: number;
+  missingDataFlags?: {
+    corners?: boolean;
+    cards?: boolean;
+    halves?: boolean;
+  };
 }
 
 export interface BookmakerOdds {
@@ -241,6 +266,15 @@ export interface MarketPrediction {
   impliedProbability?: number;
   expectedValue?: number; // (p * O) - 1
   edge?: number; // p - implied
+  riskTier?: RiskTier;
+  confidenceScore?: number; // 0.0 - 1.0 (or percentage)
+  plainEnglishReason?: string;
+  handicapType?: 'asian' | 'european';
+  handicapLine?: number;
+  goalBand?: string;
+  winProb?: number;
+  pushProb?: number;
+  lossProb?: number;
   modelConfidence: ModelConfidence;
   qualificationStatus: QualificationStatus;
   rankingScore: number;

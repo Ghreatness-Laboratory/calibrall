@@ -240,6 +240,194 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
     },
     isEnabled: true,
   },
+  draw_no_bet: {
+    type: 'draw_no_bet',
+    title: 'Draw No Bet (DNB)',
+    category: 'draw_no_bet',
+    period: 'REGULAR_TIME',
+    description: 'Home or away victory with full stake refund (push) if the match finishes level in regular time.',
+    defaultSelections: ['Home DNB', 'Away DNB'],
+    settlementRule: 'Regular time only. If regular time ends in a draw, the stake is pushed/refunded.',
+    dataRequirements: {
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.80,
+      maxUncertaintyScore: 0.22,
+    },
+    qualificationCriteria: {
+      minProbability: 0.65,
+      minEv: 0.035,
+      minEdge: 0.025,
+    },
+    isEnabled: true,
+  },
+  asian_handicap: {
+    type: 'asian_handicap',
+    title: 'Asian Handicap',
+    category: 'handicap',
+    period: 'REGULAR_TIME',
+    description: 'Goal line handicap with half and whole goal margins (-1.5, -1, -0.5, 0, +0.5, +1, +1.5). Whole lines return stake on exact tie.',
+    defaultSelections: ['Home Handicap', 'Away Handicap'],
+    supportedLines: [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5],
+    settlementRule: 'Computed from 90-minute joint scoreline distribution. Full push refund on integer margins matching the line.',
+    dataRequirements: {
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.82,
+      maxUncertaintyScore: 0.20,
+    },
+    qualificationCriteria: {
+      minProbability: 0.60,
+      minEv: 0.035,
+      minEdge: 0.025,
+    },
+    isEnabled: true,
+  },
+  european_handicap: {
+    type: 'european_handicap',
+    title: 'European Handicap (3-Way)',
+    category: 'handicap',
+    period: 'REGULAR_TIME',
+    description: 'Traditional 3-way handicap (-1, +1) with home win, handicap draw, and away win outcomes. No push occurs.',
+    defaultSelections: ['Home Win (-1)', 'Draw (-1)', 'Away Win (+1)', 'Home Win (+1)'],
+    supportedLines: [-1.0, 1.0],
+    settlementRule: '3-way settlement on regular time score after applying integer goal adjustment. No push.',
+    dataRequirements: {
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.82,
+      maxUncertaintyScore: 0.20,
+    },
+    qualificationCriteria: {
+      minProbability: 0.50,
+      minEv: 0.04,
+      minEdge: 0.03,
+    },
+    isEnabled: true,
+  },
+  goal_bounds: {
+    type: 'goal_bounds',
+    title: 'Goal Bounds (Total Match Ranges)',
+    category: 'goal_bounds',
+    period: 'REGULAR_TIME',
+    description: 'Exact non-overlapping and bounded match goal ranges: 0-1, 0-2, 1-2, 1-3, 2-3, 2-4, 2+, 3+, 4+.',
+    defaultSelections: ['1-3 Goals', '2-4 Goals', '2+ Goals', '0-2 Goals'],
+    settlementRule: 'Regular time match total goals within specified numeric band. Probabilities sum to 100% across disjoint complete partitions.',
+    dataRequirements: {
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.82,
+      maxUncertaintyScore: 0.20,
+    },
+    qualificationCriteria: {
+      minProbability: 0.65,
+      minEv: 0.035,
+      minEdge: 0.025,
+    },
+    isEnabled: true,
+  },
+  team_goal_bounds: {
+    type: 'team_goal_bounds',
+    title: 'Team Goal Bounds',
+    category: 'goal_bounds',
+    period: 'REGULAR_TIME',
+    description: 'Team-specific goal bounds (0-1, 1-2, 2+) derived directly from marginal scoreline distributions.',
+    defaultSelections: ['Home 1-2 Goals', 'Away 0-1 Goals', 'Home 2+ Goals'],
+    settlementRule: 'Regular time goals scored by specific team.',
+    dataRequirements: {
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.82,
+      maxUncertaintyScore: 0.20,
+    },
+    qualificationCriteria: {
+      minProbability: 0.65,
+      minEv: 0.035,
+      minEdge: 0.025,
+    },
+    isEnabled: true,
+  },
+  corner_handicap: {
+    type: 'corner_handicap',
+    title: 'Corner Handicap',
+    category: 'team_corners',
+    period: 'REGULAR_TIME',
+    description: 'Differential corner winning lines (e.g. Home -1.5 corners, Away +1.5 corners).',
+    defaultSelections: ['Home -1.5 Corners', 'Away +1.5 Corners'],
+    supportedLines: [-1.5, 1.5],
+    settlementRule: 'Regular time corners taken.',
+    dataRequirements: {
+      requiresCornerData: true,
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.85,
+      maxUncertaintyScore: 0.20,
+    },
+    qualificationCriteria: {
+      minProbability: 0.55,
+      minEv: 0.04,
+      minEdge: 0.03,
+    },
+    isEnabled: true,
+  },
+  team_bookings: {
+    type: 'team_bookings',
+    title: 'Team Bookings',
+    category: 'bookings',
+    period: 'REGULAR_TIME',
+    description: 'Over/under disciplinary bookings on specific teams.',
+    defaultSelections: ['Home Over 1.5 Cards', 'Away Over 1.5 Cards'],
+    supportedLines: [1.5, 2.5],
+    settlementRule: 'Regular time cards shown to active players on pitch.',
+    dataRequirements: {
+      requiresDisciplinaryData: true,
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.85,
+      maxUncertaintyScore: 0.18,
+    },
+    qualificationCriteria: {
+      minProbability: 0.55,
+      minEv: 0.04,
+      minEdge: 0.03,
+    },
+    isEnabled: true,
+  },
+  booking_points: {
+    type: 'booking_points',
+    title: 'Booking Points (10/25 rule)',
+    category: 'bookings',
+    period: 'REGULAR_TIME',
+    description: 'Standard booking points: Yellow card = 10 pts, Red card = 25 pts. Over/Under 35.5, 45.5 pts.',
+    defaultSelections: ['Over 35.5 Booking Pts', 'Over 45.5 Booking Pts'],
+    supportedLines: [35.5, 45.5],
+    settlementRule: 'Regular time yellow = 10, red = 25. Max 35 points per player.',
+    dataRequirements: {
+      requiresDisciplinaryData: true,
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.85,
+      maxUncertaintyScore: 0.18,
+    },
+    qualificationCriteria: {
+      minProbability: 0.55,
+      minEv: 0.04,
+      minEdge: 0.03,
+    },
+    isEnabled: true,
+  },
+  win_draw_combo: {
+    type: 'win_draw_combo',
+    title: 'Win & Goal Combos',
+    category: 'combos',
+    period: 'REGULAR_TIME',
+    description: 'Combined outcomes (e.g. Home or Draw + Over 1.5 goals, Home Win + Over 1.5 goals, Home Win & BTTS).',
+    defaultSelections: ['Home or Draw & Over 1.5', 'Away or Draw & Over 1.5', 'Home Win & Over 1.5', 'Home Win & BTTS'],
+    settlementRule: 'Both legs must be satisfied at regular time whistle.',
+    dataRequirements: {
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.82,
+      maxUncertaintyScore: 0.20,
+    },
+    qualificationCriteria: {
+      minProbability: 0.55,
+      minEv: 0.04,
+      minEdge: 0.03,
+    },
+    isEnabled: true,
+  },
 };
 
 // Configuration guard: list of all authorized option types
@@ -280,8 +468,65 @@ export function getOptionTypeLabel(type: SupportedOptionType | string): string {
       return '1st half goals';
     case 'second_half_result':
       return '2nd half result';
+    case 'draw_no_bet':
+      return 'Draw no bet';
+    case 'asian_handicap':
+      return 'Asian handicap';
+    case 'european_handicap':
+      return 'European handicap';
+    case 'goal_bounds':
+      return 'Goal bounds';
+    case 'team_goal_bounds':
+      return 'Team goal bounds';
+    case 'corner_handicap':
+      return 'Corner handicap';
+    case 'team_bookings':
+      return 'Team bookings';
+    case 'booking_points':
+      return 'Booking points';
+    case 'win_draw_combo':
+      return 'Win & goal combos';
     default:
       return type ? type.replace(/_/g, ' ') : '';
+  }
+}
+
+import { RiskTier } from '@/types';
+
+/**
+ * Returns badge styling and text for risk tiers:
+ * SAFE: green (#b8e63a)
+ * MODERATE: yellow (#e3b341)
+ * RISKY: orange
+ * LONGSHOT: purple
+ */
+export function getRiskTierBadge(tier?: RiskTier): { label: string; badgeClass: string } {
+  switch (tier) {
+    case 'SAFE':
+      return {
+        label: 'SAFE',
+        badgeClass: 'bg-[#b8e63a]/15 text-[#b8e63a] border border-[#b8e63a]/30',
+      };
+    case 'MODERATE':
+      return {
+        label: 'MODERATE',
+        badgeClass: 'bg-[#e3b341]/15 text-[#e3b341] border border-[#e3b341]/30',
+      };
+    case 'RISKY':
+      return {
+        label: 'RISKY',
+        badgeClass: 'bg-orange-500/15 text-orange-400 border border-orange-500/30',
+      };
+    case 'LONGSHOT':
+      return {
+        label: 'LONGSHOT',
+        badgeClass: 'bg-purple-500/15 text-purple-300 border border-purple-500/30',
+      };
+    default:
+      return {
+        label: 'ANALYSIS',
+        badgeClass: 'bg-white/10 text-[#8fa69a] border border-white/15',
+      };
   }
 }
 

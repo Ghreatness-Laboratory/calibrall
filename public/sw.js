@@ -2,7 +2,7 @@
 // Version: 1.0.0
 // Brand: Every call, on record.
 
-const CACHE_VERSION = 'calibrall-v1.0.1';
+const CACHE_VERSION = 'calibrall-v1.0.2';
 const PRECACHE_NAME = `calibrall-precache-${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `calibrall-static-${CACHE_VERSION}`;
 const DATA_CACHE_NAME = `calibrall-data-${CACHE_VERSION}`;
@@ -186,6 +186,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Bypass hot-reload, webpack chunks, and development-only requests
+  if (
+    url.pathname.includes('webpack') ||
+    url.pathname.includes('hot-update') ||
+    url.pathname.includes('_next/webpack-hmr')
+  ) {
+    return;
+  }
+
   // Static assets (Next.js chunks, fonts, images, club crests, icons)
   // Policy: Stale-While-Revalidate with caching
   const isStaticAsset =
@@ -206,18 +215,33 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       (async () => {
         const cached = await caches.match(request);
-        const fetchPromise = fetch(request)
-          .then(async (networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
+        if (cached) {
+          const contentType = cached.headers.get('content-type') || '';
+          // Discard corrupted cached responses (e.g. HTML served for JS)
+          if (url.pathname.endsWith('.js') && contentType.includes('text/html')) {
+            const cache = await caches.open(STATIC_CACHE_NAME);
+            cache.delete(request).catch(() => {});
+          } else {
+            return cached;
+          }
+        }
+
+        try {
+          const networkResponse = await fetch(request);
+          if (networkResponse && networkResponse.status === 200) {
+            const contentType = networkResponse.headers.get('content-type') || '';
+            // Only cache valid assets that are not HTML error pages
+            if (!contentType.includes('text/html') || !url.pathname.endsWith('.js')) {
               const cache = await caches.open(STATIC_CACHE_NAME);
               cache.put(request, networkResponse.clone());
               trimCache(STATIC_CACHE_NAME, MAX_IMAGE_ENTRIES);
             }
-            return networkResponse;
-          })
-          .catch(() => cached);
-
-        return cached || fetchPromise;
+          }
+          return networkResponse;
+        } catch (err) {
+          if (cached) return cached;
+          return new Response('', { status: 404, statusText: 'Not Found' });
+        }
       })()
     );
     return;

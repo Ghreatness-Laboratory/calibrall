@@ -23,7 +23,8 @@ import {
 } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
 import { Fixture, MarketPrediction } from '@/types';
-import { formatExpectedValue, formatSelectionName } from '@/lib/prediction/marketCatalog';
+import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
+import { checkDerby } from '@/lib/prediction/contextFactors';
 
 export default function MatchAnalysisPage() {
   const params = useParams();
@@ -41,7 +42,18 @@ export default function MatchAnalysisPage() {
       try {
         setIsLoading(true);
         const res = await fetch('/api/v1/fixtures', { cache: 'no-store' });
-        const json = await res.json();
+        if (!res.ok) {
+          setFixture(null);
+          return;
+        }
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          setFixture(null);
+          return;
+        }
         if (json.lastUpdated) setLastUpdated(json.lastUpdated);
         const found = (json.data || []).find((f: Fixture) => f.id === id);
         setFixture(found || null);
@@ -168,6 +180,19 @@ export default function MatchAnalysisPage() {
             <span className="font-[500] text-[#e8efe9]">{fixture.competition.name}</span>
             <span className="text-[#8fa69a]/60">·</span>
             <span className="font-mono">Matchday {fixture.matchday}</span>
+            {(() => {
+              const derby = (fixture.isDerby && fixture.derbyName) ? { name: fixture.derbyName } : checkDerby(fixture.homeTeam.name, fixture.awayTeam.name);
+              return derby ? (
+                <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  ⚡ {derby.name}
+                </span>
+              ) : null;
+            })()}
+            {fixture.hasCoachChange && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                New Manager
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-4 font-mono text-[11px] text-[#8fa69a]">
@@ -326,15 +351,35 @@ export default function MatchAnalysisPage() {
       <div className="bg-[#0f2219] border border-[#b8e63a]/30 rounded-[12px] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         {evaluation.topPick ? (
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#b8e63a] mb-1">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Primary qualified recommendation</span>
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#b8e63a]">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Primary qualified recommendation</span>
+              </div>
+              {(() => {
+                const tier = getRiskTierBadge(evaluation.topPick.riskTier);
+                return (
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-wider ${tier.badgeClass}`}>
+                    {tier.label}
+                  </span>
+                );
+              })()}
+              {evaluation.topPick.marketOdds && (
+                <span className="text-[11px] font-mono text-[#e8efe9] bg-white/[0.08] px-1.5 py-0.5 rounded border border-white/10">
+                  @{formatOdds(evaluation.topPick.marketOdds)}
+                </span>
+              )}
             </div>
             <h3 className="text-[15px] font-[500] text-[#e8efe9]">
               {formatSelectionName(evaluation.topPick.selection)} — {(evaluation.topPick.modelProbability * 100).toFixed(1)}% probability
               {evaluation.topPick.expectedValue !== undefined ? ` (${formatExpectedValue(evaluation.topPick.expectedValue).text} EV)` : ''}
             </h3>
-            <p className="text-[12px] text-[#8fa69a] mt-0.5 max-w-2xl leading-normal">
+            {evaluation.topPick.plainEnglishReason && (
+              <p className="text-[12px] text-[#b8e63a] font-medium mt-1 max-w-2xl leading-normal">
+                {evaluation.topPick.plainEnglishReason}
+              </p>
+            )}
+            <p className="text-[11px] text-[#8fa69a] mt-0.5 max-w-2xl leading-normal">
               Ranked highest across {evaluation.predictions.length} candidate lines. Passes minimum sample size ({stats.sampleSizeMatches} matches) and margin-of-safety filters.
             </p>
           </div>
@@ -380,6 +425,8 @@ export default function MatchAnalysisPage() {
             predictions={evaluation.predictions}
             selectedPredictionId={selectedPrediction?.id}
             onSelectPrediction={(p) => setSelectedPrediction(p)}
+            homeTeamName={fixture.homeTeam.name}
+            awayTeamName={fixture.awayTeam.name}
           />
         </div>
 

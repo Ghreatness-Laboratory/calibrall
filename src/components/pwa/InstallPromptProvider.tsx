@@ -63,11 +63,14 @@ export function InstallPromptProvider({ children }: { children: React.ReactNode 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Register service worker after window load
-    const registerSW = () => {
-      // In production or when explicitly enabled
-      const isProd = process.env.NODE_ENV === 'production' || window.location.search.includes('sw=1');
-      if ('serviceWorker' in navigator && (isProd || window.location.hostname !== 'localhost')) {
+    // Register service worker only in true production or when explicitly requested via ?sw=1
+    const handleServiceWorker = () => {
+      if (!('serviceWorker' in navigator)) return;
+
+      const isExplicitProd = process.env.NODE_ENV === 'production' && !window.location.hostname.includes('ais-dev');
+      const isManualTest = window.location.search.includes('sw=1');
+
+      if (isExplicitProd || isManualTest) {
         navigator.serviceWorker
           .register('/sw.js', { scope: '/' })
           .then((registration) => {
@@ -99,13 +102,31 @@ export function InstallPromptProvider({ children }: { children: React.ReactNode 
             window.location.reload();
           }
         });
+      } else {
+        // In development / preview: proactively unregister any previously registered service worker
+        // to prevent stale chunk caching and Unexpected token '<' errors
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const reg of registrations) {
+            reg.unregister().catch(() => {});
+          }
+        }).catch(() => {});
+
+        if ('caches' in window) {
+          caches.keys().then((keys) => {
+            for (const key of keys) {
+              if (key.startsWith('calibrall-')) {
+                caches.delete(key).catch(() => {});
+              }
+            }
+          }).catch(() => {});
+        }
       }
     };
 
     if (document.readyState === 'complete') {
-      registerSW();
+      handleServiceWorker();
     } else {
-      window.addEventListener('load', registerSW);
+      window.addEventListener('load', handleServiceWorker);
     }
 
     // 2. Listen for beforeinstallprompt

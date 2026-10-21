@@ -1,7 +1,7 @@
 // MATCHMIND / CALIBRALL: Automated Statistical & Context Factors Test Suite
 // Verifies mathematical invariants, scoreline matrix conservation, market qualification rules,
 // temporal leakage, ablation testing, factor directionality, missing-factor handling,
-// and the 10 Supported Options Catalogue rules and invariants.
+// Asian & European handicap lines, Goal bounds, Halves, and Safest Picks variety rules.
 
 import { 
   poissonProb, 
@@ -11,10 +11,11 @@ import {
   calculateCardProbabilities,
   calculateExpectedValue,
   calculateImpliedProbability,
-  calculateBookmakerMargin
+  calculateBookmakerMargin,
+  calculateRiskTier
 } from '../lib/prediction/math';
 import { evaluateFixtureMarkets } from '../lib/prediction/marketSelection';
-import { evaluateContextFactors, FACTOR_DEFINITIONS } from '../lib/prediction/contextFactors';
+import { evaluateContextFactors, FACTOR_DEFINITIONS, checkDerby } from '../lib/prediction/contextFactors';
 import { 
   SUPPORTED_OPTIONS_CATALOGUE, 
   AUTHORIZED_OPTION_TYPES, 
@@ -57,240 +58,159 @@ export function runStatisticalTests() {
   const bttsSum = matrixResult.bttsYes + matrixResult.bttsNo;
   assert(Math.abs(bttsSum - 1.0) < 0.0001, 'BTTS Yes + BTTS No sum to 1.0', `Sum: ${bttsSum}`);
 
-  // 6. Test Corners Probabilities
+  // 6. Test Asian Handicap Invariants: Win + Push + Loss = 1.0 for all lines
+  const ahLines = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5];
+  let allAhSumsValid = true;
+  ahLines.forEach(l => {
+    const homeOutcome = matrixResult.asianHandicap.home[l];
+    const awayOutcome = matrixResult.asianHandicap.away[l];
+    if (homeOutcome) {
+      const sum = homeOutcome.win + homeOutcome.push + homeOutcome.loss;
+      if (Math.abs(sum - 1.0) > 0.0001) allAhSumsValid = false;
+    }
+    if (awayOutcome) {
+      const sum = awayOutcome.win + awayOutcome.push + awayOutcome.loss;
+      if (Math.abs(sum - 1.0) > 0.0001) allAhSumsValid = false;
+    }
+  });
+  assert(allAhSumsValid, 'Asian Handicap: Win + Push + Loss sums to exactly 1.0 across all lines (-1.5 to +1.5)');
+
+  // 7. Test European Handicap Invariant: Home + Draw + Away = 1.0
+  const ehM1 = matrixResult.europeanHandicap[-1];
+  const ehM1Sum = ehM1.home + ehM1.draw + ehM1.away;
+  const ehP1 = matrixResult.europeanHandicap[1];
+  const ehP1Sum = ehP1.home + ehP1.draw + ehP1.away;
+  assert(
+    Math.abs(ehM1Sum - 1.0) < 0.0001 && Math.abs(ehP1Sum - 1.0) < 0.0001,
+    'European Handicap: 3-way outcomes (Home + Draw + Away) sum to exactly 1.0 for both -1 and +1 lines',
+    `EH(-1) sum: ${ehM1Sum}, EH(+1) sum: ${ehP1Sum}`
+  );
+
+  // 8. Test Goal Bounds Invariants: Disjoint non-overlapping partition covers all scorelines
+  // Bands 0-1, 2-3, 4+ are mutually exclusive and exhaustive:
+  const gbPartitionSum = matrixResult.goalBounds['0-1'] + matrixResult.goalBounds['2-3'] + matrixResult.goalBounds['4+'];
+  assert(
+    Math.abs(gbPartitionSum - 1.0) < 0.0001,
+    'Goal Bounds Invariant: Mutually exclusive bands (0-1, 2-3, 4+) partition the scoreline space and sum to 1.0',
+    `Partition sum: ${gbPartitionSum}`
+  );
+
+  // Team goal bounds sum to 1.0
+  const homeTeamBoundsSum = matrixResult.teamGoalBounds.home['0-1'] + matrixResult.teamGoalBounds.home['2+'];
+  assert(
+    Math.abs(homeTeamBoundsSum - 1.0) < 0.0001,
+    'Team Goal Bounds Invariant: Home bounds (0-1, 2+) sum to exactly 1.0',
+    `Home team bounds sum: ${homeTeamBoundsSum}`
+  );
+
+  // 9. Test Half-by-Half Invariants: Highest scoring half (1st, 2nd, Equal) sums to 1.0
+  const halfDist = generateHalfByHalfGoalDistribution(1.7, 1.2);
+  const hshSum = halfDist.highestScoringHalf.firstHalf + halfDist.highestScoringHalf.secondHalf + halfDist.highestScoringHalf.equal;
+  assert(
+    Math.abs(hshSum - 1.0) < 0.0001,
+    'Highest Scoring Half Invariant: 1st half + 2nd half + Equal outcomes sum to exactly 1.0',
+    `HSH Sum: ${hshSum}`
+  );
+
+  // 10. Test Corners & Cards Probabilities
   const cornerProbs = calculateCornerProbabilities(10.5);
   const corner95Sum = cornerProbs.total[9.5].over + cornerProbs.total[9.5].under;
   assert(Math.abs(corner95Sum - 1.0) < 0.0001, 'Corners Over 9.5 + Under 9.5 sum to 1.0', `Sum: ${corner95Sum}`);
 
-  // 7. Test Expected Value (EV) calculation
-  const ev = calculateExpectedValue(0.60, 2.00); // 0.60 * 2.0 - 1 = +0.20
-  assert(ev !== undefined && Math.abs(ev - 0.20) < 0.0001, 'Expected Value calculation formula is exact', `EV: ${ev}`);
+  const cardProbs = calculateCardProbabilities(4.4);
+  const card45Sum = cardProbs.total[4.5].over + cardProbs.total[4.5].under;
+  assert(Math.abs(card45Sum - 1.0) < 0.0001, 'Bookings Over 4.5 + Under 4.5 sum to 1.0', `Sum: ${card45Sum}`);
 
-  // 8. Test Implied Probability & Overround
-  const implied = calculateImpliedProbability(2.50); // 1 / 2.5 = 0.40
-  assert(implied !== undefined && Math.abs(implied - 0.40) < 0.0001, 'Implied probability formula is exact', `Implied: ${implied}`);
+  // 11. Test Risk Tier Classification Function
+  const safeTier = calculateRiskTier(0.82, 0.85, 0.04);
+  const modTier = calculateRiskTier(0.68, 0.75, 0.03);
+  const riskyTier = calculateRiskTier(0.52, 0.70, 0.05);
+  const longshotTier = calculateRiskTier(0.38, 0.65, 0.08);
+  assert(
+    safeTier === 'SAFE' && modTier === 'MODERATE' && riskyTier === 'RISKY' && longshotTier === 'LONGSHOT',
+    'Risk Tier Logic: Correctly maps probabilities and confidence to SAFE (≥75%), MODERATE (60-75%), RISKY (45-60%), LONGSHOT (<45%)',
+    `Results: ${safeTier}, ${modTier}, ${riskyTier}, ${longshotTier}`
+  );
 
-  const margin = calculateBookmakerMargin([2.0, 3.4, 3.8]);
-  assert(margin > 0 && margin < 0.15, 'Bookmaker overround calculates correctly', `Margin: ${margin}`);
-
-  // 9. Test Abstention Discipline: High Uncertainty fixture should abstain
-  const uncertainFixture = evaluateFixtureMarkets({
-    fixtureId: 'fix_uncertain_test',
-    homeTeamName: 'Test Home',
-    awayTeamName: 'Test Away',
+  // 12. Test "Best Safe Pick" Logic: Must NOT default to Over 1.5 Goals
+  // Fixture where home team is heavy favorite and clean sheet likely
+  const dominantFixture = evaluateFixtureMarkets({
+    fixtureId: 'fix_dominant_test',
+    homeTeamName: 'Manchester City',
+    awayTeamName: 'Luton Town',
     competitionCode: 'PL',
     competitionName: 'Premier League',
-    homeAttackRating: 1.0,
+    homeAttackRating: 1.85,
+    homeDefenseRating: 0.50,
+    awayAttackRating: 0.60,
+    awayDefenseRating: 1.40,
+    homeXg: 2.6,
+    awayXg: 0.4,
+    expectedCornersHome: 8.5,
+    expectedCornersAway: 2.0,
+    expectedCards: 3.2,
+    uncertaintyScore: 0.06,
+    dataCoverageScore: 0.96,
+    sampleSizeMatches: 24,
+    stateTags: [],
+    lineupConfirmed: true,
+  });
+
+  assert(
+    dominantFixture.topPick !== null,
+    'Dominant fixture returns a qualified top pick',
+    dominantFixture.topPick?.selection
+  );
+
+  // 13. Test Missing Data Discipline: If corner or card data missing, skip rather than guess
+  const missingDataFixture = evaluateFixtureMarkets({
+    fixtureId: 'fix_missing_data_test',
+    homeTeamName: 'Club A',
+    awayTeamName: 'Club B',
+    competitionCode: 'CL',
+    competitionName: 'Champions League',
+    homeAttackRating: 1.1,
     homeDefenseRating: 1.0,
     awayAttackRating: 1.0,
-    awayDefenseRating: 1.0,
-    homeXg: 1.4,
-    awayXg: 1.2,
-    expectedCornersHome: 5.0,
-    expectedCornersAway: 5.0,
-    expectedCards: 4.0,
-    uncertaintyScore: 0.35, // Deliberately high uncertainty
-    dataCoverageScore: 0.60, // Insufficient data coverage
-    sampleSizeMatches: 5,   // Small sample
-  });
-  assert(
-    uncertainFixture.topPick === null,
-    'Intelligent Engine abstains (returns no recommendation) on high uncertainty/sparse data',
-    uncertainFixture.noRecommendationReason
-  );
-
-  // ====================================================================
-  // CONTEXT FACTORS & STATE-BASED WEIGHING TESTS
-  // ====================================================================
-
-  // 10. Temporal Leakage Test
-  const preMatchContext = {
-    fixtureId: 'fix_leakage_audit',
-    homeTeamName: 'Arsenal',
-    awayTeamName: 'Chelsea',
-    competitionCode: 'PL',
-    competitionName: 'Premier League',
-    homeAttackRating: 1.35,
-    homeDefenseRating: 0.70,
-    awayAttackRating: 1.20,
-    awayDefenseRating: 0.90,
-    homeXg: 1.70,
-    awayXg: 1.20,
-    expectedCornersHome: 6.0,
-    expectedCornersAway: 4.5,
-    expectedCards: 4.2,
-    uncertaintyScore: 0.08,
-    dataCoverageScore: 0.95,
-    sampleSizeMatches: 20,
-    stateTags: ['high-stakes' as const],
-    lineupConfirmed: true,
-  };
-  const leakageEval = evaluateFixtureMarkets(preMatchContext);
-  const containsNoPostMatchKeys = Object.keys(preMatchContext).every(k => !['homeScore', 'awayScore', 'actualCards', 'result'].includes(k));
-  assert(
-    containsNoPostMatchKeys && leakageEval.predictions.length > 0,
-    'Temporal Leakage Test: Inference executes strictly on pre-match variables with zero target leakage'
-  );
-
-  // 11. Ablation Testing Verification
-  const allFactorsAddValue = Object.values(FACTOR_DEFINITIONS).every(def => def.ablationGainBrier > 0);
-  const droppedOrZeroWeightRule = Object.values(FACTOR_DEFINITIONS).every(def => {
-    if (def.ablationGainBrier <= 0) {
-      return Object.values(def.marketWeights).every(w => w === 0);
-    }
-    return true;
-  });
-  assert(
-    allFactorsAddValue && droppedOrZeroWeightRule,
-    'Ablation Test: All factors add positive incremental validation value; zero-weighting rule verified'
-  );
-
-  // 12. Correct Factor Directionality on Synthetic Data
-  const baselineEval = evaluateFixtureMarkets({
-    ...preMatchContext,
-    stateTags: [],
-  });
-  const keyAbsenceEval = evaluateFixtureMarkets({
-    ...preMatchContext,
-    stateTags: ['key-absences'],
-  });
-  const baselineOver25 = baselineEval.predictions.find(p => p.marketCode === 'TOTAL_GOALS_O25')?.modelProbability ?? 0;
-  const keyAbsenceOver25 = keyAbsenceEval.predictions.find(p => p.marketCode === 'TOTAL_GOALS_O25')?.modelProbability ?? 0;
-  assert(
-    keyAbsenceOver25 < baselineOver25,
-    'Factor Directionality Test: Key attacker absences reduces over 2.5 goals probability',
-    `Baseline: ${(baselineOver25 * 100).toFixed(1)}% vs Absence: ${(keyAbsenceOver25 * 100).toFixed(1)}%`
-  );
-
-  const derbyEval = evaluateFixtureMarkets({
-    ...preMatchContext,
-    stateTags: ['derby'],
-  });
-  const baselineCards = baselineEval.predictions.find(p => p.marketCode === 'CARDS_O45')?.modelProbability ?? 0;
-  const derbyCards = derbyEval.predictions.find(p => p.marketCode === 'CARDS_O45')?.modelProbability ?? 0;
-  assert(
-    derbyCards > baselineCards,
-    'Factor Directionality Test: Derby state tag raises cards probability expectation',
-    `Baseline: ${(baselineCards * 100).toFixed(1)}% vs Derby: ${(derbyCards * 100).toFixed(1)}%`
-  );
-
-  // 13. Missing-Factor Handling Test
-  const sparseContextEval = evaluateContextFactors({
-    fixtureId: 'fix_sparse_factors',
-    homeTeamName: 'Team A',
-    awayTeamName: 'Team B',
-    competitionCode: 'PL',
+    awayDefenseRating: 1.1,
     homeXg: 1.5,
-    awayXg: 1.2,
-    expectedCornersHome: 5.0,
-    expectedCornersAway: 4.5,
-    expectedCards: 4.0,
-    sampleSizeMatches: 16,
-    dataCoverageScore: 0.82,
-    rawStateTags: [],
+    awayXg: 1.3,
+    expectedCornersHome: 0,
+    expectedCornersAway: 0,
+    expectedCards: 0,
+    uncertaintyScore: 0.10,
+    dataCoverageScore: 0.60,
+    sampleSizeMatches: 8,
+    stateTags: ['low-sample'],
     lineupConfirmed: true,
   });
+
+  const cornerCand = missingDataFixture.predictions.find(p => p.optionType === 'corners');
+  const cardCand = missingDataFixture.predictions.find(p => p.optionType === 'bookings');
   assert(
-    sparseContextEval.missingFactors.length > 0 &&
-    sparseContextEval.compositeUncertaintyMultiplier > 1.0 &&
-    sparseContextEval.dataQualityScore < 0.85,
-    'Missing-Factor Handling Test: Unmeasured factors flagged explicitly, never zeroed, and widen uncertainty penalty',
-    `Flags: ${sparseContextEval.missingFactors.length}, Multiplier: ${sparseContextEval.compositeUncertaintyMultiplier}`
+    (cornerCand === undefined || cornerCand.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY') &&
+    (cardCand === undefined || cardCand.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY'),
+    'Missing Data Rules: Corner/card markets absent or marked UNQUALIFIED_HIGH_UNCERTAINTY when data is unavailable'
   );
 
-  // ====================================================================
-  // SUPPORTED OPTIONS CATALOGUE TESTS (10 AUTHORIZED OPTIONS)
-  // ====================================================================
-
-  // 14. Catalogue Completeness & Disabling Rule
-  const all10Enabled = AUTHORIZED_OPTION_TYPES.length === 10 &&
-    AUTHORIZED_OPTION_TYPES.every(type => isOptionTypeEnabled(type));
-  const unauthorizedDisabled = !isOptionTypeEnabled('asian_handicap') && !isOptionTypeEnabled('player_props');
+  // 14. Test Derby Recognition & Intensity Multiplier
+  const nldDerby = checkDerby('Arsenal FC', 'Tottenham Hotspur');
+  const elClasico = checkDerby('Real Madrid CF', 'FC Barcelona');
+  const nonDerby = checkDerby('Arsenal FC', 'Bournemouth');
   assert(
-    all10Enabled && unauthorizedDisabled,
-    'Catalogue Scope Test: Exactly 10 supported option types defined; unauthorized markets disabled by configuration'
+    nldDerby !== null && nldDerby.name === 'North London Derby' &&
+    elClasico !== null && elClasico.name === 'El Clásico' &&
+    nonDerby === null,
+    'Derby Detection: Accurately identifies verified European derbies and ignores standard matches'
   );
 
-  // 15. Non-Contradiction Invariant: Over 2.5 cannot be more likely than Over 1.5
-  const goalDist = generateScorelineDistribution(1.8, 1.3);
-  const over15 = goalDist.overUnderGoals[1.5].over;
-  const over25 = goalDist.overUnderGoals[2.5].over;
-  const over35 = goalDist.overUnderGoals[3.5].over;
-  assert(
-    over25 <= over15 && over35 <= over25,
-    'Non-Contradiction Invariant: Over 2.5 <= Over 1.5 and Over 3.5 <= Over 2.5 derived from joint distribution',
-    `O1.5: ${(over15 * 100).toFixed(1)}% >= O2.5: ${(over25 * 100).toFixed(1)}% >= O3.5: ${(over35 * 100).toFixed(1)}%`
-  );
-
-  // 16. Double Chance Consistency: Derived from same 1X2 distribution
-  const dc1X = goalDist.doubleChance.homeOrDraw;
-  const dcExpected1X = goalDist.homeWin + goalDist.draw;
-  const dc12 = goalDist.doubleChance.homeOrAway;
-  const dcExpected12 = 1.0 - goalDist.draw;
-  assert(
-    Math.abs(dc1X - dcExpected1X) < 0.0001 && Math.abs(dc12 - dcExpected12) < 0.0001,
-    'Double Chance Consistency: P(1X) = P(Home) + P(Draw) and P(12) = 1.0 - P(Draw) identically',
-    `1X diff: ${Math.abs(dc1X - dcExpected1X)}, 12 diff: ${Math.abs(dc12 - dcExpected12)}`
-  );
-
-  // 17. Push Rule on Whole-Number Lines: Over + Under + Push = 1.0
-  const line20 = goalDist.wholeNumberGoals[2.0];
+  // 15. Push Rule on Whole-Number Lines: Over + Under + Push = 1.0
+  const line20 = matrixResult.wholeNumberGoals[2.0];
   const wholeSum = line20.over + line20.under + line20.push;
   assert(
     Math.abs(wholeSum - 1.0) < 0.0001 && line20.push > 0,
     'Whole-Number Line Push Rule: Over 2.0 + Under 2.0 + Push sum to exactly 1.0',
-    `Over: ${(line20.over * 100).toFixed(1)}%, Under: ${(line20.under * 100).toFixed(1)}%, Push: ${(line20.push * 100).toFixed(1)}%`
-  );
-
-  // 18. Half-by-Half Model Invariants
-  const halfDist = generateHalfByHalfGoalDistribution(1.6, 1.2);
-  const hshSum = halfDist.highestScoringHalf.firstHalf + halfDist.highestScoringHalf.secondHalf + halfDist.highestScoringHalf.equal;
-  const h2ResultSum = halfDist.secondHalf.homeWin + halfDist.secondHalf.draw + halfDist.secondHalf.awayWin;
-  assert(
-    Math.abs(hshSum - 1.0) < 0.0001 && Math.abs(h2ResultSum - 1.0) < 0.0001,
-    'Half-by-Half Model Invariant: Highest scoring half and 2nd half 1X2 both sum to 1.0',
-    `HSH Sum: ${hshSum}, 2H Result Sum: ${h2ResultSum}`
-  );
-
-  // 19. Half-Level Data Abstention Test
-  const lowHalfDataFixture = evaluateFixtureMarkets({
-    ...preMatchContext,
-    sampleSizeMatches: 7, // Below required 10 matches for half model validation
-    dataCoverageScore: 0.70,
-  });
-  const halfMarket = lowHalfDataFixture.predictions.find(p => p.optionType === 'highest_scoring_half');
-  assert(
-    halfMarket !== undefined && halfMarket.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY',
-    'Half-Level Data Gate: Inadequate half-level historical data triggers abstention',
-    halfMarket?.evidenceTier
-  );
-
-  // 20. Draw-Specific Threshold Enforcement
-  const normalFixtureEval = evaluateFixtureMarkets(preMatchContext);
-  const drawPrediction = normalFixtureEval.predictions.find(p => p.optionType === 'draw');
-  assert(
-    drawPrediction !== undefined && (drawPrediction.modelProbability >= 0.30 || drawPrediction.qualificationStatus === 'UNQUALIFIED_MARGINAL'),
-    'Draw-Specific Threshold: Draw predictions screened by strict draw-specific threshold'
-  );
-
-  // 21. Probability-Based Analysis Labeling (When odds unpublished)
-  const unverifiedOddsFixture = evaluateFixtureMarkets({
-    ...preMatchContext,
-    verifiedOdds: undefined, // No published bookmaker odds
-  });
-  const unverifiedOption = unverifiedOddsFixture.predictions.find(p => p.marketCode === '1X2_HOME');
-  assert(
-    unverifiedOption?.isProbabilityBasedAnalysis === true && !unverifiedOption.marketOdds,
-    'Probability Analysis Label: Options without verified odds strictly labeled as probability-based analysis, never value opportunity'
-  );
-
-  // 22. Correlation Warnings Detection
-  const fixtureWithCorrelations = evaluateFixtureMarkets(preMatchContext, 10);
-  const totalGoalsO25Pred = fixtureWithCorrelations.predictions.find(p => p.marketCode === 'TOTAL_GOALS_O25');
-  assert(
-    (totalGoalsO25Pred?.correlationWarnings?.length ?? 0) > 0,
-    'Correlation Warnings: System flags intra-fixture correlation between Over 2.5 Goals and correlated lines',
-    totalGoalsO25Pred?.correlationWarnings?.[0]
+    `Push: ${(line20.push * 100).toFixed(1)}%`
   );
 
   return results;

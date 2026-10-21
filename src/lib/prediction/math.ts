@@ -39,6 +39,21 @@ export function dixonColesTau(x: number, y: number, lambda: number, mu: number, 
   return 1.0;
 }
 
+export interface HandicapOutcome {
+  win: number;
+  push: number;
+  loss: number;
+  line: number;
+  team: 'home' | 'away';
+}
+
+export interface EuropeanHandicapOutcome {
+  home: number;
+  draw: number;
+  away: number;
+  line: number;
+}
+
 export interface ScorelineMatrixResult {
   matrix: number[][]; // [homeScore][awayScore]
   homeWin: number;
@@ -49,6 +64,40 @@ export interface ScorelineMatrixResult {
     homeOrDraw: number; // 1X = homeWin + draw
     awayOrDraw: number; // X2 = awayWin + draw
     homeOrAway: number; // 12 = homeWin + awayWin = 1 - draw
+  };
+  drawNoBet: {
+    home: { win: number; push: number; loss: number; winProbWithoutPush: number };
+    away: { win: number; push: number; loss: number; winProbWithoutPush: number };
+  };
+  asianHandicap: {
+    home: Record<number, HandicapOutcome>;
+    away: Record<number, HandicapOutcome>;
+  };
+  europeanHandicap: Record<number, EuropeanHandicapOutcome>;
+  goalBounds: {
+    '0-1': number;
+    '0-2': number;
+    '1-2': number;
+    '1-3': number;
+    '2-3': number;
+    '2-4': number;
+    '2+': number;
+    '3+': number;
+    '4+': number;
+  };
+  teamGoalBounds: {
+    home: { '0-1': number; '1-2': number; '2+': number };
+    away: { '0-1': number; '1-2': number; '2+': number };
+  };
+  combos: {
+    homeOrDrawAndOver15: number;
+    awayOrDrawAndOver15: number;
+    homeWinAndOver15: number;
+    awayWinAndOver15: number;
+    homeWinAndBttsYes: number;
+    awayWinAndBttsYes: number;
+    homeOrDrawAndUnder35: number;
+    awayOrDrawAndUnder35: number;
   };
   bttsYes: number;
   bttsNo: number;
@@ -125,6 +174,49 @@ export function generateScorelineDistribution(
     teamGoalsOverUnder.away[line] = { over: 0, under: 0 };
   });
 
+  const asianLines = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5];
+  const asianHandicap = {
+    home: {} as Record<number, HandicapOutcome>,
+    away: {} as Record<number, HandicapOutcome>,
+  };
+  asianLines.forEach(l => {
+    asianHandicap.home[l] = { win: 0, push: 0, loss: 0, line: l, team: 'home' };
+    asianHandicap.away[l] = { win: 0, push: 0, loss: 0, line: l, team: 'away' };
+  });
+
+  const europeanHandicap: Record<number, EuropeanHandicapOutcome> = {
+    [-1]: { home: 0, draw: 0, away: 0, line: -1 },
+    [1]: { home: 0, draw: 0, away: 0, line: 1 },
+  };
+
+  const goalBounds = {
+    '0-1': 0,
+    '0-2': 0,
+    '1-2': 0,
+    '1-3': 0,
+    '2-3': 0,
+    '2-4': 0,
+    '2+': 0,
+    '3+': 0,
+    '4+': 0,
+  };
+
+  const teamGoalBounds = {
+    home: { '0-1': 0, '1-2': 0, '2+': 0 },
+    away: { '0-1': 0, '1-2': 0, '2+': 0 },
+  };
+
+  const combos = {
+    homeOrDrawAndOver15: 0,
+    awayOrDrawAndOver15: 0,
+    homeWinAndOver15: 0,
+    awayWinAndOver15: 0,
+    homeWinAndBttsYes: 0,
+    awayWinAndBttsYes: 0,
+    homeOrDrawAndUnder35: 0,
+    awayOrDrawAndUnder35: 0,
+  };
+
   for (let h = 0; h <= maxGoals; h++) {
     for (let a = 0; a <= maxGoals; a++) {
       const p = matrix[h][a];
@@ -160,6 +252,60 @@ export function generateScorelineDistribution(
         if (a > line) teamGoalsOverUnder.away[line].over += p;
         else teamGoalsOverUnder.away[line].under += p;
       });
+
+      // Asian Handicap for Home and Away
+      asianLines.forEach(l => {
+        const diffHome = Number(((h + l) - a).toFixed(2));
+        if (diffHome > 0) asianHandicap.home[l].win += p;
+        else if (diffHome === 0) asianHandicap.home[l].push += p;
+        else asianHandicap.home[l].loss += p;
+
+        const diffAway = Number(((a + l) - h).toFixed(2));
+        if (diffAway > 0) asianHandicap.away[l].win += p;
+        else if (diffAway === 0) asianHandicap.away[l].push += p;
+        else asianHandicap.away[l].loss += p;
+      });
+
+      // European Handicap (-1, +1)
+      // Line -1: Home gives 1 goal deficit
+      if (h - 1 > a) europeanHandicap[-1].home += p;
+      else if (h - 1 === a) europeanHandicap[-1].draw += p;
+      else europeanHandicap[-1].away += p;
+
+      // Line +1: Home gets 1 goal advantage
+      if (h + 1 > a) europeanHandicap[1].home += p;
+      else if (h + 1 === a) europeanHandicap[1].draw += p;
+      else europeanHandicap[1].away += p;
+
+      // Goal Bounds
+      if (totalMatchGoals <= 1) goalBounds['0-1'] += p;
+      if (totalMatchGoals <= 2) goalBounds['0-2'] += p;
+      if (totalMatchGoals >= 1 && totalMatchGoals <= 2) goalBounds['1-2'] += p;
+      if (totalMatchGoals >= 1 && totalMatchGoals <= 3) goalBounds['1-3'] += p;
+      if (totalMatchGoals >= 2 && totalMatchGoals <= 3) goalBounds['2-3'] += p;
+      if (totalMatchGoals >= 2 && totalMatchGoals <= 4) goalBounds['2-4'] += p;
+      if (totalMatchGoals >= 2) goalBounds['2+'] += p;
+      if (totalMatchGoals >= 3) goalBounds['3+'] += p;
+      if (totalMatchGoals >= 4) goalBounds['4+'] += p;
+
+      // Team Goal Bounds
+      if (h <= 1) teamGoalBounds.home['0-1'] += p;
+      if (h >= 1 && h <= 2) teamGoalBounds.home['1-2'] += p;
+      if (h >= 2) teamGoalBounds.home['2+'] += p;
+
+      if (a <= 1) teamGoalBounds.away['0-1'] += p;
+      if (a >= 1 && a <= 2) teamGoalBounds.away['1-2'] += p;
+      if (a >= 2) teamGoalBounds.away['2+'] += p;
+
+      // Combos
+      if (h >= a && totalMatchGoals > 1.5) combos.homeOrDrawAndOver15 += p;
+      if (a >= h && totalMatchGoals > 1.5) combos.awayOrDrawAndOver15 += p;
+      if (h > a && totalMatchGoals > 1.5) combos.homeWinAndOver15 += p;
+      if (a > h && totalMatchGoals > 1.5) combos.awayWinAndOver15 += p;
+      if (h > a && h >= 1 && a >= 1) combos.homeWinAndBttsYes += p;
+      if (a > h && h >= 1 && a >= 1) combos.awayWinAndBttsYes += p;
+      if (h >= a && totalMatchGoals < 3.5) combos.homeOrDrawAndUnder35 += p;
+      if (a >= h && totalMatchGoals < 3.5) combos.awayOrDrawAndUnder35 += p;
     }
   }
 
@@ -179,6 +325,23 @@ export function generateScorelineDistribution(
   const awayOrDraw = awayWin + draw;
   const homeOrAway = homeWin + awayWin;
 
+  // Draw No Bet derivations
+  const dnbDecisive = homeWin + awayWin;
+  const drawNoBet = {
+    home: {
+      win: homeWin,
+      push: draw,
+      loss: awayWin,
+      winProbWithoutPush: dnbDecisive > 0 ? homeWin / dnbDecisive : 0.5,
+    },
+    away: {
+      win: awayWin,
+      push: draw,
+      loss: homeWin,
+      winProbWithoutPush: dnbDecisive > 0 ? awayWin / dnbDecisive : 0.5,
+    },
+  };
+
   // Sort scorelines by probability descending
   scorelineList.sort((a, b) => b.probability - a.probability);
 
@@ -192,6 +355,12 @@ export function generateScorelineDistribution(
       awayOrDraw,
       homeOrAway,
     },
+    drawNoBet,
+    asianHandicap,
+    europeanHandicap,
+    goalBounds,
+    teamGoalBounds,
+    combos,
     bttsYes,
     bttsNo: Math.max(0, 1 - bttsYes),
     overUnderGoals,
@@ -536,3 +705,25 @@ export function calculateBookmakerMargin(oddsList: number[]): number {
   const sumImplied = oddsList.reduce((acc, odds) => acc + (odds > 1 ? 1 / odds : 0), 0);
   return Math.max(0, sumImplied - 1.0);
 }
+
+import { RiskTier } from '@/types';
+
+/**
+ * Calculates Risk Tier according to strict mathematical rule:
+ * - SAFE: probability 75% or higher, with a high confidence score (>= 0.70)
+ * - MODERATE: probability 60-75%
+ * - RISKY: probability 45-60%, or higher-odds value plays
+ * - LONGSHOT: below 45%, only shown if the edge is large
+ */
+export function calculateRiskTier(probability: number, confidenceScore: number = 0.8, edge?: number): RiskTier {
+  if (probability >= 0.75 && confidenceScore >= 0.70) {
+    return 'SAFE';
+  } else if (probability >= 0.60) {
+    return 'MODERATE';
+  } else if (probability >= 0.45) {
+    return 'RISKY';
+  } else {
+    return 'LONGSHOT';
+  }
+}
+

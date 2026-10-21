@@ -34,7 +34,20 @@ export function useLiveFixtures(competitionCode?: string, status?: string): Live
       const res = await fetch(`/api/v1/fixtures?${query.toString()}`, {
         cache: 'no-store',
       });
-      const json = await res.json();
+      if (!res.ok) {
+        setLiveDataAvailable(false);
+        setError(`Live data unavailable. Last updated ${lastUpdated}`);
+        return;
+      }
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        setLiveDataAvailable(false);
+        setError(`Live data unavailable. Last updated ${lastUpdated}`);
+        return;
+      }
       
       const list = json.data || [];
       setFixtures(list);

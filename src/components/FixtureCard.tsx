@@ -6,7 +6,8 @@ import { Fixture, MarketPrediction } from '@/types';
 import { Bookmark, Clock, ArrowUpRight, AlertCircle } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
 import TeamCrest from '@/components/TeamCrest';
-import { formatExpectedValue, formatSelectionName } from '@/lib/prediction/marketCatalog';
+import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
+import { checkDerby } from '@/lib/prediction/contextFactors';
 
 interface Props {
   fixture: Fixture;
@@ -52,6 +53,15 @@ export default function FixtureCard({
   const homeName = fixture.homeTeam.shortName || fixture.homeTeam.name;
   const awayName = fixture.awayTeam.shortName || fixture.awayTeam.name;
 
+  const derbyInfo = useMemo(() => {
+    if (fixture.isDerby && fixture.derbyName) {
+      return { name: fixture.derbyName };
+    }
+    return checkDerby(fixture.homeTeam.name, fixture.awayTeam.name);
+  }, [fixture]);
+
+  const tierBadge = topPrediction ? getRiskTierBadge(topPrediction.riskTier) : null;
+
   return (
     <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-3.5 space-y-3 transition-colors hover:border-white/20 group">
       {/* Header row 11px muted: "Premier League · MD 28" left, clock icon + "16:30 UTC" + bookmark right */}
@@ -60,6 +70,16 @@ export default function FixtureCard({
           <span className="truncate">{fixture.competition.name}</span>
           <span className="text-[#8fa69a]/60">·</span>
           <span className="font-mono shrink-0">MD {fixture.matchday}</span>
+          {derbyInfo && (
+            <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 truncate shrink-0">
+              ⚡ {derbyInfo.name}
+            </span>
+          )}
+          {fixture.hasCoachChange && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+              New Coach
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0">
@@ -129,7 +149,7 @@ export default function FixtureCard({
             </div>
           </div>
 
-          {/* Right column separated by a hairline: venue (11px muted) and "Market intel" lime link with arrow-up-right */}
+          {/* Right column separated by a hairline: venue (11px muted) and "Market intel" link with arrow-up-right */}
           <div className="col-span-4 border-l border-white/[0.08] pl-3 flex flex-col justify-center items-end text-right min-h-[58px]">
             <span className="text-[11px] text-[#8fa69a] truncate max-w-full">
               {fixture.venue ? fixture.venue.split(' ')[0] : 'Stadium'}
@@ -141,34 +161,63 @@ export default function FixtureCard({
           </div>
         </div>
 
-        {/* Top pick: nested panel with a subtle lime border */}
+        {/* Top pick: nested panel with a subtle border */}
         <div className="mt-3">
           {topPrediction ? (
-            <div className="bg-[#0a1812]/70 rounded-[8px] border border-[#b8e63a]/25 p-2.5 space-y-1.5">
-              {/* Row 1: "Top pick" (11px muted), EV in mono at right */}
+            <div className="bg-[#0a1812]/70 rounded-[8px] border border-white/[0.12] hover:border-[#b8e63a]/30 p-2.5 space-y-2 transition-colors">
+              {/* Row 1: "Top pick" + Risk tier badge, odds + EV in mono at right */}
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-[#8fa69a]">Top pick</span>
-                {topPrediction.expectedValue !== undefined && (
-                  <span className={`font-mono ${formatExpectedValue(topPrediction.expectedValue).colorClass}`}>
-                    {formatExpectedValue(topPrediction.expectedValue).text} EV
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#8fa69a] font-medium">Top pick</span>
+                  {tierBadge && (
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider ${tierBadge.badgeClass}`}>
+                      {tierBadge.label}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 font-mono text-[11px]">
+                  {topPrediction.marketOdds && (
+                    <span className="text-[#e8efe9] bg-white/[0.05] px-1.5 py-0.5 rounded border border-white/10">
+                      @{formatOdds(topPrediction.marketOdds)}
+                    </span>
+                  )}
+                  {topPrediction.expectedValue !== undefined && (
+                    <span className={formatExpectedValue(topPrediction.expectedValue).colorClass}>
+                      {formatExpectedValue(topPrediction.expectedValue).text} EV
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Row 2: pick name (14px/500), probability in mono at right */}
-              <div className="flex items-center justify-between">
-                <span className="text-[14px] font-[500] text-[#e8efe9] truncate mr-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[14px] font-[500] text-[#e8efe9] truncate">
                   {formatSelectionName(topPrediction.selection)}
                 </span>
-                <span className="font-mono text-[12px] text-[#e8efe9] shrink-0">
+                <span className="font-mono text-[13px] font-semibold text-[#b8e63a] shrink-0">
                   {(topPrediction.modelProbability * 100).toFixed(1)}%
                 </span>
               </div>
 
-              {/* Row 3: 4px probability bar beneath filled to probability */}
+              {/* Row 3: Plain-English reason */}
+              {topPrediction.plainEnglishReason && (
+                <p className="text-[11px] text-[#8fa69a] line-clamp-2 leading-relaxed">
+                  {topPrediction.plainEnglishReason}
+                </p>
+              )}
+
+              {/* Row 4: 4px probability bar beneath filled to probability */}
               <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#b8e63a] rounded-full transition-all duration-300"
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    topPrediction.riskTier === 'SAFE' 
+                      ? 'bg-[#b8e63a]' 
+                      : topPrediction.riskTier === 'MODERATE' 
+                      ? 'bg-[#e3b341]' 
+                      : topPrediction.riskTier === 'RISKY' 
+                      ? 'bg-orange-400' 
+                      : 'bg-purple-400'
+                  }`}
                   style={{
                     width: `${Math.min(100, Math.max(0, topPrediction.modelProbability * 100))}%`,
                   }}

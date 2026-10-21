@@ -32,7 +32,14 @@ export default function AdminPage() {
     setSyncStatus('SYNCING');
     try {
       const res = await fetch('/api/v1/sync', { method: 'POST' });
-      const data = await res.json();
+      if (!res.ok) throw new Error('Sync failed');
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error('Invalid JSON response');
+      }
       const timeStr = 'Just now';
       
       const newJobs: typeof syncLogs = [];

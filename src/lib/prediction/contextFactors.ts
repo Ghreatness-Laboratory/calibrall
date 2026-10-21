@@ -45,6 +45,9 @@ export const FACTOR_DEFINITIONS: Record<FactorCode, FactorDefinition> = {
       half_time: 0.22,
       double_chance: 0.32,
       draw_no_bet: 0.33,
+      handicap: 0.33,
+      goal_bounds: 0.32,
+      combos: 0.30,
     },
     ablationGainBrier: 0.0182,
   },
@@ -65,6 +68,9 @@ export const FACTOR_DEFINITIONS: Record<FactorCode, FactorDefinition> = {
       half_time: 0.20,
       double_chance: 0.28,
       draw_no_bet: 0.29,
+      handicap: 0.30,
+      goal_bounds: 0.28,
+      combos: 0.29,
     },
     ablationGainBrier: 0.0165,
   },
@@ -85,6 +91,9 @@ export const FACTOR_DEFINITIONS: Record<FactorCode, FactorDefinition> = {
       half_time: 0.16,
       double_chance: 0.20,
       draw_no_bet: 0.20,
+      handicap: 0.21,
+      goal_bounds: 0.18,
+      combos: 0.20,
     },
     ablationGainBrier: 0.0124,
   },
@@ -105,6 +114,9 @@ export const FACTOR_DEFINITIONS: Record<FactorCode, FactorDefinition> = {
       half_time: 0.10,
       double_chance: 0.14,
       draw_no_bet: 0.14,
+      handicap: 0.15,
+      goal_bounds: 0.14,
+      combos: 0.14,
     },
     ablationGainBrier: 0.0094,
   },
@@ -125,6 +137,9 @@ export const FACTOR_DEFINITIONS: Record<FactorCode, FactorDefinition> = {
       half_time: 0.18,
       double_chance: 0.19,
       draw_no_bet: 0.19,
+      handicap: 0.21,
+      goal_bounds: 0.22,
+      combos: 0.20,
     },
     ablationGainBrier: 0.0141,
   },
@@ -145,6 +160,9 @@ export const FACTOR_DEFINITIONS: Record<FactorCode, FactorDefinition> = {
       half_time: 0.04,
       double_chance: 0.05,
       draw_no_bet: 0.05,
+      handicap: 0.05,
+      goal_bounds: 0.04,
+      combos: 0.04,
     },
     ablationGainBrier: 0.0195,
   },
@@ -165,6 +183,9 @@ export const FACTOR_DEFINITIONS: Record<FactorCode, FactorDefinition> = {
       half_time: 0.08,
       double_chance: 0.10,
       draw_no_bet: 0.11,
+      handicap: 0.11,
+      goal_bounds: 0.09,
+      combos: 0.09,
     },
     ablationGainBrier: 0.0048,
   },
@@ -185,6 +206,9 @@ export const FACTOR_DEFINITIONS: Record<FactorCode, FactorDefinition> = {
       half_time: 0.04,
       double_chance: 0.05,
       draw_no_bet: 0.05,
+      handicap: 0.06,
+      goal_bounds: 0.05,
+      combos: 0.05,
     },
     ablationGainBrier: 0.0028,
   },
@@ -205,6 +229,9 @@ export const FACTOR_DEFINITIONS: Record<FactorCode, FactorDefinition> = {
       half_time: 0.07,
       double_chance: 0.10,
       draw_no_bet: 0.10,
+      handicap: 0.11,
+      goal_bounds: 0.08,
+      combos: 0.08,
     },
     ablationGainBrier: 0.0039,
   },
@@ -225,6 +252,9 @@ export const FACTOR_DEFINITIONS: Record<FactorCode, FactorDefinition> = {
       half_time: 0.05,
       double_chance: 0.05,
       draw_no_bet: 0.05,
+      handicap: 0.05,
+      goal_bounds: 0.05,
+      combos: 0.05,
     },
     ablationGainBrier: 0.0071,
   },
@@ -305,6 +335,39 @@ export const STATE_TAG_REGISTRY: Record<StateTag, FixtureStateTagInfo> = {
 // 3. FACTOR CONTRIBUTION & STATE ADJUSTMENT COMPUTATION
 // ====================================================================
 
+export interface DerbyInfo {
+  name: string;
+  rivals: [string, string];
+  intensityMultiplier: number;
+}
+
+export const KNOWN_DERBIES: DerbyInfo[] = [
+  { name: 'North London Derby', rivals: ['Arsenal', 'Tottenham'], intensityMultiplier: 1.25 },
+  { name: 'Manchester Derby', rivals: ['Manchester City', 'Manchester United'], intensityMultiplier: 1.22 },
+  { name: 'Merseyside Derby', rivals: ['Liverpool', 'Everton'], intensityMultiplier: 1.25 },
+  { name: 'London Derby', rivals: ['Arsenal', 'Chelsea'], intensityMultiplier: 1.18 },
+  { name: 'North West Derby', rivals: ['Manchester United', 'Liverpool'], intensityMultiplier: 1.22 },
+  { name: 'El Clásico', rivals: ['Real Madrid', 'Barcelona'], intensityMultiplier: 1.28 },
+  { name: 'Madrid Derby', rivals: ['Real Madrid', 'Atlético Madrid'], intensityMultiplier: 1.24 },
+  { name: 'Der Klassiker', rivals: ['Bayern München', 'Borussia Dortmund'], intensityMultiplier: 1.20 },
+  { name: 'Derby della Madonnina', rivals: ['Inter', 'Milan'], intensityMultiplier: 1.25 },
+  { name: 'Derby d\'Italia', rivals: ['Juventus', 'Inter'], intensityMultiplier: 1.24 },
+  { name: 'Derby della Capitale', rivals: ['Roma', 'Lazio'], intensityMultiplier: 1.28 },
+];
+
+export function checkDerby(homeTeam: string, awayTeam: string): DerbyInfo | null {
+  const normHome = (homeTeam || '').toLowerCase();
+  const normAway = (awayTeam || '').toLowerCase();
+  for (const d of KNOWN_DERBIES) {
+    const r0 = d.rivals[0].toLowerCase();
+    const r1 = d.rivals[1].toLowerCase();
+    if ((normHome.includes(r0) && normAway.includes(r1)) || (normHome.includes(r1) && normAway.includes(r0))) {
+      return d;
+    }
+  }
+  return null;
+}
+
 export interface ContextEvaluationResult {
   stateTags: StateTag[];
   lineupStatus: 'confirmed' | 'pre-lineup';
@@ -314,6 +377,7 @@ export interface ContextEvaluationResult {
   dataQualityScore: number;
   factorContributionsByMarket: Record<MarketCategory, FactorContribution[]>;
   correlationWarnings: string[];
+  detectedDerby?: DerbyInfo | null;
 }
 
 /**
@@ -347,8 +411,11 @@ export function evaluateContextFactors(params: {
     lineupConfirmed = false,
   } = params;
 
-  // 1. Establish Verified State Tags
+  const detectedDerby = checkDerby(params.homeTeamName, params.awayTeamName);
   const stateTags: StateTag[] = [...rawStateTags];
+  if (detectedDerby && !stateTags.includes('derby')) {
+    stateTags.push('derby');
+  }
 
   if (!lineupConfirmed && !stateTags.includes('lineup-unconfirmed')) {
     stateTags.push('lineup-unconfirmed');
@@ -812,6 +879,84 @@ export function evaluateContextFactors(params: {
         direction: 'positive',
         impactDescription: 'Win-or-draw tactical imperative.',
         magnitude: 0.52,
+      },
+    ],
+    handicap: [
+      {
+        factorCode: 'team_form',
+        factorName: 'Goal Spread Consistency',
+        weight: 0.35,
+        direction: 'positive',
+        impactDescription: 'Stable margin-of-victory profile across domestic fixtures.',
+        magnitude: 0.82,
+      },
+      {
+        factorCode: 'squad_state',
+        factorName: 'Defensive Cover Cushion',
+        weight: 0.30,
+        direction: 'positive',
+        impactDescription: 'Low probability of multiple-goal concession.',
+        magnitude: 0.75,
+      },
+      {
+        factorCode: 'tactical_matchup',
+        factorName: 'Territorial Tilt Advantage',
+        weight: 0.22,
+        direction: 'positive',
+        impactDescription: 'Possession dominance restricts opponent scoring chances.',
+        magnitude: 0.60,
+      },
+    ],
+    goal_bounds: [
+      {
+        factorCode: 'team_form',
+        factorName: 'Scoreline Frequency Clustering',
+        weight: 0.36,
+        direction: 'positive',
+        impactDescription: 'High density of matches terminating inside 1-3 goal bands.',
+        magnitude: 0.85,
+      },
+      {
+        factorCode: 'tactical_matchup',
+        factorName: 'Game Tempo & Transition Control',
+        weight: 0.30,
+        direction: 'positive',
+        impactDescription: 'Measured build-up play limits extreme outlier scorelines.',
+        magnitude: 0.70,
+      },
+      {
+        factorCode: 'squad_state',
+        factorName: 'Finishing Efficiency Band',
+        weight: 0.22,
+        direction: 'positive',
+        impactDescription: 'Predictable chance conversion rates across the match.',
+        magnitude: 0.55,
+      },
+    ],
+    combos: [
+      {
+        factorCode: 'team_form',
+        factorName: 'Result & Goal Volume Concurrency',
+        weight: 0.35,
+        direction: 'positive',
+        impactDescription: 'Strong joint co-occurrence of favored result and over goal line.',
+        magnitude: 0.84,
+      },
+      {
+        factorCode: 'squad_state',
+        factorName: 'Attacking Unit Potency',
+        weight: 0.30,
+        direction: 'positive',
+        impactDescription: 'Reliable goal output supporting compound outcome conditions.',
+        magnitude: 0.72,
+      },
+      {
+        factorCode: 'match_stakes',
+        factorName: 'Tactical Game State Evolution',
+        weight: 0.22,
+        direction: 'positive',
+        impactDescription: 'Early goal dynamics preserve transition counter-attacking spaces.',
+        magnitude: 0.56,
       },
     ],
   };
