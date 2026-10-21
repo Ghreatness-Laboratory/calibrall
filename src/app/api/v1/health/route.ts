@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { getFootballDataProvider } from '@/lib/data/provider';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const provider = getFootballDataProvider();
   const providerHealth = await provider.getHealth();

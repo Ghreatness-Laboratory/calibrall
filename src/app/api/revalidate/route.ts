@@ -11,7 +11,13 @@ export async function POST(req: NextRequest) {
   const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
   const providedSecret = headerSecret || bearerToken;
 
-  const validSecret = process.env.REVALIDATE_SECRET || process.env.AUTH_SECRET || 'calibrall_revalidate_secret';
+  const configuredSecret = process.env.REVALIDATE_SECRET?.trim() || process.env.AUTH_SECRET?.trim();
+  if (!configuredSecret) {
+    console.error(
+      '[Revalidate] REVALIDATE_SECRET environment variable is not configured in Vercel settings! Using fallback secret.'
+    );
+  }
+  const validSecret = configuredSecret || 'calibrall_revalidate_secret';
 
   if (!providedSecret || providedSecret !== validSecret) {
     return NextResponse.json(

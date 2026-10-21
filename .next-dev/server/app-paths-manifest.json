@@ -1,6 +1,5 @@
 {
-  "/api/v1/fixtures/route": "app/api/v1/fixtures/route.js",
+  "/api/health/route": "app/api/health/route.js",
   "/api/revalidate/route": "app/api/revalidate/route.js",
-  "/api/v1/predictions/today/route": "app/api/v1/predictions/today/route.js",
-  "/api/v1/fixtures/[id]/predictions/route": "app/api/v1/fixtures/[id]/predictions/route.js"
+  "/api/v1/fixtures/route": "app/api/v1/fixtures/route.js"
 }
