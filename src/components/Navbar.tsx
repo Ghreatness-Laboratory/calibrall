@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { getStoredUser, setStoredUser } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
+import DesktopInstallButton from '@/components/pwa/DesktopInstallButton';
+import DropdownInstallItem from '@/components/pwa/DropdownInstallItem';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -82,7 +84,10 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0a1812]/95 backdrop-blur-sm border-b border-white/[0.08]">
+    <header
+      className="sticky top-0 z-40 bg-[#0a1812]/95 backdrop-blur-sm border-b border-white/[0.08]"
+      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+    >
       {/* Top status bar: 32px (h-8), 11px mono, left "Dixon-Coles v2.4 online" with green dot, right "08:32 UTC" and small PRO chip */}
       <div className="h-8 bg-[#07130e] border-b border-white/[0.06] px-4 text-[11px] font-mono flex items-center justify-between text-[#8fa69a] whitespace-nowrap overflow-hidden">
         <div className="flex items-center gap-2">
@@ -142,8 +147,11 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* Right side: On mobile, avatar only. On desktop, search + theme toggle + avatar */}
+          {/* Right side: Desktop install button + search + theme toggle + avatar */}
           <div className="flex items-center gap-2">
+            {/* Desktop Install App Button */}
+            <DesktopInstallButton />
+
             <Link
               href="/matches"
               className="hidden md:flex w-[30px] h-[30px] rounded-[6px] border border-white/[0.08] bg-[#0f2219] text-[#8fa69a] hover:text-[#e8efe9] items-center justify-center transition-colors"
@@ -197,6 +205,9 @@ export default function Navbar() {
                     </div>
                   </div>
                   <div className="py-1">
+                    {/* Primary placement: Install App in avatar dropdown */}
+                    <DropdownInstallItem onSelect={() => setUserDropdownOpen(false)} />
+
                     {/* Mobile theme toggle in menu */}
                     <button
                       onClick={toggleMonochrome}

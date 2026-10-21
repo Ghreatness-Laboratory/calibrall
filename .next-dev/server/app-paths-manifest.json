@@ -1,7 +1,8 @@
 {
+  "/offline/page": "app/offline/page.js",
   "/api/v1/health/route": "app/api/v1/health/route.js",
-  "/page": "app/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
+  "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
+  "/matches/page": "app/matches/page.js",
   "/predictions/page": "app/predictions/page.js",
   "/performance/page": "app/performance/page.js"
 }

@@ -23,6 +23,7 @@ import {
   Contrast,
   ShieldCheck
 } from 'lucide-react';
+import AccountInstallRow from '@/components/pwa/AccountInstallRow';
 
 export default function SettingsPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -100,6 +101,9 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      {/* PWA Install in Account tab */}
+      <AccountInstallRow />
 
       <form onSubmit={handleSave} className="space-y-5 text-[12px]">
         {/* Profile Card */}
