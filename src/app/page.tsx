@@ -38,7 +38,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            MATCHMIND independently evaluates all available football markets—Total Goals, Corners, Both Teams to Score, Cards, and 1X2 lines—to identify qualified probability and verified expected value. When the data is insufficient, it abstains.
+            CALIBRALL independently evaluates all available football markets—Total Goals, Corners, Both Teams to Score, Cards, and 1X2 lines—to identify qualified probability and verified expected value. When the data is insufficient, it abstains.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -86,7 +86,7 @@ export default function HomePage() {
               <span className="w-3 h-3 rounded-full bg-rose-500/80" />
               <span className="w-3 h-3 rounded-full bg-amber-500/80" />
               <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
-              <span className="font-mono text-xs text-gray-400 ml-2">matchmind-terminal // live-fixtures-feed</span>
+              <span className="font-mono text-xs text-gray-400 ml-2">calibrall-terminal // live-fixtures-feed</span>
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-[10px] font-mono text-brand-emerald bg-brand-emerald/10 px-2 py-0.5 rounded border border-brand-emerald/30">
@@ -138,7 +138,7 @@ export default function HomePage() {
           <span className="text-xs font-mono uppercase tracking-widest text-brand-blue">Architecture Philosophy</span>
           <h2 className="text-3xl font-extrabold text-white">Why Match Winners Are Often The Worst Market</h2>
           <p className="text-gray-300 text-sm leading-relaxed">
-            Most prediction tools force a 1X2 pick on every game regardless of efficiency. MATCHMIND scans up to 18 market lines per fixture to find statistical mispricings where the evidence is overwhelmingly concentrated.
+            Most prediction tools force a 1X2 pick on every game regardless of efficiency. CALIBRALL scans up to 18 market lines per fixture to find statistical mispricings where the evidence is overwhelmingly concentrated.
           </p>
         </div>
 
@@ -169,7 +169,7 @@ export default function HomePage() {
             </div>
             <h3 className="text-base font-bold text-white">Abstention Discipline</h3>
             <p className="text-xs text-gray-400 leading-relaxed">
-              When data coverage is low, tactical uncertainty is high, or market prices are perfectly efficient, MATCHMIND proudly outputs <em>"No strong recommendation"</em>.
+              When data coverage is low, tactical uncertainty is high, or market prices are perfectly efficient, CALIBRALL proudly outputs <em>"No strong recommendation"</em>.
             </p>
           </div>
         </div>
@@ -368,7 +368,7 @@ export default function HomePage() {
           <span>Commitment to Statistical Integrity</span>
         </div>
         <p className="text-xs text-gray-300 leading-relaxed">
-          MATCHMIND was created as an antidote to unsubstantiated "guaranteed lock" tipping websites. Sports outcomes are subject to irreducible randomness. Our algorithms quantify uncertainty, disclose small sample warnings, and never alter past results retrospectively.
+          CALIBRALL was created as an antidote to unsubstantiated "guaranteed lock" tipping websites. Sports outcomes are subject to irreducible randomness. Our algorithms quantify uncertainty, disclose small sample warnings, and never alter past results retrospectively.
         </p>
       </section>
     </div>

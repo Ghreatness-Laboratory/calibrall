@@ -43,10 +43,10 @@ export default function PerformancePage() {
       <div className="bg-[#0b1019] border border-border rounded-lg p-4 text-xs text-gray-300 space-y-2">
         <div className="flex items-center space-x-2 text-brand-emerald font-bold">
           <ShieldCheck className="w-4 h-4" />
-          <span>The MATCHMIND Verification Charter</span>
+          <span>The CALIBRALL Verification Charter</span>
         </div>
         <p className="leading-relaxed">
-          Unlike tipping services that quote misleading win rates on arbitrarily selected bets, MATCHMIND evaluates all pre-match predictions against settled scores using standardized probabilistic metrics: <strong>Brier Score</strong> (mean squared error of probability forecasts) and <strong>Logarithmic Loss</strong>. No prediction is ever retroactively omitted, altered, or replaced.
+          Unlike tipping services that quote misleading win rates on arbitrarily selected bets, CALIBRALL evaluates all pre-match predictions against settled scores using standardized probabilistic metrics: <strong>Brier Score</strong> (mean squared error of probability forecasts) and <strong>Logarithmic Loss</strong>. No prediction is ever retroactively omitted, altered, or replaced.
         </p>
       </div>
 

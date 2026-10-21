@@ -3,10 +3,10 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata = {
-  title: 'MATCHMIND | Football Prediction & Market Intelligence Platform',
+  title: 'CALIBRALL | Football Prediction & Market Intelligence Platform',
   description: 'Institutional-grade football analytics terminal. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.',
   openGraph: {
-    title: 'MATCHMIND | Football Prediction & Market Intelligence Platform',
+    title: 'CALIBRALL | Football Prediction & Market Intelligence Platform',
     description: 'Institutional-grade football analytics terminal. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.',
   },
 };

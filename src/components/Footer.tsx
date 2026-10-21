@@ -11,15 +11,15 @@ export default function Footer() {
           <AlertCircle className="w-5 h-5 text-brand-amber shrink-0 mt-0.5" />
           <div className="text-gray-300 text-xs leading-relaxed">
             <span className="font-semibold text-white">Responsible Use & Probabilistic Disclaimer: </span>
-            MATCHMIND is an analytical terminal providing objective statistical estimates, Poisson goal matrices, and market edge comparisons. Football matches are inherently stochastic; high statistical probability is not a guarantee of occurrence. MATCHMIND does not take wagers, manage bets, or offer guaranteed financial returns. 18+ only.
+            CALIBRALL is an analytical terminal providing objective statistical estimates, Poisson goal matrices, and market edge comparisons. Football matches are inherently stochastic; high statistical probability is not a guarantee of occurrence. CALIBRALL does not take wagers, manage bets, or offer guaranteed financial returns. 18+ only.
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center space-x-2 font-bold text-white text-sm mb-3">
-              <span className="w-5 h-5 rounded bg-brand-emerald flex items-center justify-center text-[10px] text-white">M</span>
-              <span>MATCHMIND</span>
+              <span className="w-5 h-5 rounded bg-brand-emerald flex items-center justify-center text-[10px] text-white font-mono">C</span>
+              <span>CALIBRALL</span>
             </div>
             <p className="text-gray-400 text-xs leading-relaxed">
               Institutional-grade market intelligence terminal for European football fixtures. Multi-market evaluation across goals, corners, cards, and match results.
@@ -60,7 +60,7 @@ export default function Footer() {
 
         <div className="border-t border-border-subtle mt-8 pt-6 flex flex-col sm:flex-row items-center justify-between text-gray-500 text-[11px]">
           <div>
-            © {new Date().getFullYear()} MATCHMIND Intelligence Inc. All rights reserved.
+            © {new Date().getFullYear()} CALIBRALL Intelligence Inc. All rights reserved.
           </div>
           <div className="flex items-center space-x-4 mt-2 sm:mt-0 font-mono">
             <span className="flex items-center space-x-1">

@@ -89,11 +89,11 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex items-center space-x-8">
             <Link href="/" className="flex items-center space-x-2.5 group">
-              <div className="w-8 h-8 rounded bg-gradient-to-br from-brand-emerald to-emerald-800 flex items-center justify-center font-bold text-white shadow-glow-emerald">
-                M
+              <div className="w-8 h-8 rounded bg-gradient-to-br from-brand-emerald to-emerald-800 flex items-center justify-center font-bold text-white shadow-glow-emerald font-mono">
+                C
               </div>
               <div>
-                <span className="font-extrabold tracking-tight text-white text-base">MATCH<span className="text-brand-emerald">MIND</span></span>
+                <span className="font-extrabold tracking-tight text-white text-base">CALIBR<span className="text-brand-emerald">ALL</span></span>
                 <span className="block text-[9px] uppercase tracking-widest text-gray-400 -mt-1 font-mono">Market Intel</span>
               </div>
             </Link>

@@ -23,7 +23,7 @@ const DEMO_SAVED_KEY = 'matchmind_demo_saved_fixtures';
 
 export const DEFAULT_DEMO_USER: UserProfile = {
   id: 'usr_demo_7890',
-  email: 'analyst@matchmind.app',
+  email: 'analyst@calibrall.app',
   fullName: 'Marcus Vance (Senior Quant)',
   role: 'admin',
   subscriptionTier: 'pro',

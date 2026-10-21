@@ -24,7 +24,7 @@ export default function MethodologyPage() {
           <span>1. The Dixon-Coles Bivariate Goal Model</span>
         </h2>
         <p>
-          While naive Poisson regression assumes home and away goal scoring are independent, empirical football data reveals significant negative correlation at low scores (specifically 0-0, 1-0, 0-1, and 1-1). To account for this, MATCHMIND applies the Dixon & Coles (1997) parameter adjustment:
+          While naive Poisson regression assumes home and away goal scoring are independent, empirical football data reveals significant negative correlation at low scores (specifically 0-0, 1-0, 0-1, and 1-1). To account for this, CALIBRALL applies the Dixon & Coles (1997) parameter adjustment:
         </p>
 
         <div className="p-4 bg-surface-100 rounded border border-border font-mono text-[11px] text-gray-200 space-y-1">

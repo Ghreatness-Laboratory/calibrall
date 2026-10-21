@@ -23,7 +23,7 @@ export interface FootballDataProvider {
 export class SeedDataProvider implements FootballDataProvider {
   async getHealth(): Promise<ProviderHealth> {
     return {
-      providerName: 'MatchMind Local Ingestion & Dev Engine',
+      providerName: 'Calibrall Local Ingestion & Dev Engine',
       isConfigured: true,
       status: 'STANDBY_DEV_MODE',
       lastSyncTimestamp: new Date().toISOString(),
