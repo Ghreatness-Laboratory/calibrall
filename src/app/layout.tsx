@@ -67,7 +67,7 @@ export default function RootLayout({
         <InstallPromptProvider>
           <Navbar />
           <OfflineBanner />
-          <main className="flex-1 max-w-7xl w-full mx-auto px-[18px] sm:px-6 lg:px-8 py-5">
+          <main className="flex-1 max-w-7xl w-full mx-auto px-[18px] sm:px-6 lg:px-8 py-5 min-w-0">
             {children}
           </main>
           <Footer />

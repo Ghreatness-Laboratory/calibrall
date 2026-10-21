@@ -2,7 +2,7 @@
 // Version: 1.0.0
 // Brand: Every call, on record.
 
-const CACHE_VERSION = 'calibrall-v1.0.0';
+const CACHE_VERSION = 'calibrall-v1.0.1';
 const PRECACHE_NAME = `calibrall-precache-${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `calibrall-static-${CACHE_VERSION}`;
 const DATA_CACHE_NAME = `calibrall-data-${CACHE_VERSION}`;

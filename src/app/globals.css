@@ -7,30 +7,30 @@
   --foreground: #e8efe9;
 }
 
-html, body {
+/* Ensure single primary scroller on the root without nested traps */
+html {
+  height: auto;
+  overflow-x: clip;
+}
+
+body {
+  min-height: 100dvh;
+  overflow-y: auto;
+  overflow-x: clip;
+  -webkit-overflow-scrolling: touch;
   background-color: #0a1812;
   color: #e8efe9;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-weight: 400;
-  overflow-x: hidden;
-  /* Prevent pull-to-refresh overscroll glitch and text sizing bugs in standalone PWA */
-  overscroll-behavior-y: contain;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Standalone PWA environment polish */
+/* Apply pull-to-refresh overscroll constraint only on html in standalone PWA mode */
 @media (display-mode: standalone) {
-  body {
-    user-select: none;
-    -webkit-user-select: none;
-  }
-
-  /* Allow text selection inside analytical tables and data cells */
-  table, pre, code, .tabular-nums {
-    user-select: text;
-    -webkit-user-select: text;
+  html {
+    overscroll-behavior-y: contain;
   }
 }
 
