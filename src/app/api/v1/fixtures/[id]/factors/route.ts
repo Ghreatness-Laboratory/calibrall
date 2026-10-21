@@ -3,6 +3,9 @@ import { getFootballDataProvider } from '@/lib/data/provider';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { STATE_TAG_REGISTRY, FACTOR_DEFINITIONS } from '@/lib/prediction/contextFactors';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 120;
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }

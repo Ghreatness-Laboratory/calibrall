@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { FIXTURES, FIXTURE_STATISTICS } from '@/lib/data/seedData';
+import { getFixtureStatistics } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import MarketComparisonTable from '@/components/MarketComparisonTable';
 import ExplanationCard from '@/components/ExplanationCard';
@@ -22,32 +22,45 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
-import { MarketPrediction } from '@/types';
+import { Fixture, MarketPrediction } from '@/types';
 import { formatExpectedValue, formatSelectionName } from '@/lib/prediction/marketCatalog';
 
 export default function MatchAnalysisPage() {
   const params = useParams();
   const id = params?.id as string;
 
-  const fixture = FIXTURES.find(f => f.id === id);
+  const [fixture, setFixture] = useState<Fixture | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [lastUpdated, setLastUpdated] = useState<string>(() => {
+    const d = new Date();
+    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
+  });
+
+  useEffect(() => {
+    async function loadFixture() {
+      try {
+        setIsLoading(true);
+        const res = await fetch('/api/v1/fixtures', { cache: 'no-store' });
+        const json = await res.json();
+        if (json.lastUpdated) setLastUpdated(json.lastUpdated);
+        const found = (json.data || []).find((f: Fixture) => f.id === id);
+        setFixture(found || null);
+      } catch {
+        setFixture(null);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    if (id) loadFixture();
+  }, [id]);
 
   const [isSaved, setIsSaved] = useState<boolean>(() => {
-    if (!fixture) return false;
-    return getStoredSavedFixtures().includes(fixture.id);
+    return getStoredSavedFixtures().includes(id);
   });
 
   const stats = useMemo(() => {
     if (!fixture) return null;
-    return FIXTURE_STATISTICS[fixture.id] || {
-      homeXg: 1.55,
-      awayXg: 1.25,
-      expectedCornersHome: 5.4,
-      expectedCornersAway: 4.8,
-      expectedCards: 4.2,
-      uncertaintyScore: 0.09,
-      dataCoverageScore: 0.94,
-      sampleSizeMatches: 20,
-    };
+    return getFixtureStatistics(fixture);
   }, [fixture]);
 
   const evaluation = useMemo(() => {
@@ -77,21 +90,31 @@ export default function MatchAnalysisPage() {
   }, [fixture, stats]);
 
   // Selected prediction for explanation inspection
-  const [selectedPrediction, setSelectedPrediction] = useState<MarketPrediction | null>(() => {
-    return evaluation?.topPick || (evaluation?.predictions[0] ?? null);
-  });
+  const [selectedPredictionOverride, setSelectedPredictionOverride] = useState<MarketPrediction | null>(null);
+  const selectedPrediction = selectedPredictionOverride || evaluation?.topPick || (evaluation?.predictions[0] ?? null);
+  const setSelectedPrediction = (p: MarketPrediction | null) => setSelectedPredictionOverride(p);
+
+  if (isLoading) {
+    return (
+      <div className="py-20 text-center space-y-3">
+        <div className="w-5 h-5 border-2 border-[#b8e63a] border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-[12px] font-mono text-[#8fa69a]">Loading live match data...</p>
+      </div>
+    );
+  }
 
   if (!fixture || !stats || !evaluation) {
     return (
       <div className="py-20 text-center space-y-4">
-        <h2 className="text-[16px] font-[500] text-[#e8efe9]">Fixture not found</h2>
-        <p className="text-[13px] text-[#8fa69a]">The requested fixture does not exist in the active European database.</p>
+        <h2 className="text-[16px] font-[500] text-[#e8efe9]">Live data unavailable. Last updated {lastUpdated}</h2>
+        <p className="text-[13px] text-[#8fa69a]">The requested match data could not be retrieved from live European football pipelines.</p>
         <Link href="/matches" className="inline-block px-4 py-2 rounded-[8px] bg-[#0f2219] border border-white/[0.08] text-[13px] text-[#e8efe9]">
           Return to fixtures
         </Link>
       </div>
     );
   }
+
 
   const handleToggleBookmark = () => {
     const updated = toggleStoredSavedFixture(fixture.id);

@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { FIXTURES, FIXTURE_STATISTICS } from '@/lib/data/seedData';
+import { getFixtureStatistics } from '@/lib/data/seedData';
+import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 import { getStoredSavedFixtures } from '@/lib/supabase/client';
@@ -11,6 +12,7 @@ import { Bookmark, ArrowRight, Trash2 } from 'lucide-react';
 export default function SavedMatchesPage() {
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures();
 
   useEffect(() => {
     setSavedIds(getStoredSavedFixtures());
@@ -18,17 +20,8 @@ export default function SavedMatchesPage() {
   }, []);
 
   const savedFixtures = useMemo(() => {
-    return FIXTURES.filter(f => savedIds.includes(f.id)).map(fixture => {
-      const stats = FIXTURE_STATISTICS[fixture.id] || {
-        homeXg: 1.5,
-        awayXg: 1.2,
-        expectedCornersHome: 5.5,
-        expectedCornersAway: 4.5,
-        expectedCards: 4.2,
-        uncertaintyScore: 0.1,
-        dataCoverageScore: 0.92,
-        sampleSizeMatches: 20,
-      };
+    return fixtures.filter(f => savedIds.includes(f.id)).map(fixture => {
+      const stats = getFixtureStatistics(fixture);
 
       const evalResult = evaluateFixtureMarkets({
         fixtureId: fixture.id,
@@ -59,7 +52,7 @@ export default function SavedMatchesPage() {
         noRecommendationReason: evalResult.noRecommendationReason,
       };
     });
-  }, [savedIds]);
+  }, [fixtures, savedIds]);
 
   const handleClearAll = () => {
     if (typeof window !== 'undefined') {
@@ -106,6 +99,14 @@ export default function SavedMatchesPage() {
               isSavedInitial={true}
             />
           ))}
+        </div>
+      ) : isLoaded && savedIds.length > 0 && !liveDataAvailable ? (
+        <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-3">
+          <Bookmark className="w-8 h-8 mx-auto text-[#8fa69a]/40" />
+          <h3 className="text-[#e8efe9] font-[500] text-[15px]">Live data unavailable. Last updated {lastUpdated}</h3>
+          <p className="text-[12px] text-[#8fa69a] max-w-sm mx-auto">
+            You have {savedIds.length} bookmarked fixture{savedIds.length > 1 ? 's' : ''}. Live fixture data will display once live API synchronization completes.
+          </p>
         </div>
       ) : (
         <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-3">

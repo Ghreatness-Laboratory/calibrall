@@ -4,9 +4,9 @@ import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   COMPETITIONS, 
-  FIXTURES, 
-  FIXTURE_STATISTICS, 
+  getFixtureStatistics, 
 } from '@/lib/data/seedData';
+import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 import TeamCrest from '@/components/TeamCrest';
@@ -27,21 +27,14 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'completed'>('today');
 
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(selectedLeague);
+
   const savedFixtureIds = useMemo(() => getStoredSavedFixtures(), []);
 
-  // Pre-calculate market evaluation for all fixtures
+  // Pre-calculate market evaluation for all live fixtures
   const evaluatedFixtures = useMemo(() => {
-    return FIXTURES.map(fixture => {
-      const stats = FIXTURE_STATISTICS[fixture.id] || {
-        homeXg: 1.5,
-        awayXg: 1.2,
-        expectedCornersHome: 5.5,
-        expectedCornersAway: 4.5,
-        expectedCards: 4.2,
-        uncertaintyScore: 0.1,
-        dataCoverageScore: 0.92,
-        sampleSizeMatches: 20,
-      };
+    return fixtures.map(fixture => {
+      const stats = getFixtureStatistics(fixture);
 
       const evalResult = evaluateFixtureMarkets({
         fixtureId: fixture.id,
@@ -73,7 +66,8 @@ export default function DashboardPage() {
         noRecommendationReason: evalResult.noRecommendationReason,
       };
     });
-  }, []);
+  }, [fixtures]);
+
 
   // Filter fixtures
   const filteredList = useMemo(() => {
@@ -214,70 +208,77 @@ export default function DashboardPage() {
           <span className="font-mono text-[11px] text-[#8fa69a]">Ranked by expected value (EV)</span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-[12px]">
-            <thead className="bg-[#0a1812]/80 text-[#8fa69a] text-[11px] font-[500] border-b border-white/[0.06]">
-              <tr>
-                <th className="py-2 px-3">Match</th>
-                <th className="py-2 px-3">Market</th>
-                <th className="py-2 px-3">Selection</th>
-                <th className="py-2 px-3">Prob</th>
-                <th className="py-2 px-3">Odds</th>
-                <th className="py-2 px-3">Edge</th>
-                <th className="py-2 px-3">Est. EV</th>
-                <th className="py-2 px-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.05]">
-              {topOpportunities.map((item, idx) => (
-                <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="py-2.5 px-3 text-[#e8efe9]">
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center -space-x-1 shrink-0">
-                        <TeamCrest
-                          crestUrl={item.homeTeam.crestUrl}
-                          teamName={item.homeTeam.shortName || item.homeTeam.name}
-                          size={20}
-                        />
-                        <TeamCrest
-                          crestUrl={item.awayTeam.crestUrl}
-                          teamName={item.awayTeam.shortName || item.awayTeam.name}
-                          size={20}
-                        />
-                      </div>
-                      <span className="font-[500] truncate max-w-[140px] sm:max-w-none">{item.matchName}</span>
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-3 text-[#8fa69a] text-[12px]">{item.marketName}</td>
-                  <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">{formatSelectionName(item.selection)}</td>
-                  <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums">
-                    {(item.probability * 100).toFixed(1)}%
-                  </td>
-                  <td className="py-2.5 px-3 font-mono text-[#8fa69a]">
-                    {formatOdds(item.odds)}
-                  </td>
-                  <td className="py-2.5 px-3 font-mono text-[#8fa69a] tabular-nums">
-                    {item.edge ? `+${(item.edge * 100).toFixed(1)}%` : 'n/a'}
-                  </td>
-                  <td className="py-2.5 px-3 font-mono tabular-nums font-[500]">
-                    <span className={formatExpectedValue(item.expectedValue).colorClass}>
-                      {formatExpectedValue(item.expectedValue).text}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 text-right">
-                    <Link
-                      href={`/matches/${item.fixtureId}`}
-                      className="inline-flex items-center gap-0.5 text-[11px] text-[#b8e63a] hover:underline font-[500]"
-                    >
-                      <span>Analyze</span>
-                      <ArrowUpRight className="w-3 h-3" />
-                    </Link>
-                  </td>
+        {topOpportunities.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[12px]">
+              <thead className="bg-[#0a1812]/80 text-[#8fa69a] text-[11px] font-[500] border-b border-white/[0.06]">
+                <tr>
+                  <th className="py-2 px-3">Match</th>
+                  <th className="py-2 px-3">Market</th>
+                  <th className="py-2 px-3">Selection</th>
+                  <th className="py-2 px-3">Prob</th>
+                  <th className="py-2 px-3">Odds</th>
+                  <th className="py-2 px-3">Edge</th>
+                  <th className="py-2 px-3">Est. EV</th>
+                  <th className="py-2 px-3 text-right">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-white/[0.05]">
+                {topOpportunities.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="py-2.5 px-3 text-[#e8efe9]">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center -space-x-1 shrink-0">
+                          <TeamCrest
+                            crestUrl={item.homeTeam.crestUrl}
+                            teamName={item.homeTeam.shortName || item.homeTeam.name}
+                            size={20}
+                          />
+                          <TeamCrest
+                            crestUrl={item.awayTeam.crestUrl}
+                            teamName={item.awayTeam.shortName || item.awayTeam.name}
+                            size={20}
+                          />
+                        </div>
+                        <span className="font-[500] truncate max-w-[140px] sm:max-w-none">{item.matchName}</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 text-[#8fa69a] text-[12px]">{item.marketName}</td>
+                    <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">{formatSelectionName(item.selection)}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums">
+                      {(item.probability * 100).toFixed(1)}%
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[#8fa69a]">
+                      {formatOdds(item.odds)}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[#8fa69a] tabular-nums">
+                      {item.edge ? `+${(item.edge * 100).toFixed(1)}%` : 'n/a'}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono tabular-nums font-[500]">
+                      <span className={formatExpectedValue(item.expectedValue).colorClass}>
+                        {formatExpectedValue(item.expectedValue).text}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-right">
+                      <Link
+                        href={`/matches/${item.fixtureId}`}
+                        className="inline-flex items-center gap-0.5 text-[11px] text-[#b8e63a] hover:underline font-[500]"
+                      >
+                        <span>Analyze</span>
+                        <ArrowUpRight className="w-3 h-3" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-[12px] text-[#8fa69a] space-y-1">
+            <div className="font-mono text-[#e8efe9]">Live data unavailable. Last updated {lastUpdated}</div>
+            <p>Market opportunities will populate once live provider data is refreshed.</p>
+          </div>
+        )}
       </div>
 
       {/* Main Fixtures Section */}
@@ -349,10 +350,14 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] text-[#8fa69a]">
+          <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] text-[#8fa69a] space-y-2">
             <Layers className="w-8 h-8 mx-auto text-[#8fa69a]/40 mb-2" />
-            <h3 className="text-[#e8efe9] font-[500] text-[14px]">No fixtures match your filter</h3>
-            <p className="text-[12px] mt-0.5">Try clearing your search query or selecting a different competition.</p>
+            <div className="font-mono text-[13px] text-[#e8efe9]">
+              {liveDataAvailable ? 'No fixtures match your filter' : `Live data unavailable. Last updated ${lastUpdated}`}
+            </div>
+            <p className="text-[12px] max-w-sm mx-auto">
+              {liveDataAvailable ? 'Try clearing your search query or selecting a different competition.' : 'Awaiting live football API stream synchronization.'}
+            </p>
           </div>
         )}
       </div>

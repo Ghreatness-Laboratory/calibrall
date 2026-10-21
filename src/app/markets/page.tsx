@@ -2,10 +2,11 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { FIXTURES, FIXTURE_STATISTICS } from '@/lib/data/seedData';
+import { getFixtureStatistics } from '@/lib/data/seedData';
+import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { ArrowUpRight, Clock } from 'lucide-react';
-import { SupportedOptionType } from '@/types';
+import { SupportedOptionType, Fixture } from '@/types';
 import TeamCrest from '@/components/TeamCrest';
 import { formatExpectedValue, formatOdds } from '@/lib/prediction/marketCatalog';
 
@@ -38,6 +39,8 @@ export default function MarketExplorerPage() {
   const [selectedOptionType, setSelectedOptionType] = useState<string>('ALL');
   const [selectedMarketLine, setSelectedMarketLine] = useState<string>('TOTAL_GOALS_O25');
 
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures();
+
   const filteredOptions = useMemo(() => {
     if (selectedOptionType === 'ALL') return MARKET_OPTIONS;
     return MARKET_OPTIONS.filter(o => o.optionType === selectedOptionType);
@@ -47,23 +50,14 @@ export default function MarketExplorerPage() {
   const comparisons = useMemo(() => {
     const list: {
       fixtureId: string;
-      fixture: any;
+      fixture: Fixture;
       prediction: any;
       homeXg: number;
       awayXg: number;
     }[] = [];
 
-    FIXTURES.filter(f => f.status !== 'FINISHED').forEach(fixture => {
-      const stats = FIXTURE_STATISTICS[fixture.id] || {
-        homeXg: 1.5,
-        awayXg: 1.2,
-        expectedCornersHome: 5.5,
-        expectedCornersAway: 4.5,
-        expectedCards: 4.2,
-        uncertaintyScore: 0.1,
-        dataCoverageScore: 0.92,
-        sampleSizeMatches: 20,
-      };
+    fixtures.filter(f => f.status !== 'FINISHED').forEach(fixture => {
+      const stats = getFixtureStatistics(fixture);
 
       const evalResult = evaluateFixtureMarkets({
         fixtureId: fixture.id,
@@ -101,7 +95,8 @@ export default function MarketExplorerPage() {
     });
 
     return list.sort((a, b) => b.prediction.modelProbability - a.prediction.modelProbability);
-  }, [selectedMarketLine]);
+  }, [fixtures, selectedMarketLine]);
+
 
   const activeOption = MARKET_OPTIONS.find(o => o.code === selectedMarketLine) || MARKET_OPTIONS[0];
 
@@ -203,78 +198,89 @@ export default function MarketExplorerPage() {
           <span className="font-mono text-[#8fa69a] text-[11px]">{comparisons.length} fixtures</span>
         </div>
 
-        <div className="divide-y divide-white/[0.05]">
-          {comparisons.map((item, idx) => {
-            const p = item.prediction;
-            const fix = item.fixture;
-            const pct = p.modelProbability * 100;
+        {comparisons.length > 0 ? (
+          <div className="divide-y divide-white/[0.05]">
+            {comparisons.map((item, idx) => {
+              const p = item.prediction;
+              const fix = item.fixture;
+              const pct = p.modelProbability * 100;
 
-            return (
-              <div key={idx} className="p-3.5 hover:bg-white/[0.02] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 text-[12px]">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-[11px] text-[#8fa69a] w-5">#{idx + 1}</span>
-                  <div className="flex items-center -space-x-1 shrink-0">
-                    <TeamCrest
-                      crestUrl={fix.homeTeam.crestUrl}
-                      teamName={fix.homeTeam.shortName || fix.homeTeam.name}
-                      size={24}
-                    />
-                    <TeamCrest
-                      crestUrl={fix.awayTeam.crestUrl}
-                      teamName={fix.awayTeam.shortName || fix.awayTeam.name}
-                      size={24}
-                    />
+              return (
+                <div key={idx} className="p-3.5 hover:bg-white/[0.02] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 text-[12px]">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[11px] text-[#8fa69a] w-5">#{idx + 1}</span>
+                    <div className="flex items-center -space-x-1.5 shrink-0">
+                      <TeamCrest
+                        crestUrl={fix.homeTeam.crestUrl}
+                        teamName={fix.homeTeam.shortName || fix.homeTeam.name}
+                        size={24}
+                      />
+                      <TeamCrest
+                        crestUrl={fix.awayTeam.crestUrl}
+                        teamName={fix.awayTeam.shortName || fix.awayTeam.name}
+                        size={24}
+                      />
+                    </div>
+                    <div>
+                      <div className="font-[500] text-[#e8efe9]">
+                        {fix.homeTeam.shortName || fix.homeTeam.name} vs {fix.awayTeam.shortName || fix.awayTeam.name}
+                      </div>
+                      <div className="text-[11px] text-[#8fa69a] font-mono">
+                        {fix.competition.name} · xG {item.homeXg.toFixed(2)} - {item.awayXg.toFixed(2)}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-[500] text-[#e8efe9]">
-                      {fix.homeTeam.shortName || fix.homeTeam.name} vs {fix.awayTeam.shortName || fix.awayTeam.name}
+
+                  <div className="flex items-center gap-5 ml-8 md:ml-0 font-mono text-[12px]">
+                    {/* Probability Bar */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 bg-white/[0.08] rounded-full h-1 overflow-hidden">
+                        <div className="bg-[#b8e63a] h-full rounded-full" style={{ width: `${Math.min(100, pct)}%` }} />
+                      </div>
+                      <span className="font-[500] text-[#e8efe9] tabular-nums">
+                        {pct.toFixed(1)}%
+                      </span>
                     </div>
-                    <div className="text-[11px] text-[#8fa69a] font-mono">
-                      {fix.competition.name} · xG {item.homeXg.toFixed(2)} - {item.awayXg.toFixed(2)}
+
+                    {/* Market Price / Mode */}
+                    <div className="text-right min-w-[70px]">
+                      {p.marketOdds ? (
+                        <span className="text-[#e8efe9]">{p.marketOdds.toFixed(2)}</span>
+                      ) : (
+                        <span className="text-[10px] text-[#8fa69a]">n/a</span>
+                      )}
                     </div>
+
+                    {/* EV */}
+                    <div className="text-right min-w-[65px]">
+                      <span className={`font-[500] ${formatExpectedValue(p.expectedValue).colorClass}`}>
+                        {formatExpectedValue(p.expectedValue).text}
+                      </span>
+                    </div>
+
+                    {/* Action Link */}
+                    <Link
+                      href={`/matches/${item.fixtureId}`}
+                      className="p-1 rounded-[6px] hover:bg-white/[0.05] text-[#b8e63a] transition-colors"
+                      title="Audit Match"
+                    >
+                      <ArrowUpRight className="w-4 h-4" />
+                    </Link>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-5 ml-8 md:ml-0 font-mono text-[12px]">
-                  {/* Probability Bar */}
-                  <div className="flex items-center gap-2">
-                    <div className="w-20 bg-white/[0.08] rounded-full h-1 overflow-hidden">
-                      <div className="bg-[#b8e63a] h-full rounded-full" style={{ width: `${Math.min(100, pct)}%` }} />
-                    </div>
-                    <span className="font-[500] text-[#e8efe9] tabular-nums">
-                      {pct.toFixed(1)}%
-                    </span>
-                  </div>
-
-                  {/* Market Price / Mode */}
-                  <div className="text-right min-w-[70px]">
-                    {p.marketOdds ? (
-                      <span className="text-[#e8efe9]">{p.marketOdds.toFixed(2)}</span>
-                    ) : (
-                      <span className="text-[10px] text-[#8fa69a]">n/a</span>
-                    )}
-                  </div>
-
-                  {/* EV */}
-                  <div className="text-right min-w-[65px]">
-                    <span className={`font-[500] ${formatExpectedValue(p.expectedValue).colorClass}`}>
-                      {formatExpectedValue(p.expectedValue).text}
-                    </span>
-                  </div>
-
-                  {/* Action Link */}
-                  <Link
-                    href={`/matches/${item.fixtureId}`}
-                    className="p-1 rounded-[6px] hover:bg-white/[0.05] text-[#b8e63a] transition-colors"
-                    title="Audit Match"
-                  >
-                    <ArrowUpRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-12 text-center text-[12px] text-[#8fa69a] space-y-2">
+            <div className="font-mono text-[13px] text-[#e8efe9]">
+              {liveDataAvailable ? 'No upcoming fixtures available for this market line' : `Live data unavailable. Last updated ${lastUpdated}`}
+            </div>
+            <p className="max-w-sm mx-auto">
+              {liveDataAvailable ? 'Select a different market or competition filter above.' : 'Cross-match market intelligence will populate once live provider data is refreshed.'}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

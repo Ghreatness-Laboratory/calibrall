@@ -1,13 +1,37 @@
 import { NextResponse } from 'next/server';
-import { FIXTURES, FIXTURE_STATISTICS } from '@/lib/data/seedData';
+import { getFootballDataProvider } from '@/lib/data/provider';
+import { getFixtureStatistics } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 120;
+
 export async function GET() {
+  const provider = getFootballDataProvider();
+  const liveResult = await provider.getLiveFixtures();
+
+  if (!liveResult.liveDataAvailable || liveResult.fixtures.length === 0) {
+    return NextResponse.json(
+      {
+        totalQualified: 0,
+        recommendations: [],
+        liveDataAvailable: false,
+        lastUpdated: liveResult.lastUpdated,
+        error: liveResult.error || `Live data unavailable. Last updated ${liveResult.lastUpdated}`,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=60',
+        },
+      }
+    );
+  }
+
   const qualified: any[] = [];
 
-  FIXTURES.filter(f => f.status !== 'FINISHED').forEach(fixture => {
-    const stats = FIXTURE_STATISTICS[fixture.id];
-    if (!stats) return;
+  liveResult.fixtures.filter(f => f.status !== 'FINISHED').forEach(fixture => {
+    const stats = getFixtureStatistics(fixture);
 
     const evalResult = evaluateFixtureMarkets({
       fixtureId: fixture.id,
@@ -41,9 +65,18 @@ export async function GET() {
     }
   });
 
-  return NextResponse.json({
-    totalQualified: qualified.length,
-    recommendations: qualified,
-    timestamp: new Date().toISOString(),
-  });
+  return NextResponse.json(
+    {
+      totalQualified: qualified.length,
+      recommendations: qualified,
+      liveDataAvailable: true,
+      lastUpdated: liveResult.lastUpdated,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      headers: {
+        'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=60',
+      },
+    }
+  );
 }

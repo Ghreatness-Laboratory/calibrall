@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getEvaluatedFixture } from '@/lib/data/provider';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 120;
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }

@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { COMPETITIONS, FIXTURES, FIXTURE_STATISTICS } from '@/lib/data/seedData';
+import { COMPETITIONS, getFixtureStatistics } from '@/lib/data/seedData';
+import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { MarketPrediction, SupportedOptionType, MarketPeriod, Team } from '@/types';
 import TeamCrest from '@/components/TeamCrest';
@@ -26,7 +27,9 @@ export default function PredictionsPage() {
   const [onlyValuePicks, setOnlyValuePicks] = useState<boolean>(false);
   const [minProb, setMinProb] = useState<number>(0.50);
 
-  // Generate qualified and probability-based market candidates across all fixtures
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(selectedComp);
+
+  // Generate qualified and probability-based market candidates across all live fixtures
   const allPredictions = useMemo(() => {
     const list: {
       fixtureId: string;
@@ -39,17 +42,8 @@ export default function PredictionsPage() {
       prediction: MarketPrediction;
     }[] = [];
 
-    FIXTURES.forEach(fixture => {
-      const stats = FIXTURE_STATISTICS[fixture.id] || {
-        homeXg: 1.5,
-        awayXg: 1.2,
-        expectedCornersHome: 5.5,
-        expectedCornersAway: 4.5,
-        expectedCards: 4.2,
-        uncertaintyScore: 0.1,
-        dataCoverageScore: 0.92,
-        sampleSizeMatches: 20,
-      };
+    fixtures.forEach(fixture => {
+      const stats = getFixtureStatistics(fixture);
 
       const evalResult = evaluateFixtureMarkets({
         fixtureId: fixture.id,
@@ -89,7 +83,8 @@ export default function PredictionsPage() {
     });
 
     return list;
-  }, []);
+  }, [fixtures]);
+
 
   const filtered = useMemo(() => {
     return allPredictions.filter(item => {
@@ -242,109 +237,120 @@ export default function PredictionsPage() {
           <span>Ranked by expected value & probability</span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-[12px]">
-            <thead className="bg-[#0a1812]/80 text-[#8fa69a] font-mono text-[10px] uppercase border-b border-white/[0.06]">
-              <tr>
-                <th className="py-2 px-3">Fixture</th>
-                <th className="py-2 px-3">Option type</th>
-                <th className="py-2 px-3">Selection</th>
-                <th className="py-2 px-3">Period</th>
-                <th className="py-2 px-3">Prob</th>
-                <th className="py-2 px-3">Price mode</th>
-                <th className="py-2 px-3">Edge</th>
-                <th className="py-2 px-3">Est. EV</th>
-                <th className="py-2 px-3 text-right">Audit</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.05]">
-              {filtered.map((item, idx) => {
-                const p = item.prediction;
-                const isTop = p.isTopPick;
+        {filtered.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[12px]">
+              <thead className="bg-[#0a1812]/80 text-[#8fa69a] font-mono text-[10px] uppercase border-b border-white/[0.06]">
+                <tr>
+                  <th className="py-2 px-3">Fixture</th>
+                  <th className="py-2 px-3">Option type</th>
+                  <th className="py-2 px-3">Selection</th>
+                  <th className="py-2 px-3">Period</th>
+                  <th className="py-2 px-3">Prob</th>
+                  <th className="py-2 px-3">Price mode</th>
+                  <th className="py-2 px-3">Edge</th>
+                  <th className="py-2 px-3">Est. EV</th>
+                  <th className="py-2 px-3 text-right">Audit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.05]">
+                {filtered.map((item, idx) => {
+                  const p = item.prediction;
+                  const isTop = p.isTopPick;
 
-                return (
-                  <tr key={idx} className={`hover:bg-white/[0.02] transition-colors ${isTop ? 'bg-[#b8e63a]/[0.03]' : ''}`}>
-                    <td className="py-2.5 px-3 text-[#e8efe9]">
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center -space-x-1 shrink-0">
-                          <TeamCrest
-                            crestUrl={item.homeTeam.crestUrl}
-                            teamName={item.homeTeam.shortName || item.homeTeam.name}
-                            size={20}
-                          />
-                          <TeamCrest
-                            crestUrl={item.awayTeam.crestUrl}
-                            teamName={item.awayTeam.shortName || item.awayTeam.name}
-                            size={20}
-                          />
+                  return (
+                    <tr key={idx} className={`hover:bg-white/[0.02] transition-colors ${isTop ? 'bg-[#b8e63a]/[0.03]' : ''}`}>
+                      <td className="py-2.5 px-3 text-[#e8efe9]">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center -space-x-1 shrink-0">
+                            <TeamCrest
+                              crestUrl={item.homeTeam.crestUrl}
+                              teamName={item.homeTeam.shortName || item.homeTeam.name}
+                              size={20}
+                            />
+                            <TeamCrest
+                              crestUrl={item.awayTeam.crestUrl}
+                              teamName={item.awayTeam.shortName || item.awayTeam.name}
+                              size={20}
+                            />
+                          </div>
+                          <span className="font-[500] truncate max-w-[150px] sm:max-w-none">{item.fixtureName}</span>
                         </div>
-                        <span className="font-[500] truncate max-w-[150px] sm:max-w-none">{item.fixtureName}</span>
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-3 text-[#8fa69a]">
-                      <span className="text-[12px] text-[#e8efe9]">
-                        {getOptionTypeLabel(p.optionType)}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">
-                      <div className="flex items-center gap-1.5">
-                        <span>{formatSelectionName(p.selection)}</span>
-                        {isTop && (
-                          <span className="text-[9px] bg-[#b8e63a]/20 text-[#b8e63a] px-1 rounded-[3px] font-mono">
-                            Top pick
+                      </td>
+                      <td className="py-2.5 px-3 text-[#8fa69a]">
+                        <span className="text-[12px] text-[#e8efe9]">
+                          {getOptionTypeLabel(p.optionType)}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">
+                        <div className="flex items-center gap-1.5">
+                          <span>{formatSelectionName(p.selection)}</span>
+                          {isTop && (
+                            <span className="text-[9px] bg-[#b8e63a]/20 text-[#b8e63a] px-1 rounded-[3px] font-mono">
+                              Top pick
+                            </span>
+                          )}
+                          {p.pushProbability !== undefined && (
+                            <span className="text-[9px] bg-white/10 text-[#8fa69a] px-1 rounded-[3px] font-mono">
+                              Push rule
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-[#8fa69a] text-[12px]">
+                        {getPeriodLabel(p.period)}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums font-[500]">
+                        {(p.modelProbability * 100).toFixed(1)}%
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[12px]">
+                        {p.marketOdds ? (
+                          <span className="bg-[#0a1812] px-1.5 py-0.5 rounded-[4px] border border-white/[0.08] text-[#e8efe9] tabular-nums">
+                            {p.marketOdds.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-[#8fa69a] bg-[#0a1812] px-1.5 py-0.5 rounded-[4px] border border-white/[0.06]">
+                            Probability analysis
                           </span>
                         )}
-                        {p.pushProbability !== undefined && (
-                          <span className="text-[9px] bg-white/10 text-[#8fa69a] px-1 rounded-[3px] font-mono">
-                            Push rule
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[#8fa69a] tabular-nums">
+                        {p.edge ? `+${(p.edge * 100).toFixed(1)}%` : 'n/a'}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono tabular-nums">
+                        {p.expectedValue !== undefined ? (
+                          <span className={`font-[500] ${formatExpectedValue(p.expectedValue).colorClass}`}>
+                            {formatExpectedValue(p.expectedValue).text}
                           </span>
+                        ) : (
+                          <span className="text-[#8fa69a] text-[12px]">n/a</span>
                         )}
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-3 text-[#8fa69a] text-[12px]">
-                      {getPeriodLabel(p.period)}
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums font-[500]">
-                      {(p.modelProbability * 100).toFixed(1)}%
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-[12px]">
-                      {p.marketOdds ? (
-                        <span className="bg-[#0a1812] px-1.5 py-0.5 rounded-[4px] border border-white/[0.08] text-[#e8efe9] tabular-nums">
-                          {p.marketOdds.toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-[#8fa69a] bg-[#0a1812] px-1.5 py-0.5 rounded-[4px] border border-white/[0.06]">
-                          Probability analysis
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-[#8fa69a] tabular-nums">
-                      {p.edge ? `+${(p.edge * 100).toFixed(1)}%` : 'n/a'}
-                    </td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums">
-                      {p.expectedValue !== undefined ? (
-                        <span className={`font-[500] ${formatExpectedValue(p.expectedValue).colorClass}`}>
-                          {formatExpectedValue(p.expectedValue).text}
-                        </span>
-                      ) : (
-                        <span className="text-[#8fa69a] text-[12px]">n/a</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <Link
-                        href={`/matches/${item.fixtureId}`}
-                        className="inline-flex items-center gap-0.5 text-[11px] text-[#b8e63a] hover:underline font-[500]"
-                      >
-                        <span>Audit</span>
-                        <ArrowUpRight className="w-3 h-3" />
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <Link
+                          href={`/matches/${item.fixtureId}`}
+                          className="inline-flex items-center gap-0.5 text-[11px] text-[#b8e63a] hover:underline font-[500]"
+                        >
+                          <span>Audit</span>
+                          <ArrowUpRight className="w-3 h-3" />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-12 text-center text-[12px] text-[#8fa69a] space-y-2">
+            <div className="font-mono text-[13px] text-[#e8efe9]">
+              {liveDataAvailable ? 'No predictions match your selected filters' : `Live data unavailable. Last updated ${lastUpdated}`}
+            </div>
+            <p className="max-w-sm mx-auto">
+              {liveDataAvailable ? 'Try adjusting the minimum probability threshold or selecting all option types.' : 'Live market intelligence will populate once live provider data is refreshed.'}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

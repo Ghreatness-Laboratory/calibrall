@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { COMPETITIONS, FIXTURES, FIXTURE_STATISTICS } from '@/lib/data/seedData';
+import { COMPETITIONS, getFixtureStatistics } from '@/lib/data/seedData';
+import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 import { Search } from 'lucide-react';
@@ -12,18 +13,11 @@ export default function MatchesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [minProbability, setMinProbability] = useState<number>(0.50);
 
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(selectedLeague, statusFilter);
+
   const evaluatedFixtures = useMemo(() => {
-    return FIXTURES.map(fixture => {
-      const stats = FIXTURE_STATISTICS[fixture.id] || {
-        homeXg: 1.5,
-        awayXg: 1.2,
-        expectedCornersHome: 5.5,
-        expectedCornersAway: 4.5,
-        expectedCards: 4.2,
-        uncertaintyScore: 0.1,
-        dataCoverageScore: 0.92,
-        sampleSizeMatches: 20,
-      };
+    return fixtures.map(fixture => {
+      const stats = getFixtureStatistics(fixture);
 
       const evalResult = evaluateFixtureMarkets({
         fixtureId: fixture.id,
@@ -54,7 +48,8 @@ export default function MatchesPage() {
         noRecommendationReason: evalResult.noRecommendationReason,
       };
     });
-  }, []);
+  }, [fixtures]);
+
 
   const filtered = useMemo(() => {
     return evaluatedFixtures.filter(({ fixture, topPick }) => {
@@ -176,16 +171,27 @@ export default function MatchesPage() {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-        {filtered.map(({ fixture, topPick, noRecommendationReason }) => (
-          <FixtureCard
-            key={fixture.id}
-            fixture={fixture}
-            topPrediction={topPick}
-            noRecommendationReason={noRecommendationReason}
-          />
-        ))}
-      </div>
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {filtered.map(({ fixture, topPick, noRecommendationReason }) => (
+            <FixtureCard
+              key={fixture.id}
+              fixture={fixture}
+              topPrediction={topPick}
+              noRecommendationReason={noRecommendationReason}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] text-[#8fa69a] space-y-2">
+          <div className="font-mono text-[13px] text-[#e8efe9]">
+            {liveDataAvailable ? 'No matching fixtures found' : `Live data unavailable. Last updated ${lastUpdated}`}
+          </div>
+          <p className="text-[12px] max-w-sm mx-auto">
+            {liveDataAvailable ? 'Try adjusting your minimum probability or competition filters.' : 'Live European football fixtures will populate once API connectivity is established.'}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

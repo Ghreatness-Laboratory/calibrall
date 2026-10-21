@@ -90,10 +90,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Never cache auth endpoints, supabase/auth requests, payment flows, or mutations
+  // Never cache auth endpoints, revalidate endpoint, payment flows, or mutations
   if (
     url.pathname.includes('/auth') ||
     url.pathname.includes('/api/auth') ||
+    url.pathname.includes('/api/revalidate') ||
     url.pathname.includes('/payment') ||
     url.pathname.includes('/stripe') ||
     url.hostname.includes('supabase.co')

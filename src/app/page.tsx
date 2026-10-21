@@ -10,23 +10,22 @@ import {
   ChevronRight,
   ShieldCheck
 } from 'lucide-react';
-import { COMPETITIONS, FIXTURES, FIXTURE_STATISTICS, VERIFIED_PERFORMANCE_REPORT } from '@/lib/data/seedData';
+import { COMPETITIONS, getFixtureStatistics, VERIFIED_PERFORMANCE_REPORT } from '@/lib/data/seedData';
+import { getFootballDataProvider } from '@/lib/data/provider';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 import TeamCrest from '@/components/TeamCrest';
 
-export default function HomePage() {
-  const showcaseFixtures = FIXTURES.slice(0, 3).map(fixture => {
-    const stats = FIXTURE_STATISTICS[fixture.id] || {
-      homeXg: 1.5,
-      awayXg: 1.2,
-      expectedCornersHome: 5.5,
-      expectedCornersAway: 4.5,
-      expectedCards: 4.2,
-      uncertaintyScore: 0.1,
-      dataCoverageScore: 0.92,
-      sampleSizeMatches: 20,
-    };
+export const dynamic = 'force-dynamic';
+export const revalidate = 120;
+
+export default async function HomePage() {
+  const provider = getFootballDataProvider();
+  const liveResult = await provider.getLiveFixtures();
+  const hasLiveFixtures = liveResult.liveDataAvailable && liveResult.fixtures.length > 0;
+
+  const showcaseFixtures = (hasLiveFixtures ? liveResult.fixtures.slice(0, 3) : []).map(fixture => {
+    const stats = getFixtureStatistics(fixture);
 
     const evalResult = evaluateFixtureMarkets({
       fixtureId: fixture.id,
@@ -57,6 +56,7 @@ export default function HomePage() {
       noRecommendationReason: evalResult.noRecommendationReason,
     };
   });
+
 
   const featureChecklist = [
     { title: 'Dixon-Coles goals model', desc: 'Bivariate Poisson joint distributions' },
@@ -136,28 +136,41 @@ export default function HomePage() {
           <div className="flex items-center justify-between pb-3 border-b border-white/[0.08] mb-4">
             <span className="text-[13px] font-[500] text-[#e8efe9]">Live fixtures</span>
             <span className="text-[11px] font-mono px-2 py-0.5 rounded-[4px] border border-white/[0.1] text-[#b8e63a]">
-              Active verification
+              {hasLiveFixtures ? 'Active verification' : `Updated ${liveResult.lastUpdated}`}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-            {showcaseFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
-              <FixtureCard
-                key={fixture.id}
-                fixture={fixture}
-                topPrediction={topPick}
-                noRecommendationReason={noRecommendationReason}
-              />
-            ))}
-          </div>
+          {hasLiveFixtures ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                {showcaseFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
+                  <FixtureCard
+                    key={fixture.id}
+                    fixture={fixture}
+                    topPrediction={topPick}
+                    noRecommendationReason={noRecommendationReason}
+                  />
+                ))}
+              </div>
 
-          <div className="mt-3.5 pt-3 border-t border-white/[0.06] flex items-center justify-between text-[12px] text-[#8fa69a]">
-            <span>Displaying 3 of 6 live evaluated fixtures for today</span>
-            <Link href="/matches" className="text-[#b8e63a] hover:underline flex items-center gap-1 font-[500]">
-              <span>View all available fixtures & markets</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
+              <div className="mt-3.5 pt-3 border-t border-white/[0.06] flex items-center justify-between text-[12px] text-[#8fa69a]">
+                <span>Displaying {showcaseFixtures.length} of {liveResult.fixtures.length} live evaluated fixtures</span>
+                <Link href="/matches" className="text-[#b8e63a] hover:underline flex items-center gap-1 font-[500]">
+                  <span>View all available fixtures & markets</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="p-6 rounded-[12px] bg-[#0f2219] border border-white/[0.08] text-center space-y-2">
+              <div className="font-mono text-[13px] text-[#e8efe9]">
+                Live data unavailable. Last updated {liveResult.lastUpdated}
+              </div>
+              <p className="text-[12px] text-[#8fa69a] max-w-md mx-auto">
+                No active fixtures returned for today. Connect live football API keys in your environment to stream real-time match data.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
