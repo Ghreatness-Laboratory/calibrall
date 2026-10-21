@@ -25,6 +25,7 @@ import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase
 import { Fixture, MarketPrediction } from '@/types';
 import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import { checkDerby } from '@/lib/prediction/contextFactors';
+import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
 
 export default function MatchAnalysisPage() {
   const params = useParams();
@@ -41,7 +42,8 @@ export default function MatchAnalysisPage() {
     async function loadFixture() {
       try {
         setIsLoading(true);
-        const res = await fetch('/api/v1/fixtures', { cache: 'no-store' });
+        const isNba = id?.startsWith('nba_');
+        const res = await fetch(`/api/v1/fixtures?sport=${isNba ? 'basketball' : 'football'}`, { cache: 'no-store' });
         if (!res.ok) {
           setFixture(null);
           return;
@@ -70,13 +72,15 @@ export default function MatchAnalysisPage() {
     return getStoredSavedFixtures().includes(id);
   });
 
-  const stats = useMemo(() => {
-    if (!fixture) return null;
-    return getFixtureStatistics(fixture);
-  }, [fixture]);
+  const isBasketball = fixture?.sport === 'basketball' || id?.startsWith('nba_');
 
-  const evaluation = useMemo(() => {
-    if (!fixture || !stats) return null;
+  const stats = useMemo(() => {
+    if (!fixture || isBasketball) return null;
+    return getFixtureStatistics(fixture);
+  }, [fixture, isBasketball]);
+
+  const footballEvaluation = useMemo(() => {
+    if (!fixture || isBasketball || !stats) return null;
     return evaluateFixtureMarkets({
       fixtureId: fixture.id,
       homeTeamName: fixture.homeTeam.name,
@@ -99,11 +103,20 @@ export default function MatchAnalysisPage() {
       lineupConfirmed: stats.lineupConfirmed,
       verifiedOdds: stats.verifiedOdds,
     });
-  }, [fixture, stats]);
+  }, [fixture, isBasketball, stats]);
+
+  const basketballPredictions = useMemo(() => {
+    if (!fixture || !isBasketball) return [];
+    return generateNBAPredictions(fixture);
+  }, [fixture, isBasketball]);
+
+  const predictions = isBasketball ? basketballPredictions : (footballEvaluation?.predictions || []);
+  const topPick = isBasketball ? (basketballPredictions[0] || null) : (footballEvaluation?.topPick || null);
+  const noRecommendationReason = isBasketball ? undefined : footballEvaluation?.noRecommendationReason;
 
   // Selected prediction for explanation inspection
   const [selectedPredictionOverride, setSelectedPredictionOverride] = useState<MarketPrediction | null>(null);
-  const selectedPrediction = selectedPredictionOverride || evaluation?.topPick || (evaluation?.predictions[0] ?? null);
+  const selectedPrediction = selectedPredictionOverride || topPick || (predictions[0] ?? null);
   const setSelectedPrediction = (p: MarketPrediction | null) => setSelectedPredictionOverride(p);
 
   if (isLoading) {
@@ -115,11 +128,15 @@ export default function MatchAnalysisPage() {
     );
   }
 
-  if (!fixture || !stats || !evaluation) {
+  if (!fixture || (!isBasketball && (!stats || !footballEvaluation)) || (isBasketball && basketballPredictions.length === 0)) {
     return (
       <div className="py-20 text-center space-y-4">
         <h2 className="text-[16px] font-[500] text-[#e8efe9]">Live data unavailable. Last updated {lastUpdated}</h2>
-        <p className="text-[13px] text-[#8fa69a]">The requested match data could not be retrieved from live European football pipelines.</p>
+        <p className="text-[13px] text-[#8fa69a]">
+          {isBasketball 
+            ? 'The requested NBA matchup data could not be retrieved from live statistical feeds.' 
+            : 'The requested match data could not be retrieved from live European football pipelines.'}
+        </p>
         <Link href="/matches" className="inline-block px-4 py-2 rounded-[8px] bg-[#0f2219] border border-white/[0.08] text-[13px] text-[#e8efe9]">
           Return to fixtures
         </Link>
@@ -127,15 +144,14 @@ export default function MatchAnalysisPage() {
     );
   }
 
-
   const handleToggleBookmark = () => {
     const updated = toggleStoredSavedFixture(fixture.id);
     setIsSaved(updated);
   };
 
   const kickoff = new Date(fixture.kickoffTime);
-  const totalXg = stats.homeXg + stats.awayXg;
-  const totalCorners = stats.expectedCornersHome + stats.expectedCornersAway;
+  const totalXg = stats ? stats.homeXg + stats.awayXg : 0;
+  const totalCorners = stats ? stats.expectedCornersHome + stats.expectedCornersAway : 0;
   const homeName = fixture.homeTeam.shortName || fixture.homeTeam.name;
   const awayName = fixture.awayTeam.shortName || fixture.awayTeam.name;
 
@@ -306,50 +322,102 @@ export default function MatchAnalysisPage() {
         </div>
 
         {/* Quantitative Indicators Banner */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3.5 border-t border-white/[0.08]">
-          <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
-            <span className="text-[11px] text-[#8fa69a] block">Expected goals (xG)</span>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-[14px] font-[500] text-[#e8efe9] font-mono">{stats.homeXg.toFixed(2)} - {stats.awayXg.toFixed(2)}</span>
-              <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">({totalXg.toFixed(2)})</span>
+        {isBasketball && fixture.basketballStats ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3.5 border-t border-white/[0.08]">
+            <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+              <span className="text-[11px] text-[#8fa69a] block">Offensive Efficiency</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-[14px] font-[500] text-[#e8efe9] font-mono">
+                  {fixture.basketballStats.homeOffEff.toFixed(3)}
+                </span>
+                <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">
+                  vs {fixture.basketballStats.awayOffEff.toFixed(3)}
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
-            <span className="text-[11px] text-[#8fa69a] block">Corner expectation</span>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-[14px] font-[500] text-[#e8efe9] font-mono">{totalCorners.toFixed(1)}</span>
-              <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">
-                {stats.expectedCornersHome.toFixed(1)}H / {stats.expectedCornersAway.toFixed(1)}A
-              </span>
+            <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+              <span className="text-[11px] text-[#8fa69a] block">Defensive Efficiency</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-[14px] font-[500] text-[#e8efe9] font-mono">
+                  {fixture.basketballStats.homeDefEff.toFixed(3)}
+                </span>
+                <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">
+                  vs {fixture.basketballStats.awayDefEff.toFixed(3)}
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
-            <span className="text-[11px] text-[#8fa69a] block">Projected cards</span>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-[14px] font-[500] text-[#e8efe9] font-mono">{stats.expectedCards.toFixed(1)}</span>
-              <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">Ref: {stats.expectedCards.toFixed(1)}</span>
+            <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+              <span className="text-[11px] text-[#8fa69a] block">Pace (Possessions/G)</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-[14px] font-[500] text-[#e8efe9] font-mono">
+                  {fixture.basketballStats.homePoss.toFixed(1)}
+                </span>
+                <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">
+                  vs {fixture.basketballStats.awayPoss.toFixed(1)}
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
-            <span className="text-[11px] text-[#8fa69a] block">Confidence / coverage</span>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-[14px] font-[500] text-[#b8e63a] font-mono">
-                {((1 - stats.uncertaintyScore) * 100).toFixed(0)}%
-              </span>
-              <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">
-                {stats.sampleSizeMatches} games
-              </span>
+            <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+              <span className="text-[11px] text-[#8fa69a] block">Projected Total</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-[14px] font-[500] text-[#b8e63a] font-mono">
+                  {fixture.basketballStats.projectedTotal?.toFixed(1)} pts
+                </span>
+                <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">
+                  Margin: {fixture.basketballStats.projectedMargin?.toFixed(1)}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        ) : stats ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3.5 border-t border-white/[0.08]">
+            <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+              <span className="text-[11px] text-[#8fa69a] block">Expected goals (xG)</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-[14px] font-[500] text-[#e8efe9] font-mono">{stats.homeXg.toFixed(2)} - {stats.awayXg.toFixed(2)}</span>
+                <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">({totalXg.toFixed(2)})</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+              <span className="text-[11px] text-[#8fa69a] block">Corner expectation</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-[14px] font-[500] text-[#e8efe9] font-mono">{totalCorners.toFixed(1)}</span>
+                <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">
+                  {stats.expectedCornersHome.toFixed(1)}H / {stats.expectedCornersAway.toFixed(1)}A
+                </span>
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+              <span className="text-[11px] text-[#8fa69a] block">Projected cards</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-[14px] font-[500] text-[#e8efe9] font-mono">{stats.expectedCards.toFixed(1)}</span>
+                <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">Ref: {stats.expectedCards.toFixed(1)}</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06]">
+              <span className="text-[11px] text-[#8fa69a] block">Confidence / coverage</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-[14px] font-[500] text-[#b8e63a] font-mono">
+                  {((1 - stats.uncertaintyScore) * 100).toFixed(0)}%
+                </span>
+                <span className="text-[11px] text-[#8fa69a] font-mono ml-auto">
+                  {stats.sampleSizeMatches} games
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Flagship Recommendation Banner */}
       <div className="bg-[#0f2219] border border-[#b8e63a]/30 rounded-[12px] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {evaluation.topPick ? (
+        {topPick ? (
           <div>
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#b8e63a]">
@@ -357,30 +425,30 @@ export default function MatchAnalysisPage() {
                 <span>Primary qualified recommendation</span>
               </div>
               {(() => {
-                const tier = getRiskTierBadge(evaluation.topPick.riskTier);
+                const tier = getRiskTierBadge(topPick.riskTier);
                 return (
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-wider ${tier.badgeClass}`}>
                     {tier.label}
                   </span>
                 );
               })()}
-              {evaluation.topPick.marketOdds && (
+              {topPick.marketOdds && (
                 <span className="text-[11px] font-mono text-[#e8efe9] bg-white/[0.08] px-1.5 py-0.5 rounded border border-white/10">
-                  @{formatOdds(evaluation.topPick.marketOdds)}
+                  @{formatOdds(topPick.marketOdds)}
                 </span>
               )}
             </div>
             <h3 className="text-[15px] font-[500] text-[#e8efe9]">
-              {formatSelectionName(evaluation.topPick.selection)} — {(evaluation.topPick.modelProbability * 100).toFixed(1)}% probability
-              {evaluation.topPick.expectedValue !== undefined ? ` (${formatExpectedValue(evaluation.topPick.expectedValue).text} EV)` : ''}
+              {formatSelectionName(topPick.selection)} — {(topPick.modelProbability * 100).toFixed(1)}% probability
+              {topPick.expectedValue !== undefined ? ` (${formatExpectedValue(topPick.expectedValue).text} EV)` : ''}
             </h3>
-            {evaluation.topPick.plainEnglishReason && (
+            {topPick.plainEnglishReason && (
               <p className="text-[12px] text-[#b8e63a] font-medium mt-1 max-w-2xl leading-normal">
-                {evaluation.topPick.plainEnglishReason}
+                {topPick.plainEnglishReason}
               </p>
             )}
             <p className="text-[11px] text-[#8fa69a] mt-0.5 max-w-2xl leading-normal">
-              Ranked highest across {evaluation.predictions.length} candidate lines. Passes minimum sample size ({stats.sampleSizeMatches} matches) and margin-of-safety filters.
+              Ranked highest across {predictions.length} candidate lines. {isBasketball ? 'Calculated via official NBA Possession-Efficiency methodology.' : `Passes minimum sample size (${stats?.sampleSizeMatches ?? 10} matches) and margin-of-safety filters.`}
             </p>
           </div>
         ) : (
@@ -391,38 +459,115 @@ export default function MatchAnalysisPage() {
             </div>
             <h3 className="text-[15px] font-[500] text-[#e8efe9]">Statistical evidence insufficient</h3>
             <p className="text-[12px] text-[#8fa69a] mt-0.5 max-w-2xl leading-normal">
-              {evaluation.noRecommendationReason || "Current market prices reflect efficient probabilities. Abstaining to maintain statistical calibration."}
+              {noRecommendationReason || "Current market prices reflect efficient probabilities. Abstaining to maintain statistical calibration."}
             </p>
           </div>
         )}
 
         <div className="shrink-0 flex items-center">
-          <span className="text-[11px] font-mono text-[#8fa69a]">Dixon-Coles bivariate Poisson</span>
+          <span className="text-[11px] font-mono text-[#8fa69a]">
+            {isBasketball ? 'NBA Efficiency Model' : 'Dixon-Coles bivariate Poisson'}
+          </span>
         </div>
       </div>
 
-      {/* Dixon-Coles Scoreline Probability Heatmap Matrix */}
-      <ScorelineMatrix
-        homeTeamName={fixture.homeTeam.name}
-        awayTeamName={fixture.awayTeam.name}
-        homeXg={stats.homeXg}
-        awayXg={stats.awayXg}
-      />
+      {/* Basketball: NBA Efficiency Math Breakdown */}
+      {isBasketball && fixture.basketballStats && (
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+            <div>
+              <h3 className="text-[15px] font-[500] text-[#e8efe9]">NBA Score Projection Math Breakdown</h3>
+              <p className="text-[11px] text-[#8fa69a] mt-0.5">Strict efficiency × possession formulas (no pace blending or unrequested adjustments)</p>
+            </div>
+            <span className="text-[11px] font-mono text-[#b8e63a] bg-[#b8e63a]/10 px-2.5 py-1 rounded border border-[#b8e63a]/20">
+              Verified Model
+            </span>
+          </div>
 
-      {/* Factors and State-Based Weighing Panel */}
-      <FactorsAndStatePanel
-        contextEvaluation={evaluation.contextEvaluation}
-        rankedOptions={evaluation.rankedOptions}
-        selectedOptionId={selectedPrediction?.id}
-        onSelectOption={(p) => setSelectedPrediction(p)}
-      />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-[12px]">
+            <div className="p-3 bg-[#0a1812] border border-white/[0.06] rounded-[8px]">
+              <div className="text-[10px] text-[#8fa69a] font-mono uppercase">{fixture.homeTeam.name} Offense</div>
+              <div className="text-[16px] font-mono font-bold text-[#e8efe9] mt-1">{fixture.basketballStats.homeOff.toFixed(2)}</div>
+              <div className="text-[11px] text-[#8fa69a] font-mono mt-0.5">
+                {fixture.basketballStats.homeOffEff} × {fixture.basketballStats.homePoss}
+              </div>
+            </div>
+
+            <div className="p-3 bg-[#0a1812] border border-white/[0.06] rounded-[8px]">
+              <div className="text-[10px] text-[#8fa69a] font-mono uppercase">{fixture.awayTeam.name} Offense</div>
+              <div className="text-[16px] font-mono font-bold text-[#e8efe9] mt-1">{fixture.basketballStats.awayOff.toFixed(2)}</div>
+              <div className="text-[11px] text-[#8fa69a] font-mono mt-0.5">
+                {fixture.basketballStats.awayOffEff} × {fixture.basketballStats.awayPoss}
+              </div>
+            </div>
+
+            <div className="p-3 bg-[#0a1812] border border-white/[0.06] rounded-[8px]">
+              <div className="text-[10px] text-[#8fa69a] font-mono uppercase">{fixture.homeTeam.name} Defense (Allows)</div>
+              <div className="text-[16px] font-mono font-bold text-[#e8efe9] mt-1">{fixture.basketballStats.homeDef.toFixed(2)}</div>
+              <div className="text-[11px] text-[#8fa69a] font-mono mt-0.5">
+                {fixture.basketballStats.homeDefEff} × {fixture.basketballStats.awayPoss}
+              </div>
+            </div>
+
+            <div className="p-3 bg-[#0a1812] border border-white/[0.06] rounded-[8px]">
+              <div className="text-[10px] text-[#8fa69a] font-mono uppercase">{fixture.awayTeam.name} Defense (Allows)</div>
+              <div className="text-[16px] font-mono font-bold text-[#e8efe9] mt-1">{fixture.basketballStats.awayDef.toFixed(2)}</div>
+              <div className="text-[11px] text-[#8fa69a] font-mono mt-0.5">
+                {fixture.basketballStats.awayDefEff} × {fixture.basketballStats.homePoss}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <div className="p-3 bg-[#0a1812] border border-white/[0.06] rounded-[8px]">
+              <div className="text-[10px] text-[#8fa69a] font-mono uppercase">Projected Scores (Avg Off + Opp Def)</div>
+              <div className="text-[15px] font-mono font-bold text-[#b8e63a] mt-1">
+                {fixture.basketballStats.homeProjected.toFixed(2)} - {fixture.basketballStats.awayProjected.toFixed(2)}
+              </div>
+            </div>
+
+            <div className="p-3 bg-[#0a1812] border border-white/[0.06] rounded-[8px]">
+              <div className="text-[10px] text-[#8fa69a] font-mono uppercase">Projected Total Points</div>
+              <div className="text-[15px] font-mono font-bold text-[#e8efe9] mt-1">
+                {fixture.basketballStats.projectedTotal.toFixed(2)}
+              </div>
+            </div>
+
+            <div className="p-3 bg-[#0a1812] border border-white/[0.06] rounded-[8px]">
+              <div className="text-[10px] text-[#8fa69a] font-mono uppercase">Spread Margin & Projected Winner</div>
+              <div className="text-[15px] font-mono font-bold text-[#e8efe9] mt-1">
+                {fixture.basketballStats.projectedWinner} by {fixture.basketballStats.projectedMargin.toFixed(2)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Football: Dixon-Coles Scoreline Matrix & Factors Panel */}
+      {!isBasketball && stats && footballEvaluation && (
+        <>
+          <ScorelineMatrix
+            homeTeamName={fixture.homeTeam.name}
+            awayTeamName={fixture.awayTeam.name}
+            homeXg={stats.homeXg}
+            awayXg={stats.awayXg}
+          />
+
+          <FactorsAndStatePanel
+            contextEvaluation={footballEvaluation.contextEvaluation}
+            rankedOptions={footballEvaluation.rankedOptions}
+            selectedOptionId={selectedPrediction?.id}
+            onSelectOption={(p) => setSelectedPrediction(p)}
+          />
+        </>
+      )}
 
       {/* Main Split: Market Comparison Table (Left 7 cols) & Explanation Engine (Right 5 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Table */}
         <div className="lg:col-span-7 space-y-3">
           <MarketComparisonTable
-            predictions={evaluation.predictions}
+            predictions={predictions}
             selectedPredictionId={selectedPrediction?.id}
             onSelectPrediction={(p) => setSelectedPrediction(p)}
             homeTeamName={fixture.homeTeam.name}
@@ -439,7 +584,7 @@ export default function MatchAnalysisPage() {
 
           <ExplanationCard
             prediction={selectedPrediction}
-            noRecommendationReason={evaluation.noRecommendationReason}
+            noRecommendationReason={noRecommendationReason}
           />
         </div>
       </div>

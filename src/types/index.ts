@@ -1,4 +1,4 @@
-// MATCHMIND: Complete TypeScript Type Definitions
+export type Sport = 'football' | 'basketball';
 
 export type MatchStatus = 'TIMED' | 'SCHEDULED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | 'POSTPONED' | 'CANCELED';
 
@@ -17,7 +17,11 @@ export type MarketCategory =
   | 'draw_no_bet'
   | 'handicap'
   | 'goal_bounds'
-  | 'combos';
+  | 'combos'
+  | 'moneyline'
+  | 'spread'
+  | 'total_points'
+  | 'team_totals';
 
 export type SupportedOptionType = 
   | 'win'
@@ -38,7 +42,11 @@ export type SupportedOptionType =
   | 'corner_handicap'
   | 'team_bookings'
   | 'booking_points'
-  | 'win_draw_combo';
+  | 'win_draw_combo'
+  | 'moneyline'
+  | 'spread'
+  | 'total_points'
+  | 'team_totals';
 
 export type MarketPeriod = 'REGULAR_TIME' | 'FIRST_HALF' | 'SECOND_HALF' | 'FULL_TIME';
 
@@ -225,6 +233,7 @@ export interface Fixture {
   referee?: string;
   dataFreshness: string;
   isDemo?: boolean;
+  sport?: Sport;
   isDerby?: boolean;
   derbyName?: string;
   hasCoachChange?: boolean;
@@ -236,6 +245,42 @@ export interface Fixture {
     cards?: boolean;
     halves?: boolean;
   };
+  // Basketball specific fields
+  basketballStats?: {
+    homeOffEff: number;
+    homeDefEff: number;
+    homePoss: number;
+    awayOffEff: number;
+    awayDefEff: number;
+    awayPoss: number;
+    homeOff: number;
+    awayOff: number;
+    homeDef: number;
+    awayDef: number;
+    homeProjected: number;
+    awayProjected: number;
+    projectedTotal: number;
+    projectedMargin: number;
+    projectedWinner: string;
+    sportsbookTotal?: number;
+    sportsbookSpreadHome?: number;
+    totalLean?: 'OVER' | 'UNDER' | 'PUSH';
+    spreadLean?: string;
+  };
+}
+
+export interface NBATeamStats {
+  teamId: string;
+  teamName: string;
+  abbreviation: string;
+  conference: 'East' | 'West';
+  division: string;
+  offensiveEfficiency: number; // ORtg / 100
+  defensiveEfficiency: number; // DRtg / 100
+  possessions: number;          // PACE
+  season: string;
+  lastUpdated: string;
+  source: string;
 }
 
 export interface BookmakerOdds {

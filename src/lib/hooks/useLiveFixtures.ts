@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Fixture } from '@/types';
+import { Fixture, Sport } from '@/types';
 
 export interface LiveFixturesHookResult {
   fixtures: Fixture[];
@@ -12,7 +12,11 @@ export interface LiveFixturesHookResult {
   refetch: () => Promise<void>;
 }
 
-export function useLiveFixtures(competitionCode?: string, status?: string): LiveFixturesHookResult {
+export function useLiveFixtures(
+  competitionCode?: string, 
+  status?: string, 
+  sport: Sport = 'football'
+): LiveFixturesHookResult {
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [liveDataAvailable, setLiveDataAvailable] = useState(false);
@@ -28,6 +32,7 @@ export function useLiveFixtures(competitionCode?: string, status?: string): Live
     try {
       setIsLoading(true);
       const query = new URLSearchParams();
+      query.set('sport', sport);
       if (competitionCode && competitionCode !== 'ALL') query.set('competition', competitionCode);
       if (status && status !== 'ALL') query.set('status', status);
 
@@ -55,8 +60,8 @@ export function useLiveFixtures(competitionCode?: string, status?: string): Live
       if (json.lastUpdated) {
         setLastUpdated(json.lastUpdated);
       }
-      if (json.error || !json.liveDataAvailable) {
-        setError(json.error || `Live data unavailable. Last updated ${json.lastUpdated || lastUpdated}`);
+      if (json.error && list.length === 0) {
+        setError(json.error);
       } else {
         setError(undefined);
       }
@@ -66,7 +71,7 @@ export function useLiveFixtures(competitionCode?: string, status?: string): Live
     } finally {
       setIsLoading(false);
     }
-  }, [competitionCode, status, lastUpdated]);
+  }, [competitionCode, status, sport, lastUpdated]);
 
   useEffect(() => {
     load();

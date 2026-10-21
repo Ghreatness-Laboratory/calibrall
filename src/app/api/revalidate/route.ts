@@ -29,15 +29,30 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Parse optional target pattern or path
+  // Parse optional target pattern or sport
   let targetPattern: string | undefined;
+  let sportToClear: string | undefined;
   try {
     const body = await req.json().catch(() => ({}));
     targetPattern = body?.pattern;
+    sportToClear = body?.sport;
   } catch {}
 
+  // Determine cache bust pattern based on sport
+  let effectivePattern = targetPattern;
+  if (!effectivePattern && sportToClear) {
+    if (sportToClear === 'basketball') {
+      effectivePattern = 'basketball';
+    } else if (sportToClear === 'football') {
+      effectivePattern = 'football';
+    }
+  }
+
   // 1. Bust server cache
-  const deletedEntries = await serverCache.bust(targetPattern);
+  const deletedEntries = await serverCache.bust(effectivePattern);
+  if (sportToClear === 'basketball') {
+    await serverCache.bust('nba:');
+  }
 
   // 2. Trigger Next.js framework revalidation across all dynamic pages
   try {
@@ -47,14 +62,16 @@ export async function POST(req: NextRequest) {
     revalidatePath('/matches');
     revalidatePath('/predictions');
     revalidatePath('/markets');
+    revalidatePath('/performance');
   } catch (err: any) {
     console.warn('[Revalidate] revalidatePath warning:', err?.message);
   }
 
   return NextResponse.json({
     revalidated: true,
+    sportCleared: sportToClear || 'all',
     cacheEntriesBusted: deletedEntries,
     timestamp: new Date().toISOString(),
-    message: 'Cache successfully busted and framework routes revalidated.',
+    message: `Cache successfully busted for ${sportToClear || 'all sports'} and framework routes revalidated.`,
   });
 }

@@ -8,6 +8,8 @@ import MobileInstallBanner from '@/components/pwa/MobileInstallBanner';
 import IOSInstallModal from '@/components/pwa/IOSInstallModal';
 import SWUpdateToast from '@/components/pwa/SWUpdateToast';
 import OfflineBanner from '@/components/pwa/OfflineBanner';
+import { SportProvider } from '@/lib/context/SportContext';
+import SportSwitcher from '@/components/SportSwitcher';
 
 export const viewport: Viewport = {
   themeColor: '#0a1812',
@@ -17,8 +19,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'MATCHMIND | Football Prediction & Market Intelligence Platform',
-  description: 'Football Prediction & Market Intelligence Platform. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.',
+  title: 'MATCHMIND | Football & NBA Basketball Statistical Projection Platform',
+  description: 'Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
@@ -36,8 +38,8 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: 'MATCHMIND | Football Prediction & Market Intelligence Platform',
-    description: 'Football Prediction & Market Intelligence Platform. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.',
+    title: 'MATCHMIND | Football & NBA Basketball Statistical Projection Platform',
+    description: 'Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.',
     type: 'website',
   },
 };
@@ -65,16 +67,19 @@ export default function RootLayout({
       </head>
       <body className="min-h-[100dvh] bg-[#0a1812] text-[#e8efe9] flex flex-col antialiased selection:bg-[#b8e63a] selection:text-black pb-[calc(76px+env(safe-area-inset-bottom,0px))] md:pb-0">
         <InstallPromptProvider>
-          <Navbar />
-          <OfflineBanner />
-          <main className="flex-1 max-w-7xl w-full mx-auto px-[18px] sm:px-6 lg:px-8 py-5 min-w-0">
-            {children}
-          </main>
-          <Footer />
-          <BottomNav />
-          <MobileInstallBanner />
-          <IOSInstallModal />
-          <SWUpdateToast />
+          <SportProvider>
+            <Navbar />
+            <SportSwitcher />
+            <OfflineBanner />
+            <main className="flex-1 max-w-7xl w-full mx-auto px-[18px] sm:px-6 lg:px-8 py-4 min-w-0">
+              {children}
+            </main>
+            <Footer />
+            <BottomNav />
+            <MobileInstallBanner />
+            <IOSInstallModal />
+            <SWUpdateToast />
+          </SportProvider>
         </InstallPromptProvider>
       </body>
     </html>

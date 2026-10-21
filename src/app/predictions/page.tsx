@@ -25,17 +25,26 @@ import {
   getRiskTierBadge
 } from '@/lib/prediction/marketCatalog';
 import { checkDerby } from '@/lib/prediction/contextFactors';
+import { useSport } from '@/lib/context/SportContext';
+import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
 
-type MarketGroupFilter = 'ALL' | 'goals' | 'corners' | 'cards' | 'handicap' | 'results' | 'halves' | 'goal_bounds';
+type MarketGroupFilter = 'ALL' | 'goals' | 'corners' | 'cards' | 'handicap' | 'results' | 'halves' | 'goal_bounds' | 'moneyline' | 'spread' | 'total_points';
 
 export default function PredictionsPage() {
+  const { sport, isSwitching } = useSport();
+  const isBasketball = sport === 'basketball';
+
   const [selectedComp, setSelectedComp] = useState<string>('ALL');
   const [selectedRiskTier, setSelectedRiskTier] = useState<string>('ALL');
   const [selectedMarketGroup, setSelectedMarketGroup] = useState<MarketGroupFilter>('ALL');
   const [onlyValuePicks, setOnlyValuePicks] = useState<boolean>(false);
   const [minProb, setMinProb] = useState<number>(0.50);
 
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(selectedComp);
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(
+    isBasketball ? 'NBA' : selectedComp,
+    'ALL',
+    sport
+  );
 
   // Generate qualified and probability-based market candidates across all live fixtures
   const allPredictions = useMemo(() => {
@@ -53,6 +62,24 @@ export default function PredictionsPage() {
     }[] = [];
 
     fixtures.forEach(fixture => {
+      if (isBasketball || fixture.sport === 'basketball') {
+        const nbaPreds = generateNBAPredictions(fixture);
+        nbaPreds.forEach(p => {
+          list.push({
+            fixtureId: fixture.id,
+            fixtureName: `${fixture.homeTeam.shortName || fixture.homeTeam.name} vs ${fixture.awayTeam.shortName || fixture.awayTeam.name}`,
+            homeTeam: fixture.homeTeam,
+            awayTeam: fixture.awayTeam,
+            compCode: 'NBA',
+            compName: 'NBA',
+            kickoff: fixture.kickoffTime,
+            isDerby: false,
+            prediction: p,
+          });
+        });
+        return;
+      }
+
       const stats = getFixtureStatistics(fixture);
       const derbyInfo = fixture.isDerby && fixture.derbyName 
         ? { name: fixture.derbyName }
@@ -98,7 +125,7 @@ export default function PredictionsPage() {
     });
 
     return list;
-  }, [fixtures]);
+  }, [fixtures, isBasketball]);
 
   // Requirement 13: Daily "Safest Picks" across all leagues
   // Top 5 SAFE picks, with variety rule: no more than 2 from the same market type/category
@@ -156,6 +183,15 @@ export default function PredictionsPage() {
     if (group === 'goal_bounds') {
       return p.optionType === 'goal_bounds' || p.optionType === 'team_goal_bounds' || p.marketCategory === 'goal_bounds';
     }
+    if (group === 'moneyline') {
+      return p.optionType === 'moneyline' || p.marketCategory === 'moneyline';
+    }
+    if (group === 'spread') {
+      return p.optionType === 'spread' || p.marketCategory === 'spread';
+    }
+    if (group === 'total_points') {
+      return p.optionType === 'total_points' || p.marketCategory === 'total_points';
+    }
     return true;
   };
 
@@ -173,7 +209,7 @@ export default function PredictionsPage() {
     }).sort((a, b) => b.prediction.rankingScore - a.prediction.rankingScore);
   }, [allPredictions, selectedComp, selectedRiskTier, selectedMarketGroup, onlyValuePicks, minProb]);
 
-  const marketGroupFilters: { id: MarketGroupFilter; label: string }[] = [
+  const footballMarketFilters: { id: MarketGroupFilter; label: string }[] = [
     { id: 'ALL', label: 'All markets' },
     { id: 'results', label: 'Results & Double Chance' },
     { id: 'goals', label: 'Goals & BTTS' },
@@ -183,6 +219,15 @@ export default function PredictionsPage() {
     { id: 'corners', label: 'Corners' },
     { id: 'cards', label: 'Cards & Bookings' },
   ];
+
+  const basketballMarketFilters: { id: MarketGroupFilter; label: string }[] = [
+    { id: 'ALL', label: 'All NBA markets' },
+    { id: 'moneyline', label: 'Moneyline' },
+    { id: 'spread', label: 'Point Spread' },
+    { id: 'total_points', label: 'Game Total Points' },
+  ];
+
+  const activeMarketFilters = isBasketball ? basketballMarketFilters : footballMarketFilters;
 
   const riskTierPills: { id: string; label: string; badgeColor: string }[] = [
     { id: 'ALL', label: 'All Tiers', badgeColor: 'bg-white/10 text-white' },
@@ -308,16 +353,25 @@ export default function PredictionsPage() {
           {/* Competition */}
           <div>
             <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Competition</label>
-            <select
-              value={selectedComp}
-              onChange={(e) => setSelectedComp(e.target.value)}
-              className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
-            >
-              <option value="ALL">All competitions</option>
-              {COMPETITIONS.map(c => (
-                <option key={c.code} value={c.code}>{c.name}</option>
-              ))}
-            </select>
+            {isBasketball ? (
+              <select
+                disabled
+                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#e8efe9] opacity-90 cursor-default"
+              >
+                <option value="NBA">NBA (USA)</option>
+              </select>
+            ) : (
+              <select
+                value={selectedComp}
+                onChange={(e) => setSelectedComp(e.target.value)}
+                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
+              >
+                <option value="ALL">All competitions</option>
+                {COMPETITIONS.map(c => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Risk Tier */}
@@ -370,7 +424,7 @@ export default function PredictionsPage() {
         {/* Market-Type Filter Pills (Requirement 12 & 16) */}
         <div className="pt-2 border-t border-white/[0.06] flex items-center gap-1.5 overflow-x-auto text-[11px] pb-1 [scrollbar-width:none]">
           <span className="text-[#8fa69a] font-mono shrink-0 mr-1">Market:</span>
-          {marketGroupFilters.map(filter => (
+          {activeMarketFilters.map(filter => (
             <button
               key={filter.id}
               onClick={() => setSelectedMarketGroup(filter.id)}

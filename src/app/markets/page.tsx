@@ -3,14 +3,16 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { getFixtureStatistics } from '@/lib/data/seedData';
+import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
+import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
-import { ArrowUpRight, Clock } from 'lucide-react';
+import { ArrowUpRight, Clock, Info } from 'lucide-react';
 import { SupportedOptionType, Fixture } from '@/types';
 import TeamCrest from '@/components/TeamCrest';
 import { formatExpectedValue, formatOdds } from '@/lib/prediction/marketCatalog';
 
-const MARKET_OPTIONS: {
+const FOOTBALL_MARKET_OPTIONS: {
   code: string;
   label: string;
   optionType: SupportedOptionType;
@@ -35,72 +37,107 @@ const MARKET_OPTIONS: {
   { code: '2H_RESULT_HOME', label: '10. 2nd half result: Home win', optionType: 'second_half_result', category: 'half_time', period: '2nd half' },
 ];
 
-export default function MarketExplorerPage() {
-  const [selectedOptionType, setSelectedOptionType] = useState<string>('ALL');
-  const [selectedMarketLine, setSelectedMarketLine] = useState<string>('TOTAL_GOALS_O25');
+const BASKETBALL_MARKET_OPTIONS: {
+  code: string;
+  label: string;
+  optionType: SupportedOptionType;
+  category: string;
+  period: string;
+}[] = [
+  { code: 'BASKETBALL_MONEYLINE', label: '1. Moneyline: Winner', optionType: 'moneyline', category: 'moneyline', period: 'Full game' },
+  { code: 'BASKETBALL_SPREAD', label: '2. Point Spread (ATS)', optionType: 'spread', category: 'spread', period: 'Full game' },
+  { code: 'BASKETBALL_TOTAL_POINTS', label: '3. Total Points (Over / Under)', optionType: 'total_points', category: 'total_points', period: 'Full game' },
+];
 
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures();
+export default function MarketExplorerPage() {
+  const { sport, isSwitching } = useSport();
+  const isBasketball = sport === 'basketball';
+
+  const marketOptions = isBasketball ? BASKETBALL_MARKET_OPTIONS : FOOTBALL_MARKET_OPTIONS;
+
+  const [selectedOptionType, setSelectedOptionType] = useState<string>('ALL');
+  const [selectedMarketLine, setSelectedMarketLine] = useState<string>(
+    isBasketball ? 'BASKETBALL_MONEYLINE' : 'TOTAL_GOALS_O25'
+  );
+
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(
+    isBasketball ? 'NBA' : undefined,
+    'ALL',
+    sport
+  );
 
   const filteredOptions = useMemo(() => {
-    if (selectedOptionType === 'ALL') return MARKET_OPTIONS;
-    return MARKET_OPTIONS.filter(o => o.optionType === selectedOptionType);
-  }, [selectedOptionType]);
+    if (selectedOptionType === 'ALL') return marketOptions;
+    return marketOptions.filter(o => o.optionType === selectedOptionType);
+  }, [marketOptions, selectedOptionType]);
 
-  // Evaluate all upcoming fixtures for this specific market code
+  // Evaluate upcoming fixtures for this specific market code
   const comparisons = useMemo(() => {
     const list: {
       fixtureId: string;
       fixture: Fixture;
       prediction: any;
-      homeXg: number;
-      awayXg: number;
+      homeMetric?: string;
+      awayMetric?: string;
     }[] = [];
 
     fixtures.filter(f => f.status !== 'FINISHED').forEach(fixture => {
-      const stats = getFixtureStatistics(fixture);
-
-      const evalResult = evaluateFixtureMarkets({
-        fixtureId: fixture.id,
-        homeTeamName: fixture.homeTeam.name,
-        awayTeamName: fixture.awayTeam.name,
-        competitionCode: fixture.competition.code,
-        competitionName: fixture.competition.name,
-        homeAttackRating: fixture.homeTeam.attackRating,
-        homeDefenseRating: fixture.homeTeam.defenseRating,
-        awayAttackRating: fixture.awayTeam.attackRating,
-        awayDefenseRating: fixture.awayTeam.defenseRating,
-        homeXg: stats.homeXg,
-        awayXg: stats.awayXg,
-        expectedCornersHome: stats.expectedCornersHome,
-        expectedCornersAway: stats.expectedCornersAway,
-        expectedCards: stats.expectedCards,
-        uncertaintyScore: stats.uncertaintyScore,
-        dataCoverageScore: stats.dataCoverageScore,
-        sampleSizeMatches: stats.sampleSizeMatches,
-        stateTags: stats.stateTags,
-        lineupConfirmed: stats.lineupConfirmed,
-        verifiedOdds: stats.verifiedOdds,
-      });
-
-      const matchedPred = evalResult.predictions.find(p => p.marketCode === selectedMarketLine);
-      if (matchedPred) {
-        list.push({
+      if (isBasketball || fixture.sport === 'basketball') {
+        const preds = generateNBAPredictions(fixture);
+        const matched = preds.find(p => p.marketCode === selectedMarketLine);
+        if (matched) {
+          list.push({
+            fixtureId: fixture.id,
+            fixture,
+            prediction: matched,
+            homeMetric: fixture.basketballStats ? `${fixture.basketballStats.homeProjected.toFixed(1)} pts` : undefined,
+            awayMetric: fixture.basketballStats ? `${fixture.basketballStats.awayProjected.toFixed(1)} pts` : undefined,
+          });
+        }
+      } else {
+        const stats = getFixtureStatistics(fixture);
+        const evalResult = evaluateFixtureMarkets({
           fixtureId: fixture.id,
-          fixture,
-          prediction: matchedPred,
+          homeTeamName: fixture.homeTeam.name,
+          awayTeamName: fixture.awayTeam.name,
+          competitionCode: fixture.competition.code,
+          competitionName: fixture.competition.name,
+          homeAttackRating: fixture.homeTeam.attackRating,
+          homeDefenseRating: fixture.homeTeam.defenseRating,
+          awayAttackRating: fixture.awayTeam.attackRating,
+          awayDefenseRating: fixture.awayTeam.defenseRating,
           homeXg: stats.homeXg,
           awayXg: stats.awayXg,
+          expectedCornersHome: stats.expectedCornersHome,
+          expectedCornersAway: stats.expectedCornersAway,
+          expectedCards: stats.expectedCards,
+          uncertaintyScore: stats.uncertaintyScore,
+          dataCoverageScore: stats.dataCoverageScore,
+          sampleSizeMatches: stats.sampleSizeMatches,
+          stateTags: stats.stateTags,
+          lineupConfirmed: stats.lineupConfirmed,
+          verifiedOdds: stats.verifiedOdds,
         });
+
+        const matchedPred = evalResult.predictions.find(p => p.marketCode === selectedMarketLine);
+        if (matchedPred) {
+          list.push({
+            fixtureId: fixture.id,
+            fixture,
+            prediction: matchedPred,
+            homeMetric: `${stats.homeXg.toFixed(2)} xG`,
+            awayMetric: `${stats.awayXg.toFixed(2)} xG`,
+          });
+        }
       }
     });
 
     return list.sort((a, b) => b.prediction.modelProbability - a.prediction.modelProbability);
-  }, [fixtures, selectedMarketLine]);
+  }, [fixtures, selectedMarketLine, isBasketball]);
 
+  const activeOption = marketOptions.find(o => o.code === selectedMarketLine) || marketOptions[0];
 
-  const activeOption = MARKET_OPTIONS.find(o => o.code === selectedMarketLine) || MARKET_OPTIONS[0];
-
-  const optionFilterTabs: { id: string; label: string }[] = [
+  const footballOptionTabs = [
     { id: 'ALL', label: 'All 10 option types' },
     { id: 'win', label: '1. Win' },
     { id: 'draw', label: '2. Draw' },
@@ -114,16 +151,36 @@ export default function MarketExplorerPage() {
     { id: 'second_half_result', label: '10. 2nd half result' },
   ];
 
+  const basketballOptionTabs = [
+    { id: 'ALL', label: 'All NBA options' },
+    { id: 'moneyline', label: '1. Moneyline' },
+    { id: 'spread', label: '2. Point Spread' },
+    { id: 'total_points', label: '3. Total Points' },
+  ];
+
+  const optionFilterTabs = isBasketball ? basketballOptionTabs : footballOptionTabs;
+
+  if (isSwitching) {
+    return (
+      <div className="space-y-6 py-6 animate-pulse">
+        <div className="h-8 w-64 bg-white/10 rounded-[8px]" />
+        <div className="h-32 bg-[#0f2219] rounded-[12px] border border-white/10" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
         <div>
           <h1 className="text-[18px] font-[500] text-[#e8efe9]">
-            Cross-match market explorer
+            {isBasketball ? 'NBA Cross-Match Market Explorer' : 'Cross-Match Market Explorer'}
           </h1>
           <p className="text-[12px] text-[#8fa69a] mt-0.5">
-            Compare model probability, pricing and edge for specific option lines across all European fixtures.
+            {isBasketball
+              ? 'Compare model probability, pricing, and margin differential across NBA matchups.'
+              : 'Compare model probability, pricing and edge for specific option lines across all European fixtures.'}
           </p>
         </div>
       </div>
@@ -138,7 +195,7 @@ export default function MarketExplorerPage() {
               onClick={() => {
                 setSelectedOptionType(tab.id);
                 if (tab.id !== 'ALL') {
-                  const firstMatch = MARKET_OPTIONS.find(o => o.optionType === tab.id);
+                  const firstMatch = marketOptions.find(o => o.optionType === tab.id);
                   if (firstMatch) setSelectedMarketLine(firstMatch.code);
                 }
               }}
@@ -184,12 +241,12 @@ export default function MarketExplorerPage() {
           <div>
             <h2 className="font-[500] text-[#e8efe9] flex items-center gap-2">
               <span>Cross-match comparison:</span>
-              <span className="text-[#b8e63a]">{activeOption.label}</span>
+              <span className="text-[#b8e63a]">{activeOption?.label}</span>
             </h2>
             <div className="text-[#8fa69a] text-[11px] mt-0.5 flex items-center gap-2">
               <span className="flex items-center gap-1 font-mono">
                 <Clock className="w-3 h-3 text-[#b8e63a]" />
-                <span>Period: {activeOption.period}</span>
+                <span>Period: {activeOption?.period}</span>
               </span>
               <span>·</span>
               <span>Ranked by modeled probability</span>
@@ -199,86 +256,65 @@ export default function MarketExplorerPage() {
         </div>
 
         {comparisons.length > 0 ? (
-          <div className="divide-y divide-white/[0.05]">
-            {comparisons.map((item, idx) => {
-              const p = item.prediction;
-              const fix = item.fixture;
-              const pct = p.modelProbability * 100;
-
-              return (
-                <div key={idx} className="p-3.5 hover:bg-white/[0.02] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 text-[12px]">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-[11px] text-[#8fa69a] w-5">#{idx + 1}</span>
-                    <div className="flex items-center -space-x-1.5 shrink-0">
-                      <TeamCrest
-                        crestUrl={fix.homeTeam.crestUrl}
-                        teamName={fix.homeTeam.shortName || fix.homeTeam.name}
-                        size={24}
-                      />
-                      <TeamCrest
-                        crestUrl={fix.awayTeam.crestUrl}
-                        teamName={fix.awayTeam.shortName || fix.awayTeam.name}
-                        size={24}
-                      />
-                    </div>
-                    <div>
-                      <div className="font-[500] text-[#e8efe9]">
-                        {fix.homeTeam.shortName || fix.homeTeam.name} vs {fix.awayTeam.shortName || fix.awayTeam.name}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[12px]">
+              <thead className="bg-[#0a1812]/80 text-[#8fa69a] text-[11px] font-[500] border-b border-white/[0.06]">
+                <tr>
+                  <th className="py-2.5 px-3">Fixture</th>
+                  <th className="py-2.5 px-3">Modeled selection</th>
+                  <th className="py-2.5 px-3">Probability</th>
+                  <th className="py-2.5 px-3">Odds</th>
+                  <th className="py-2.5 px-3">EV / Edge</th>
+                  <th className="py-2.5 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.05]">
+                {comparisons.map(({ fixture, prediction }) => (
+                  <tr key={fixture.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="py-3 px-3">
+                      <div className="font-medium text-[#e8efe9]">
+                        {fixture.homeTeam.name} vs {fixture.awayTeam.name}
                       </div>
                       <div className="text-[11px] text-[#8fa69a] font-mono">
-                        {fix.competition.name} · xG {item.homeXg.toFixed(2)} - {item.awayXg.toFixed(2)}
+                        {fixture.competition.name}
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-5 ml-8 md:ml-0 font-mono text-[12px]">
-                    {/* Probability Bar */}
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 bg-white/[0.08] rounded-full h-1 overflow-hidden">
-                        <div className="bg-[#b8e63a] h-full rounded-full" style={{ width: `${Math.min(100, pct)}%` }} />
-                      </div>
-                      <span className="font-[500] text-[#e8efe9] tabular-nums">
-                        {pct.toFixed(1)}%
-                      </span>
-                    </div>
-
-                    {/* Market Price / Mode */}
-                    <div className="text-right min-w-[70px]">
-                      {p.marketOdds ? (
-                        <span className="text-[#e8efe9]">{p.marketOdds.toFixed(2)}</span>
+                    </td>
+                    <td className="py-3 px-3 text-[#e8efe9] font-medium">
+                      {prediction.selection}
+                    </td>
+                    <td className="py-3 px-3 font-mono font-semibold text-[#b8e63a]">
+                      {(prediction.modelProbability * 100).toFixed(1)}%
+                    </td>
+                    <td className="py-3 px-3 font-mono text-[#e8efe9]">
+                      {prediction.marketOdds ? `@${formatOdds(prediction.marketOdds)}` : '—'}
+                    </td>
+                    <td className="py-3 px-3 font-mono text-[11px]">
+                      {prediction.expectedValue !== undefined && prediction.expectedValue !== null ? (
+                        (() => {
+                          const evData = formatExpectedValue(prediction.expectedValue);
+                          return <span className={evData.colorClass}>{evData.text}</span>;
+                        })()
                       ) : (
-                        <span className="text-[10px] text-[#8fa69a]">n/a</span>
+                        <span className="text-[#8fa69a]">Prob-based</span>
                       )}
-                    </div>
-
-                    {/* EV */}
-                    <div className="text-right min-w-[65px]">
-                      <span className={`font-[500] ${formatExpectedValue(p.expectedValue).colorClass}`}>
-                        {formatExpectedValue(p.expectedValue).text}
-                      </span>
-                    </div>
-
-                    {/* Action Link */}
-                    <Link
-                      href={`/matches/${item.fixtureId}`}
-                      className="p-1 rounded-[6px] hover:bg-white/[0.05] text-[#b8e63a] transition-colors"
-                      title="Audit Match"
-                    >
-                      <ArrowUpRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <Link
+                        href={`/matches/${fixture.id}`}
+                        className="inline-flex items-center gap-1 text-[11px] text-[#8fa69a] hover:text-[#b8e63a] font-medium"
+                      >
+                        <span>Analyze</span>
+                        <ArrowUpRight className="w-3 h-3" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <div className="p-12 text-center text-[12px] text-[#8fa69a] space-y-2">
-            <div className="font-mono text-[13px] text-[#e8efe9]">
-              {liveDataAvailable ? 'No upcoming fixtures available for this market line' : `Live data unavailable. Last updated ${lastUpdated}`}
-            </div>
-            <p className="max-w-sm mx-auto">
-              {liveDataAvailable ? 'Select a different market or competition filter above.' : 'Cross-match market intelligence will populate once live provider data is refreshed.'}
-            </p>
+          <div className="p-8 text-center text-[12px] text-[#8fa69a]">
+            No fixtures found matching this line line.
           </div>
         )}
       </div>

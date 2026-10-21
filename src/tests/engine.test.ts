@@ -21,6 +21,7 @@ import {
   AUTHORIZED_OPTION_TYPES, 
   isOptionTypeEnabled 
 } from '../lib/prediction/marketCatalog';
+import { calculateNBAScoreProjection } from '../lib/prediction/nbaMath';
 
 export function runStatisticalTests() {
   const results: { testName: string; passed: boolean; details?: string }[] = [];
@@ -211,6 +212,29 @@ export function runStatisticalTests() {
     Math.abs(wholeSum - 1.0) < 0.0001 && line20.push > 0,
     'Whole-Number Line Push Rule: Over 2.0 + Under 2.0 + Push sum to exactly 1.0',
     `Push: ${(line20.push * 100).toFixed(1)}%`
+  );
+
+  // 16. NBA Score Projection Exact Formula Test (Boston vs Detroit)
+  // Boston: off 1.159, def 1.085, poss 98.5
+  // Detroit: off 1.124, def 1.054, poss 103.1
+  // Expected: Boston offense 114.16, Detroit offense 115.88, Boston defense 111.86, Detroit defense 103.82, Boston projected 108.99, Detroit projected 113.87, total 222.86
+  const nbaResult = calculateNBAScoreProjection(
+    { name: 'Boston Celtics', offensiveEfficiency: 1.159, defensiveEfficiency: 1.085, possessions: 98.5 },
+    { name: 'Detroit Pistons', offensiveEfficiency: 1.124, defensiveEfficiency: 1.054, possessions: 103.1 }
+  );
+
+  const bOffOk = Math.abs(nbaResult.aOff - 114.16) <= 0.01;
+  const dOffOk = Math.abs(nbaResult.bOff - 115.88) <= 0.01;
+  const bDefOk = Math.abs(nbaResult.aDef - 111.86) <= 0.01;
+  const dDefOk = Math.abs(nbaResult.bDef - 103.82) <= 0.01;
+  const bProjOk = Math.abs(nbaResult.aProjected - 108.99) <= 0.01;
+  const dProjOk = Math.abs(nbaResult.bProjected - 113.87) <= 0.01;
+  const totalOk = Math.abs(nbaResult.total - 222.86) <= 0.01;
+
+  assert(
+    bOffOk && dOffOk && bDefOk && dDefOk && bProjOk && dProjOk && totalOk,
+    'NBA Projection Invariant (Boston vs Detroit): Matches expected values within 0.01 tolerance',
+    `BosOff: ${nbaResult.aOff.toFixed(2)} (exp 114.16), DetOff: ${nbaResult.bOff.toFixed(2)} (exp 115.88), BosDef: ${nbaResult.aDef.toFixed(2)} (exp 111.86), DetDef: ${nbaResult.bDef.toFixed(2)} (exp 103.82), BosProj: ${nbaResult.aProjected.toFixed(2)} (exp 108.99), DetProj: ${nbaResult.bProjected.toFixed(2)} (exp 113.87), Total: ${nbaResult.total.toFixed(2)} (exp 222.86)`
   );
 
   return results;

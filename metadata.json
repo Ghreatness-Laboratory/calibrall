@@ -1,6 +1,6 @@
 {
   "name": "MATCHMIND",
-  "description": "Football Prediction & Market Intelligence Platform. Intelligent multi-market statistical evaluation, expected value ranking, Dixon-Coles Poisson goals, corners & bookings models.",
+  "description": "Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.",
   "permissions": [],
   "capabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

@@ -6,13 +6,16 @@ import { getFixtureStatistics } from '@/lib/data/seedData';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
+import NBAGameCard from '@/components/nba/NBAGameCard';
+import { useSport } from '@/lib/context/SportContext';
 import { getStoredSavedFixtures } from '@/lib/supabase/client';
 import { Bookmark, ArrowRight, Trash2 } from 'lucide-react';
 
 export default function SavedMatchesPage() {
+  const { sport } = useSport();
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures();
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(undefined, undefined, sport);
 
   useEffect(() => {
     setSavedIds(getStoredSavedFixtures());
@@ -91,13 +94,17 @@ export default function SavedMatchesPage() {
       {isLoaded && savedFixtures.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {savedFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
-            <FixtureCard
-              key={fixture.id}
-              fixture={fixture}
-              topPrediction={topPick}
-              noRecommendationReason={noRecommendationReason}
-              isSavedInitial={true}
-            />
+            fixture.sport === 'basketball' ? (
+              <NBAGameCard key={fixture.id} fixture={fixture} />
+            ) : (
+              <FixtureCard
+                key={fixture.id}
+                fixture={fixture}
+                topPrediction={topPick}
+                noRecommendationReason={noRecommendationReason}
+                isSavedInitial={true}
+              />
+            )
           ))}
         </div>
       ) : isLoaded && savedIds.length > 0 && !liveDataAvailable ? (

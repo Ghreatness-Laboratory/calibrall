@@ -91,17 +91,17 @@ class ServerCache {
   }
 
   /**
-   * Generates standardized fixture cache key with league and date window
+   * Generates standardized fixture cache key with sport, league and date window
    */
-  getFixtureCacheKey(league: string | undefined, dateFrom: string, dateTo: string): string {
-    return `fixtures:${league || 'ALL'}:${dateFrom}:${dateTo}`;
+  getFixtureCacheKey(league: string | undefined, dateFrom: string, dateTo: string, sport: string = 'football'): string {
+    return `fixtures:${sport}:${league || 'ALL'}:${dateFrom}:${dateTo}`;
   }
 
   /**
-   * Generates standardized odds cache key with league and date window
+   * Generates standardized odds cache key with sport, league and date window
    */
-  getOddsCacheKey(league: string | undefined, dateFrom: string, dateTo: string): string {
-    return `odds:${league || 'ALL'}:${dateFrom}:${dateTo}`;
+  getOddsCacheKey(league: string | undefined, dateFrom: string, dateTo: string, sport: string = 'football'): string {
+    return `odds:${sport}:${league || 'ALL'}:${dateFrom}:${dateTo}`;
   }
 
   /**

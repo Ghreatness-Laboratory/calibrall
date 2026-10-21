@@ -23,7 +23,7 @@ export interface FactorDefinition {
   category: 'form' | 'squad' | 'stakes' | 'fatigue' | 'tactics' | 'referee' | 'environment' | 'h2h' | 'management' | 'market';
   description: string;
   defaultShrinkage: number; // Bayesian shrinkage toward league mean (0.0 = none, 1.0 = total)
-  marketWeights: Record<MarketCategory, number>; // Market-specific learned weights
+  marketWeights: Partial<Record<MarketCategory, number>>; // Market-specific learned weights
   ablationGainBrier: number; // Validated Brier score reduction proven via ablation testing
 }
 
@@ -375,7 +375,7 @@ export interface ContextEvaluationResult {
   missingFactors: MissingFactorFlag[];
   compositeUncertaintyMultiplier: number;
   dataQualityScore: number;
-  factorContributionsByMarket: Record<MarketCategory, FactorContribution[]>;
+  factorContributionsByMarket: Partial<Record<MarketCategory, FactorContribution[]>>;
   correlationWarnings: string[];
   detectedDerby?: DerbyInfo | null;
 }
@@ -612,7 +612,7 @@ export function evaluateContextFactors(params: {
   });
 
   // 4. Compute Top 3 Factor Contributions by Market Category
-  const factorContributionsByMarket: Record<MarketCategory, FactorContribution[]> = {
+  const factorContributionsByMarket: Partial<Record<MarketCategory, FactorContribution[]>> = {
     total_goals: [
       {
         factorCode: 'team_form',

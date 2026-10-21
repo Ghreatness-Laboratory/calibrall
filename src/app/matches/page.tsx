@@ -2,25 +2,39 @@
 
 import React, { useState, useMemo } from 'react';
 import { COMPETITIONS, getFixtureStatistics } from '@/lib/data/seedData';
+import { NBA_COMPETITION } from '@/lib/data/nbaSeedData';
+import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
-import { Search, SlidersHorizontal, Info } from 'lucide-react';
+import NBAGameCard from '@/components/nba/NBAGameCard';
+import { Search, SlidersHorizontal, Info, Calendar, RefreshCw } from 'lucide-react';
 import { MarketPrediction, RiskTier } from '@/types';
 
-type MarketGroupFilter = 'ALL' | 'goals' | 'corners' | 'cards' | 'handicap' | 'results' | 'halves' | 'goal_bounds';
+type FootballMarketGroup = 'ALL' | 'goals' | 'corners' | 'cards' | 'handicap' | 'results' | 'halves' | 'goal_bounds';
+type BasketballMarketGroup = 'ALL' | 'moneyline' | 'spread' | 'total_points';
 
 export default function MatchesPage() {
+  const { sport, isSwitching } = useSport();
+  const isBasketball = sport === 'basketball';
+
   const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedRiskTier, setSelectedRiskTier] = useState<string>('ALL');
-  const [selectedMarketGroup, setSelectedMarketGroup] = useState<MarketGroupFilter>('ALL');
+  const [selectedFootballGroup, setSelectedFootballGroup] = useState<FootballMarketGroup>('ALL');
+  const [selectedBasketballGroup, setSelectedBasketballGroup] = useState<BasketballMarketGroup>('ALL');
   const [minProbability, setMinProbability] = useState<number>(0.50);
 
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(selectedLeague, statusFilter);
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated, refetch } = useLiveFixtures(
+    isBasketball ? 'NBA' : selectedLeague, 
+    statusFilter, 
+    sport
+  );
 
-  const evaluatedFixtures = useMemo(() => {
+  // Football evaluated fixtures
+  const evaluatedFootballFixtures = useMemo(() => {
+    if (isBasketball) return [];
     return fixtures.map(fixture => {
       const stats = getFixtureStatistics(fixture);
 
@@ -54,9 +68,10 @@ export default function MatchesPage() {
         noRecommendationReason: evalResult.noRecommendationReason,
       };
     });
-  }, [fixtures]);
+  }, [fixtures, isBasketball]);
 
-  const matchesMarketGroup = (p: MarketPrediction, group: MarketGroupFilter): boolean => {
+  // Market Group Matching
+  const matchesFootballMarketGroup = (p: MarketPrediction, group: FootballMarketGroup): boolean => {
     if (group === 'ALL') return true;
     if (group === 'goals') {
       return p.optionType === 'over_under_goals' || p.optionType === 'first_half_goals' || p.marketCategory === 'total_goals' || p.marketCategory === 'team_goals' || p.marketCategory === 'btts';
@@ -82,8 +97,10 @@ export default function MatchesPage() {
     return true;
   };
 
-  const filtered = useMemo(() => {
-    return evaluatedFixtures.filter(({ fixture, topPick, predictions }) => {
+  // Filtered fixtures
+  const filteredFootball = useMemo(() => {
+    if (isBasketball) return [];
+    return evaluatedFootballFixtures.filter(({ fixture, topPick, predictions }) => {
       if (selectedLeague !== 'ALL' && fixture.competition.code !== selectedLeague) {
         return false;
       }
@@ -104,15 +121,31 @@ export default function MatchesPage() {
           return false;
         }
       }
-      if (selectedMarketGroup !== 'ALL') {
-        const hasMatchingMarket = predictions.some(p => matchesMarketGroup(p, selectedMarketGroup) && p.modelProbability >= minProbability);
+      if (selectedFootballGroup !== 'ALL') {
+        const hasMatchingMarket = predictions.some(p => matchesFootballMarketGroup(p, selectedFootballGroup) && p.modelProbability >= minProbability);
         if (!hasMatchingMarket) return false;
       }
       return true;
     });
-  }, [evaluatedFixtures, selectedLeague, statusFilter, searchQuery, minProbability, selectedRiskTier, selectedMarketGroup]);
+  }, [evaluatedFootballFixtures, selectedLeague, statusFilter, searchQuery, minProbability, selectedRiskTier, selectedFootballGroup, isBasketball]);
 
-  const marketGroupFilters: { id: MarketGroupFilter; label: string }[] = [
+  const filteredBasketball = useMemo(() => {
+    if (!isBasketball) return [];
+    return fixtures.filter(fixture => {
+      if (statusFilter !== 'ALL' && fixture.status !== statusFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesHome = fixture.homeTeam.name.toLowerCase().includes(q);
+        const matchesAway = fixture.awayTeam.name.toLowerCase().includes(q);
+        if (!matchesHome && !matchesAway) return false;
+      }
+      return true;
+    });
+  }, [fixtures, statusFilter, searchQuery, isBasketball]);
+
+  const footballMarketFilters: { id: FootballMarketGroup; label: string }[] = [
     { id: 'ALL', label: 'All markets' },
     { id: 'results', label: 'Results & Double Chance' },
     { id: 'goals', label: 'Goals' },
@@ -123,6 +156,13 @@ export default function MatchesPage() {
     { id: 'cards', label: 'Cards' },
   ];
 
+  const basketballMarketFilters: { id: BasketballMarketGroup; label: string }[] = [
+    { id: 'ALL', label: 'All NBA markets' },
+    { id: 'moneyline', label: 'Moneyline' },
+    { id: 'spread', label: 'Point Spread' },
+    { id: 'total_points', label: 'Game Total Points' },
+  ];
+
   const riskTierPills: { id: string; label: string }[] = [
     { id: 'ALL', label: 'All Tiers' },
     { id: 'SAFE', label: 'Safe (≥75%)' },
@@ -130,31 +170,56 @@ export default function MatchesPage() {
     { id: 'RISKY', label: 'Risky (45-60%)' },
   ];
 
+  if (isSwitching) {
+    return (
+      <div className="space-y-6 py-6 animate-pulse">
+        <div className="h-8 w-64 bg-white/10 rounded-[8px]" />
+        <div className="h-28 bg-[#0f2219] rounded-[12px] border border-white/10" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="h-44 bg-[#0f2219] rounded-[12px] border border-white/10" />
+          <div className="h-44 bg-[#0f2219] rounded-[12px] border border-white/10" />
+          <div className="h-44 bg-[#0f2219] rounded-[12px] border border-white/10" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
         <div>
           <h1 className="text-[18px] font-[500] text-[#e8efe9]">
-            Fixtures & market intelligence explorer
+            {isBasketball ? 'NBA Matchups & Market Intelligence Explorer' : 'Fixtures & Market Intelligence Explorer'}
           </h1>
           <p className="text-[12px] text-[#8fa69a] mt-0.5">
-            Search, filter, and inspect scheduled European fixtures and quantitative prediction outputs.
+            {isBasketball
+              ? 'NBA schedules, projected scores, totals, spreads, and winner leans derived from efficiency ratings.'
+              : 'Search, filter, and inspect scheduled European fixtures and quantitative prediction outputs.'}
           </p>
         </div>
+
+        <button
+          onClick={() => refetch()}
+          type="button"
+          className="self-start sm:self-auto h-[34px] px-3 rounded-[8px] bg-[#0f2219] hover:bg-white/[0.04] border border-white/[0.08] text-[12px] text-[#8fa69a] hover:text-[#e8efe9] flex items-center gap-1.5 transition-colors"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#b8e63a]' : ''}`} />
+          <span>Refresh</span>
+        </button>
       </div>
 
-      {/* Responsible Use Disclaimer Banner (Requirement 15) */}
+      {/* Responsible Use Disclaimer Banner */}
       <div className="p-3 bg-[#0f2219] border border-white/[0.08] rounded-[10px] flex items-start gap-2.5 text-[12px] text-[#8fa69a]">
         <Info className="w-4 h-4 text-[#b8e63a] shrink-0 mt-0.5" />
         <p className="leading-normal">
-          <span className="text-[#e8efe9] font-[500]">Statistical estimate notice:</span> All outputs are probabilistic projections derived from Dixon-Coles and negative binomial distribution models, not guaranteed outcomes.
+          <span className="text-[#e8efe9] font-[500]">Statistical estimate notice:</span> All outputs are probabilistic projections derived from {isBasketball ? 'NBA offensive/defensive efficiency and possessions ratings' : 'Dixon-Coles and negative binomial distribution models'}, not guaranteed outcomes. Please use responsibly.
         </p>
       </div>
 
-      {/* Filter Toolbar (Requirements 12 & 16) */}
+      {/* Filter Toolbar */}
       <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3.5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-[12px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-[12px]">
           {/* Team Search */}
           <div>
             <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Team search</label>
@@ -162,7 +227,7 @@ export default function MatchesPage() {
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#8fa69a]" />
               <input
                 type="text"
-                placeholder="Search club name..."
+                placeholder={isBasketball ? 'Search NBA team (e.g. Celtics)...' : 'Search club name...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-[#0a1812] border border-white/[0.08] pl-8 pr-3 py-1.5 rounded-[8px] text-[12px] text-[#e8efe9] placeholder-[#8fa69a]/50 focus:outline-hidden focus:border-[#b8e63a]"
@@ -170,26 +235,35 @@ export default function MatchesPage() {
             </div>
           </div>
 
-          {/* League Filter */}
+          {/* League Filter - Only shown for football, or NBA only for basketball */}
           <div>
             <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Competition</label>
-            <select
-              value={selectedLeague}
-              onChange={(e) => setSelectedLeague(e.target.value)}
-              className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[12px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
-            >
-              <option value="ALL">All competitions (5 Tier-1)</option>
-              {COMPETITIONS.map(c => (
-                <option key={c.code} value={c.code}>
-                  {c.name} ({c.country})
-                </option>
-              ))}
-            </select>
+            {isBasketball ? (
+              <select
+                disabled
+                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[12px] text-[#e8efe9] opacity-90 cursor-default"
+              >
+                <option value="NBA">NBA (National Basketball Association)</option>
+              </select>
+            ) : (
+              <select
+                value={selectedLeague}
+                onChange={(e) => setSelectedLeague(e.target.value)}
+                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[12px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
+              >
+                <option value="ALL">All competitions (5 Tier-1)</option>
+                {COMPETITIONS.map(c => (
+                  <option key={c.code} value={c.code}>
+                    {c.name} ({c.country})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Status Filter */}
           <div>
-            <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Fixture status</label>
+            <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Game status</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -200,105 +274,85 @@ export default function MatchesPage() {
               <option value="FINISHED">Completed results</option>
             </select>
           </div>
-
-          {/* Min Probability Slider */}
-          <div>
-            <div className="flex items-center justify-between text-[11px] mb-1">
-              <span className="text-[#8fa69a] font-[500]">Min probability</span>
-              <span className="font-mono text-[#b8e63a]">{(minProbability * 100).toFixed(0)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0.40"
-              max="0.80"
-              step="0.05"
-              value={minProbability}
-              onChange={(e) => setMinProbability(parseFloat(e.target.value))}
-              className="w-full accent-[#b8e63a] cursor-pointer"
-            />
-          </div>
         </div>
 
-        {/* Market Category Pills (Requirements 12 & 16) */}
-        <div className="pt-2 border-t border-white/[0.06] flex items-center gap-1.5 overflow-x-auto text-[11px] pb-1 [scrollbar-width:none]">
-          <span className="text-[#8fa69a] font-mono shrink-0 mr-1">Market:</span>
-          {marketGroupFilters.map(filter => (
-            <button
-              key={filter.id}
-              onClick={() => setSelectedMarketGroup(filter.id)}
-              type="button"
-              className={`px-2.5 py-1 rounded-[6px] whitespace-nowrap transition-colors text-[11px] font-[500] ${
-                selectedMarketGroup === filter.id
-                  ? 'bg-[#b8e63a] text-[#0a1812] font-semibold'
-                  : 'bg-[#0a1812] border border-white/[0.06] text-[#8fa69a] hover:text-[#e8efe9]'
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Risk Tier Quick Buttons (Requirement 12) */}
-        <div className="pt-1 flex items-center justify-between gap-2 flex-wrap text-[11px]">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-            <span className="text-[#8fa69a] font-mono shrink-0 mr-1">Tier:</span>
-            {riskTierPills.map(tier => (
-              <button
-                key={tier.id}
-                onClick={() => setSelectedRiskTier(tier.id)}
-                type="button"
-                className={`px-2 py-0.5 rounded-[4px] whitespace-nowrap transition-colors text-[11px] ${
-                  selectedRiskTier === tier.id
-                    ? 'bg-white/20 text-white font-semibold border border-white/30'
-                    : 'bg-[#0a1812] border border-white/[0.06] text-[#8fa69a] hover:text-[#e8efe9]'
-                }`}
-              >
-                {tier.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-3 text-[#8fa69a]">
-            <span>Found {filtered.length} matching fixtures</span>
-            <button
-              onClick={() => {
-                setSelectedLeague('ALL');
-                setSearchQuery('');
-                setStatusFilter('ALL');
-                setSelectedRiskTier('ALL');
-                setSelectedMarketGroup('ALL');
-                setMinProbability(0.50);
-              }}
-              type="button"
-              className="text-[#b8e63a] hover:underline"
-            >
-              Reset filters
-            </button>
+        {/* Market Category Pills */}
+        <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between gap-2 overflow-x-auto">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-[#8fa69a] mr-1 shrink-0">Market type:</span>
+            {isBasketball ? (
+              basketballMarketFilters.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedBasketballGroup(tab.id)}
+                  type="button"
+                  className={`px-2.5 py-1 rounded-[6px] text-[11px] font-[500] whitespace-nowrap transition-colors ${
+                    selectedBasketballGroup === tab.id
+                      ? 'bg-[#b8e63a] text-[#0a1812]'
+                      : 'bg-[#0a1812] text-[#8fa69a] hover:text-[#e8efe9] border border-white/[0.06]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))
+            ) : (
+              footballMarketFilters.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedFootballGroup(tab.id)}
+                  type="button"
+                  className={`px-2.5 py-1 rounded-[6px] text-[11px] font-[500] whitespace-nowrap transition-colors ${
+                    selectedFootballGroup === tab.id
+                      ? 'bg-[#b8e63a] text-[#0a1812]'
+                      : 'bg-[#0a1812] text-[#8fa69a] hover:text-[#e8efe9] border border-white/[0.06]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))
+            )}
           </div>
         </div>
       </div>
 
-      {/* Grid */}
-      {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {filtered.map(({ fixture, topPick, noRecommendationReason }) => (
-            <FixtureCard
-              key={fixture.id}
-              fixture={fixture}
-              topPrediction={topPick}
-              noRecommendationReason={noRecommendationReason}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] text-[#8fa69a] space-y-2">
-          <div className="font-mono text-[13px] text-[#e8efe9]">
-            {liveDataAvailable ? 'No matching fixtures found' : `Live data unavailable. Last updated ${lastUpdated}`}
+      {/* Grid of Fixtures */}
+      {isBasketball ? (
+        filteredBasketball.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {filteredBasketball.map(fixture => (
+              <NBAGameCard key={fixture.id} fixture={fixture} />
+            ))}
           </div>
-          <p className="text-[12px] max-w-sm mx-auto">
-            {liveDataAvailable ? 'Try adjusting your minimum probability, risk tier, or competition filters.' : 'Live European football fixtures will populate once API connectivity is established.'}
-          </p>
-        </div>
+        ) : (
+          <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-2">
+            <Calendar className="w-8 h-8 mx-auto text-[#8fa69a]/40" />
+            <h3 className="text-[#e8efe9] font-[500] text-[15px]">No games scheduled</h3>
+            <p className="text-[12px] text-[#8fa69a] max-w-sm mx-auto">
+              No NBA matchups matching your filter criteria. Next scheduled games will stream automatically on matchday.
+            </p>
+          </div>
+        )
+      ) : (
+        filteredFootball.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {filteredFootball.map(({ fixture, topPick, noRecommendationReason }) => (
+              <FixtureCard
+                key={fixture.id}
+                fixture={fixture}
+                topPrediction={topPick}
+                noRecommendationReason={noRecommendationReason}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-2">
+            <Calendar className="w-8 h-8 mx-auto text-[#8fa69a]/40" />
+            <h3 className="text-[#e8efe9] font-[500] text-[15px]">No games scheduled</h3>
+            <p className="text-[12px] text-[#8fa69a] max-w-sm mx-auto">
+              No European football fixtures matching your search filter. Next fixtures will appear on the next matchday.
+            </p>
+          </div>
+        )
       )}
     </div>
   );
