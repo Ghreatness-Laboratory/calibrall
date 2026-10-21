@@ -117,11 +117,16 @@ CREATE INDEX IF NOT EXISTS idx_fixtures_status ON public.fixtures(status);
 CREATE TABLE IF NOT EXISTS public.market_definitions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     code TEXT UNIQUE NOT NULL,
-    category TEXT NOT NULL CHECK (category IN ('match_result', 'total_goals', 'team_goals', 'btts', 'total_corners', 'team_corners', 'bookings', 'half_time')),
+    option_type TEXT NOT NULL CHECK (option_type IN ('win', 'draw', 'double_chance', 'over_under_goals', 'both_teams_to_score', 'corners', 'bookings', 'highest_scoring_half', 'first_half_goals', 'second_half_result')),
+    category TEXT NOT NULL CHECK (category IN ('match_result', 'total_goals', 'team_goals', 'btts', 'total_corners', 'team_corners', 'bookings', 'half_time', 'double_chance')),
     name TEXT NOT NULL,
+    selection TEXT NOT NULL,
     line NUMERIC(4, 1),
-    period TEXT NOT NULL DEFAULT 'regular_90',
+    period TEXT NOT NULL CHECK (period IN ('REGULAR_TIME', 'FIRST_HALF', 'SECOND_HALF', 'FULL_TIME')),
     settlement_rule TEXT NOT NULL,
+    is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    min_probability NUMERIC(4, 3) DEFAULT 0.500,
+    max_uncertainty NUMERIC(4, 3) DEFAULT 0.200,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

@@ -1,10 +1,12 @@
 // MATCHMIND / CALIBRALL: Automated Statistical & Context Factors Test Suite
 // Verifies mathematical invariants, scoreline matrix conservation, market qualification rules,
-// temporal leakage, ablation testing, factor directionality, and missing-factor handling.
+// temporal leakage, ablation testing, factor directionality, missing-factor handling,
+// and the 10 Supported Options Catalogue rules and invariants.
 
 import { 
   poissonProb, 
   generateScorelineDistribution, 
+  generateHalfByHalfGoalDistribution,
   calculateCornerProbabilities,
   calculateCardProbabilities,
   calculateExpectedValue,
@@ -13,6 +15,11 @@ import {
 } from '../lib/prediction/math';
 import { evaluateFixtureMarkets } from '../lib/prediction/marketSelection';
 import { evaluateContextFactors, FACTOR_DEFINITIONS } from '../lib/prediction/contextFactors';
+import { 
+  SUPPORTED_OPTIONS_CATALOGUE, 
+  AUTHORIZED_OPTION_TYPES, 
+  isOptionTypeEnabled 
+} from '../lib/prediction/marketCatalog';
 
 export function runStatisticalTests() {
   const results: { testName: string; passed: boolean; details?: string }[] = [];
@@ -52,7 +59,7 @@ export function runStatisticalTests() {
 
   // 6. Test Corners Probabilities
   const cornerProbs = calculateCornerProbabilities(10.5);
-  const corner95Sum = cornerProbs[9.5].over + cornerProbs[9.5].under;
+  const corner95Sum = cornerProbs.total[9.5].over + cornerProbs.total[9.5].under;
   assert(Math.abs(corner95Sum - 1.0) < 0.0001, 'Corners Over 9.5 + Under 9.5 sum to 1.0', `Sum: ${corner95Sum}`);
 
   // 7. Test Expected Value (EV) calculation
@@ -93,12 +100,10 @@ export function runStatisticalTests() {
   );
 
   // ====================================================================
-  // REQUIREMENT F TESTS: CONTEXT FACTORS & STATE-BASED WEIGHING
+  // CONTEXT FACTORS & STATE-BASED WEIGHING TESTS
   // ====================================================================
 
   // 10. Temporal Leakage Test
-  // Ensure model evaluation strictly consumes pre-match verified parameters
-  // and has zero references or dependencies on actual post-match results (e.g. final scores)
   const preMatchContext = {
     fixtureId: 'fix_leakage_audit',
     homeTeamName: 'Arsenal',
@@ -128,10 +133,8 @@ export function runStatisticalTests() {
   );
 
   // 11. Ablation Testing Verification
-  // Verify every active factor in FACTOR_DEFINITIONS has proven positive Brier score gain (> 0)
   const allFactorsAddValue = Object.values(FACTOR_DEFINITIONS).every(def => def.ablationGainBrier > 0);
   const droppedOrZeroWeightRule = Object.values(FACTOR_DEFINITIONS).every(def => {
-    // If ablation gain were <= 0, weight would be zeroed out
     if (def.ablationGainBrier <= 0) {
       return Object.values(def.marketWeights).every(w => w === 0);
     }
@@ -143,7 +146,6 @@ export function runStatisticalTests() {
   );
 
   // 12. Correct Factor Directionality on Synthetic Data
-  // Hypothesis 1: Key absences lowers expected goals and corners
   const baselineEval = evaluateFixtureMarkets({
     ...preMatchContext,
     stateTags: [],
@@ -160,7 +162,6 @@ export function runStatisticalTests() {
     `Baseline: ${(baselineOver25 * 100).toFixed(1)}% vs Absence: ${(keyAbsenceOver25 * 100).toFixed(1)}%`
   );
 
-  // Hypothesis 2: Derby raises bookings and cards expectation
   const derbyEval = evaluateFixtureMarkets({
     ...preMatchContext,
     stateTags: ['derby'],
@@ -174,7 +175,6 @@ export function runStatisticalTests() {
   );
 
   // 13. Missing-Factor Handling Test
-  // Missing factors must NEVER be treated as zero or neutral; must flag and widen uncertainty
   const sparseContextEval = evaluateContextFactors({
     fixtureId: 'fix_sparse_factors',
     homeTeamName: 'Team A',
@@ -186,7 +186,7 @@ export function runStatisticalTests() {
     expectedCornersAway: 4.5,
     expectedCards: 4.0,
     sampleSizeMatches: 16,
-    dataCoverageScore: 0.82, // Low data coverage triggers missing factor flag
+    dataCoverageScore: 0.82,
     rawStateTags: [],
     lineupConfirmed: true,
   });
@@ -196,6 +196,101 @@ export function runStatisticalTests() {
     sparseContextEval.dataQualityScore < 0.85,
     'Missing-Factor Handling Test: Unmeasured factors flagged explicitly, never zeroed, and widen uncertainty penalty',
     `Flags: ${sparseContextEval.missingFactors.length}, Multiplier: ${sparseContextEval.compositeUncertaintyMultiplier}`
+  );
+
+  // ====================================================================
+  // SUPPORTED OPTIONS CATALOGUE TESTS (10 AUTHORIZED OPTIONS)
+  // ====================================================================
+
+  // 14. Catalogue Completeness & Disabling Rule
+  const all10Enabled = AUTHORIZED_OPTION_TYPES.length === 10 &&
+    AUTHORIZED_OPTION_TYPES.every(type => isOptionTypeEnabled(type));
+  const unauthorizedDisabled = !isOptionTypeEnabled('asian_handicap') && !isOptionTypeEnabled('player_props');
+  assert(
+    all10Enabled && unauthorizedDisabled,
+    'Catalogue Scope Test: Exactly 10 supported option types defined; unauthorized markets disabled by configuration'
+  );
+
+  // 15. Non-Contradiction Invariant: Over 2.5 cannot be more likely than Over 1.5
+  const goalDist = generateScorelineDistribution(1.8, 1.3);
+  const over15 = goalDist.overUnderGoals[1.5].over;
+  const over25 = goalDist.overUnderGoals[2.5].over;
+  const over35 = goalDist.overUnderGoals[3.5].over;
+  assert(
+    over25 <= over15 && over35 <= over25,
+    'Non-Contradiction Invariant: Over 2.5 <= Over 1.5 and Over 3.5 <= Over 2.5 derived from joint distribution',
+    `O1.5: ${(over15 * 100).toFixed(1)}% >= O2.5: ${(over25 * 100).toFixed(1)}% >= O3.5: ${(over35 * 100).toFixed(1)}%`
+  );
+
+  // 16. Double Chance Consistency: Derived from same 1X2 distribution
+  const dc1X = goalDist.doubleChance.homeOrDraw;
+  const dcExpected1X = goalDist.homeWin + goalDist.draw;
+  const dc12 = goalDist.doubleChance.homeOrAway;
+  const dcExpected12 = 1.0 - goalDist.draw;
+  assert(
+    Math.abs(dc1X - dcExpected1X) < 0.0001 && Math.abs(dc12 - dcExpected12) < 0.0001,
+    'Double Chance Consistency: P(1X) = P(Home) + P(Draw) and P(12) = 1.0 - P(Draw) identically',
+    `1X diff: ${Math.abs(dc1X - dcExpected1X)}, 12 diff: ${Math.abs(dc12 - dcExpected12)}`
+  );
+
+  // 17. Push Rule on Whole-Number Lines: Over + Under + Push = 1.0
+  const line20 = goalDist.wholeNumberGoals[2.0];
+  const wholeSum = line20.over + line20.under + line20.push;
+  assert(
+    Math.abs(wholeSum - 1.0) < 0.0001 && line20.push > 0,
+    'Whole-Number Line Push Rule: Over 2.0 + Under 2.0 + Push sum to exactly 1.0',
+    `Over: ${(line20.over * 100).toFixed(1)}%, Under: ${(line20.under * 100).toFixed(1)}%, Push: ${(line20.push * 100).toFixed(1)}%`
+  );
+
+  // 18. Half-by-Half Model Invariants
+  const halfDist = generateHalfByHalfGoalDistribution(1.6, 1.2);
+  const hshSum = halfDist.highestScoringHalf.firstHalf + halfDist.highestScoringHalf.secondHalf + halfDist.highestScoringHalf.equal;
+  const h2ResultSum = halfDist.secondHalf.homeWin + halfDist.secondHalf.draw + halfDist.secondHalf.awayWin;
+  assert(
+    Math.abs(hshSum - 1.0) < 0.0001 && Math.abs(h2ResultSum - 1.0) < 0.0001,
+    'Half-by-Half Model Invariant: Highest scoring half and 2nd half 1X2 both sum to 1.0',
+    `HSH Sum: ${hshSum}, 2H Result Sum: ${h2ResultSum}`
+  );
+
+  // 19. Half-Level Data Abstention Test
+  const lowHalfDataFixture = evaluateFixtureMarkets({
+    ...preMatchContext,
+    sampleSizeMatches: 7, // Below required 10 matches for half model validation
+    dataCoverageScore: 0.70,
+  });
+  const halfMarket = lowHalfDataFixture.predictions.find(p => p.optionType === 'highest_scoring_half');
+  assert(
+    halfMarket !== undefined && halfMarket.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY',
+    'Half-Level Data Gate: Inadequate half-level historical data triggers abstention',
+    halfMarket?.evidenceTier
+  );
+
+  // 20. Draw-Specific Threshold Enforcement
+  const normalFixtureEval = evaluateFixtureMarkets(preMatchContext);
+  const drawPrediction = normalFixtureEval.predictions.find(p => p.optionType === 'draw');
+  assert(
+    drawPrediction !== undefined && (drawPrediction.modelProbability >= 0.30 || drawPrediction.qualificationStatus === 'UNQUALIFIED_MARGINAL'),
+    'Draw-Specific Threshold: Draw predictions screened by strict draw-specific threshold'
+  );
+
+  // 21. Probability-Based Analysis Labeling (When odds unpublished)
+  const unverifiedOddsFixture = evaluateFixtureMarkets({
+    ...preMatchContext,
+    verifiedOdds: undefined, // No published bookmaker odds
+  });
+  const unverifiedOption = unverifiedOddsFixture.predictions.find(p => p.marketCode === '1X2_HOME');
+  assert(
+    unverifiedOption?.isProbabilityBasedAnalysis === true && !unverifiedOption.marketOdds,
+    'Probability Analysis Label: Options without verified odds strictly labeled as probability-based analysis, never value opportunity'
+  );
+
+  // 22. Correlation Warnings Detection
+  const fixtureWithCorrelations = evaluateFixtureMarkets(preMatchContext, 10);
+  const totalGoalsO25Pred = fixtureWithCorrelations.predictions.find(p => p.marketCode === 'TOTAL_GOALS_O25');
+  assert(
+    (totalGoalsO25Pred?.correlationWarnings?.length ?? 0) > 0,
+    'Correlation Warnings: System flags intra-fixture correlation between Over 2.5 Goals and correlated lines',
+    totalGoalsO25Pred?.correlationWarnings?.[0]
   );
 
   return results;

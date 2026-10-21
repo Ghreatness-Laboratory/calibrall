@@ -232,10 +232,24 @@ export default function FactorsAndStatePanel({
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-border text-gray-300">
                           {opt.evidenceTier}
                         </span>
+                        {opt.pushProbability !== undefined && (
+                          <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono border border-amber-500/30">
+                            Push If Landed On {opt.line}
+                          </span>
+                        )}
                       </div>
-                      <span className="text-[11px] text-gray-400 font-mono">
-                        Market: {opt.marketName} {opt.line ? `(Line: ${opt.line})` : ''} • Data Quality: {(opt.dataQualityScore * 100).toFixed(0)}%
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400 font-mono mt-0.5">
+                        <span className="text-brand-accent">Option: {opt.optionType ? opt.optionType.replace(/_/g, ' ') : opt.marketName}</span>
+                        <span>•</span>
+                        <span>Period: {opt.period ?? 'REGULAR_TIME'}</span>
+                        <span>•</span>
+                        <span>Data Quality: {(opt.dataQualityScore * 100).toFixed(0)}%</span>
+                      </div>
+                      {opt.settlementRule && (
+                        <div className="text-[10px] text-gray-500 mt-0.5">
+                          Rule: {opt.settlementRule}
+                        </div>
+                      )}
                     </div>
                   </div>
 

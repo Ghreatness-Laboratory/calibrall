@@ -101,3 +101,74 @@ For each fixture, the system returns up to $N$ ranked selection options (configu
 - **Match Page**: Dedicated "Factors and state" panel displaying tags, pre-match factor matrix, and top ranked selection options.
 - **Performance Reporting**: Dedicated performance reporting by state tag on `/performance`.
 - **Automated Tests**: Unit tests verify temporal leakage, factor ablation, correct factor directionality on synthetic data, and missing-factor penalty handling.
+
+---
+
+## 12. Supported Options Catalogue
+
+These are the only option types the engine may suggest to users at launch. Each is defined in `market_definitions` with a selection, line, period, and settlement rule. Any other market stays disabled by configuration.
+
+### 1. Win
+- **Selections**: Home Win, Away Win.
+- **Source**: Validated Dixon-Coles bivariate scoreline distribution.
+- **Period**: Regular time only (90 minutes plus stoppage time; extra time and penalties strictly excluded).
+
+### 2. Draw
+- **Selection**: Draw.
+- **Threshold Policy**: Shown only when draw probability ($p \ge 0.30$) and evidence meet the draw-specific threshold (uncertainty $\le 0.14$, coverage $\ge 88\%$), since draws exhibit high entropy and are empirically difficult to forecast.
+
+### 3. Double Chance ("Or" Options)
+- **Selections**: Home or Draw (1X), Away or Draw (X2), Home or Away (12).
+- **Mathematical Invariant**: Derived from the exact same 1X2 distribution so probabilities stay consistent:
+  $$P(\text{1X}) = P(\text{Home}) + P(\text{Draw})$$
+  $$P(\text{X2}) = P(\text{Away}) + P(\text{Draw})$$
+  $$P(\text{12}) = P(\text{Home}) + P(\text{Away}) = 1.0 - P(\text{Draw})$$
+- Home or Away means decisive match outcome (no draw).
+
+### 4. Over/Under Goals
+- **Selections**: Over and Under on supported lines: 0.5, 1.5, 2.5, 3.5, 4.5, plus integer lines (e.g. 2.0).
+- **Source**: Joint scoreline distribution.
+- **Push Rule**: Whole-number lines landing exactly on the total result in a Push ($P(\text{Push}) = P(total = line)$, stake refund).
+
+### 5. Both Teams to Score (BTTS)
+- **Selections**: Yes, No.
+- **Source**: Joint scoreline distribution:
+  $$P(\text{BTTS Yes}) = \sum_{h=1}^M \sum_{a=1}^M P(h, a), \quad P(\text{BTTS No}) = 1.0 - P(\text{BTTS Yes})$$
+
+### 6. Corners
+- **Selections**: Total corners over/under on supported lines (8.5, 9.5, 10.5), plus team corners (Home/Away Over 4.5/5.5) where data supports it.
+- **Source**: Dedicated Poisson & Negative Binomial count models.
+- **Data Gate**: Requires adequate corner data ($n \ge 8$, coverage $\ge 78\%$), or the engine abstains.
+
+### 7. Bookings
+- **Selections**: Total bookings over/under on supported lines (3.5, 4.5), plus team bookings where data supports it.
+- **Source**: Disciplinary count model calibrated to the competition's card definition (yellow = 1, red = 2, max 3 per player).
+- **Data Gate**: Requires adequate card and referee data, or the engine abstains.
+
+### 8. Highest Scoring Half
+- **Selections**: First Half, Second Half, Equal.
+- **Source**: Calibrated half-by-half bivariate goals model ($\sim 44.5\%$ 1st half tempo vs $\sim 55.5\%$ 2nd half tempo).
+- **Data Gate**: Requires verified half-level history ($n \ge 10$, coverage $\ge 85\%$), or the engine abstains.
+
+### 9. First-Half Goals
+- **Selections**: Over/Under on first-half goal lines (0.5, 1.5).
+- **Source**: First-half goal distribution.
+- **Period**: 1st half only (whistle at 45m + stoppage).
+- **Data Gate**: Requires half-level history, or abstains.
+
+### 10. Second-Half Result
+- **Selections**: Home Win (2H), Away Win (2H), Draw (2H).
+- **Settlement**: Settled solely on the second-half score (score treated as 0-0 at restart).
+- **Source**: Half-split second-half distribution.
+- **Data Gate**: Requires half-level history, or abstains.
+
+---
+
+### Rules for All Options
+1. **Joint Goals Model Derivation**: All related options are derived from one joint goals model so they never contradict each other. For example, Over 2.5 cannot be more likely than Over 1.5 ($P(\text{Over } 2.5) \le P(\text{Over } 1.5)$).
+2. **Market-Specific Thresholds**: Each option must meet its own market-specific thresholds for probability, uncertainty, data completeness, and validation. Half-based options need enough half-level history, or the engine must abstain.
+3. **Correlation Warnings**: The system detects and displays active correlation warnings when options in the list are highly correlated (e.g. Over 2.5 and BTTS Yes; Home Win and Double Chance 1X).
+4. **Option Type Filtering**: Users can filter by option type in settings and across every list and comparison view.
+5. **Probability-Based Analysis**: If an option has no verified odds, it is strictly labeled as a *probability-based analysis*, never a value opportunity.
+6. **Abstention Discipline**: The engine is configured to return *"No strong recommendation"* for any option or for the whole fixture when statistical hurdles are not satisfied.
+

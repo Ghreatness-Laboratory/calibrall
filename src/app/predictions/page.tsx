@@ -12,15 +12,17 @@ import {
   AlertCircle, 
   Layers,
   Sliders,
-  ShieldCheck
+  ShieldCheck,
+  Clock
 } from 'lucide-react';
-import { MarketCategory, QualificationStatus } from '@/types';
+import { SupportedOptionType, QualificationStatus, MarketPrediction } from '@/types';
+import { SUPPORTED_OPTIONS_CATALOGUE, getPeriodLabel } from '@/lib/prediction/marketCatalog';
 
 export default function PredictionsPage() {
   const [selectedComp, setSelectedComp] = useState<string>('ALL');
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
-  const [onlyValuePicks, setOnlyValuePicks] = useState<boolean>(true);
-  const [minProb, setMinProb] = useState<number>(0.55);
+  const [selectedOptionType, setSelectedOptionType] = useState<string>('ALL');
+  const [onlyValuePicks, setOnlyValuePicks] = useState<boolean>(false);
+  const [minProb, setMinProb] = useState<number>(0.50);
 
   // Evaluate all upcoming fixtures
   const allPredictions = useMemo(() => {
@@ -30,7 +32,7 @@ export default function PredictionsPage() {
       compCode: string;
       compName: string;
       kickoff: string;
-      prediction: any;
+      prediction: MarketPrediction;
     }[] = [];
 
     FIXTURES.filter(f => f.status !== 'FINISHED').forEach(fixture => {
@@ -87,14 +89,28 @@ export default function PredictionsPage() {
     return allPredictions.filter(item => {
       const p = item.prediction;
       if (selectedComp !== 'ALL' && item.compCode !== selectedComp) return false;
-      if (selectedCategory !== 'ALL' && p.marketCategory !== selectedCategory) return false;
+      if (selectedOptionType !== 'ALL' && p.optionType !== selectedOptionType) return false;
       if (p.modelProbability < minProb) return false;
-      if (onlyValuePicks && p.qualificationStatus !== 'QUALIFIED_VALUE' && p.qualificationStatus !== 'QUALIFIED_PROBABILITY') {
+      if (onlyValuePicks && p.qualificationStatus !== 'QUALIFIED_VALUE') {
         return false;
       }
       return true;
-    }).sort((a, b) => (b.prediction.expectedValue ?? 0) - (a.prediction.expectedValue ?? 0));
-  }, [allPredictions, selectedComp, selectedCategory, onlyValuePicks, minProb]);
+    }).sort((a, b) => (b.prediction.expectedValue ?? (b.prediction.modelProbability * 0.1)) - (a.prediction.expectedValue ?? (a.prediction.modelProbability * 0.1)));
+  }, [allPredictions, selectedComp, selectedOptionType, onlyValuePicks, minProb]);
+
+  const optionFilterPills: { id: string; label: string }[] = [
+    { id: 'ALL', label: 'All 10 Option Types' },
+    { id: 'win', label: '1. Win' },
+    { id: 'draw', label: '2. Draw' },
+    { id: 'double_chance', label: '3. Double Chance' },
+    { id: 'over_under_goals', label: '4. Over/Under Goals' },
+    { id: 'both_teams_to_score', label: '5. BTTS' },
+    { id: 'corners', label: '6. Corners' },
+    { id: 'bookings', label: '7. Bookings' },
+    { id: 'highest_scoring_half', label: '8. Highest Half' },
+    { id: 'first_half_goals', label: '9. 1st Half Goals' },
+    { id: 'second_half_result', label: '10. 2nd Half Result' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -103,10 +119,10 @@ export default function PredictionsPage() {
         <div>
           <h1 className="text-2xl font-extrabold text-white flex items-center space-x-2">
             <CheckCircle2 className="w-6 h-6 text-brand-emerald" />
-            <span>Today’s Market Intelligence & Qualified Predictions</span>
+            <span>Today’s Market Intelligence & Supported Options</span>
           </h1>
           <p className="text-xs text-gray-400 mt-1">
-            Independently ranked statistical opportunities. Filter by market type, minimum edge, and model confidence.
+            Independently ranked statistical opportunities strictly from the 10 authorized catalogue option types.
           </p>
         </div>
       </div>
@@ -115,7 +131,7 @@ export default function PredictionsPage() {
       <div className="p-3.5 bg-blue-500/10 border border-blue-500/30 rounded flex items-start space-x-3 text-xs text-gray-300">
         <ShieldCheck className="w-4 h-4 text-brand-blue shrink-0 mt-0.5" />
         <p className="leading-relaxed">
-          <strong className="text-white">The Expected Value Principle:</strong> A high probability (e.g. 80%) alone does not make a bet advantageous if the bookmaker price demands 85%. Only selections with statistical advantage exceeding bookmaker overround are classified as <strong className="text-brand-emerald">Qualified Value</strong>.
+          <strong className="text-white">Analysis & Value Boundary:</strong> Selections with verified bookmaker pricing exceeding overround are classified as <strong className="text-brand-emerald">Qualified Value</strong>. Options with unpublished odds are provided as <strong className="text-brand-blue">Probability-Based Analyses</strong> only. The platform does not place wagers, offer staking advice, or provide outcome guarantees.
         </p>
       </div>
 
@@ -137,20 +153,18 @@ export default function PredictionsPage() {
             </select>
           </div>
 
-          {/* Market Category */}
+          {/* Option Type */}
           <div>
-            <label className="block text-gray-400 mb-1 text-[11px] font-medium">Market Focus</label>
+            <label className="block text-gray-400 mb-1 text-[11px] font-medium">Option Catalogue Filter</label>
             <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              value={selectedOptionType}
+              onChange={(e) => setSelectedOptionType(e.target.value)}
               className="w-full bg-surface-100 border border-border px-3 py-1.5 rounded text-white focus:outline-hidden focus:border-brand-emerald"
             >
-              <option value="ALL">All Market Types</option>
-              <option value="total_goals">Total Goals (Over/Under)</option>
-              <option value="btts">Both Teams to Score (BTTS)</option>
-              <option value="total_corners">Total Corners</option>
-              <option value="match_result">1X2 Match Result</option>
-              <option value="bookings">Disciplinary Bookings</option>
+              <option value="ALL">All 10 Option Types</option>
+              {Object.entries(SUPPORTED_OPTIONS_CATALOGUE).map(([k, meta]) => (
+                <option key={k} value={k}>{meta.title}</option>
+              ))}
             </select>
           </div>
 
@@ -162,13 +176,14 @@ export default function PredictionsPage() {
             </div>
             <input
               type="range"
-              min="0.45"
+              min="0.30"
               max="0.80"
               step="0.05"
               value={minProb}
               onChange={(e) => setMinProb(parseFloat(e.target.value))}
               className="w-full accent-brand-emerald cursor-pointer"
-            />
+            >
+            </input>
           </div>
 
           {/* Only Value Toggle */}
@@ -180,17 +195,35 @@ export default function PredictionsPage() {
                 onChange={(e) => setOnlyValuePicks(e.target.checked)}
                 className="rounded bg-surface-100 border-border text-brand-emerald focus:ring-0 w-4 h-4"
               />
-              <span>Only Qualified Value & Edge</span>
+              <span>Only Verified Value (EV &gt; 0)</span>
             </label>
           </div>
+        </div>
+
+        {/* Quick Option Type Pills */}
+        <div className="pt-2 border-t border-border-subtle flex items-center space-x-1.5 overflow-x-auto text-[11px] pb-1 scrollbar-thin">
+          <span className="text-gray-500 font-mono shrink-0 mr-1">Catalogue:</span>
+          {optionFilterPills.map(pill => (
+            <button
+              key={pill.id}
+              onClick={() => setSelectedOptionType(pill.id)}
+              className={`px-2 py-0.5 rounded whitespace-nowrap transition-colors ${
+                selectedOptionType === pill.id
+                  ? 'bg-brand-emerald text-navy-950 font-bold'
+                  : 'bg-surface-100 border border-border-subtle text-gray-400 hover:text-white'
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Predictions Table */}
       <div className="bg-surface-200 border border-border rounded overflow-hidden">
         <div className="p-3.5 bg-surface-100 border-b border-border flex items-center justify-between text-xs text-gray-400">
-          <span className="font-mono">Displaying {filtered.length} qualified opportunities</span>
-          <span className="italic">Sorted by Expected Value</span>
+          <span className="font-mono">Displaying {filtered.length} analyzed options</span>
+          <span className="italic">Ranking by Model Score & Expected Value</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -198,14 +231,14 @@ export default function PredictionsPage() {
             <thead className="bg-[#0c1017] text-gray-400 font-mono text-[10px] uppercase border-b border-border">
               <tr>
                 <th className="py-2.5 px-3">Fixture</th>
-                <th className="py-2.5 px-3">Category</th>
+                <th className="py-2.5 px-3">Option Type</th>
                 <th className="py-2.5 px-3">Selection</th>
+                <th className="py-2.5 px-3">Period</th>
                 <th className="py-2.5 px-3">Model Prob</th>
-                <th className="py-2.5 px-3">Odds</th>
+                <th className="py-2.5 px-3">Price Mode</th>
                 <th className="py-2.5 px-3">Edge</th>
                 <th className="py-2.5 px-3">Est. EV</th>
-                <th className="py-2.5 px-3">Confidence</th>
-                <th className="py-2.5 px-3">Status</th>
+                <th className="py-2.5 px-3">Evidence Tier</th>
                 <th className="py-2.5 px-3">Audit</th>
               </tr>
             </thead>
@@ -222,33 +255,54 @@ export default function PredictionsPage() {
                         <span>{item.fixtureName}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-gray-400 capitalize">{p.marketCategory.replace('_', ' ')}</td>
-                    <td className="py-3 px-3 font-medium text-white flex items-center space-x-1">
-                      <span>{p.selection}</span>
-                      {isTop && (
-                        <span className="text-[9px] bg-brand-emerald/20 text-brand-emerald px-1 rounded font-mono uppercase">Top Pick</span>
-                      )}
+                    <td className="py-3 px-3 text-gray-300">
+                      <span className="font-mono text-[11px] text-brand-accent">
+                        {p.optionType.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 font-medium text-white">
+                      <div className="flex items-center space-x-1.5">
+                        <span>{p.selection}</span>
+                        {isTop && (
+                          <span className="text-[9px] bg-brand-emerald/20 text-brand-emerald px-1 rounded font-mono uppercase">Top Pick</span>
+                        )}
+                        {p.pushProbability !== undefined && (
+                          <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 rounded font-mono">Push Rule</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-gray-400 font-mono text-[11px]">
+                      {getPeriodLabel(p.period)}
                     </td>
                     <td className="py-3 px-3 font-mono font-bold text-white tabular-nums">
                       {(p.modelProbability * 100).toFixed(1)}%
                     </td>
-                    <td className="py-3 px-3 font-mono text-gray-200">
-                      {p.marketOdds ? p.marketOdds.toFixed(2) : '—'}
+                    <td className="py-3 px-3 font-mono text-[11px]">
+                      {p.marketOdds ? (
+                        <span className="bg-surface-100 px-1.5 py-0.5 rounded border border-border text-gray-200">
+                          {p.marketOdds.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
+                          Probability Analysis
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-3 font-mono text-brand-blue tabular-nums">
                       {p.edge ? `+${(p.edge * 100).toFixed(1)}%` : '—'}
                     </td>
-                    <td className="py-3 px-3 font-mono font-bold text-brand-emerald tabular-nums">
-                      {p.expectedValue ? `+${(p.expectedValue * 100).toFixed(1)}%` : '—'}
+                    <td className="py-3 px-3 font-mono font-bold tabular-nums">
+                      {p.expectedValue !== undefined ? (
+                        <span className={(p.expectedValue ?? 0) > 0 ? 'text-brand-emerald' : 'text-gray-500'}>
+                          +{(p.expectedValue * 100).toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="text-gray-500 font-normal italic text-[11px]">No Odds</span>
+                      )}
                     </td>
                     <td className="py-3 px-3">
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-100 border border-border text-gray-300">
-                        {p.modelConfidence}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className="text-[10px] font-medium text-brand-emerald bg-emerald-500/10 border border-brand-emerald/30 px-1.5 py-0.5 rounded">
-                        {p.qualificationStatus.replace('_', ' ')}
+                      <span className="text-[10px] font-medium text-gray-300 bg-surface-100 border border-border px-1.5 py-0.5 rounded">
+                        {p.evidenceTier}
                       </span>
                     </td>
                     <td className="py-3 px-3">

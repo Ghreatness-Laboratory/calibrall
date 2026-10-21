@@ -14,6 +14,38 @@ export type MarketCategory =
   | 'double_chance'
   | 'draw_no_bet';
 
+export type SupportedOptionType = 
+  | 'win'
+  | 'draw'
+  | 'double_chance'
+  | 'over_under_goals'
+  | 'both_teams_to_score'
+  | 'corners'
+  | 'bookings'
+  | 'highest_scoring_half'
+  | 'first_half_goals'
+  | 'second_half_result';
+
+export type MarketPeriod = 'REGULAR_TIME' | 'FIRST_HALF' | 'SECOND_HALF' | 'FULL_TIME';
+
+export interface MarketDefinition {
+  id: string;
+  marketCode: string;
+  optionType: SupportedOptionType;
+  marketCategory: MarketCategory;
+  name: string;
+  selection: string;
+  line?: number;
+  period: MarketPeriod;
+  settlementRule: string;
+  isEnabled: boolean;
+  minProbabilityThreshold: number;
+  maxUncertaintyThreshold: number;
+  minDataCoverage: number;
+  minSampleSize: number;
+  isPushPossible?: boolean;
+}
+
 export type ModelConfidence = 'VERY_HIGH' | 'HIGH' | 'MODERATE' | 'LOW';
 
 export type QualificationStatus = 
@@ -197,10 +229,13 @@ export interface MarketPrediction {
   id: string;
   fixtureId: string;
   marketCode: string;
+  optionType: SupportedOptionType;
   marketCategory: MarketCategory;
   marketName: string;
   selection: string;
   line?: number;
+  period: MarketPeriod;
+  settlementRule: string;
   modelProbability: number;
   marketOdds?: number;
   impliedProbability?: number;
@@ -213,6 +248,8 @@ export interface MarketPrediction {
   settlementStatus: SettlementStatus;
   evidenceTier: string; // Plain-text tier e.g. "Tier 1: Qualified Value", "Tier 2: High Probability", "Unqualified: High Uncertainty"
   dataQualityScore: number; // Combined verified data completeness score 0.0 - 1.0
+  isProbabilityBasedAnalysis: boolean; // Flagged when no verified odds exist (probability-based analysis, not value opportunity)
+  pushProbability?: number; // Push probability for whole-number lines that land exactly on the line
   stateTags: StateTag[]; // Verified state tags that affected this prediction
   lineupStatus: 'confirmed' | 'pre-lineup';
   topFactorContributions: FactorContribution[]; // Top 3 measured factors contributing to this line
@@ -320,6 +357,7 @@ export interface UserPreferences {
   preferredCompetitions: string[];
   favoriteTeams: string[];
   preferredMarkets: MarketCategory[];
+  preferredOptionTypes?: SupportedOptionType[];
   minProbabilityThreshold: number;
   minEdgeThreshold: number;
   emailNotificationsEnabled: boolean;

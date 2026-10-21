@@ -36,6 +36,18 @@ export const DEFAULT_DEMO_PREFERENCES: UserPreferences = {
   preferredCompetitions: ['PL', 'CL', 'PD', 'BL1', 'SA'],
   favoriteTeams: ['team_mancity', 'team_arsenal', 'team_realmadrid'],
   preferredMarkets: ['total_goals', 'btts', 'total_corners', 'match_result'],
+  preferredOptionTypes: [
+    'win',
+    'draw',
+    'double_chance',
+    'over_under_goals',
+    'both_teams_to_score',
+    'corners',
+    'bookings',
+    'highest_scoring_half',
+    'first_half_goals',
+    'second_half_result'
+  ],
   minProbabilityThreshold: 0.58,
   minEdgeThreshold: 0.035,
   emailNotificationsEnabled: true,

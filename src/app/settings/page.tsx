@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   UserProfile, 
   UserPreferences, 
-  MarketCategory 
+  MarketCategory,
+  SupportedOptionType 
 } from '@/types';
 import { 
   getStoredUser, 
@@ -13,6 +14,7 @@ import {
   setStoredPreferences 
 } from '@/lib/supabase/client';
 import { COMPETITIONS } from '@/lib/data/seedData';
+import { SUPPORTED_OPTIONS_CATALOGUE } from '@/lib/prediction/marketCatalog';
 import { 
   Sliders, 
   User, 
@@ -76,6 +78,17 @@ export default function SettingsPage() {
       ? prefs.preferredMarkets.filter(m => m !== cat)
       : [...prefs.preferredMarkets, cat];
     setPrefs({ ...prefs, preferredMarkets: list });
+  };
+
+  const toggleOptionType = (type: SupportedOptionType) => {
+    const current = prefs.preferredOptionTypes || [
+      'win', 'draw', 'double_chance', 'over_under_goals', 'both_teams_to_score',
+      'corners', 'bookings', 'highest_scoring_half', 'first_half_goals', 'second_half_result'
+    ];
+    const list = current.includes(type)
+      ? current.filter(t => t !== type)
+      : [...current, type];
+    setPrefs({ ...prefs, preferredOptionTypes: list });
   };
 
   return (
@@ -255,6 +268,61 @@ export default function SettingsPage() {
                 >
                   <span className="font-bold text-xs">{c.code}</span>
                   {active && <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Supported Options Catalogue */}
+        <div className="bg-surface-200 border border-border rounded-lg p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-white flex items-center space-x-2">
+              <span className="w-2 h-2 rounded-full bg-brand-emerald"></span>
+              <span>Supported Options Catalogue (Launch Allowed Options)</span>
+            </h2>
+            <span className="text-[11px] font-mono text-gray-400">
+              Only authorized options enabled. All other markets disabled.
+            </span>
+          </div>
+          <p className="text-[11px] text-gray-400">
+            Select which of the 10 mathematically verified option types you want evaluated across match feeds.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {Object.entries(SUPPORTED_OPTIONS_CATALOGUE).map(([key, opt]) => {
+              const optType = key as SupportedOptionType;
+              const activeList = prefs.preferredOptionTypes || [
+                'win', 'draw', 'double_chance', 'over_under_goals', 'both_teams_to_score',
+                'corners', 'bookings', 'highest_scoring_half', 'first_half_goals', 'second_half_result'
+              ];
+              const isSelected = activeList.includes(optType);
+
+              return (
+                <button
+                  type="button"
+                  key={optType}
+                  onClick={() => toggleOptionType(optType)}
+                  className={`p-3 rounded border text-left transition-all ${
+                    isSelected
+                      ? 'bg-surface-100 border-brand-emerald ring-1 ring-brand-emerald/40 text-white'
+                      : 'bg-surface-100/50 border-border text-gray-400 opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div>
+                      <div className="font-bold text-xs text-white flex items-center space-x-1.5">
+                        <span>{opt.title}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-brand-accent uppercase">
+                        Period: {opt.period}
+                      </span>
+                    </div>
+                    {isSelected && <CheckCircle2 className="w-4 h-4 text-brand-emerald shrink-0" />}
+                  </div>
+                  <p className="text-[10px] text-gray-400 line-clamp-2 mt-1">
+                    {opt.settlementRule}
+                  </p>
                 </button>
               );
             })}
