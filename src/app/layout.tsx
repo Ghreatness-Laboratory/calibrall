@@ -65,13 +65,13 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-[100dvh] bg-[#0a1812] text-[#e8efe9] flex flex-col antialiased selection:bg-[#b8e63a] selection:text-black pb-[calc(76px+env(safe-area-inset-bottom,0px))] md:pb-0">
+      <body className="min-h-[100dvh] bg-[var(--bg)] text-[var(--text)] flex flex-col antialiased selection:bg-[var(--accent)] selection:text-[var(--accent-ink)] pb-[calc(88px+env(safe-area-inset-bottom,0px))] md:pb-0">
         <InstallPromptProvider>
           <SportProvider>
             <Navbar />
             <SportSwitcher />
             <OfflineBanner />
-            <main className="flex-1 max-w-7xl w-full mx-auto px-[18px] sm:px-6 lg:px-8 py-4 min-w-0">
+            <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-3.5 min-w-0">
               {children}
             </main>
             <Footer />

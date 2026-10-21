@@ -85,31 +85,31 @@ export default function Navbar() {
 
   return (
     <header
-      className="sticky top-0 z-40 bg-[#0a1812]/95 backdrop-blur-sm border-b border-white/[0.08]"
+      className="sticky top-0 z-40 bg-[var(--bg)]/95 backdrop-blur-md border-b border-[var(--border)]"
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
-      {/* Top status bar: 32px (h-8), 11px mono, left "Dixon-Coles v2.4 online" with green dot, right "08:32 UTC" and small PRO chip */}
-      <div className="h-8 bg-[#07130e] border-b border-white/[0.06] px-4 text-[11px] font-mono flex items-center justify-between text-[#8fa69a] whitespace-nowrap overflow-hidden">
+      {/* 1. Top status bar: 10.5px mono, bottom border 1px; green dot with soft 3px halo; PRO badge with 1px --warn border, 5px radius */}
+      <div className="h-[28px] bg-[var(--bg)] border-b border-[var(--border)] px-4 text-[10.5px] font-mono flex items-center justify-between text-[var(--text-2)] whitespace-nowrap overflow-hidden">
         <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#b8e63a] shrink-0" />
-          <span className="text-[#e8efe9]">Dixon-Coles v2.4 online</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0 shadow-[0_0_0_3px_var(--accent-soft)]" />
+          <span className="text-[var(--text)] tracking-tight">Dixon-Coles v2.4 online</span>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <span suppressHydrationWarning>{timeStr || '08:32 UTC'}</span>
-          <span className="text-[10px] font-mono font-[500] px-1.5 py-0.5 rounded-[4px] border border-[#e3b341]/60 text-[#e3b341] tracking-wide">
+          <span suppressHydrationWarning className="text-[var(--text-3)]">{timeStr || '08:32 UTC'}</span>
+          <span className="text-[9.5px] font-mono font-[600] px-1.5 py-[1px] rounded-[5px] border border-[var(--warn)] text-[var(--warn)] tracking-widest leading-none">
             PRO
           </span>
         </div>
       </div>
 
-      {/* Main header: 30px logo, "Calibrall" 15px/500, tagline 11px muted. Search & theme icons 30px. Avatar as 30px circle. Total height < 88px */}
+      {/* 2. Main header: 30px logo tile (radius 8) + name 15px/650 + tagline 11px --text-3; avatar 30px circle with 1px border */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-[52px]">
+        <div className="flex items-center justify-between h-[48px]">
           {/* Logo & Brand */}
           <div className="flex items-center gap-4 sm:gap-6">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-[30px] h-[30px] min-w-[30px] min-h-[30px] rounded-[6px] overflow-hidden border border-white/[0.1] flex items-center justify-center bg-[#f4f1ea] shrink-0">
+              <div className="w-[30px] h-[30px] min-w-[30px] min-h-[30px] rounded-[8px] overflow-hidden border border-[var(--border)] flex items-center justify-center bg-[#f4f1ea] shrink-0">
                 <img
                   src="/assets/aistudio/calibrall-profile-light_3415fbe5.png"
                   alt="Calibrall logo"
@@ -117,10 +117,10 @@ export default function Navbar() {
                 />
               </div>
               <div className="flex flex-col">
-                <span className="text-[15px] font-[500] text-[#e8efe9] leading-tight group-hover:text-[#b8e63a] transition-colors whitespace-nowrap">
+                <span className="text-[15px] font-[650] text-[var(--text)] leading-tight group-hover:text-[var(--accent)] transition-colors whitespace-nowrap tracking-[-0.01em]">
                   Calibrall
                 </span>
-                <span className="text-[11px] text-[#8fa69a] leading-tight whitespace-nowrap">
+                <span className="text-[11px] text-[var(--text-3)] leading-tight whitespace-nowrap">
                   Every call, on record.
                 </span>
               </div>
@@ -134,10 +134,10 @@ export default function Navbar() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`px-3 py-1.5 rounded-[6px] text-[13px] font-[400] transition-colors ${
+                    className={`px-3 py-1.5 rounded-[8px] text-[12.5px] transition-colors ${
                       active
-                        ? 'bg-white/[0.06] text-[#b8e63a]'
-                        : 'text-[#8fa69a] hover:text-[#e8efe9] hover:bg-white/[0.03]'
+                        ? 'bg-[var(--surface-2)] text-[var(--accent)] font-[550]'
+                        : 'text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--surface)]'
                     }`}
                   >
                     <span>{item.label}</span>
@@ -149,39 +149,37 @@ export default function Navbar() {
 
           {/* Right side: Desktop install button + search + theme toggle + avatar */}
           <div className="flex items-center gap-2">
-            {/* Desktop Install App Button */}
             <DesktopInstallButton />
 
             <Link
               href="/matches"
-              className="hidden md:flex w-[30px] h-[30px] rounded-[6px] border border-white/[0.08] bg-[#0f2219] text-[#8fa69a] hover:text-[#e8efe9] items-center justify-center transition-colors"
+              className="hidden md:flex w-[30px] h-[30px] rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:text-[var(--text)] items-center justify-center transition-colors"
               title="Search fixtures"
               aria-label="Search fixtures"
             >
-              <Search className="w-3.5 h-3.5" />
+              <Search className="w-3.5 h-3.5" strokeWidth={1.75} />
             </Link>
 
-            {/* Theme toggle: icon-only 30px button */}
             <button
               onClick={toggleMonochrome}
               type="button"
-              className={`hidden md:flex w-[30px] h-[30px] rounded-[6px] border items-center justify-center transition-colors ${
+              className={`hidden md:flex w-[30px] h-[30px] rounded-[8px] border items-center justify-center transition-colors ${
                 isMonochrome
                   ? 'bg-white text-black border-white'
-                  : 'bg-[#0f2219] border-white/[0.08] text-[#8fa69a] hover:text-[#e8efe9] hover:border-white/20'
+                  : 'bg-[var(--surface)] border-[var(--border)] text-[var(--text-2)] hover:text-[var(--text)] hover:border-[var(--border-strong)]'
               }`}
               title={isMonochrome ? 'Switch to color mode' : 'Switch to black & white mode'}
               aria-label="Toggle monochrome mode"
             >
-              <Contrast className="w-3.5 h-3.5" />
+              <Contrast className="w-3.5 h-3.5" strokeWidth={1.75} />
             </button>
 
-            {/* Avatar: 30px circle button */}
+            {/* Avatar: 30px circle button with 1px border */}
             <div className="relative">
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 type="button"
-                className="w-[30px] h-[30px] rounded-full border border-white/[0.1] bg-[#0f2219] text-[#e8efe9] hover:border-[#b8e63a]/50 flex items-center justify-center text-[12px] font-mono font-[500] transition-colors"
+                className="w-[30px] h-[30px] rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)]/50 flex items-center justify-center text-[11.5px] font-mono font-[600] transition-colors"
                 title="Account menu"
                 aria-label="Account menu"
               >
@@ -189,56 +187,54 @@ export default function Navbar() {
               </button>
 
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-[#0f2219] border border-white/[0.1] rounded-[8px] py-1.5 z-50 text-[12px] shadow-lg">
-                  <div className="px-3 py-2 border-b border-white/[0.06]">
-                    <p className="font-[500] text-[#e8efe9]">{user?.fullName || 'Analyst'}</p>
-                    <p className="text-[11px] text-[#8fa69a] truncate">{user?.email || 'analyst@calibrall.app'}</p>
+                <div className="absolute right-0 mt-2 w-56 bg-[var(--surface)] border border-[var(--border)] rounded-[12px] py-1.5 z-50 text-[12px] shadow-lg">
+                  <div className="px-3.5 py-2.5 border-b border-[var(--border)]">
+                    <p className="font-[600] text-[var(--text)] text-[12.5px]">{user?.fullName || 'Analyst'}</p>
+                    <p className="text-[11px] text-[var(--text-3)] truncate mt-0.5">{user?.email || 'analyst@calibrall.app'}</p>
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-[11px] text-[#8fa69a]">Tier:</span>
+                      <span className="text-[11px] text-[var(--text-3)]">Tier:</span>
                       <button
                         onClick={cycleTier}
                         type="button"
-                        className="px-2 py-0.5 rounded-[4px] bg-[#b8e63a]/15 text-[#b8e63a] border border-[#b8e63a]/30 font-mono text-[10px] capitalize font-[500] hover:bg-[#b8e63a]/25"
+                        className="px-2 py-0.5 rounded-[5px] bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30 font-mono text-[10px] capitalize font-[550] hover:bg-[var(--accent-soft)]/80"
                       >
                         {user?.subscriptionTier || 'pro'} (click to change)
                       </button>
                     </div>
                   </div>
                   <div className="py-1">
-                    {/* Primary placement: Install App in avatar dropdown */}
                     <DropdownInstallItem onSelect={() => setUserDropdownOpen(false)} />
 
-                    {/* Mobile theme toggle in menu */}
                     <button
                       onClick={toggleMonochrome}
                       type="button"
-                      className="w-full flex items-center px-3 py-1.5 text-[#8fa69a] hover:bg-white/[0.04] hover:text-[#e8efe9] text-left md:hidden"
+                      className="w-full flex items-center px-3.5 py-1.5 text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] text-left md:hidden text-[12px]"
                     >
-                      <Contrast className="w-3.5 h-3.5 mr-2" />
+                      <Contrast className="w-3.5 h-3.5 mr-2" strokeWidth={1.75} />
                       <span>{isMonochrome ? 'Switch to color mode' : 'Black & white mode'}</span>
                     </button>
                     <Link
                       href="/settings"
                       onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center px-3 py-1.5 text-[#8fa69a] hover:bg-white/[0.04] hover:text-[#e8efe9]"
+                      className="flex items-center px-3.5 py-1.5 text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] text-[12px]"
                     >
-                      <Sliders className="w-3.5 h-3.5 mr-2" />
+                      <Sliders className="w-3.5 h-3.5 mr-2" strokeWidth={1.75} />
                       Settings & model filters
                     </Link>
                     <Link
                       href="/pricing"
                       onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center px-3 py-1.5 text-[#8fa69a] hover:bg-white/[0.04] hover:text-[#e8efe9]"
+                      className="flex items-center px-3.5 py-1.5 text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] text-[12px]"
                     >
-                      <User className="w-3.5 h-3.5 mr-2" />
+                      <User className="w-3.5 h-3.5 mr-2" strokeWidth={1.75} />
                       Subscription tier
                     </Link>
                     <Link
                       href="/admin"
                       onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center px-3 py-1.5 text-[#8fa69a] hover:bg-white/[0.04] hover:text-[#e8efe9]"
+                      className="flex items-center px-3.5 py-1.5 text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] text-[12px]"
                     >
-                      <Lock className="w-3.5 h-3.5 mr-2" />
+                      <Lock className="w-3.5 h-3.5 mr-2" strokeWidth={1.75} />
                       System admin
                     </Link>
                   </div>

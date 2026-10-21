@@ -1,9 +1,53 @@
-// Server Cache & Redis Integration Layer
-// Production-hardened: supports rediss:// TLS URLs, short connect timeout,
-// fails open to local cache / provider if Redis is down, and NEVER caches failures.
-
-import Redis, { RedisOptions } from 'ioredis';
+// Server Cache & In-Memory Redis Integration Layer
+// MOCKED per AI Studio Web Runtime Constraints — in-memory, data lost on container sleep
 import { Fixture } from '@/types';
+
+// MOCKED — in-memory, data lost on container sleep
+const store = new Map<string, { value: any; expiresAt: number }>();
+export const redis = {
+  get: async (k: string) => {
+    const entry = store.get(k);
+    if (!entry) return null;
+    if (Date.now() >= entry.expiresAt) {
+      store.delete(k);
+      return null;
+    }
+    return typeof entry.value === 'string' ? entry.value : JSON.stringify(entry.value);
+  },
+  set: async (k: string, v: any, ...args: any[]) => {
+    let ttlMs = 300 * 1000;
+    if (args.includes('EX')) {
+      const exIdx = args.indexOf('EX');
+      const seconds = args[exIdx + 1];
+      if (typeof seconds === 'number') ttlMs = seconds * 1000;
+    }
+    store.set(k, { value: v, expiresAt: Date.now() + ttlMs });
+    return 'OK';
+  },
+  del: async (...keys: string[]) => {
+    let count = 0;
+    for (const k of keys) {
+      if (store.delete(k)) count++;
+    }
+    return count;
+  },
+  incr: async (k: string) => {
+    const entry = store.get(k);
+    const curr = (entry && typeof entry.value === 'number') ? entry.value : 0;
+    const next = curr + 1;
+    store.set(k, { value: next, expiresAt: entry?.expiresAt ?? Date.now() + 86400000 });
+    return next;
+  },
+  keys: async (pattern: string) => {
+    const cleaned = pattern.replace(/\*/g, '');
+    return Array.from(store.keys()).filter(k => k.includes(cleaned));
+  },
+  flushdb: async () => {
+    store.clear();
+    return 'OK';
+  },
+  ping: async () => 'PONG',
+};
 
 interface CacheEntry<T> {
   value: T;
@@ -12,83 +56,13 @@ interface CacheEntry<T> {
 
 class ServerCache {
   private inMemoryStore = new Map<string, CacheEntry<any>>();
-  private redisClient: Redis | null = null;
-  private isConnectingRedis = false;
-  private redisFailedOnce = false;
 
   // Dynamic TTL rules
   static readonly FIXTURE_DEFAULT_TTL_SEC = 300;      // 5 minutes
   static readonly FIXTURE_NEAR_KICKOFF_TTL_SEC = 60;  // 1 minute within 2 hours of kickoff
   static readonly ODDS_DEFAULT_TTL_SEC = 600;         // 10 minutes
 
-  constructor() {
-    this.initRedis();
-  }
-
-  private initRedis(): Redis | null {
-    const redisUrl = process.env.REDIS_URL?.trim();
-    if (!redisUrl) {
-      return null;
-    }
-
-    if (this.redisClient) {
-      return this.redisClient;
-    }
-
-    if (this.isConnectingRedis) {
-      return null;
-    }
-
-    try {
-      this.isConnectingRedis = true;
-      const isTls = redisUrl.startsWith('rediss://');
-
-      const options: RedisOptions = {
-        connectTimeout: 2000,
-        commandTimeout: 2000,
-        maxRetriesPerRequest: 1,
-        enableOfflineQueue: false,
-        lazyConnect: true,
-        retryStrategy(times) {
-          if (times > 3) return null; // stop reconnecting after 3 attempts
-          return Math.min(times * 100, 1000);
-        },
-      };
-
-      if (isTls) {
-        options.tls = {
-          rejectUnauthorized: false,
-        };
-      }
-
-      const client = new Redis(redisUrl, options);
-
-      client.on('error', (err) => {
-        if (!this.redisFailedOnce) {
-          this.redisFailedOnce = true;
-          console.error('[Redis Client Error] Redis connection failed, failing open to memory/provider:', err?.message || err);
-        }
-      });
-
-      client.on('connect', () => {
-        this.redisFailedOnce = false;
-        console.log('[Redis] Connected successfully to remote Redis cache.');
-      });
-
-      // Attempt async background connection
-      client.connect().catch((err) => {
-        console.error('[Redis Connect Failed] Failing open:', err?.message || err);
-      });
-
-      this.redisClient = client;
-      return this.redisClient;
-    } catch (err: any) {
-      console.error('[Redis Init Exception] Failing open:', err?.message || err);
-      return null;
-    } finally {
-      this.isConnectingRedis = false;
-    }
-  }
+  constructor() {}
 
   /**
    * Generates standardized fixture cache key with sport, league and date window
@@ -144,27 +118,9 @@ class ServerCache {
   }
 
   /**
-   * Retrieve cached value.
-   * Checks Redis first (if available); if Redis times out or fails, fails open to local in-memory cache.
+   * Retrieve cached value from in-memory store.
    */
   async get<T>(key: string): Promise<T | null> {
-    // 1. Try Redis first if active
-    const client = this.redisClient || this.initRedis();
-    if (client && client.status === 'ready') {
-      try {
-        const raw = await client.get(key);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (!this.isFailureOrEmpty(parsed)) {
-            return parsed as T;
-          }
-        }
-      } catch (err: any) {
-        console.error(`[Redis Read Error for ${key}] Failing open:`, err?.message || err);
-      }
-    }
-
-    // 2. Fail open to local in-memory store
     const entry = this.inMemoryStore.get(key);
     if (!entry) return null;
 
@@ -182,8 +138,7 @@ class ServerCache {
   }
 
   /**
-   * Store value with MANDATORY TTL expiry.
-   * Requirement 4: Stop caching failures. Only cache successful responses.
+   * Store value with MANDATORY TTL expiry in in-memory store.
    */
   async set<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
     // Never cache failures or empty payloads
@@ -196,93 +151,43 @@ class ServerCache {
       return;
     }
 
-    // Always update local memory store with expiry
+    // Update local memory store with expiry
     const expiresAt = Date.now() + (ttlSeconds * 1000);
     this.inMemoryStore.set(key, { value, expiresAt });
-
-    // Also persist to Redis if available
-    const client = this.redisClient || this.initRedis();
-    if (client && client.status === 'ready') {
-      try {
-        await client.set(key, JSON.stringify(value), 'EX', ttlSeconds);
-      } catch (err: any) {
-        console.error(`[Redis Write Error for ${key}] Failing open to memory:`, err?.message || err);
-      }
-    }
+    store.set(key, { value, expiresAt });
   }
 
   /**
-   * Busts the cache. Clears both in-memory store and Redis matching keys.
+   * Busts the cache. Clears in-memory store.
    */
   async bust(pattern?: string): Promise<number> {
     let memoryDeleted = 0;
     if (!pattern) {
       memoryDeleted = this.inMemoryStore.size;
       this.inMemoryStore.clear();
+      store.clear();
     } else {
       for (const key of Array.from(this.inMemoryStore.keys())) {
         if (key.includes(pattern)) {
           this.inMemoryStore.delete(key);
+          store.delete(key);
           memoryDeleted++;
         }
       }
     }
-
-    // Bust Redis keys if connected
-    let redisDeleted = 0;
-    const client = this.redisClient || this.initRedis();
-    if (client && client.status === 'ready') {
-      try {
-        if (!pattern) {
-          await client.flushdb();
-        } else {
-          const keys = await client.keys(`*${pattern}*`);
-          if (keys.length > 0) {
-            redisDeleted = await client.del(...keys);
-          }
-        }
-      } catch (err: any) {
-        console.error('[Redis Bust Error]', err?.message || err);
-      }
-    }
-
-    return memoryDeleted + redisDeleted;
+    return memoryDeleted;
   }
 
   /**
    * Redis health check probe for /api/health
    */
   async ping(): Promise<{ ok: boolean; configured: boolean; latencyMs?: number; error?: string; urlScheme?: string }> {
-    const redisUrl = process.env.REDIS_URL?.trim();
-    if (!redisUrl) {
-      return { ok: false, configured: false, error: 'REDIS_URL environment variable is not configured' };
-    }
-
-    const urlScheme = redisUrl.startsWith('rediss://') ? 'rediss (TLS)' : 'redis';
-    const client = this.redisClient || this.initRedis();
-
-    if (!client) {
-      return { ok: false, configured: true, urlScheme, error: 'Failed to initialize Redis client' };
-    }
-
-    const t0 = Date.now();
-    try {
-      const pong = await client.ping();
-      return {
-        ok: pong === 'PONG',
-        configured: true,
-        urlScheme,
-        latencyMs: Date.now() - t0,
-      };
-    } catch (err: any) {
-      return {
-        ok: false,
-        configured: true,
-        urlScheme,
-        latencyMs: Date.now() - t0,
-        error: err?.message || 'Redis ping failed',
-      };
-    }
+    return {
+      ok: true,
+      configured: true,
+      urlScheme: 'In-Memory Cache (Mocked)',
+      latencyMs: 0,
+    };
   }
 }
 

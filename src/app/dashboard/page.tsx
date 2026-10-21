@@ -166,12 +166,12 @@ export default function DashboardPage() {
   if (isSwitching) {
     return (
       <div className="space-y-6 py-6 animate-pulse">
-        <div className="h-8 w-64 bg-white/10 rounded-[8px]" />
-        <div className="h-32 bg-[#0f2219] rounded-[12px] border border-white/10" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          <div className="h-44 bg-[#0f2219] rounded-[12px] border border-white/10" />
-          <div className="h-44 bg-[#0f2219] rounded-[12px] border border-white/10" />
-          <div className="h-44 bg-[#0f2219] rounded-[12px] border border-white/10" />
+        <div className="h-8 w-64 bg-[var(--surface-2)] rounded-[10px]" />
+        <div className="h-32 bg-[var(--surface)] rounded-[12px] border border-[var(--border)]" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+          <div className="h-44 bg-[var(--surface)] rounded-[12px] border border-[var(--border)]" />
+          <div className="h-44 bg-[var(--surface)] rounded-[12px] border border-[var(--border)]" />
+          <div className="h-44 bg-[var(--surface)] rounded-[12px] border border-[var(--border)]" />
         </div>
       </div>
     );
@@ -180,15 +180,15 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Top Header & Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
         <div>
-          <h1 className="text-[18px] font-[500] text-[#e8efe9] flex items-center gap-2">
+          <h1 className="text-[18px] font-[620] text-[var(--text)] flex items-center gap-2">
             <span>{isBasketball ? 'NBA Analytics & Market Terminal' : 'Market Intelligence Dashboard'}</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] border border-[#b8e63a]/40 text-[#b8e63a]">
-              Live
+            <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded-[5px] border border-[var(--accent)]/40 text-[var(--accent)] font-semibold">
+              LIVE
             </span>
           </h1>
-          <p className="text-[12px] text-[#8fa69a] mt-0.5">
+          <p className="text-[12.5px] text-[var(--text-2)] mt-0.5">
             {isBasketball 
               ? 'Multi-team efficiency modeling, projected totals, spreads, and pace analysis for all 30 NBA franchises.'
               : 'Real-time multi-market evaluation across the 10 authorized catalog types. Every call, on record.'}
@@ -197,13 +197,13 @@ export default function DashboardPage() {
 
         {/* Search */}
         <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#8fa69a]" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[var(--text-3)]" strokeWidth={1.75} />
           <input
             type="text"
             placeholder={isBasketball ? "Search NBA franchise..." : "Search club or league..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-[#0f2219] border border-white/[0.08] pl-8 pr-3 py-1.5 rounded-[8px] text-[12px] text-[#e8efe9] placeholder-[#8fa69a]/50 focus:outline-hidden focus:border-[#b8e63a] w-52 sm:w-60"
+            className="bg-[var(--surface)] border border-[var(--border)] pl-8 pr-3 py-1.5 rounded-[10px] text-[12px] text-[var(--text)] placeholder-[var(--text-3)] focus:outline-hidden focus:border-[var(--accent)] w-52 sm:w-60"
           />
         </div>
       </div>
@@ -217,42 +217,42 @@ export default function DashboardPage() {
 
       {/* When Football: Top Analytical Insights Grid */}
       {!isBasketball && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-3.5 space-y-1.5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3.5 space-y-1.5">
             <div className="flex items-center justify-between text-[11px]">
-              <span className="font-[500] text-[#e8efe9] flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-[#b8e63a]" />
+              <span className="font-[600] text-[var(--text)] flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
                 <span>Goal lines (over / under)</span>
               </span>
-              <span className="font-mono text-[#8fa69a]">Mean: 2.85 xG</span>
+              <span className="font-mono text-[var(--text-3)] text-[10.5px]">Mean: 2.85 xG</span>
             </div>
-            <p className="text-[12px] text-[#8fa69a] leading-normal">
+            <p className="text-[12px] text-[var(--text-2)] leading-normal">
               Elevated offensive volume in Barcelona vs Real Madrid (3.60 combined xG). Arsenal vs Liverpool exhibits balanced 1.62 - 1.48 expectation.
             </p>
           </div>
 
-          <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-3.5 space-y-1.5">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3.5 space-y-1.5">
             <div className="flex items-center justify-between text-[11px]">
-              <span className="font-[500] text-[#e8efe9] flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5 text-[#e8efe9]" />
+              <span className="font-[600] text-[var(--text)] flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
                 <span>Corner volume distribution</span>
               </span>
-              <span className="font-mono text-[#8fa69a]">Mean: 10.8</span>
+              <span className="font-mono text-[var(--text-3)] text-[10.5px]">Mean: 10.8</span>
             </div>
-            <p className="text-[12px] text-[#8fa69a] leading-normal">
+            <p className="text-[12px] text-[var(--text-2)] leading-normal">
               Man City vs Tottenham corner expectation (11.0 total) offers qualified statistical support on Over 9.5 corners.
             </p>
           </div>
 
-          <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-3.5 space-y-1.5">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3.5 space-y-1.5">
             <div className="flex items-center justify-between text-[11px]">
-              <span className="font-[500] text-[#e8efe9] flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5 text-[#e3b341]" />
+              <span className="font-[600] text-[var(--text)] flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 text-[var(--warn)]" strokeWidth={1.75} />
                 <span>Disciplinary bookings</span>
               </span>
-              <span className="font-mono text-[#8fa69a]">Line: 4.5</span>
+              <span className="font-mono text-[var(--text-3)] text-[10.5px]">Line: 4.5</span>
             </div>
-            <p className="text-[12px] text-[#8fa69a] leading-normal">
+            <p className="text-[12px] text-[var(--text-2)] leading-normal">
               Derby d&apos;Italia (Inter vs Juventus) ref Daniele Orsato averages 5.60 cards/match; elevated probability on Over 4.5 Bookings.
             </p>
           </div>
@@ -260,16 +260,16 @@ export default function DashboardPage() {
       )}
 
       {/* Fixtures Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
         {/* Tabs: Today vs Upcoming vs Completed */}
-        <div className="flex items-center gap-1 bg-[#0f2219] p-1 rounded-[8px] border border-white/[0.08] text-[12px] font-medium self-start">
+        <div className="flex items-center gap-1 bg-[var(--surface)] p-1 rounded-[10px] border border-[var(--border)] text-[12px] font-medium self-start">
           <button
             onClick={() => setActiveTab('today')}
             type="button"
-            className={`px-3 py-1 rounded-[6px] transition-colors ${
+            className={`px-3 py-1 rounded-[8px] transition-colors ${
               activeTab === 'today'
-                ? 'bg-[#b8e63a] text-[#0a1812] font-semibold'
-                : 'text-[#8fa69a] hover:text-[#e8efe9]'
+                ? 'bg-[var(--accent)] text-[var(--accent-ink)] font-semibold'
+                : 'text-[var(--text-2)] hover:text-[var(--text)]'
             }`}
           >
             Today&apos;s games
@@ -277,10 +277,10 @@ export default function DashboardPage() {
           <button
             onClick={() => setActiveTab('upcoming')}
             type="button"
-            className={`px-3 py-1 rounded-[6px] transition-colors ${
+            className={`px-3 py-1 rounded-[8px] transition-colors ${
               activeTab === 'upcoming'
-                ? 'bg-[#b8e63a] text-[#0a1812] font-semibold'
-                : 'text-[#8fa69a] hover:text-[#e8efe9]'
+                ? 'bg-[var(--accent)] text-[var(--accent-ink)] font-semibold'
+                : 'text-[var(--text-2)] hover:text-[var(--text)]'
             }`}
           >
             Upcoming
@@ -288,10 +288,10 @@ export default function DashboardPage() {
           <button
             onClick={() => setActiveTab('completed')}
             type="button"
-            className={`px-3 py-1 rounded-[6px] transition-colors ${
+            className={`px-3 py-1 rounded-[8px] transition-colors ${
               activeTab === 'completed'
-                ? 'bg-[#b8e63a] text-[#0a1812] font-semibold'
-                : 'text-[#8fa69a] hover:text-[#e8efe9]'
+                ? 'bg-[var(--accent)] text-[var(--accent-ink)] font-semibold'
+                : 'text-[var(--text-2)] hover:text-[var(--text)]'
             }`}
           >
             Completed
@@ -304,10 +304,10 @@ export default function DashboardPage() {
             <button
               onClick={() => setSelectedLeague('ALL')}
               type="button"
-              className={`px-2 py-0.5 rounded-[4px] whitespace-nowrap transition-colors ${
+              className={`px-2 py-0.5 rounded-[5px] whitespace-nowrap transition-colors ${
                 selectedLeague === 'ALL'
-                  ? 'bg-white/[0.1] text-[#e8efe9] font-[500]'
-                  : 'text-[#8fa69a] hover:text-[#e8efe9]'
+                  ? 'bg-[var(--surface-2)] text-[var(--text)] font-semibold border border-[var(--border-strong)]'
+                  : 'text-[var(--text-3)] hover:text-[var(--text)]'
               }`}
             >
               All leagues
@@ -317,10 +317,10 @@ export default function DashboardPage() {
                 key={c.code}
                 onClick={() => setSelectedLeague(c.code)}
                 type="button"
-                className={`px-2 py-0.5 rounded-[4px] whitespace-nowrap transition-colors ${
+                className={`px-2 py-0.5 rounded-[5px] whitespace-nowrap transition-colors ${
                   selectedLeague === c.code
-                    ? 'bg-white/[0.1] text-[#e8efe9] font-[500]'
-                    : 'text-[#8fa69a] hover:text-[#e8efe9]'
+                    ? 'bg-[var(--surface-2)] text-[var(--text)] font-semibold border border-[var(--border-strong)]'
+                    : 'text-[var(--text-3)] hover:text-[var(--text)]'
                 }`}
               >
                 {c.code}
@@ -333,23 +333,25 @@ export default function DashboardPage() {
       {/* Matchup Grid */}
       {isBasketball ? (
         filteredBasketball.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {filteredBasketball.map(f => (
               <NBAGameCard key={f.id} fixture={f} />
             ))}
           </div>
         ) : (
-          <div className="p-8 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-2">
-            <Calendar className="w-8 h-8 mx-auto text-[#8fa69a]/40" />
-            <h3 className="text-[#e8efe9] font-[500] text-[15px]">No games scheduled</h3>
-            <p className="text-[12px] text-[#8fa69a] max-w-sm mx-auto">
+          <div className="p-8 text-center bg-[var(--surface)] border border-dashed border-[var(--border-strong)] rounded-[12px] space-y-2.5">
+            <div className="w-[34px] h-[34px] rounded-[8px] bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center mx-auto text-[var(--text-3)]">
+              <Calendar className="w-4 h-4" strokeWidth={1.75} />
+            </div>
+            <h3 className="text-[var(--text)] font-[600] text-[12.5px]">No games scheduled</h3>
+            <p className="text-[11.5px] text-[var(--text-3)] max-w-sm mx-auto">
               No NBA matchups matching your current filter. Scheduled games will appear on matchday.
             </p>
           </div>
         )
       ) : (
         filteredList.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {filteredList.map(({ fixture, topPick, noRecommendationReason }) => (
               <FixtureCard
                 key={fixture.id}
@@ -360,10 +362,12 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="p-8 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-2">
-            <Calendar className="w-8 h-8 mx-auto text-[#8fa69a]/40" />
-            <h3 className="text-[#e8efe9] font-[500] text-[15px]">No games scheduled</h3>
-            <p className="text-[12px] text-[#8fa69a] max-w-sm mx-auto">
+          <div className="p-8 text-center bg-[var(--surface)] border border-dashed border-[var(--border-strong)] rounded-[12px] space-y-2.5">
+            <div className="w-[34px] h-[34px] rounded-[8px] bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center mx-auto text-[var(--text-3)]">
+              <Calendar className="w-4 h-4" strokeWidth={1.75} />
+            </div>
+            <h3 className="text-[var(--text)] font-[600] text-[12.5px]">No games scheduled</h3>
+            <p className="text-[11.5px] text-[var(--text-3)] max-w-sm mx-auto">
               No European football fixtures matching your filter. Check upcoming matchdays.
             </p>
           </div>

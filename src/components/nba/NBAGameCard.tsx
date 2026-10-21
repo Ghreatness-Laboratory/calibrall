@@ -21,22 +21,22 @@ export default function NBAGameCard({ fixture }: NBAGameCardProps) {
   const awayName = fixture.awayTeam.name;
 
   return (
-    <div className="bg-[#0f2219] border border-white/[0.08] hover:border-white/[0.16] rounded-[12px] p-4 flex flex-col justify-between transition-all space-y-3.5">
+    <div className="bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--border-strong)] rounded-[12px] p-3.5 flex flex-col justify-between transition-all space-y-3">
       {/* Top Meta Header */}
-      <div className="flex items-center justify-between text-[11px] text-[#8fa69a] pb-2 border-b border-white/[0.06]">
-        <div className="flex items-center gap-1.5 font-medium text-[#e8efe9]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#b8e63a]" />
+      <div className="flex items-center justify-between text-[11px] text-[var(--text-3)] pb-2 border-b border-[var(--border)]">
+        <div className="flex items-center gap-1.5 font-[550] text-[var(--text)]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_0_3px_var(--accent-soft)]" />
           <span>NBA Regular Season</span>
         </div>
 
-        <div className="flex items-center gap-2 font-mono text-[11px]">
+        <div className="flex items-center gap-2 font-mono text-[10.5px]">
           {isFinished ? (
-            <span className="px-1.5 py-0.2 rounded text-[10px] bg-white/10 text-[#e8efe9]">
+            <span className="px-1.5 py-0.2 rounded-[4px] text-[9.5px] bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)]">
               FINAL
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-[#8fa69a]">
-              <Clock className="w-3 h-3 text-[#b8e63a]" />
+            <span className="flex items-center gap-1 text-[var(--text-3)]">
+              <Clock className="w-3 h-3 text-[var(--accent)]" strokeWidth={1.75} />
               <span>{timeStr}</span>
             </span>
           )}
@@ -48,25 +48,25 @@ export default function NBAGameCard({ fixture }: NBAGameCardProps) {
         {/* Home Team Row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <TeamCrest crestUrl={fixture.homeTeam.crestUrl} teamName={homeName} size={24} />
-            <span className="text-[13px] font-[500] text-[#e8efe9] truncate">
+            <TeamCrest crestUrl={fixture.homeTeam.crestUrl} teamName={homeName} size={22} />
+            <span className="text-[13px] font-[600] text-[var(--text)] truncate">
               {homeName}
             </span>
           </div>
 
           <div className="font-mono tabular-nums text-right shrink-0">
             {isFinished ? (
-              <span className={`text-[15px] font-[600] ${
-                (fixture.homeScore ?? 0) > (fixture.awayScore ?? 0) ? 'text-[#b8e63a]' : 'text-[#8fa69a]'
+              <span className={`text-[14px] font-[600] ${
+                (fixture.homeScore ?? 0) > (fixture.awayScore ?? 0) ? 'text-[var(--accent)]' : 'text-[var(--text-3)]'
               }`}>
                 {fixture.homeScore}
               </span>
             ) : stats ? (
               <div className="text-right">
-                <span className="text-[14px] font-[600] text-[#b8e63a]">
+                <span className="text-[13.5px] font-[600] text-[var(--accent)]">
                   {stats.homeProjected.toFixed(1)}
                 </span>
-                <span className="block text-[10px] text-[#8fa69a]">proj</span>
+                <span className="block text-[9.5px] text-[var(--text-3)]">proj</span>
               </div>
             ) : null}
           </div>
@@ -75,25 +75,25 @@ export default function NBAGameCard({ fixture }: NBAGameCardProps) {
         {/* Away Team Row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <TeamCrest crestUrl={fixture.awayTeam.crestUrl} teamName={awayName} size={24} />
-            <span className="text-[13px] font-[500] text-[#e8efe9] truncate">
+            <TeamCrest crestUrl={fixture.awayTeam.crestUrl} teamName={awayName} size={22} />
+            <span className="text-[13px] font-[600] text-[var(--text)] truncate">
               {awayName}
             </span>
           </div>
 
           <div className="font-mono tabular-nums text-right shrink-0">
             {isFinished ? (
-              <span className={`text-[15px] font-[600] ${
-                (fixture.awayScore ?? 0) > (fixture.homeScore ?? 0) ? 'text-[#b8e63a]' : 'text-[#8fa69a]'
+              <span className={`text-[14px] font-[600] ${
+                (fixture.awayScore ?? 0) > (fixture.homeScore ?? 0) ? 'text-[var(--accent)]' : 'text-[var(--text-3)]'
               }`}>
                 {fixture.awayScore}
               </span>
             ) : stats ? (
               <div className="text-right">
-                <span className="text-[14px] font-[600] text-[#5eb6e8]">
+                <span className="text-[13.5px] font-[600] text-[var(--info)]">
                   {stats.awayProjected.toFixed(1)}
                 </span>
-                <span className="block text-[10px] text-[#8fa69a]">proj</span>
+                <span className="block text-[9.5px] text-[var(--text-3)]">proj</span>
               </div>
             ) : null}
           </div>
@@ -102,31 +102,31 @@ export default function NBAGameCard({ fixture }: NBAGameCardProps) {
 
       {/* Projections & Leans Footer */}
       {stats && (
-        <div className="pt-2 border-t border-white/[0.06] space-y-2">
+        <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
           {/* Proj Total & Margin */}
-          <div className="flex items-center justify-between text-[11px] font-mono text-[#8fa69a]">
+          <div className="flex items-center justify-between text-[10.5px] font-mono text-[var(--text-3)]">
             <span>
-              Total: <strong className="text-[#e8efe9] font-semibold">{stats.projectedTotal.toFixed(1)}</strong>
+              Total: <strong className="text-[var(--text)] font-[600]">{stats.projectedTotal.toFixed(1)}</strong>
               {stats.sportsbookTotal && (
-                <span className="text-[#8fa69a]/70 ml-1">(O/U {stats.sportsbookTotal})</span>
+                <span className="text-[var(--text-3)]/80 ml-1">(O/U {stats.sportsbookTotal})</span>
               )}
             </span>
             <span>
-              Margin: <strong className="text-[#e8efe9] font-semibold">{stats.projectedMargin.toFixed(1)} pts</strong>
+              Margin: <strong className="text-[var(--text)] font-[600]">{stats.projectedMargin.toFixed(1)} pts</strong>
             </span>
           </div>
 
           {/* Winner Lean Chip */}
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-1.5 text-[11px]">
-              <span className="text-[#8fa69a]">Winner lean:</span>
-              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-[#b8e63a]/15 text-[#b8e63a] border border-[#b8e63a]/30">
+              <span className="text-[var(--text-3)]">Winner lean:</span>
+              <span className="px-2 py-0.5 rounded-[5px] text-[10.5px] font-[600] bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30">
                 {stats.projectedWinner.split(' ').pop()}
               </span>
             </div>
 
             {stats.totalLean && (
-              <span className="text-[11px] font-mono font-medium text-[#5eb6e8]">
+              <span className="text-[10.5px] font-mono font-[550] text-[var(--info)]">
                 Lean: {stats.totalLean}
               </span>
             )}

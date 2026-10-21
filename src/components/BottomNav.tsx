@@ -98,12 +98,12 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#0c1f17] border-t-[0.5px] border-white/10"
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[rgba(11,18,16,0.96)] backdrop-blur-md border-t border-[var(--border)]"
       style={{
-        paddingTop: '8px',
+        paddingTop: '6px',
         paddingLeft: '6px',
         paddingRight: '6px',
-        paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+        paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))',
       }}
     >
       <div className="grid grid-cols-5 w-full">
@@ -114,33 +114,33 @@ export default function BottomNav() {
               key={tab.id}
               href={tab.href}
               aria-current={tab.isActive ? 'page' : undefined}
-              className={`relative min-h-[48px] flex flex-col items-center justify-center transition-colors duration-150 active:opacity-75 focus-visible:outline-2 focus-visible:outline-[#b8e63a] rounded-[4px] ${
+              className={`relative min-h-[46px] flex flex-col items-center justify-center transition-colors duration-150 active:opacity-75 focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded-[6px] ${
                 tab.isActive
-                  ? 'text-[#b8e63a]'
-                  : 'text-[#8fa69a] hover:text-[#e8efe9]'
+                  ? 'text-[var(--accent)]'
+                  : 'text-[var(--text-3)] hover:text-[var(--text-2)]'
               }`}
             >
-              {/* 2px x 24px lime indicator bar above the active tab */}
+              {/* 2px x 24px indicator bar above active tab */}
               {tab.isActive && (
                 <span
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] bg-[#b8e63a] rounded-[2px]"
+                  className="absolute top-[-6px] left-1/2 -translate-x-1/2 w-6 h-[2px] bg-[var(--accent)] rounded-full"
                   aria-hidden="true"
                 />
               )}
 
-              <div className="relative">
-                <Icon className="w-5 h-5" strokeWidth={1.75} />
+              <div className="relative mt-0.5">
+                <Icon className="w-[19px] h-[19px]" strokeWidth={tab.isActive ? 2 : 1.75} />
                 {tab.hasDot && !tab.isActive && (
                   <span
-                    className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[#b8e63a]"
+                    className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--accent)] ring-2 ring-[var(--bg)]"
                     aria-hidden="true"
                   />
                 )}
               </div>
 
               <span
-                className={`text-[11px] leading-tight mt-[3px] whitespace-nowrap select-none ${
-                  tab.isActive ? 'font-[500] text-[#b8e63a]' : 'font-[400] text-[#8fa69a]'
+                className={`text-[10px] leading-tight mt-[3px] whitespace-nowrap select-none tracking-tight ${
+                  tab.isActive ? 'font-[550] text-[var(--accent)]' : 'font-[450] text-[var(--text-3)]'
                 }`}
               >
                 {tab.label}

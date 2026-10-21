@@ -63,28 +63,28 @@ export default function FixtureCard({
   const tierBadge = topPrediction ? getRiskTierBadge(topPrediction.riskTier) : null;
 
   return (
-    <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-3.5 space-y-3 transition-colors hover:border-white/20 group">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3.5 space-y-2.5 transition-colors hover:border-[var(--border-strong)] group">
       {/* Header row 11px muted: "Premier League · MD 28" left, clock icon + "16:30 UTC" + bookmark right */}
-      <div className="flex items-center justify-between text-[11px] text-[#8fa69a]">
+      <div className="flex items-center justify-between text-[11px] text-[var(--text-3)]">
         <div className="flex items-center gap-1.5 truncate">
-          <span className="truncate">{fixture.competition.name}</span>
-          <span className="text-[#8fa69a]/60">·</span>
+          <span className="truncate text-[var(--text-2)]">{fixture.competition.name}</span>
+          <span className="text-[var(--text-3)]/60">·</span>
           <span className="font-mono shrink-0">MD {fixture.matchday}</span>
           {derbyInfo && (
-            <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 truncate shrink-0">
+            <span className="ml-1 px-1.5 py-0.5 rounded-[4px] text-[10px] font-[600] bg-rose-500/15 text-rose-300 border border-rose-500/25 truncate shrink-0">
               ⚡ {derbyInfo.name}
             </span>
           )}
           {fixture.hasCoachChange && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+            <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/25 shrink-0">
               New Coach
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0">
-          <span className="flex items-center gap-1 font-mono text-[11px] text-[#8fa69a]" suppressHydrationWarning>
-            <Clock className="w-3.5 h-3.5 text-[#8fa69a]" />
+          <span className="flex items-center gap-1 font-mono text-[10.5px] text-[var(--text-3)]" suppressHydrationWarning>
+            <Clock className="w-3.5 h-3.5 text-[var(--text-3)]" strokeWidth={1.75} />
             <span suppressHydrationWarning>
               {isFinished ? 'Full time' : kickoffFormatted}
             </span>
@@ -92,13 +92,14 @@ export default function FixtureCard({
           <button
             onClick={handleToggleBookmark}
             type="button"
-            className="p-1 -mr-1 rounded-[6px] hover:bg-white/[0.05] transition-colors"
+            className="p-1 -mr-1 rounded-[6px] hover:bg-[var(--surface-2)] transition-colors"
             title={isSaved ? 'Remove from saved' : 'Save fixture'}
             aria-label={isSaved ? 'Remove bookmark' : 'Bookmark fixture'}
           >
             <Bookmark
+              strokeWidth={1.75}
               className={`w-3.5 h-3.5 transition-colors ${
-                isSaved ? 'text-[#e3b341] fill-[#e3b341]' : 'text-[#8fa69a] hover:text-[#e8efe9]'
+                isSaved ? 'text-[var(--warn)] fill-[var(--warn)]' : 'text-[var(--text-3)] hover:text-[var(--text)]'
               }`}
             />
           </button>
@@ -107,23 +108,23 @@ export default function FixtureCard({
 
       {/* Main fixture matchup row */}
       <Link href={`/matches/${fixture.id}`} className="block">
-        <div className="grid grid-cols-12 items-center gap-3">
-          {/* Teams column (8 cols): 24x24 crests, names at 14px/500 ("Arsenal", "Liverpool"), 10px between rows */}
-          <div className="col-span-8 flex flex-col gap-[10px]">
+        <div className="grid grid-cols-12 items-center gap-2.5">
+          {/* Teams column (8 cols): 24x24 crests, names at 13px/600 */}
+          <div className="col-span-8 flex flex-col gap-2">
             {/* Home team row */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-[10px] min-h-[24px] min-w-0">
+              <div className="flex items-center gap-2.5 min-h-[24px] min-w-0">
                 <TeamCrest
                   crestUrl={fixture.homeTeam.crestUrl}
                   teamName={homeName}
-                  size={24}
+                  size={22}
                 />
-                <span className="text-[14px] font-[500] text-[#e8efe9] leading-tight truncate group-hover:text-[#b8e63a] transition-colors">
+                <span className="text-[13px] font-[600] text-[var(--text)] leading-tight truncate group-hover:text-[var(--accent)] transition-colors">
                   {homeName}
                 </span>
               </div>
               {isFinished && (
-                <span className="font-mono text-[13px] text-[#e8efe9] ml-2 shrink-0">
+                <span className="font-mono text-[12.5px] text-[var(--text)] ml-2 shrink-0">
                   {fixture.homeScore ?? 0}
                 </span>
               )}
@@ -131,53 +132,53 @@ export default function FixtureCard({
 
             {/* Away team row */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-[10px] min-h-[24px] min-w-0">
+              <div className="flex items-center gap-2.5 min-h-[24px] min-w-0">
                 <TeamCrest
                   crestUrl={fixture.awayTeam.crestUrl}
                   teamName={awayName}
-                  size={24}
+                  size={22}
                 />
-                <span className="text-[14px] font-[500] text-[#e8efe9] leading-tight truncate group-hover:text-[#b8e63a] transition-colors">
+                <span className="text-[13px] font-[600] text-[var(--text)] leading-tight truncate group-hover:text-[var(--accent)] transition-colors">
                   {awayName}
                 </span>
               </div>
               {isFinished && (
-                <span className="font-mono text-[13px] text-[#e8efe9] ml-2 shrink-0">
+                <span className="font-mono text-[12.5px] text-[var(--text)] ml-2 shrink-0">
                   {fixture.awayScore ?? 0}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Right column separated by a hairline: venue (11px muted) and "Market intel" link with arrow-up-right */}
-          <div className="col-span-4 border-l border-white/[0.08] pl-3 flex flex-col justify-center items-end text-right min-h-[58px]">
-            <span className="text-[11px] text-[#8fa69a] truncate max-w-full">
+          {/* Right column separated by a hairline */}
+          <div className="col-span-4 border-l border-[var(--border)] pl-2.5 flex flex-col justify-center items-end text-right min-h-[52px]">
+            <span className="text-[10.5px] text-[var(--text-3)] truncate max-w-full">
               {fixture.venue ? fixture.venue.split(' ')[0] : 'Stadium'}
             </span>
-            <div className="flex items-center gap-1 text-[12px] font-[500] text-[#b8e63a] mt-1 group-hover:underline">
+            <div className="flex items-center gap-1 text-[11.5px] font-[550] text-[var(--accent)] mt-1 group-hover:underline">
               <span>Market intel</span>
-              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
             </div>
           </div>
         </div>
 
         {/* Top pick: nested panel with a subtle border */}
-        <div className="mt-3">
+        <div className="mt-2.5">
           {topPrediction ? (
-            <div className="bg-[#0a1812]/70 rounded-[8px] border border-white/[0.12] hover:border-[#b8e63a]/30 p-2.5 space-y-2 transition-colors">
+            <div className="bg-[var(--surface-2)] rounded-[8px] border border-[var(--border)] hover:border-[var(--accent)]/30 p-2.5 space-y-1.5 transition-colors">
               {/* Row 1: "Top pick" + Risk tier badge, odds + EV in mono at right */}
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-[10.5px]">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[#8fa69a] font-medium">Top pick</span>
+                  <span className="text-[var(--text-3)] font-medium">Top pick</span>
                   {tierBadge && (
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider ${tierBadge.badgeClass}`}>
+                    <span className={`px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-[600] tracking-wider ${tierBadge.badgeClass}`}>
                       {tierBadge.label}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 font-mono text-[11px]">
+                <div className="flex items-center gap-2 font-mono text-[10.5px]">
                   {topPrediction.marketOdds && (
-                    <span className="text-[#e8efe9] bg-white/[0.05] px-1.5 py-0.5 rounded border border-white/10">
+                    <span className="text-[var(--text)] bg-[var(--surface)] px-1.5 py-0.5 rounded-[4px] border border-[var(--border)]">
                       @{formatOdds(topPrediction.marketOdds)}
                     </span>
                   )}
@@ -189,35 +190,27 @@ export default function FixtureCard({
                 </div>
               </div>
 
-              {/* Row 2: pick name (14px/500), probability in mono at right */}
+              {/* Row 2: pick name (13px/600), probability in mono at right */}
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[14px] font-[500] text-[#e8efe9] truncate">
+                <span className="text-[13px] font-[600] text-[var(--text)] truncate">
                   {formatSelectionName(topPrediction.selection)}
                 </span>
-                <span className="font-mono text-[13px] font-semibold text-[#b8e63a] shrink-0">
+                <span className="font-mono text-[12.5px] font-[600] text-[var(--accent)] shrink-0">
                   {(topPrediction.modelProbability * 100).toFixed(1)}%
                 </span>
               </div>
 
               {/* Row 3: Plain-English reason */}
               {topPrediction.plainEnglishReason && (
-                <p className="text-[11px] text-[#8fa69a] line-clamp-2 leading-relaxed">
+                <p className="text-[11.5px] text-[var(--text-3)] line-clamp-2 leading-relaxed">
                   {topPrediction.plainEnglishReason}
                 </p>
               )}
 
-              {/* Row 4: 4px probability bar beneath filled to probability */}
-              <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
+              {/* Row 4: 3px probability bar beneath filled to probability */}
+              <div className="w-full h-1 bg-[var(--surface)] rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-300 ${
-                    topPrediction.riskTier === 'SAFE' 
-                      ? 'bg-[#b8e63a]' 
-                      : topPrediction.riskTier === 'MODERATE' 
-                      ? 'bg-[#e3b341]' 
-                      : topPrediction.riskTier === 'RISKY' 
-                      ? 'bg-orange-400' 
-                      : 'bg-purple-400'
-                  }`}
+                  className="h-full rounded-full transition-all duration-300 bg-[var(--accent)]"
                   style={{
                     width: `${Math.min(100, Math.max(0, topPrediction.modelProbability * 100))}%`,
                   }}
@@ -225,8 +218,8 @@ export default function FixtureCard({
               </div>
             </div>
           ) : (
-            <div className="bg-[#0a1812]/50 rounded-[8px] border border-white/[0.06] p-2.5 flex items-center gap-2 text-[#8fa69a] text-[11px]">
-              <AlertCircle className="w-3.5 h-3.5 text-[#8fa69a] shrink-0" />
+            <div className="bg-[var(--surface-2)] rounded-[8px] border border-[var(--border)] p-2.5 flex items-center gap-2 text-[var(--text-3)] text-[11px]">
+              <AlertCircle className="w-3.5 h-3.5 text-[var(--text-3)] shrink-0" strokeWidth={1.75} />
               <span className="truncate">
                 {noRecommendationReason || 'No strong recommendation (Abstaining on marginal edge)'}
               </span>

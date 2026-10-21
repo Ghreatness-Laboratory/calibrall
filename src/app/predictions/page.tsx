@@ -239,44 +239,44 @@ export default function PredictionsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
         <div>
-          <h1 className="text-[18px] font-[500] text-[#e8efe9] flex items-center gap-2">
+          <h1 className="text-[18px] font-[620] text-[var(--text)] flex items-center gap-2">
             <span>Market intelligence & prediction engine</span>
           </h1>
-          <p className="text-[12px] text-[#8fa69a] mt-0.5">
+          <p className="text-[12.5px] text-[var(--text-2)] mt-0.5">
             Full-market evaluation across Results, Handicaps, Goal Bounds, Halves, Corners, and Cards.
           </p>
         </div>
       </div>
 
       {/* Responsible Use Disclaimer Banner (Requirement 15) */}
-      <div className="p-3 bg-[#0f2219] border border-white/[0.08] rounded-[10px] flex items-start gap-2.5 text-[12px] text-[#8fa69a]">
-        <Info className="w-4 h-4 text-[#b8e63a] shrink-0 mt-0.5" />
-        <p className="leading-normal">
-          <span className="text-[#e8efe9] font-[500]">Responsible statistical notice:</span> All predictions, probabilities, and model lines are mathematical estimates computed via Dixon-Coles bivariate Poisson and negative binomial regression models, not guaranteed outcomes. Past statistical performance does not ensure future returns.
+      <div className="p-3 bg-[rgba(217,164,65,0.04)] border border-[rgba(217,164,65,0.3)] rounded-[10px] flex items-start gap-2.5 text-[11px] text-[var(--text-3)] leading-relaxed">
+        <Info className="w-3.5 h-3.5 text-[var(--warn)] shrink-0 mt-0.5" strokeWidth={1.75} />
+        <p>
+          <strong className="text-[var(--text-2)] font-semibold">Responsible statistical notice:</strong> All predictions, probabilities, and model lines are mathematical estimates computed via Dixon-Coles bivariate Poisson and negative binomial regression models, not guaranteed outcomes. Past statistical performance does not ensure future returns.
         </p>
       </div>
 
       {/* DAILY SAFEST PICKS SECTION (Requirement 13) */}
       {safestPicks.length > 0 && (
-        <div className="bg-[#0f2219] border border-[#b8e63a]/30 rounded-[12px] p-4 space-y-3.5">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3.5 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#b8e63a]" />
-              <h2 className="text-[15px] font-[500] text-[#e8efe9]">
+              <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
+              <h2 className="text-[13.5px] font-[620] text-[var(--text)]">
                 Daily Safest Picks (Top 5 Across All Leagues)
               </h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#b8e63a]/20 text-[#b8e63a] font-semibold border border-[#b8e63a]/30">
+              <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded-[5px] bg-[var(--accent-soft)] text-[var(--accent)] font-semibold border border-[var(--accent)]/30">
                 Variety Rule Active (Max 2 per Market)
               </span>
             </div>
-            <span className="text-[11px] text-[#8fa69a] font-mono">
+            <span className="text-[10.5px] text-[var(--text-3)] font-mono">
               High Confidence · ≥75% Probability
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
             {safestPicks.map((item, idx) => {
               const p = item.prediction;
               const tierBadge = getRiskTierBadge(p.riskTier);
@@ -285,52 +285,52 @@ export default function PredictionsPage() {
                 <Link
                   key={idx}
                   href={`/matches/${item.fixtureId}`}
-                  className="bg-[#0a1812] border border-white/[0.08] hover:border-[#b8e63a]/50 rounded-[10px] p-3 flex flex-col justify-between space-y-2.5 transition-all group hover:scale-[1.01]"
+                  className="bg-[var(--surface-2)] border border-[var(--border)] hover:border-[var(--border-strong)] rounded-[10px] p-3 flex flex-col justify-between space-y-2.5 transition-all group"
                 >
                   <div className="space-y-1.5">
                     {/* Header: Comp & Tier */}
-                    <div className="flex items-center justify-between text-[10px] text-[#8fa69a]">
+                    <div className="flex items-center justify-between text-[10px] text-[var(--text-3)]">
                       <span className="truncate max-w-[90px]">{item.compCode}</span>
-                      <span className={`px-1.5 py-0.2 rounded font-mono font-bold text-[9px] ${tierBadge.badgeClass}`}>
+                      <span className={`px-1.5 py-0.2 rounded-[4px] font-mono font-bold text-[9px] ${tierBadge.badgeClass}`}>
                         {tierBadge.label}
                       </span>
                     </div>
 
                     {/* Teams Row */}
-                    <div className="flex items-center gap-1.5 text-[12px] font-[500] text-[#e8efe9] truncate">
+                    <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text)] truncate">
                       <TeamCrest crestUrl={item.homeTeam.crestUrl} teamName={item.homeTeam.name} size={16} />
                       <span className="truncate">{item.homeTeam.shortName || item.homeTeam.name}</span>
-                      <span className="text-[#8fa69a] text-[10px]">v</span>
+                      <span className="text-[var(--text-3)] text-[10px]">v</span>
                       <TeamCrest crestUrl={item.awayTeam.crestUrl} teamName={item.awayTeam.name} size={16} />
                       <span className="truncate">{item.awayTeam.shortName || item.awayTeam.name}</span>
                     </div>
 
                     {/* Selection */}
-                    <div className="text-[13px] font-[600] text-[#e8efe9] group-hover:text-[#b8e63a] transition-colors leading-snug">
+                    <div className="text-[12.5px] font-[600] text-[var(--text)] group-hover:text-[var(--accent)] transition-colors leading-snug">
                       {formatSelectionName(p.selection)}
                     </div>
 
                     {/* Plain English Reason */}
                     {p.plainEnglishReason && (
-                      <p className="text-[10px] text-[#8fa69a] line-clamp-2 leading-relaxed">
+                      <p className="text-[10.5px] text-[var(--text-3)] line-clamp-2 leading-relaxed">
                         {p.plainEnglishReason}
                       </p>
                     )}
                   </div>
 
                   {/* Probability Bar & Odds */}
-                  <div className="pt-2 border-t border-white/[0.06] space-y-1">
+                  <div className="pt-2 border-t border-[var(--border)] space-y-1">
                     <div className="flex items-center justify-between text-[11px] font-mono">
-                      <span className="text-[#b8e63a] font-bold">{(p.modelProbability * 100).toFixed(0)}%</span>
+                      <span className="text-[var(--accent)] font-bold">{(p.modelProbability * 100).toFixed(0)}%</span>
                       {p.marketOdds && (
-                        <span className="text-[#e8efe9] bg-white/[0.06] px-1.5 py-0.5 rounded text-[10px]">
+                        <span className="text-[var(--text)] bg-[var(--surface)] px-1.5 py-0.5 rounded-[4px] border border-[var(--border)] text-[10px]">
                           @{formatOdds(p.marketOdds)}
                         </span>
                       )}
                     </div>
-                    <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
+                    <div className="w-full h-1 bg-[var(--surface)] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#b8e63a] rounded-full"
+                        className="h-full bg-[var(--accent)] rounded-full"
                         style={{ width: `${Math.min(100, p.modelProbability * 100)}%` }}
                       />
                     </div>
@@ -343,20 +343,20 @@ export default function PredictionsPage() {
       )}
 
       {/* FILTER BAR (Requirements 12 & 16) */}
-      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3.5">
-        <div className="flex items-center gap-2 text-[12px] font-[500] text-[#e8efe9]">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-[#b8e63a]" />
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3.5 space-y-3">
+        <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--text)]">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
           <span>Filter market intelligence</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-[12px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-[12px]">
           {/* Competition */}
           <div>
-            <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Competition</label>
+            <label className="block text-[var(--text-3)] mb-1 text-[10.5px] font-medium">Competition</label>
             {isBasketball ? (
               <select
                 disabled
-                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#e8efe9] opacity-90 cursor-default"
+                className="w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-[10px] text-[12px] text-[var(--text)] opacity-90 cursor-default"
               >
                 <option value="NBA">NBA (USA)</option>
               </select>
@@ -364,7 +364,7 @@ export default function PredictionsPage() {
               <select
                 value={selectedComp}
                 onChange={(e) => setSelectedComp(e.target.value)}
-                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
+                className="w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-[10px] text-[12px] text-[var(--text)] focus:outline-hidden focus:border-[var(--accent)]"
               >
                 <option value="ALL">All competitions</option>
                 {COMPETITIONS.map(c => (
@@ -376,11 +376,11 @@ export default function PredictionsPage() {
 
           {/* Risk Tier */}
           <div>
-            <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Risk Tier</label>
+            <label className="block text-[var(--text-3)] mb-1 text-[10.5px] font-medium">Risk Tier</label>
             <select
               value={selectedRiskTier}
               onChange={(e) => setSelectedRiskTier(e.target.value)}
-              className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-[10px] text-[12px] text-[var(--text)] focus:outline-hidden focus:border-[var(--accent)]"
             >
               <option value="ALL">All risk tiers</option>
               <option value="SAFE">SAFE (≥75% high confidence)</option>
@@ -392,9 +392,9 @@ export default function PredictionsPage() {
 
           {/* Min Probability Slider */}
           <div>
-            <div className="flex items-center justify-between text-[11px] mb-1">
-              <span className="text-[#8fa69a] font-[500]">Min probability</span>
-              <span className="font-mono text-[#b8e63a]">{(minProb * 100).toFixed(0)}%</span>
+            <div className="flex items-center justify-between text-[10.5px] mb-1">
+              <span className="text-[var(--text-3)] font-medium">Min probability</span>
+              <span className="font-mono text-[var(--accent)]">{(minProb * 100).toFixed(0)}%</span>
             </div>
             <input
               type="range"
@@ -403,18 +403,18 @@ export default function PredictionsPage() {
               step="0.05"
               value={minProb}
               onChange={(e) => setMinProb(parseFloat(e.target.value))}
-              className="w-full accent-[#b8e63a] cursor-pointer"
+              className="w-full accent-[var(--accent)] cursor-pointer"
             />
           </div>
 
           {/* Only Value Toggle */}
           <div className="flex items-end pb-1">
-            <label className="flex items-center gap-2 cursor-pointer text-[12px] text-[#e8efe9]">
+            <label className="flex items-center gap-2 cursor-pointer text-[12px] text-[var(--text)]">
               <input
                 type="checkbox"
                 checked={onlyValuePicks}
                 onChange={(e) => setOnlyValuePicks(e.target.checked)}
-                className="rounded bg-[#0a1812] border-white/20 text-[#b8e63a] focus:ring-0 w-3.5 h-3.5"
+                className="rounded-[4px] bg-[var(--surface-2)] border-[var(--border)] text-[var(--accent)] focus:ring-0 w-3.5 h-3.5"
               />
               <span>Only positive edge (EV &gt; 0)</span>
             </label>
@@ -422,17 +422,17 @@ export default function PredictionsPage() {
         </div>
 
         {/* Market-Type Filter Pills (Requirement 12 & 16) */}
-        <div className="pt-2 border-t border-white/[0.06] flex items-center gap-1.5 overflow-x-auto text-[11px] pb-1 [scrollbar-width:none]">
-          <span className="text-[#8fa69a] font-mono shrink-0 mr-1">Market:</span>
+        <div className="pt-2 border-t border-[var(--border)] flex items-center gap-1.5 overflow-x-auto text-[10.5px] pb-1 [scrollbar-width:none]">
+          <span className="text-[var(--text-3)] font-mono shrink-0 mr-1">Market:</span>
           {activeMarketFilters.map(filter => (
             <button
               key={filter.id}
               onClick={() => setSelectedMarketGroup(filter.id)}
               type="button"
-              className={`px-2.5 py-1 rounded-[6px] whitespace-nowrap transition-colors text-[11px] font-[500] ${
+              className={`px-2.5 py-1 rounded-[6px] whitespace-nowrap transition-colors text-[11px] font-medium ${
                 selectedMarketGroup === filter.id
-                  ? 'bg-[#b8e63a] text-[#0a1812] font-semibold'
-                  : 'bg-[#0a1812] border border-white/[0.06] text-[#8fa69a] hover:text-[#e8efe9]'
+                  ? 'bg-[var(--accent)] text-[var(--accent-ink)] font-semibold'
+                  : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-2)] hover:text-[var(--text)]'
               }`}
             >
               {filter.label}
@@ -441,17 +441,17 @@ export default function PredictionsPage() {
         </div>
 
         {/* Risk Tier Quick Buttons */}
-        <div className="pt-1 flex items-center gap-1.5 overflow-x-auto text-[11px] pb-1 [scrollbar-width:none]">
-          <span className="text-[#8fa69a] font-mono shrink-0 mr-1">Tier:</span>
+        <div className="pt-1 flex items-center gap-1.5 overflow-x-auto text-[10.5px] pb-1 [scrollbar-width:none]">
+          <span className="text-[var(--text-3)] font-mono shrink-0 mr-1">Tier:</span>
           {riskTierPills.map(tier => (
             <button
               key={tier.id}
               onClick={() => setSelectedRiskTier(tier.id)}
               type="button"
-              className={`px-2 py-0.5 rounded-[4px] whitespace-nowrap transition-colors text-[11px] ${
+              className={`px-2 py-0.5 rounded-[4px] whitespace-nowrap transition-colors text-[10.5px] ${
                 selectedRiskTier === tier.id
-                  ? 'bg-white/20 text-white font-semibold border border-white/30'
-                  : 'bg-[#0a1812] border border-white/[0.06] text-[#8fa69a] hover:text-[#e8efe9]'
+                  ? 'bg-[var(--surface-2)] text-[var(--text)] font-semibold border border-[var(--border-strong)]'
+                  : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-3)] hover:text-[var(--text)]'
               }`}
             >
               {tier.label}
@@ -461,8 +461,8 @@ export default function PredictionsPage() {
       </div>
 
       {/* Predictions Table */}
-      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] overflow-hidden">
-        <div className="p-3 bg-[#0a1812]/50 border-b border-white/[0.08] flex items-center justify-between text-[11px] text-[#8fa69a]">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
+        <div className="p-3 bg-[var(--surface-2)] border-b border-[var(--border)] flex items-center justify-between text-[11px] text-[var(--text-3)]">
           <span className="font-mono">Displaying {filtered.length} scored lines</span>
           <span>Ranked by model score & statistical edge</span>
         </div>
@@ -470,7 +470,7 @@ export default function PredictionsPage() {
         {filtered.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[12px]">
-              <thead className="bg-[#0a1812]/80 text-[#8fa69a] font-mono text-[10px] uppercase border-b border-white/[0.06]">
+              <thead className="bg-[var(--surface-2)] text-[var(--text-3)] font-mono text-[10px] uppercase tracking-wider border-b border-[var(--border)]">
                 <tr>
                   <th className="py-2.5 px-3">Fixture</th>
                   <th className="py-2.5 px-3">Tier</th>
@@ -484,30 +484,30 @@ export default function PredictionsPage() {
                   <th className="py-2.5 px-3 text-right">Intel</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.05]">
+              <tbody className="divide-y divide-[var(--border)]">
                 {filtered.map((item, idx) => {
                   const p = item.prediction;
                   const isTop = p.isTopPick;
                   const tierBadge = getRiskTierBadge(p.riskTier);
 
                   return (
-                    <tr key={idx} className={`hover:bg-white/[0.02] transition-colors ${isTop ? 'bg-[#b8e63a]/[0.03]' : ''}`}>
-                      <td className="py-2.5 px-3 text-[#e8efe9]">
+                    <tr key={idx} className={`hover:bg-[var(--surface-2)]/60 transition-colors ${isTop ? 'bg-[var(--accent-soft)]' : ''}`}>
+                      <td className="py-2.5 px-3 text-[var(--text)]">
                         <div className="flex items-center gap-2">
                           <div className="flex items-center -space-x-1 shrink-0">
                             <TeamCrest
                               crestUrl={item.homeTeam.crestUrl}
                               teamName={item.homeTeam.shortName || item.homeTeam.name}
-                              size={20}
+                              size={18}
                             />
                             <TeamCrest
                               crestUrl={item.awayTeam.crestUrl}
                               teamName={item.awayTeam.shortName || item.awayTeam.name}
-                              size={20}
+                              size={18}
                             />
                           </div>
                           <div>
-                            <span className="font-[500] block truncate max-w-[140px] sm:max-w-none">{item.fixtureName}</span>
+                            <span className="font-medium block truncate max-w-[140px] sm:max-w-none">{item.fixtureName}</span>
                             {item.isDerby && (
                               <span className="text-[10px] font-semibold text-rose-300">⚡ {item.derbyName || 'Derby'}</span>
                             )}
@@ -515,70 +515,70 @@ export default function PredictionsPage() {
                         </div>
                       </td>
                       <td className="py-2.5 px-3">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider ${tierBadge.badgeClass}`}>
+                        <span className={`px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold tracking-wider ${tierBadge.badgeClass}`}>
                           {tierBadge.label}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-[#8fa69a]">
-                        <span className="text-[12px] text-[#e8efe9]">
+                      <td className="py-2.5 px-3 text-[var(--text-2)]">
+                        <span className="text-[12px] text-[var(--text)]">
                           {getOptionTypeLabel(p.optionType)}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">
+                      <td className="py-2.5 px-3 font-medium text-[var(--text)]">
                         <div className="flex items-center gap-1.5">
                           <span>{formatSelectionName(p.selection)}</span>
                           {isTop && (
-                            <span className="text-[9px] bg-[#b8e63a]/20 text-[#b8e63a] px-1 rounded-[3px] font-mono font-bold">
+                            <span className="text-[9px] bg-[var(--accent-soft)] text-[var(--accent)] px-1 rounded-[3px] font-mono font-bold border border-[var(--accent)]/30">
                               Best pick
                             </span>
                           )}
                           {p.pushProbability !== undefined && (
-                            <span className="text-[9px] bg-white/10 text-[#8fa69a] px-1 rounded-[3px] font-mono">
+                            <span className="text-[9px] bg-[var(--surface-2)] text-[var(--text-3)] px-1 rounded-[3px] font-mono border border-[var(--border)]">
                               Push {(p.pushProbability * 100).toFixed(0)}%
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums font-[600]">
+                      <td className="py-2.5 px-3 font-mono text-[var(--text)] tabular-nums font-semibold">
                         {(p.modelProbability * 100).toFixed(1)}%
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[12px]">
                         {p.marketOdds ? (
-                          <span className="bg-[#0a1812] px-1.5 py-0.5 rounded-[4px] border border-white/[0.08] text-[#e8efe9] tabular-nums">
+                          <span className="bg-[var(--surface-2)] px-1.5 py-0.5 rounded-[4px] border border-[var(--border)] text-[var(--text)] tabular-nums">
                             {p.marketOdds.toFixed(2)}
                           </span>
                         ) : (
-                          <span className="text-[10px] text-[#8fa69a] bg-[#0a1812] px-1.5 py-0.5 rounded-[4px] border border-white/[0.06]">
+                          <span className="text-[10px] text-[var(--text-3)] bg-[var(--surface-2)] px-1.5 py-0.5 rounded-[4px] border border-[var(--border)]">
                             n/a
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-[#8fa69a] tabular-nums">
+                      <td className="py-2.5 px-3 font-mono text-[var(--text-2)] tabular-nums">
                         {p.edge !== undefined ? (
-                          <span className={p.edge >= 0 ? 'text-[#b8e63a]' : 'text-[#8fa69a]'}>
+                          <span className={p.edge >= 0 ? 'text-[var(--accent)]' : 'text-[var(--text-3)]'}>
                             {p.edge >= 0 ? `+${(p.edge * 100).toFixed(1)}%` : `${(p.edge * 100).toFixed(1)}%`}
                           </span>
                         ) : 'n/a'}
                       </td>
                       <td className="py-2.5 px-3 font-mono tabular-nums">
                         {p.expectedValue !== undefined ? (
-                          <span className={`font-[500] ${formatExpectedValue(p.expectedValue).colorClass}`}>
+                          <span className={`font-medium ${formatExpectedValue(p.expectedValue).colorClass}`}>
                             {formatExpectedValue(p.expectedValue).text}
                           </span>
                         ) : (
-                          <span className="text-[#8fa69a] text-[12px]">n/a</span>
+                          <span className="text-[var(--text-3)] text-[12px]">n/a</span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3 text-[#8fa69a] text-[11px] max-w-[220px]">
+                      <td className="py-2.5 px-3 text-[var(--text-3)] text-[11px] max-w-[220px]">
                         <span className="line-clamp-2">{p.plainEnglishReason}</span>
                       </td>
                       <td className="py-2.5 px-3 text-right">
                         <Link
                           href={`/matches/${item.fixtureId}`}
-                          className="inline-flex items-center gap-0.5 text-[11px] text-[#b8e63a] hover:underline font-[500]"
+                          className="inline-flex items-center gap-0.5 text-[11px] text-[var(--accent)] hover:underline font-medium"
                         >
                           <span>Market intel</span>
-                          <ArrowUpRight className="w-3 h-3" />
+                          <ArrowUpRight className="w-3 h-3" strokeWidth={1.75} />
                         </Link>
                       </td>
                     </tr>
@@ -588,11 +588,11 @@ export default function PredictionsPage() {
             </table>
           </div>
         ) : (
-          <div className="p-12 text-center text-[12px] text-[#8fa69a] space-y-2">
-            <div className="font-mono text-[13px] text-[#e8efe9]">
+          <div className="p-12 text-center text-[12px] text-[var(--text-3)] space-y-2">
+            <div className="font-mono text-[12.5px] text-[var(--text)]">
               {liveDataAvailable ? 'No predictions match your selected filters' : `Live data unavailable. Last updated ${lastUpdated}`}
             </div>
-            <p className="max-w-sm mx-auto">
+            <p className="max-w-sm mx-auto text-[11.5px]">
               {liveDataAvailable ? 'Try adjusting the minimum probability threshold or selecting all market categories.' : 'Live market intelligence will populate once live provider data is refreshed.'}
             </p>
           </div>
