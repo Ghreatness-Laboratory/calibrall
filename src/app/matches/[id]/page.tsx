@@ -247,7 +247,7 @@ export default function MatchAnalysisPage() {
 
           {/* Status pill & Kickoff */}
           <div className="sm:border-l sm:border-white/[0.08] sm:pl-6 flex flex-col justify-center sm:items-end">
-            <span className="text-[11px] font-mono text-[#b8e63a] uppercase">
+            <span className="text-[11px] font-mono text-[#b8e63a]">
               {fixture.status === 'FINISHED' ? 'Completed' : 'Upcoming match'}
             </span>
             <span className="text-[13px] text-[#e8efe9] font-mono mt-0.5" suppressHydrationWarning>
@@ -353,11 +353,10 @@ export default function MatchAnalysisPage() {
         {/* Table */}
         <div className="lg:col-span-7 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#b8e63a]" />
-              <span>All evaluated market lines ({evaluation.predictions.length})</span>
+            <h3 className="text-[15px] font-[500] text-[#e8efe9]">
+              All evaluated market lines ({evaluation.predictions.length})
             </h3>
-            <span className="text-[11px] text-[#8fa69a]">Click any row to audit evidence</span>
+            <span className="text-[11px] text-[#8fa69a]">Tap a row for audit</span>
           </div>
 
           <MarketComparisonTable
@@ -370,8 +369,8 @@ export default function MatchAnalysisPage() {
         {/* Explanation Card */}
         <div className="lg:col-span-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-[500] text-[#e8efe9]">Selected line evidence audit</h3>
-            <span className="text-[11px] text-[#b8e63a] font-mono">Grounded facts</span>
+            <h3 className="text-[15px] font-[500] text-[#e8efe9]">Selected line evidence audit</h3>
+            <span className="text-[11px] text-[#b8e63a] font-[500]">Grounded facts</span>
           </div>
 
           <ExplanationCard

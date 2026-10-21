@@ -132,10 +132,10 @@ export default function SettingsPage() {
 
           <div className="pt-2 flex items-center justify-between text-[11px] text-[#8fa69a] border-t border-white/[0.06]">
             <div>
-              Role: <span className="font-mono text-[#e8efe9] uppercase">{user.role}</span>
+              Role: <span className="font-mono text-[#e8efe9] capitalize">{user.role}</span>
             </div>
             <div>
-              Subscription: <span className="font-mono text-[#b8e63a] uppercase">{user.subscriptionTier}</span>
+              Subscription: <span className="font-mono text-[#b8e63a] capitalize">{user.subscriptionTier}</span>
             </div>
           </div>
         </div>

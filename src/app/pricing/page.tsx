@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Check, ShieldCheck } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { getStoredUser, setStoredUser } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
 
@@ -18,24 +18,24 @@ export default function PricingPage() {
     const updated: UserProfile = { ...user, subscriptionTier: tier };
     setUser(updated);
     setStoredUser(updated);
-    setNotification(`Switched entitlement to ${tier.toUpperCase()}`);
+    setNotification(`Switched entitlement to ${tier.charAt(0).toUpperCase() + tier.slice(1)}`);
     setTimeout(() => setNotification(''), 3000);
   };
 
   return (
-    <div className="space-y-10 py-2">
+    <div className="space-y-6 sm:space-y-7 py-2">
       {/* Title */}
-      <div className="max-w-xl space-y-2">
-        <span className="text-[11px] font-mono uppercase text-[#b8e63a]">Subscription plans</span>
-        <h1 className="text-[24px] font-[500] text-[#e8efe9]">
+      <div className="max-w-xl space-y-1 text-left">
+        <span className="text-[11px] font-[500] text-[#b8e63a] block">Subscription plans</span>
+        <h1 className="text-[22px] font-[500] text-[#e8efe9]">
           Institutional football intelligence
         </h1>
-        <p className="text-[13px] text-[#8fa69a] leading-normal">
+        <p className="text-[13px] text-[#8fa69a] leading-[1.65]">
           Select the analytical fidelity required for your research. Switch tiers instantly to experience model entitlements.
         </p>
 
         {notification && (
-          <div className="p-2.5 bg-[#b8e63a]/15 border border-[#b8e63a]/30 rounded-[8px] text-[12px] font-mono text-[#b8e63a]">
+          <div className="p-2.5 bg-[#b8e63a]/15 border border-[#b8e63a]/30 rounded-[8px] text-[12px] font-mono text-[#b8e63a] mt-2">
             {notification}
           </div>
         )}
@@ -49,14 +49,14 @@ export default function PricingPage() {
         }`}>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono text-[#8fa69a] uppercase">Research tier</span>
+              <span className="text-[11px] text-[#8fa69a]">Research tier</span>
               {user?.subscriptionTier === 'free' && (
-                <span className="text-[10px] bg-white/10 text-[#e8efe9] px-2 py-0.5 rounded-[4px] font-mono">ACTIVE</span>
+                <span className="text-[10px] bg-white/10 text-[#e8efe9] px-2 py-0.5 rounded-[4px]">Active</span>
               )}
             </div>
             <div>
               <h3 className="text-[16px] font-[500] text-[#e8efe9]">Free</h3>
-              <div className="text-[24px] font-[500] text-[#e8efe9] mt-1 font-mono">$0 <span className="text-[12px] text-[#8fa69a] font-normal">/ mo</span></div>
+              <div className="text-[24px] font-[500] text-[#e8efe9] mt-1 font-mono tabular-nums">$0 <span className="text-[12px] text-[#8fa69a] font-normal">/ mo</span></div>
               <p className="text-[12px] text-[#8fa69a] mt-1">Essential baseline match predictions and public performance dashboards.</p>
             </div>
 
@@ -92,14 +92,14 @@ export default function PricingPage() {
         }`}>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono text-[#b8e63a] uppercase">Pro analyst</span>
-              <span className="text-[10px] bg-[#e3b341]/15 text-[#e3b341] border border-[#e3b341]/40 px-2 py-0.5 rounded-[4px] font-mono">
-                POPULAR
+              <span className="text-[11px] text-[#b8e63a]">Pro analyst</span>
+              <span className="text-[10px] bg-[#e3b341]/15 text-[#e3b341] border border-[#e3b341]/40 px-2 py-0.5 rounded-[4px]">
+                Popular
               </span>
             </div>
             <div>
               <h3 className="text-[16px] font-[500] text-[#e8efe9]">Pro terminal</h3>
-              <div className="text-[24px] font-[500] text-[#e8efe9] mt-1 font-mono">$29 <span className="text-[12px] text-[#8fa69a] font-normal">/ mo</span></div>
+              <div className="text-[24px] font-[500] text-[#e8efe9] mt-1 font-mono tabular-nums">$29 <span className="text-[12px] text-[#8fa69a] font-normal">/ mo</span></div>
               <p className="text-[12px] text-[#8fa69a] mt-1">Complete multi-market ranking, expected value analysis, corners & cards.</p>
             </div>
 
@@ -143,14 +143,14 @@ export default function PricingPage() {
         }`}>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono text-[#8fa69a] uppercase">Syndicate</span>
+              <span className="text-[11px] text-[#8fa69a]">Syndicate</span>
               {user?.subscriptionTier === 'premium' && (
-                <span className="text-[10px] bg-white/10 text-[#e8efe9] px-2 py-0.5 rounded-[4px] font-mono">ACTIVE</span>
+                <span className="text-[10px] bg-white/10 text-[#e8efe9] px-2 py-0.5 rounded-[4px]">Active</span>
               )}
             </div>
             <div>
               <h3 className="text-[16px] font-[500] text-[#e8efe9]">Premium terminal</h3>
-              <div className="text-[24px] font-[500] text-[#e8efe9] mt-1 font-mono">$79 <span className="text-[12px] text-[#8fa69a] font-normal">/ mo</span></div>
+              <div className="text-[24px] font-[500] text-[#e8efe9] mt-1 font-mono tabular-nums">$79 <span className="text-[12px] text-[#8fa69a] font-normal">/ mo</span></div>
               <p className="text-[12px] text-[#8fa69a] mt-1">REST API endpoints, custom model tuning, and raw Poisson matrices.</p>
             </div>
 

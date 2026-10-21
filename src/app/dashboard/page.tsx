@@ -215,7 +215,7 @@ export default function DashboardPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[12px]">
-            <thead className="bg-[#0a1812]/80 text-[#8fa69a] font-mono text-[10px] uppercase border-b border-white/[0.06]">
+            <thead className="bg-[#0a1812]/80 text-[#8fa69a] text-[11px] font-[500] border-b border-white/[0.06]">
               <tr>
                 <th className="py-2 px-3">Match</th>
                 <th className="py-2 px-3">Market</th>

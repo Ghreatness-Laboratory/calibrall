@@ -82,9 +82,9 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-[#0a1812]/95 backdrop-blur-sm border-b border-white/[0.08]">
-      {/* Top status bar: slim (about 32px), 11px mono, left "Dixon-Coles v2.4 online" with a small green dot, right "06:48 UTC" and a small outlined PRO chip. No wrapping onto two lines. */}
-      <div className="h-8 bg-[#07130e] border-b border-white/[0.06] px-4 text-[11px] font-mono flex items-center justify-between text-[#8fa69a] whitespace-nowrap overflow-hidden">
+    <header className="sticky top-0 z-40 bg-[#0a1812]/95 backdrop-blur-sm border-b border-white/[0.08]">
+      {/* Top status bar: slim (28px), 11px mono, left "Dixon-Coles v2.4 online" with a small green dot, right "06:48 UTC" and a small outlined Pro chip. Strictly one line without wrapping. */}
+      <div className="h-7 bg-[#07130e] border-b border-white/[0.06] px-4 text-[11px] font-mono flex items-center justify-between text-[#8fa69a] whitespace-nowrap overflow-hidden">
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#b8e63a] shrink-0" />
           <span className="text-[#e8efe9]">Dixon-Coles v2.4 online</span>
@@ -92,17 +92,17 @@ export default function Navbar() {
 
         <div className="flex items-center gap-3">
           <span suppressHydrationWarning>{timeStr || '06:48 UTC'}</span>
-          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded-[4px] border border-[#e3b341]/60 text-[#e3b341] tracking-wide">
-            {user?.subscriptionTier ? user.subscriptionTier.toUpperCase() : 'PRO'}
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] border border-[#e3b341]/60 text-[#e3b341] tracking-wide">
+            {user?.subscriptionTier ? user.subscriptionTier.charAt(0).toUpperCase() + user.subscriptionTier.slice(1).toLowerCase() : 'Pro'}
           </span>
         </div>
       </div>
 
-      {/* Main header: 30px logo, "Calibrall" 15px/500, tagline 11px muted in sentence case. Right side: icon-only 30px buttons (theme toggle, avatar). */}
+      {/* Main header: 30px logo, "Calibrall" 15px/500, tagline 11px muted single line. Mobile right: avatar only. Desktop right: search, B&W icon button, avatar. Total height under 88px on mobile. */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-14">
+        <div className="flex items-center justify-between h-[52px] md:h-14">
           {/* Logo & Brand */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="w-[30px] h-[30px] min-w-[30px] min-h-[30px] rounded-[6px] overflow-hidden border border-white/[0.1] flex items-center justify-center bg-[#f4f1ea] shrink-0">
                 <img
@@ -112,16 +112,16 @@ export default function Navbar() {
                 />
               </div>
               <div className="flex flex-col">
-                <span className="text-[15px] font-[500] text-[#e8efe9] leading-tight group-hover:text-[#b8e63a] transition-colors">
+                <span className="text-[15px] font-[500] text-[#e8efe9] leading-tight group-hover:text-[#b8e63a] transition-colors whitespace-nowrap">
                   Calibrall
                 </span>
-                <span className="text-[11px] text-[#8fa69a] leading-tight">
+                <span className="text-[11px] text-[#8fa69a] leading-tight whitespace-nowrap">
                   Every call, on record.
                 </span>
               </div>
             </Link>
 
-            {/* Nav links */}
+            {/* Nav links (desktop) */}
             <nav className="hidden lg:flex items-center gap-1 ml-2">
               {navItems.map((item) => {
                 const active = pathname === item.href;
@@ -142,22 +142,22 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* Right side: icon-only 30px buttons (theme toggle, avatar) */}
+          {/* Right side: On mobile, avatar only! On desktop, search + theme toggle + avatar. */}
           <div className="flex items-center gap-2">
             <Link
               href="/matches"
-              className="w-[30px] h-[30px] rounded-[6px] border border-white/[0.08] bg-[#0f2219] text-[#8fa69a] hover:text-[#e8efe9] flex items-center justify-center transition-colors"
+              className="hidden md:flex w-[30px] h-[30px] rounded-[6px] border border-white/[0.08] bg-[#0f2219] text-[#8fa69a] hover:text-[#e8efe9] items-center justify-center transition-colors"
               title="Search fixtures"
               aria-label="Search fixtures"
             >
               <Search className="w-3.5 h-3.5" />
             </Link>
 
-            {/* Theme toggle: icon-only 30px button */}
+            {/* Theme toggle: icon-only 30px button (hidden on mobile, accessible via avatar menu or desktop header) */}
             <button
               onClick={toggleMonochrome}
               type="button"
-              className={`w-[30px] h-[30px] rounded-[6px] border flex items-center justify-center transition-colors ${
+              className={`hidden md:flex w-[30px] h-[30px] rounded-[6px] border items-center justify-center transition-colors ${
                 isMonochrome
                   ? 'bg-white text-black border-white'
                   : 'bg-[#0f2219] border-white/[0.08] text-[#8fa69a] hover:text-[#e8efe9] hover:border-white/20'
@@ -184,19 +184,28 @@ export default function Navbar() {
                 <div className="absolute right-0 mt-2 w-56 bg-[#0f2219] border border-white/[0.1] rounded-[8px] py-1.5 z-50 text-[12px] shadow-lg">
                   <div className="px-3 py-2 border-b border-white/[0.06]">
                     <p className="font-[500] text-[#e8efe9]">{user?.fullName || 'Analyst'}</p>
-                    <p className="text-[11px] text-[#8fa69a] truncate">{user?.email || 'analyst@calibrall.io'}</p>
+                    <p className="text-[11px] text-[#8fa69a] truncate">{user?.email || 'analyst@calibrall.app'}</p>
                     <div className="mt-2 flex items-center justify-between">
                       <span className="text-[11px] text-[#8fa69a]">Tier:</span>
                       <button
                         onClick={cycleTier}
                         type="button"
-                        className="px-2 py-0.5 rounded-[4px] bg-[#b8e63a]/15 text-[#b8e63a] border border-[#b8e63a]/30 font-mono text-[10px] uppercase font-[500] hover:bg-[#b8e63a]/25"
+                        className="px-2 py-0.5 rounded-[4px] bg-[#b8e63a]/15 text-[#b8e63a] border border-[#b8e63a]/30 font-mono text-[10px] capitalize font-[500] hover:bg-[#b8e63a]/25"
                       >
                         {user?.subscriptionTier || 'pro'} (click to change)
                       </button>
                     </div>
                   </div>
                   <div className="py-1">
+                    {/* Mobile theme toggle in menu */}
+                    <button
+                      onClick={toggleMonochrome}
+                      type="button"
+                      className="w-full flex items-center px-3 py-1.5 text-[#8fa69a] hover:bg-white/[0.04] hover:text-[#e8efe9] text-left md:hidden"
+                    >
+                      <Contrast className="w-3.5 h-3.5 mr-2" />
+                      <span>{isMonochrome ? 'Switch to color mode' : 'Black & white mode'}</span>
+                    </button>
                     <Link
                       href="/settings"
                       onClick={() => setUserDropdownOpen(false)}
