@@ -788,24 +788,31 @@ export function calculateBookmakerMargin(oddsList: number[]): number {
   return Math.max(0, sumImplied - 1.0);
 }
 
-import { RiskTier } from '@/types';
+import { RiskTier, ConfidenceTier } from '@/types';
 
 /**
- * Calculates Risk Tier according to strict mathematical rule:
- * - SAFE: probability 75% or higher, with a high confidence score (>= 0.70)
- * - MODERATE: probability 60-75%
- * - RISKY: probability 45-60%, or higher-odds value plays
- * - LONGSHOT: below 45%, only shown if the edge is large
+ * Calculates Confidence Tier according to calibrated mathematical rules (No "Safe"):
+ * - HIGH: calibrated probability 75% or higher, high confidence score (>= 0.70), zero risk flags
+ * - MEDIUM: calibrated probability 60-75%
+ * - LOW: below 60%, higher variance or speculative
  */
-export function calculateRiskTier(probability: number, confidenceScore: number = 0.8, edge?: number): RiskTier {
+export function calculateConfidenceTier(probability: number, confidenceScore: number = 0.8, edge?: number): ConfidenceTier {
   if (probability >= 0.75 && confidenceScore >= 0.70) {
-    return 'SAFE';
+    return 'HIGH';
   } else if (probability >= 0.60) {
-    return 'MODERATE';
-  } else if (probability >= 0.45) {
-    return 'RISKY';
+    return 'MEDIUM';
   } else {
+    return 'LOW';
+  }
+}
+
+export function calculateRiskTier(probability: number, confidenceScore: number = 0.8, edge?: number, legacyMode: boolean = false): RiskTier {
+  if (legacyMode) {
+    if (probability >= 0.75 && confidenceScore >= 0.70) return 'SAFE';
+    if (probability >= 0.60) return 'MODERATE';
+    if (probability >= 0.45) return 'RISKY';
     return 'LONGSHOT';
   }
+  return calculateConfidenceTier(probability, confidenceScore, edge);
 }
 

@@ -582,34 +582,27 @@ export function getOptionTypeLabel(type: SupportedOptionType | string): string {
 
 import { RiskTier } from '@/types';
 
-/**
- * Returns badge styling and text for risk tiers:
- * SAFE: green (#b8e63a)
- * MODERATE: yellow (#e3b341)
- * RISKY: orange
- * LONGSHOT: purple
- */
-export function getRiskTierBadge(tier?: RiskTier): { label: string; badgeClass: string } {
-  switch (tier) {
+export function getRiskTierBadge(tier?: RiskTier | string): { label: string; badgeClass: string } {
+  const normalized = (tier || '').toUpperCase();
+  switch (normalized) {
+    case 'HIGH':
     case 'SAFE':
       return {
-        label: 'SAFE',
+        label: 'HIGH',
         badgeClass: 'bg-[#b8e63a]/15 text-[#b8e63a] border border-[#b8e63a]/30',
       };
+    case 'MEDIUM':
     case 'MODERATE':
       return {
-        label: 'MODERATE',
+        label: 'MEDIUM',
         badgeClass: 'bg-[#e3b341]/15 text-[#e3b341] border border-[#e3b341]/30',
       };
+    case 'LOW':
     case 'RISKY':
-      return {
-        label: 'RISKY',
-        badgeClass: 'bg-orange-500/15 text-orange-400 border border-orange-500/30',
-      };
     case 'LONGSHOT':
       return {
-        label: 'LONGSHOT',
-        badgeClass: 'bg-purple-500/15 text-purple-300 border border-purple-500/30',
+        label: 'LOW',
+        badgeClass: 'bg-orange-500/15 text-orange-400 border border-orange-500/30',
       };
     default:
       return {
@@ -617,6 +610,10 @@ export function getRiskTierBadge(tier?: RiskTier): { label: string; badgeClass: 
         badgeClass: 'bg-white/10 text-[#8fa69a] border border-white/15',
       };
   }
+}
+
+export function getConfidenceTierBadge(tier?: string): { label: string; badgeClass: string } {
+  return getRiskTierBadge(tier);
 }
 
 /**
@@ -664,7 +661,7 @@ export function formatSelectionName(name: string): string {
   }
 
   // Draw
-  if (/^Draw/i.test(cleaned)) {
+  if (/^Draw$/i.test(cleaned)) {
     cleaned = 'Draw';
   }
 

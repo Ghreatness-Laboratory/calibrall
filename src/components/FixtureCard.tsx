@@ -61,7 +61,7 @@ export default function FixtureCard({
     return checkDerby(fixture.homeTeam.name, fixture.awayTeam.name);
   }, [fixture]);
 
-  const tierBadge = topPrediction ? getRiskTierBadge(topPrediction.riskTier) : null;
+  const tierBadge = topPrediction ? getRiskTierBadge(topPrediction.confidenceTier || topPrediction.riskTier) : null;
 
   return (
     <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-2.5 transition-all duration-150 hover:border-white/[0.14] group touch-press">
@@ -167,13 +167,18 @@ export default function FixtureCard({
         <div className="mt-2.5">
           {topPrediction ? (
             <div className="bg-[#151E19] rounded-[11px] border border-white/[0.07] hover:border-[#B6E63B]/30 p-2.5 space-y-1.5 transition-colors">
-              {/* Row 1: "Top pick" + Risk tier badge, odds + EV in mono at right */}
+              {/* Row 1: "Top pick" + Confidence tier badge, odds + EV in mono at right */}
               <div className="flex items-center justify-between text-[10.5px]">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[#8B9890] font-medium">Top pick</span>
                   {tierBadge && (
                     <span className={`px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-semibold tracking-wider ${tierBadge.badgeClass}`}>
                       {cleanDisplayText(tierBadge.label)}
+                    </span>
+                  )}
+                  {topPrediction.dataCompletenessScore !== undefined && (
+                    <span className="text-[9.5px] font-mono text-[#5E6A63] bg-white/[0.04] px-1 py-0.5 rounded-[3px]">
+                      {(topPrediction.dataCompletenessScore * 100).toFixed(0)}% data
                     </span>
                   )}
                 </div>
@@ -191,13 +196,19 @@ export default function FixtureCard({
                 </div>
               </div>
 
-              {/* Row 2: pick name (13px/600), probability in mono at right */}
+              {/* Row 2: pick name (13px/600), probability with uncertainty in mono at right */}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[13px] font-semibold text-[#ECF1EE] truncate">
                   {cleanDisplayText(formatSelectionName(topPrediction.selection))}
                 </span>
                 <span className="font-mono text-[12.5px] font-semibold text-[#B6E63B] shrink-0 tabular-nums">
-                  {(topPrediction.modelProbability * 100).toFixed(1)}%
+                  {topPrediction.calibratedProbability !== undefined
+                    ? `${(topPrediction.calibratedProbability * 100).toFixed(1)}%${
+                        topPrediction.uncertaintySpread !== undefined
+                          ? ` ± ${(topPrediction.uncertaintySpread * 100).toFixed(1)}%`
+                          : ''
+                      }`
+                    : `${(topPrediction.modelProbability * 100).toFixed(1)}%`}
                 </span>
               </div>
 
@@ -213,13 +224,13 @@ export default function FixtureCard({
                 <div
                   className="h-full rounded-full transition-all duration-300 bg-[#B6E63B]"
                   style={{
-                    width: `${Math.min(100, Math.max(0, topPrediction.modelProbability * 100))}%`,
+                    width: `${Math.min(100, Math.max(0, (topPrediction.calibratedProbability ?? topPrediction.modelProbability) * 100))}%`,
                   }}
                 />
               </div>
 
-              {/* Row 5: Substitute Option chip if present */}
-              {topPrediction.substituteOption && (
+              {/* Row 5: Substitute Option chip or Risk Flags if present */}
+              {topPrediction.substituteOption ? (
                 <div className="pt-1.5 mt-1 border-t border-white/[0.05] flex items-center justify-between text-[10.5px]">
                   <span className="text-[#B6E63B] font-medium flex items-center gap-1 truncate">
                     <TrendingUp className="w-3 h-3 shrink-0" strokeWidth={2} />
@@ -229,7 +240,14 @@ export default function FixtureCard({
                     &#8722;{topPrediction.substituteOption.varianceReductionPct}% var
                   </span>
                 </div>
-              )}
+              ) : topPrediction.riskFlags && topPrediction.riskFlags.length > 0 ? (
+                <div className="pt-1 mt-0.5 flex items-center gap-1.5 text-[10px] text-[#E2AE45] font-mono">
+                  <AlertCircle className="w-3 h-3 shrink-0" strokeWidth={2} />
+                  <span className="truncate">
+                    {topPrediction.riskFlags.length} risk factor{topPrediction.riskFlags.length > 1 ? 's' : ''} noted
+                  </span>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="bg-[#151E19] rounded-[11px] border border-white/[0.07] p-2.5 flex items-center gap-2 text-[#8B9890] text-[11px]">

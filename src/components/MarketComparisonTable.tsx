@@ -69,11 +69,11 @@ export default function MarketComparisonTable({
     predictions.forEach(p => {
       if (p.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY' && (p.evidenceTier?.includes('Insufficient Data') || p.explanation?.dataLimitations?.some(d => d.includes('Insufficient')))) {
         insufficientData.push(p);
-      } else if (p.riskTier === 'SAFE') {
+      } else if (p.confidenceTier === 'HIGH' || p.riskTier === 'HIGH' || p.riskTier === 'SAFE') {
         safe.push(p);
-      } else if (p.riskTier === 'MODERATE') {
+      } else if (p.confidenceTier === 'MEDIUM' || p.riskTier === 'MEDIUM' || p.riskTier === 'MODERATE') {
         moderate.push(p);
-      } else if (p.riskTier === 'RISKY') {
+      } else if (p.confidenceTier === 'LOW' || p.riskTier === 'LOW' || p.riskTier === 'RISKY') {
         risky.push(p);
       } else {
         longshot.push(p);
@@ -81,9 +81,9 @@ export default function MarketComparisonTable({
     });
 
     return {
-      safe: safe.sort((a, b) => b.modelProbability - a.modelProbability),
-      moderate: moderate.sort((a, b) => b.modelProbability - a.modelProbability),
-      risky: risky.sort((a, b) => b.modelProbability - a.modelProbability),
+      safe: safe.sort((a, b) => (b.calibratedProbability ?? b.modelProbability) - (a.calibratedProbability ?? a.modelProbability)),
+      moderate: moderate.sort((a, b) => (b.calibratedProbability ?? b.modelProbability) - (a.calibratedProbability ?? a.modelProbability)),
+      risky: risky.sort((a, b) => (b.calibratedProbability ?? b.modelProbability) - (a.calibratedProbability ?? a.modelProbability)),
       longshot: longshot.sort((a, b) => (b.edge ?? 0) - (a.edge ?? 0)),
       insufficientData
     };
@@ -147,12 +147,12 @@ export default function MarketComparisonTable({
     const isSelected = selectedPredictionId === pred.id;
     const isExpanded = expandedId === pred.id;
     const isTop = pred.isTopPick;
-    const probPct = pred.modelProbability * 100;
+    const probPct = (pred.calibratedProbability ?? pred.modelProbability) * 100;
     const selectionName = formatSelectionName(pred.selection);
     const categoryLabel = getOptionTypeLabel(pred.optionType);
     const evFormatted = formatExpectedValue(pred.expectedValue);
     const oddsFormatted = formatOdds(pred.marketOdds);
-    const tierBadge = getRiskTierBadge(pred.riskTier);
+    const tierBadge = getRiskTierBadge(pred.confidenceTier || pred.riskTier);
 
     return (
       <div key={pred.id} className="transition-colors">
@@ -317,13 +317,13 @@ export default function MarketComparisonTable({
       {/* VIEW MODE 1: GROUPED BY TIER (Requirement 11) */}
       {viewMode === 'TIER_GROUPED' && (
         <div className="divide-y divide-white/[0.08]">
-          {/* SAFE TIER */}
+          {/* HIGH CONFIDENCE TIER */}
           <div className="p-3.5 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#b8e63a]" />
                 <h4 className="text-[13px] font-[600] text-[#b8e63a]">
-                  SAFE TIERS (≥75% Probability & High Confidence)
+                  HIGH CONFIDENCE TIERS (≥60% Calibrated Probability & Low Uncertainty)
                 </h4>
                 <span className="text-[10px] font-mono text-[#8fa69a] bg-white/[0.05] px-1.5 py-0.5 rounded">
                   {tierGroups.safe.length} lines
@@ -335,17 +335,17 @@ export default function MarketComparisonTable({
                 {tierGroups.safe.map(renderPredictionRow)}
               </div>
             ) : (
-              <p className="text-[11px] text-[#8fa69a] italic px-2 py-1">No markets currently satisfy the strict SAFE criteria (≥75% prob & ≥70% confidence).</p>
+              <p className="text-[11px] text-[#8fa69a] italic px-2 py-1">No candidate lines meet the rigorous High Confidence criteria without risk flags.</p>
             )}
           </div>
 
-          {/* MODERATE TIER */}
+          {/* MEDIUM CONFIDENCE TIER */}
           <div className="p-3.5 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#e3b341]" />
                 <h4 className="text-[13px] font-[600] text-[#e3b341]">
-                  MODERATE TIERS (60% to 75% Probability)
+                  MEDIUM CONFIDENCE TIERS (Balanced Edge and Moderate Variance)
                 </h4>
                 <span className="text-[10px] font-mono text-[#8fa69a] bg-white/[0.05] px-1.5 py-0.5 rounded">
                   {tierGroups.moderate.length} lines
@@ -357,17 +357,17 @@ export default function MarketComparisonTable({
                 {tierGroups.moderate.map(renderPredictionRow)}
               </div>
             ) : (
-              <p className="text-[11px] text-[#8fa69a] italic px-2 py-1">No markets in the moderate range.</p>
+              <p className="text-[11px] text-[#8fa69a] italic px-2 py-1">No markets in the medium confidence range.</p>
             )}
           </div>
 
-          {/* RISKY TIER */}
+          {/* LOW CONFIDENCE TIER */}
           <div className="p-3.5 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
                 <h4 className="text-[13px] font-[600] text-orange-400">
-                  RISKY VALUE PLAYS (45% to 60% Probability with Edge)
+                  LOW CONFIDENCE VALUE PLAYS (Higher Variance or Risk Flags Present)
                 </h4>
                 <span className="text-[10px] font-mono text-[#8fa69a] bg-white/[0.05] px-1.5 py-0.5 rounded">
                   {tierGroups.risky.length} lines
@@ -379,7 +379,7 @@ export default function MarketComparisonTable({
                 {tierGroups.risky.map(renderPredictionRow)}
               </div>
             ) : (
-              <p className="text-[11px] text-[#8fa69a] italic px-2 py-1">No markets classified as risky value plays.</p>
+              <p className="text-[11px] text-[#8fa69a] italic px-2 py-1">No markets classified as low confidence value plays.</p>
             )}
           </div>
 
@@ -453,11 +453,11 @@ export default function MarketComparisonTable({
               </div>
             </div>
 
-            {/* Safest Handicap Callouts (Requirement 16) */}
+            {/* Top Handicap Callouts */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {safestHomeHandicap && (
                 <div className="p-2.5 rounded-[8px] bg-[#0f2219] border border-white/[0.06] space-y-1">
-                  <div className="text-[10px] uppercase font-mono text-[#8fa69a]">Safest {homeTeamName} line</div>
+                  <div className="text-[10px] uppercase font-mono text-[#8fa69a]">Top {cleanDisplayText(homeTeamName)} line</div>
                   <div className="flex items-center justify-between">
                     <span className="text-[13px] font-[500] text-[#e8efe9]">{cleanDisplayText(safestHomeHandicap.selection)}</span>
                     <span className="font-mono text-[#b8e63a] font-bold">{(safestHomeHandicap.modelProbability * 100).toFixed(0)}%</span>
@@ -470,7 +470,7 @@ export default function MarketComparisonTable({
 
               {safestAwayHandicap && (
                 <div className="p-2.5 rounded-[8px] bg-[#0f2219] border border-white/[0.06] space-y-1">
-                  <div className="text-[10px] uppercase font-mono text-[#8fa69a]">Safest {awayTeamName} line</div>
+                  <div className="text-[10px] uppercase font-mono text-[#8fa69a]">Top {cleanDisplayText(awayTeamName)} line</div>
                   <div className="flex items-center justify-between">
                     <span className="text-[13px] font-[500] text-[#e8efe9]">{cleanDisplayText(safestAwayHandicap.selection)}</span>
                     <span className="font-mono text-[#b8e63a] font-bold">{(safestAwayHandicap.modelProbability * 100).toFixed(0)}%</span>
@@ -490,7 +490,7 @@ export default function MarketComparisonTable({
             </div>
           </div>
 
-          {/* 2. GOAL BOUNDS SECTION (Requirement 16) */}
+          {/* 2. GOAL BOUNDS SECTION */}
           <div className="bg-[#0a1812] border border-white/[0.08] rounded-[10px] p-4 space-y-3.5">
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <div className="flex items-center gap-2">
@@ -500,7 +500,7 @@ export default function MarketComparisonTable({
               <span className="text-[11px] font-mono text-[#8fa69a]">Non overlapping bands</span>
             </div>
 
-            {/* Highlights: Most likely band & Safest wide band */}
+            {/* Highlights: Most likely band & Top wide band */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {mostLikelyGoalBand && (
                 <div className="p-2.5 rounded-[8px] bg-[#0f2219] border border-white/[0.06] space-y-1">
@@ -515,7 +515,7 @@ export default function MarketComparisonTable({
 
               {safestWideBand && (
                 <div className="p-2.5 rounded-[8px] bg-[#0f2219] border border-white/[0.06] space-y-1">
-                  <div className="text-[10px] uppercase font-mono text-[#8fa69a]">Safest Wide Band Cushion</div>
+                  <div className="text-[10px] uppercase font-mono text-[#8fa69a]">Top Wide Band Cushion</div>
                   <div className="flex items-center justify-between">
                     <span className="text-[13px] font-[500] text-[#e8efe9]">{cleanDisplayText(safestWideBand.selection)}</span>
                     <span className="font-mono text-[#b8e63a] font-bold">{(safestWideBand.modelProbability * 100).toFixed(0)}%</span>

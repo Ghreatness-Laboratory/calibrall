@@ -2,7 +2,8 @@ export type Sport = 'football' | 'basketball';
 
 export type MatchStatus = 'TIMED' | 'SCHEDULED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | 'POSTPONED' | 'CANCELED';
 
-export type RiskTier = 'SAFE' | 'MODERATE' | 'RISKY' | 'LONGSHOT';
+export type ConfidenceTier = 'HIGH' | 'MEDIUM' | 'LOW';
+export type RiskTier = ConfidenceTier | 'SAFE' | 'MODERATE' | 'RISKY' | 'LONGSHOT';
 
 export type MarketCategory = 
   | 'match_result' 
@@ -356,10 +357,27 @@ export interface MarketPrediction {
   situationalPatterns?: SituationalPatternInsight[];
   similarFixturesComparison?: SimilarFixturesComparison;
   attackingDefendingMatchup?: AttackingDefendingMatchup;
-  fixtureProfile?: FixtureProfile;
-  isGenericPick?: boolean; // Dropped if within 2.5% of league base rate without match-specific variance
   isSubstituteOnly?: boolean;
+  isGenericPick?: boolean;
   liveStateStatus?: LiveStateStatus;
+  // Dixon Coles v2.5 Upgrades
+  confidenceTier?: ConfidenceTier;
+  calibratedProbability?: number;
+  rawModelProbability?: number;
+  uncertaintySpread?: number;
+  ci90?: [number, number];
+  riskFlags?: string[];
+  whyPanel?: {
+    headline?: string;
+    factorsFor: string[];
+    factorsAgainst: string[];
+    riskFlags: string[];
+    uncertaintySummary?: string;
+    dataCompletenessPct?: number;
+  };
+  engineVersion?: string;
+  dataCompletenessScore?: number;
+  abstainReason?: string;
 }
 
 export type FixtureProfile = 

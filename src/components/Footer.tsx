@@ -47,7 +47,7 @@ export default function Footer() {
         { label: 'Responsible use', href: '/responsible-use' },
         { label: 'Terms of service', href: '/responsible-use' },
         { label: 'Privacy policy', href: '/responsible-use' },
-        { label: 'Model version: Dixon Coles v2.4.1', href: '/methodology' },
+        { label: 'Model version: Dixon Coles v2.5.0', href: '/methodology' },
       ],
     },
   ];
@@ -149,6 +149,11 @@ export default function Footer() {
             ))}
           </div>
         )}
+
+        {/* Mandatory Responsible Gaming Disclaimer */}
+        <div className="text-center pt-2 text-[11.5px] text-[#8B9B93]/90 max-w-xl mx-auto leading-relaxed">
+          Statistical analysis, not financial or betting advice. 18+. Gamble responsibly.
+        </div>
 
         {/* Footer Copyright */}
         <div className="text-center pt-1 text-[11px] font-[400] text-[#5E6F67]">

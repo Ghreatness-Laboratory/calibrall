@@ -122,11 +122,11 @@ export function runStatisticalTests() {
   const card45Sum = cardProbs.total[4.5].over + cardProbs.total[4.5].under;
   assert(Math.abs(card45Sum - 1.0) < 0.0001, 'Bookings Over 4.5 + Under 4.5 sum to 1.0', `Sum: ${card45Sum}`);
 
-  // 11. Test Risk Tier Classification Function
-  const safeTier = calculateRiskTier(0.82, 0.85, 0.04);
-  const modTier = calculateRiskTier(0.68, 0.75, 0.03);
-  const riskyTier = calculateRiskTier(0.52, 0.70, 0.05);
-  const longshotTier = calculateRiskTier(0.38, 0.65, 0.08);
+  // 11. Test Risk Tier Classification Function (Legacy backward compatibility)
+  const safeTier = calculateRiskTier(0.82, 0.85, 0.04, true);
+  const modTier = calculateRiskTier(0.68, 0.75, 0.03, true);
+  const riskyTier = calculateRiskTier(0.52, 0.70, 0.05, true);
+  const longshotTier = calculateRiskTier(0.38, 0.65, 0.08, true);
   assert(
     safeTier === 'SAFE' && modTier === 'MODERATE' && riskyTier === 'RISKY' && longshotTier === 'LONGSHOT',
     'Risk Tier Logic: Correctly maps probabilities and confidence to SAFE (≥75%), MODERATE (60-75%), RISKY (45-60%), LONGSHOT (<45%)',

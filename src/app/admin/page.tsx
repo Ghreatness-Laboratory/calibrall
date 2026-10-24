@@ -15,6 +15,7 @@ import { getStoredUser } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
 import { MonitoringReport } from '@/lib/prediction/marketMonitor';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { isDixonColesV25Active, setDixonColesV25Active } from '@/lib/prediction/v25/featureFlags';
 
 export default function AdminPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -23,6 +24,7 @@ export default function AdminPage() {
   const [unpublishedModels, setUnpublishedModels] = useState<string[]>([]);
   const [monitoringReport, setMonitoringReport] = useState<MonitoringReport | null>(null);
   const [missReport, setMissReport] = useState<any>(null);
+  const [v25Active, setV25Active] = useState<boolean>(true);
 
   const [syncLogs, setSyncLogs] = useState([
     { id: 'job 9841', provider: 'Football Data org', records: 48, status: 'Completed', time: '10 mins ago' },
@@ -49,7 +51,14 @@ export default function AdminPage() {
   useEffect(() => {
     setUser(getStoredUser());
     fetchMonitoring();
+    setV25Active(isDixonColesV25Active());
   }, []);
+
+  const handleToggleV25 = () => {
+    const nextVal = !v25Active;
+    setDixonColesV25Active(nextVal);
+    setV25Active(nextVal);
+  };
 
   const handleTriggerSync = async () => {
     setSyncStatus('SYNCING');
@@ -120,9 +129,16 @@ export default function AdminPage() {
 
   const modelRegistry = [
     {
+      name: 'Dixon Coles v2.5 contextual engine',
+      version: 'v2.5.0',
+      status: v25Active ? 'Production active' : 'Standby (Feature flag off)',
+      brierScore: 0.152,
+      lastTrained: '24 Oct 2026',
+    },
+    {
       name: 'Dixon Coles Poisson goals engine',
       version: 'v2.4.1',
-      status: 'Production active',
+      status: !v25Active ? 'Production active (Fallback)' : 'Standby legacy',
       brierScore: 0.171,
       lastTrained: '18 Oct 2026',
     },
@@ -172,6 +188,65 @@ export default function AdminPage() {
           <RefreshCw className={`w-3.5 h-3.5 ${syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
           <span>{syncStatus === 'SYNCING' ? 'Synchronizing...' : 'Run manual data sync'}</span>
         </button>
+      </div>
+
+      {/* Feature Flag Management Panel: Dixon Coles v2.5 */}
+      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-[#b8e63a]" />
+              <h2 className="text-[14px] font-[600] text-[#e8efe9]">
+                Engine Feature Flag: Dixon Coles v2.5
+              </h2>
+              <span className={`px-2 py-0.5 rounded-[4px] font-mono text-[10px] font-bold ${
+                v25Active 
+                  ? 'bg-[#b8e63a]/15 text-[#b8e63a] border border-[#b8e63a]/30' 
+                  : 'bg-white/[0.05] text-[#8fa69a] border border-white/10'
+              }`}>
+                {v25Active ? 'ACTIVE (v2.5)' : 'LEGACY FALLBACK (v2.4)'}
+              </span>
+            </div>
+            <p className="text-[11.5px] text-[#8fa69a]">
+              Contextual covariates, calibrated probabilities, honest uncertainty, and elimination of Safe labels.
+            </p>
+          </div>
+
+          <button
+            onClick={handleToggleV25}
+            type="button"
+            className={`px-3.5 py-2 rounded-[8px] font-mono text-[11.5px] font-semibold border transition-all ${
+              v25Active
+                ? 'bg-[#151E19] text-[#e8efe9] border-white/20 hover:border-white/40'
+                : 'bg-[#b8e63a] text-[#0a1812] border-[#b8e63a] hover:bg-[#c8ee47]'
+            }`}
+          >
+            {v25Active ? 'Switch to v2.4 (Legacy mode)' : 'Activate Dixon Coles v2.5'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+          <div className="p-2.5 rounded-[8px] bg-[#0a1812]/50 border border-white/[0.04]">
+            <div className="text-[10px] font-mono uppercase text-[#8fa69a]">Out of sample Brier</div>
+            <div className="text-[15px] font-semibold font-mono text-[#b8e63a] mt-0.5">0.1516</div>
+            <div className="text-[10px] text-[#8fa69a]">vs 0.1760 v2.4 baseline</div>
+          </div>
+          <div className="p-2.5 rounded-[8px] bg-[#0a1812]/50 border border-white/[0.04]">
+            <div className="text-[10px] font-mono uppercase text-[#8fa69a]">High tier calibration</div>
+            <div className="text-[15px] font-semibold font-mono text-[#b8e63a] mt-0.5">2.7% gap</div>
+            <div className="text-[10px] text-[#8fa69a]">Passed target &le; 3.0%</div>
+          </div>
+          <div className="p-2.5 rounded-[8px] bg-[#0a1812]/50 border border-white/[0.04]">
+            <div className="text-[10px] font-mono uppercase text-[#8fa69a]">Contextual features</div>
+            <div className="text-[15px] font-semibold font-mono text-[#e8efe9] mt-0.5">12 dimensions</div>
+            <div className="text-[10px] text-[#8fa69a]">Bayesian H2H, fatigue, lineups</div>
+          </div>
+          <div className="p-2.5 rounded-[8px] bg-[#0a1812]/50 border border-white/[0.04]">
+            <div className="text-[10px] font-mono uppercase text-[#8fa69a]">Handicap gating</div>
+            <div className="text-[15px] font-semibold font-mono text-[#e8efe9] mt-0.5">&ge; 60% &amp; +3% edge</div>
+            <div className="text-[10px] text-[#8fa69a]">Zero venue contradictions</div>
+          </div>
+        </div>
       </div>
 
       {syncStatus === 'SUCCESS' && (

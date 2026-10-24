@@ -122,23 +122,27 @@ export default function PredictionsPage() {
     return list;
   }, [fixtures, isBasketball]);
 
-  // Daily Safest Picks: Top 5 SAFE picks, max 2 per market type
-  const safestPicks = useMemo(() => {
-    const safeCandidates = allPredictions.filter(item => {
+  // Daily High Confidence Picks: Top 5 High Confidence picks, max 2 per market type
+  const featuredConfidencePicks = useMemo(() => {
+    const candidates = allPredictions.filter(item => {
       const p = item.prediction;
-      return p.riskTier === 'SAFE' && p.modelProbability >= 0.75;
+      const isHigh = p.confidenceTier === 'HIGH' || p.riskTier === 'SAFE' || p.riskTier === 'HIGH';
+      const prob = p.calibratedProbability ?? p.modelProbability;
+      return isHigh && prob >= 0.60;
     }).sort((a, b) => {
       const confA = a.prediction.confidenceScore ?? 0.75;
       const confB = b.prediction.confidenceScore ?? 0.75;
-      const scoreA = (a.prediction.modelProbability * 10) + (confA * 5) + ((a.prediction.edge ?? 0) * 8);
-      const scoreB = (b.prediction.modelProbability * 10) + (confB * 5) + ((b.prediction.edge ?? 0) * 8);
+      const probA = a.prediction.calibratedProbability ?? a.prediction.modelProbability;
+      const probB = b.prediction.calibratedProbability ?? b.prediction.modelProbability;
+      const scoreA = (probA * 10) + (confA * 5) + ((a.prediction.edge ?? 0) * 8);
+      const scoreB = (probB * 10) + (confB * 5) + ((b.prediction.edge ?? 0) * 8);
       return scoreB - scoreA;
     });
 
-    const selected: typeof safeCandidates = [];
+    const selected: typeof candidates = [];
     const marketCounts: Record<string, number> = {};
 
-    for (const cand of safeCandidates) {
+    for (const cand of candidates) {
       if (selected.length >= 5) break;
 
       const groupKey = cand.prediction.marketCategory || cand.prediction.optionType;
@@ -192,9 +196,16 @@ export default function PredictionsPage() {
     return allPredictions.filter(item => {
       const p = item.prediction;
       if (selectedComp !== 'ALL' && item.compCode !== selectedComp) return false;
-      if (selectedRiskTier !== 'ALL' && p.riskTier !== selectedRiskTier) return false;
+      if (selectedRiskTier !== 'ALL') {
+        const matchesTier = p.confidenceTier === selectedRiskTier || p.riskTier === selectedRiskTier ||
+          (selectedRiskTier === 'HIGH' && (p.riskTier === 'SAFE' || p.confidenceTier === 'HIGH')) ||
+          (selectedRiskTier === 'MEDIUM' && (p.riskTier === 'MODERATE' || p.confidenceTier === 'MEDIUM')) ||
+          (selectedRiskTier === 'LOW' && (p.riskTier === 'RISKY' || p.confidenceTier === 'LOW'));
+        if (!matchesTier) return false;
+      }
       if (!matchesMarketGroup(p, selectedMarketGroup)) return false;
-      if (p.modelProbability < minProb) return false;
+      const prob = p.calibratedProbability ?? p.modelProbability;
+      if (prob < minProb) return false;
       if (onlyValuePicks && p.qualificationStatus !== 'QUALIFIED_VALUE') {
         return false;
       }
@@ -224,17 +235,17 @@ export default function PredictionsPage() {
 
   const riskTierPills: { id: string; label: string }[] = [
     { id: 'ALL', label: 'All Tiers' },
-    { id: 'SAFE', label: 'Safe (75%+)' },
-    { id: 'MODERATE', label: 'Moderate (60 to 75%)' },
-    { id: 'RISKY', label: 'Risky (45 to 60%)' },
+    { id: 'HIGH', label: 'High Confidence' },
+    { id: 'MEDIUM', label: 'Medium Confidence' },
+    { id: 'LOW', label: 'Low Confidence' },
   ];
 
   // Helper for Tier Badge styles
-  const getTierBadgeStyle = (tier?: RiskTier) => {
-    if (tier === 'SAFE') {
+  const getTierBadgeStyle = (tier?: string) => {
+    if (tier === 'HIGH' || tier === 'SAFE') {
       return 'text-[#B6E63B] bg-[rgba(182,230,59,0.12)] border-[rgba(182,230,59,0.45)]';
     }
-    if (tier === 'MODERATE') {
+    if (tier === 'MEDIUM' || tier === 'MODERATE') {
       return 'text-[#E2AE45] bg-[rgba(226,174,69,0.12)] border-[rgba(226,174,69,0.45)]';
     }
     return 'text-[#F08A4B] bg-[rgba(240,138,75,0.12)] border-[rgba(240,138,75,0.45)]';
@@ -280,29 +291,31 @@ export default function PredictionsPage() {
         </div>
       </div>
 
-      {/* 7. DAILY SAFEST PICKS SECTION */}
-      {safestPicks.length > 0 && (
+      {/* 7. DAILY HIGH CONFIDENCE PICKS SECTION */}
+      {featuredConfidencePicks.length > 0 && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <h3 className="text-[14px] font-[650] text-[#ECF1EE]">
-                Daily safest picks
+                Daily high confidence picks
               </h3>
               <span className="text-[9.5px] font-mono px-2 py-0.5 rounded-[6px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] font-semibold border border-[rgba(182,230,59,0.45)]">
                 MAX 2 PER MARKET
               </span>
             </div>
             <span className="text-[11.5px] text-[#8B9890]">
-              Top 5 across all leagues, 75 percent or higher probability
+              Top 5 across all leagues, high confidence and low uncertainty
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-            {safestPicks.map((item, idx) => {
+            {featuredConfidencePicks.map((item, idx) => {
               const p = item.prediction;
               const homeCode = getTeamCode(item.homeTeam);
               const awayCode = getTeamCode(item.awayTeam);
-              const tierBadgeClass = getTierBadgeStyle(p.riskTier);
+              const displayTier = p.confidenceTier || (p.riskTier === 'SAFE' ? 'HIGH' : p.riskTier === 'MODERATE' ? 'MEDIUM' : 'LOW');
+              const tierBadgeClass = getTierBadgeStyle(displayTier);
+              const probVal = p.calibratedProbability ?? p.modelProbability;
 
               return (
                 <Link
@@ -315,7 +328,7 @@ export default function PredictionsPage() {
                     <div className="flex items-center justify-between gap-1 text-[10.5px] text-[#8B9890]">
                       <span className="truncate">{item.compCode} · {getOptionTypeLabel(p.optionType)}</span>
                       <span className={`text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-[6px] border font-semibold tracking-wider shrink-0 ${tierBadgeClass}`}>
-                        {p.riskTier}
+                        {displayTier}
                       </span>
                     </div>
 
@@ -351,14 +364,19 @@ export default function PredictionsPage() {
                     <div className="w-full h-[5px] bg-[#151E19] rounded-full overflow-hidden">
                       <div
                         className="h-full bg-[#B6E63B] rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, p.modelProbability * 100)}%` }}
+                        style={{ width: `${Math.min(100, probVal * 100)}%` }}
                       />
                     </div>
 
                     {/* Bottom row: probability in lime at 16px weight 700 on left, odds in small bordered mono chip on right */}
                     <div className="flex items-center justify-between text-[11px] pt-0.5">
                       <span className="text-[16px] font-bold text-[#B6E63B] font-mono tabular-nums">
-                        {(p.modelProbability * 100).toFixed(0)}%
+                        {(probVal * 100).toFixed(0)}%
+                        {p.uncertaintySpread !== undefined && (
+                          <span className="text-[11px] text-[#8B9890] font-normal ml-1">
+                            ±{(p.uncertaintySpread * 100).toFixed(1)}%
+                          </span>
+                        )}
                       </span>
                       {p.marketOdds ? (
                         <span className="bg-[#151E19] px-2 py-0.5 rounded-[5px] border border-white/[0.07] font-mono text-[11px] text-[#ECF1EE] tabular-nums">
@@ -383,7 +401,7 @@ export default function PredictionsPage() {
           <h3 className="text-[14px] font-[650] text-[#ECF1EE]">Filters</h3>
         </div>
 
-        {/* Competition & Risk tier: two selects side by side in a two column grid */}
+        {/* Competition & Confidence tier: two selects side by side in a two column grid */}
         <div className="grid grid-cols-2 gap-2.5">
           <div>
             <label className="block text-[#8B9890] mb-1 text-[11px] font-medium">Competition</label>
@@ -409,16 +427,16 @@ export default function PredictionsPage() {
           </div>
 
           <div>
-            <label className="block text-[#8B9890] mb-1 text-[11px] font-medium">Risk tier</label>
+            <label className="block text-[#8B9890] mb-1 text-[11px] font-medium">Confidence tier</label>
             <select
               value={selectedRiskTier}
               onChange={(e) => setSelectedRiskTier(e.target.value)}
               className="w-full h-[40px] bg-[#151E19] border border-white/[0.07] px-3 rounded-[11px] text-[12.5px] text-[#ECF1EE] focus:outline-hidden focus:border-[#B6E63B]"
             >
-              <option value="ALL">All risk tiers</option>
-              <option value="SAFE">SAFE (≥75%)</option>
-              <option value="MODERATE">MODERATE (60 to 75%)</option>
-              <option value="RISKY">RISKY (45 to 60%)</option>
+              <option value="ALL">All confidence tiers</option>
+              <option value="HIGH">High confidence (≥60%)</option>
+              <option value="MEDIUM">Medium confidence</option>
+              <option value="LOW">Low confidence</option>
             </select>
           </div>
         </div>
@@ -514,7 +532,9 @@ export default function PredictionsPage() {
               const p = item.prediction;
               const homeCode = getTeamCode(item.homeTeam);
               const awayCode = getTeamCode(item.awayTeam);
-              const tierBadgeClass = getTierBadgeStyle(p.riskTier);
+              const displayTier = p.confidenceTier || (p.riskTier === 'SAFE' ? 'HIGH' : p.riskTier === 'MODERATE' ? 'MEDIUM' : 'LOW');
+              const tierBadgeClass = getTierBadgeStyle(displayTier);
+              const probVal = p.calibratedProbability ?? p.modelProbability;
 
               return (
                 <Link
@@ -527,7 +547,7 @@ export default function PredictionsPage() {
                     <div className="flex items-center justify-between gap-1 text-[10.5px] text-[#8B9890]">
                       <span className="truncate">{item.compCode} · {getOptionTypeLabel(p.optionType)}</span>
                       <span className={`text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-[6px] border font-semibold tracking-wider shrink-0 ${tierBadgeClass}`}>
-                        {p.riskTier}
+                        {displayTier}
                       </span>
                     </div>
 
@@ -568,7 +588,7 @@ export default function PredictionsPage() {
                     <div className="w-full h-[5px] bg-[#151E19] rounded-full overflow-hidden">
                       <div
                         className="h-full bg-[#B6E63B] rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, p.modelProbability * 100)}%` }}
+                        style={{ width: `${Math.min(100, probVal * 100)}%` }}
                       />
                     </div>
 
@@ -576,7 +596,7 @@ export default function PredictionsPage() {
                     <div className="flex items-center justify-between text-[11px] pt-0.5">
                       <div className="flex items-center gap-2">
                         <span className="text-[16px] font-bold text-[#B6E63B] font-mono tabular-nums">
-                          {(p.modelProbability * 100).toFixed(0)}%
+                          {(probVal * 100).toFixed(0)}%
                         </span>
                         {p.edge !== undefined && (
                           <span className={`text-[11px] font-mono tabular-nums ${p.edge >= 0 ? 'text-[#B6E63B]' : 'text-[#8B9890]'}`}>

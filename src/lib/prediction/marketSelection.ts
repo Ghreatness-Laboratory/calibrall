@@ -125,11 +125,50 @@ export function getMarketFamily(optionType: SupportedOptionType, marketCode: str
   return 'goals_over_under';
 }
 
+import { isDixonColesV25Active } from './v25/featureFlags';
+import { DixonColesV25Evaluator } from './v25/v25Evaluator';
+
 export function evaluateFixtureMarkets(
   context: FixtureContext, 
   maxRankedOptions: number = 8,
   allowedOptionTypes?: SupportedOptionType[]
 ): EvaluatedFixtureResult {
+  // ROUTE TO DIXON COLES v2.5 WHEN FEATURE FLAG IS ACTIVE
+  if (isDixonColesV25Active()) {
+    const v25Result = DixonColesV25Evaluator.evaluateFixture(context);
+    const contextEval = evaluateContextFactors({
+      fixtureId: context.fixtureId,
+      homeTeamName: context.homeTeamName,
+      awayTeamName: context.awayTeamName,
+      competitionCode: context.competitionCode,
+      homeXg: context.homeXg,
+      awayXg: context.awayXg,
+      expectedCornersHome: context.expectedCornersHome,
+      expectedCornersAway: context.expectedCornersAway,
+      expectedCards: context.expectedCards,
+      sampleSizeMatches: context.sampleSizeMatches,
+      dataCoverageScore: context.dataCoverageScore,
+      rawStateTags: context.stateTags,
+      lineupConfirmed: context.lineupConfirmed,
+    });
+    const situationalPatterns = evaluateSituationalPatterns(context);
+    const fixtureProfile = classifyFixtureProfile(context);
+    const attackingDefendingMatchup = buildAttackingDefendingMatchup(context);
+
+    const rankedOptions = [v25Result.topPick, ...v25Result.alternativePicks].filter((p): p is MarketPrediction => p !== null);
+
+    return {
+      predictions: v25Result.predictions,
+      rankedOptions,
+      topPick: v25Result.topPick,
+      noRecommendationReason: v25Result.noRecommendationReason,
+      contextEvaluation: contextEval,
+      fixtureProfile,
+      attackingDefendingMatchup,
+      situationalPatterns,
+    };
+  }
+
   // 1. Evaluate context factors & determine verified state tags
   const contextEval = evaluateContextFactors({
     fixtureId: context.fixtureId,
