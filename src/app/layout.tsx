@@ -18,7 +18,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'MATCHMIND | Football & NBA Basketball Statistical Projection Platform',
+  title: 'Calibrall | Football & NBA Basketball Statistical Projection Platform',
   description: 'Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession efficiency projections, and calibrated multi market analytics.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
