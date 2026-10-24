@@ -349,6 +349,132 @@ export interface MarketPrediction {
     reasonRejected: string;
   }[];
   explanation?: PredictionExplanation;
+  // Context, Fragility & Substitutes
+  fragilityScore?: number; // 0.0 - 1.0 composite fragility index
+  fragilityFlags?: string[];
+  substituteOption?: SubstituteOption | null;
+  situationalPatterns?: SituationalPatternInsight[];
+  similarFixturesComparison?: SimilarFixturesComparison;
+  attackingDefendingMatchup?: AttackingDefendingMatchup;
+  fixtureProfile?: FixtureProfile;
+  isGenericPick?: boolean; // Dropped if within 2.5% of league base rate without match-specific variance
+  isSubstituteOnly?: boolean;
+  liveStateStatus?: LiveStateStatus;
+}
+
+export type FixtureProfile = 
+  | 'strong_favourite' 
+  | 'tight_low_scoring' 
+  | 'open_high_scoring' 
+  | 'one_man_dependent' 
+  | 'discipline_heavy' 
+  | 'wing_set_piece' 
+  | 'congested_rotation'
+  | 'balanced_competitive';
+
+export interface GoalMarginDistribution {
+  favWinsBy1Prob: number;
+  favWinsBy2Prob: number;
+  favWinsBy3PlusProb: number;
+  drawProb: number;
+  underdogWinProb: number;
+  totalGoalsDist: {
+    under15Prob: number;
+    exact2Prob: number;
+    exact3Prob: number;
+    over35Prob: number;
+  };
+}
+
+export interface SubstituteOption {
+  id: string;
+  originalPredictionId: string;
+  marketCode: string;
+  marketName: string;
+  selection: string;
+  optionType: SupportedOptionType;
+  modelProbability: number;
+  baselineProbability?: number;
+  edgeOverBaseline?: number;
+  odds?: number;
+  impliedProbability?: number;
+  expectedValue?: number;
+  varianceReductionPct: number; // e.g. 35% lower variance
+  fragilityScore: number;
+  reasonForSwap: string;
+  isValidated: boolean;
+  brierSkillScore?: number;
+  marginDetails?: GoalMarginDistribution;
+}
+
+export interface SituationalPatternInsight {
+  name: string;
+  category: 'schedule' | 'team_market' | 'league_environment' | 'style_cluster' | 'gameweek';
+  description: string;
+  sampleSize: number;
+  observedHitRate: number;
+  leagueBaseline: number;
+  shrunkHitRate: number;
+  confidenceInterval95: [number, number];
+  isAblationValidated: boolean;
+  ablationGainBrier: number;
+  effectDirection: 'positive' | 'negative' | 'neutral';
+}
+
+export interface SimilarFixturesComparison {
+  similarMatchesCount: number;
+  similarMatches: {
+    fixtureName: string;
+    date: string;
+    score: string;
+    similarityScore: number; // 0.0 - 1.0
+  }[];
+  marketHitRate: number;
+  marketSampleSize: number;
+  ci95: [number, number];
+  divergenceFromModel: number; // |p_model - p_similar|
+  divergenceWarning: boolean;
+}
+
+export interface AttackingDefendingMatchup {
+  homeScoringReliability: number; // 0.0 - 1.0 based on shots on target, failed to score rate, 2+ goals
+  awayScoringReliability: number;
+  homeXgOverperformanceShrunk: number; // Shrunk G - xG differential
+  awayXgOverperformanceShrunk: number;
+  homeScorerDependence: number; // Max share of goals by single player (e.g. 0.42)
+  awayScorerDependence: number;
+  homeKeyAttackerStatus: 'available' | 'absent' | 'unconfirmed';
+  awayKeyAttackerStatus: 'available' | 'absent' | 'unconfirmed';
+  homeDefensiveAbsences: boolean;
+  awayDefensiveAbsences: boolean;
+  matchupAdvantageScore: number; // -1.0 to +1.0
+  summary: string;
+}
+
+export interface LiveStateStatus {
+  isLive: boolean;
+  minute?: number;
+  homeScore?: number;
+  awayScore?: number;
+  homeRedCards?: number;
+  awayRedCards?: number;
+  isSupersededByRedCard?: boolean;
+  statusNotice: string;
+}
+
+export interface PlayerContribution {
+  playerId: string;
+  playerName: string;
+  team: string;
+  position: 'FW' | 'MF' | 'DF' | 'GK';
+  minutesPlayed: number;
+  goals: number;
+  assists: number;
+  xG: number;
+  goalShare: number; // Fraction of team total goals (0.0 - 1.0)
+  isPenaltyTaker: boolean;
+  isCornerTaker: boolean;
+  status: 'confirmed_starter' | 'bench' | 'absent' | 'unconfirmed';
 }
 
 export interface PredictionExplanation {

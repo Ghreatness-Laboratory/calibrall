@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Fixture, MarketPrediction } from '@/types';
-import { Bookmark, Clock, ArrowUpRight, AlertCircle } from 'lucide-react';
+import { Bookmark, Clock, ArrowUpRight, AlertCircle, TrendingUp } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
 import TeamCrest from '@/components/TeamCrest';
 import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
@@ -216,6 +216,19 @@ export default function FixtureCard({
                   }}
                 />
               </div>
+
+              {/* Row 5: Substitute Option chip if present */}
+              {topPrediction.substituteOption && (
+                <div className="pt-1.5 mt-1 border-t border-[var(--border)] flex items-center justify-between text-[10.5px]">
+                  <span className="text-[var(--accent)] font-medium flex items-center gap-1 truncate">
+                    <TrendingUp className="w-3 h-3 shrink-0" />
+                    <span>Sub: {topPrediction.substituteOption.selection}</span>
+                  </span>
+                  <span className="font-mono text-[9.5px] text-[var(--text-3)] shrink-0 ml-1">
+                    −{topPrediction.substituteOption.varianceReductionPct}% var
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-[var(--surface-2)] rounded-[8px] border border-[var(--border)] p-2.5 flex items-center gap-2 text-[var(--text-3)] text-[11px]">

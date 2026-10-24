@@ -242,10 +242,10 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
   },
   draw_no_bet: {
     type: 'draw_no_bet',
-    title: 'Draw No Bet (DNB)',
+    title: 'Draw No Bet (DNB - Substitute Only)',
     category: 'draw_no_bet',
     period: 'REGULAR_TIME',
-    description: 'Home or away victory with full stake refund (push) if the match finishes level in regular time.',
+    description: 'Home or away victory with full stake refund (push) if the match finishes level in regular time. Available strictly as a lower-variance substitute.',
     defaultSelections: ['Home DNB', 'Away DNB'],
     settlementRule: 'Regular time only. If regular time ends in a draw, the stake is pushed/refunded.',
     dataRequirements: {
@@ -258,14 +258,14 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.035,
       minEdge: 0.025,
     },
-    isEnabled: false,
+    isEnabled: true,
   },
   asian_handicap: {
     type: 'asian_handicap',
-    title: 'Asian Handicap',
+    title: 'Asian Handicap (Substitute Only)',
     category: 'handicap',
     period: 'REGULAR_TIME',
-    description: 'Goal line handicap with half and whole goal margins (-1.5, -1, -0.5, 0, +0.5, +1, +1.5). Whole lines return stake on exact tie.',
+    description: 'Goal line handicap with half and whole goal margins (-1.5, -1, -0.5, 0, +0.5, +1, +1.5). Re-enabled strictly as a lower-variance substitute family.',
     defaultSelections: ['Home Handicap', 'Away Handicap'],
     supportedLines: [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5],
     settlementRule: 'Computed from 90-minute joint scoreline distribution. Full push refund on integer margins matching the line.',
@@ -279,14 +279,14 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.035,
       minEdge: 0.025,
     },
-    isEnabled: false,
+    isEnabled: true,
   },
   european_handicap: {
     type: 'european_handicap',
-    title: 'European Handicap (3-Way)',
+    title: 'European Handicap (Substitute Only)',
     category: 'handicap',
     period: 'REGULAR_TIME',
-    description: 'Traditional 3-way handicap (-1, +1) with home win, handicap draw, and away win outcomes. No push occurs.',
+    description: 'Traditional 3-way handicap (-1, +1) with home win, handicap draw, and away win outcomes. Re-enabled strictly as a lower-variance substitute family.',
     defaultSelections: ['Home Win (-1)', 'Draw (-1)', 'Away Win (+1)', 'Home Win (+1)'],
     supportedLines: [-1.0, 1.0],
     settlementRule: '3-way settlement on regular time score after applying integer goal adjustment. No push.',
@@ -300,7 +300,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.04,
       minEdge: 0.03,
     },
-    isEnabled: false,
+    isEnabled: true,
   },
   goal_bounds: {
     type: 'goal_bounds',
@@ -521,6 +521,14 @@ export const AUTHORIZED_OPTION_TYPES: SupportedOptionType[] = Object.keys(
 export function isOptionTypeEnabled(type: string): boolean {
   const metadata = SUPPORTED_OPTIONS_CATALOGUE[type as SupportedOptionType];
   return !!metadata && metadata.isEnabled;
+}
+
+/**
+ * Identifies families that are designated strictly as lower-variance substitute options
+ * (e.g. Asian Handicap, European Handicap, Draw No Bet)
+ */
+export function isSubstituteOnly(type: string): boolean {
+  return type === 'asian_handicap' || type === 'european_handicap' || type === 'draw_no_bet';
 }
 
 /**

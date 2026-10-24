@@ -21,6 +21,7 @@ export default function AdminPage() {
   const [lastSync, setLastSync] = useState<string>('Just now');
   const [unpublishedModels, setUnpublishedModels] = useState<string[]>([]);
   const [monitoringReport, setMonitoringReport] = useState<MonitoringReport | null>(null);
+  const [missReport, setMissReport] = useState<any>(null);
 
   const [syncLogs, setSyncLogs] = useState([
     { id: 'job_9841', provider: 'football-data.org', records: 48, status: 'Completed', time: '10 mins ago' },
@@ -35,6 +36,9 @@ export default function AdminPage() {
       if (res.ok) {
         const data = await res.json();
         setMonitoringReport(data.report);
+        if (data.missReport) {
+          setMissReport(data.missReport);
+        }
       }
     } catch {
       // ignore
@@ -321,6 +325,57 @@ export default function AdminPage() {
           </table>
         </div>
       </div>
+
+      {/* Weekly Miss Analysis & Systematic Failure Diagnostics Loop */}
+      {missReport && (
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-2.5">
+            <div>
+              <h3 className="font-[500] text-[#e8efe9] text-[14px] flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-[#e3b341]" />
+                <span>Weekly Miss Analysis & Systematic Failure Diagnostics</span>
+              </h3>
+              <p className="text-[11.5px] text-[#8fa69a] mt-0.5">
+                Evaluates failure clusters across state tags, team styles, and markets. Never rewrites historical predictions.
+              </p>
+            </div>
+            <div className="text-[11px] font-mono text-[#8fa69a]">
+              Settled sample: <span className="text-[#e8efe9] font-[550]">{missReport.totalSettledAnalyzed}</span> matches
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {missReport.topFailureClusters && missReport.topFailureClusters.length > 0 ? (
+              missReport.topFailureClusters.map((cluster: any) => (
+                <div key={cluster.clusterId} className="p-3 bg-[#0a1812]/70 rounded-[8px] border border-white/[0.06] space-y-1.5 text-[11.5px]">
+                  <div className="flex items-center justify-between font-mono">
+                    <span className="text-[#e3b341] font-[600]">
+                      Cluster: {cluster.dimensionKey} ({cluster.dimension.toUpperCase()})
+                    </span>
+                    <span className="text-rose-400">
+                      Miss rate: {(cluster.missRate * 100).toFixed(1)}% (vs {(cluster.expectedMissRate * 100).toFixed(1)}% exp)
+                    </span>
+                  </div>
+                  <p className="text-[#c9d6ce]">{cluster.systematicIssueDescription}</p>
+                  <div className="pt-1 border-t border-white/[0.04] flex items-center justify-between text-[11px]">
+                    <span className="text-[#b8e63a]">Proposed adjustment: {cluster.proposedAdjustment}</span>
+                    <span className="text-[#8fa69a] font-mono">N={cluster.totalSettled}</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-3 bg-[#0a1812]/40 rounded-[8px] text-[12px] text-[#8fa69a] text-center">
+                No statistically significant failure clusters detected. Calibration error within normal binomial limits.
+              </div>
+            )}
+          </div>
+
+          <div className="pt-1 text-[11px] font-mono text-[#8fa69a] flex items-center justify-between border-t border-white/[0.04]">
+            <span>{missReport.validationStatusNotice}</span>
+            <span suppressHydrationWarning>Generated weekly</span>
+          </div>
+        </div>
+      )}
 
       {/* Sync Jobs */}
       <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">

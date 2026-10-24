@@ -13,7 +13,13 @@ import {
   FactorContribution,
   SupportedOptionType,
   MarketPeriod,
-  RiskTier
+  RiskTier,
+  FixtureProfile,
+  GoalMarginDistribution,
+  AttackingDefendingMatchup,
+  SituationalPatternInsight,
+  SimilarFixturesComparison,
+  SubstituteOption
 } from '@/types';
 import { 
   poissonProb,
@@ -31,7 +37,8 @@ import {
 } from './contextFactors';
 import { 
   SUPPORTED_OPTIONS_CATALOGUE, 
-  isOptionTypeEnabled 
+  isOptionTypeEnabled,
+  isSubstituteOnly
 } from './marketCatalog';
 import { 
   getMarketBaseline, 
@@ -40,6 +47,24 @@ import {
 } from './baselines';
 import { checkMarketGating } from './marketGating';
 import { marketMonitor } from './marketMonitor';
+import { 
+  evaluateSituationalPatterns, 
+  buildSimilarFixturesComparison 
+} from './situationalContext';
+import { 
+  evaluateLineupAndPlayerDependence, 
+  buildAttackingDefendingMatchup 
+} from './lineupImpact';
+import { 
+  calculateGoalMarginDistribution, 
+  calculateFragilityScore, 
+  evaluateLowerVarianceSubstitute 
+} from './fragilityAndSubstitutes';
+import { 
+  classifyFixtureProfile, 
+  evaluateFixtureSpecificity, 
+  enforceFamilyDiversity 
+} from './varietyAndProfiles';
 
 export interface EvaluatedFixtureResult {
   predictions: MarketPrediction[];
@@ -48,6 +73,10 @@ export interface EvaluatedFixtureResult {
   noRecommendationReason?: string;
   contextEvaluation: ContextEvaluationResult;
   familyWinners?: Partial<Record<MarketFamily, MarketPrediction | null>>;
+  fixtureProfile?: FixtureProfile;
+  goalMarginDistribution?: GoalMarginDistribution;
+  attackingDefendingMatchup?: AttackingDefendingMatchup;
+  situationalPatterns?: SituationalPatternInsight[];
 }
 
 interface RawCandidateConfig {
@@ -120,6 +149,12 @@ export function evaluateFixtureMarkets(
 
   const { stateTags, lineupStatus, compositeUncertaintyMultiplier, dataQualityScore, factorContributionsByMarket } = contextEval;
 
+  // 1b. Situational Patterns, Team Profile & Player Lineup/Dependence Evaluation
+  const situationalPatterns = evaluateSituationalPatterns(context);
+  const fixtureProfile = classifyFixtureProfile(context);
+  const lineupImpact = evaluateLineupAndPlayerDependence(context);
+  const attackingDefendingMatchup = buildAttackingDefendingMatchup(context);
+
   // 2. State-to-market hypothesis adjustments
   let effectiveHomeXg = context.homeXg;
   let effectiveAwayXg = context.awayXg;
@@ -127,9 +162,25 @@ export function evaluateFixtureMarkets(
   let effectiveCornersAway = context.expectedCornersAway;
   let effectiveCards = context.expectedCards;
 
-  if (stateTags.includes('key-absences')) {
+  // Attacker absence discount based on single-scorer dependence
+  if (lineupImpact.homeKeyAttackerStatus === 'absent') {
+    effectiveHomeXg = Number((effectiveHomeXg * lineupImpact.homeAbsenceDiscount).toFixed(2));
+    effectiveCornersHome = Number((context.expectedCornersHome * 0.88).toFixed(1));
+  } else if (stateTags.includes('key-absences')) {
     effectiveHomeXg = Number((context.homeXg * 0.88).toFixed(2));
     effectiveCornersHome = Number((context.expectedCornersHome * 0.88).toFixed(1));
+  }
+
+  if (lineupImpact.awayKeyAttackerStatus === 'absent') {
+    effectiveAwayXg = Number((effectiveAwayXg * lineupImpact.awayAbsenceDiscount).toFixed(2));
+  }
+
+  // Defensive absences raise opposition conceded xG
+  if (lineupImpact.homeDefensePenalty > 1.0) {
+    effectiveAwayXg = Number((effectiveAwayXg * lineupImpact.homeDefensePenalty).toFixed(2));
+  }
+  if (lineupImpact.awayDefensePenalty > 1.0) {
+    effectiveHomeXg = Number((effectiveHomeXg * lineupImpact.awayDefensePenalty).toFixed(2));
   }
 
   if (stateTags.includes('derby') || stateTags.includes('high-stakes')) {
@@ -138,7 +189,7 @@ export function evaluateFixtureMarkets(
 
   const isDeadRubber = stateTags.includes('dead-rubber');
   const isDerby = stateTags.includes('derby');
-  const effectiveUncertainty = context.uncertaintyScore * compositeUncertaintyMultiplier;
+  const effectiveUncertainty = context.uncertaintyScore * compositeUncertaintyMultiplier * lineupImpact.uncertaintyExpansion;
 
   // 3. Mathematical Models Execution
   // A. Joint Full-Match Goals Model (Dixon-Coles)
@@ -1180,6 +1231,41 @@ export function evaluateFixtureMarkets(
       dataDeficiencyReason = 'Trivially safe line: Outcome is driven by high naive league base rate rather than model edge.';
     }
 
+    const isSubOnly = isSubstituteOnly(c.optionType);
+    const similarFixturesComparison = buildSimilarFixturesComparison(context, c.marketCode, c.modelProbability);
+    const specificity = evaluateFixtureSpecificity(c.modelProbability, baseRate);
+    const isGenericPick = specificity.isGeneric;
+
+    const { fragilityScore, fragilityFlags } = calculateFragilityScore({
+      prediction: {
+        id: `pred_${context.fixtureId}_${c.marketCode}`,
+        fixtureId: context.fixtureId,
+        marketCode: c.marketCode,
+        optionType: c.optionType,
+        marketCategory: c.marketCategory,
+        marketName: c.marketName,
+        selection: c.selection,
+        period: c.period,
+        settlementRule: c.settlementRule,
+        modelProbability: c.modelProbability,
+        modelConfidence: c.confidence,
+        qualificationStatus: 'UNQUALIFIED_MARGINAL',
+        rankingScore: 0,
+        isTopPick: false,
+        settlementStatus: 'PENDING',
+        evidenceTier: '',
+        dataQualityScore,
+        isProbabilityBasedAnalysis: false,
+        stateTags,
+        lineupStatus,
+        topFactorContributions: []
+      },
+      context,
+      similarFixtures: similarFixturesComparison,
+      scorerDependence: lineupImpact.homeScorerDependence,
+      hasKeyAttackerAbsent: lineupImpact.homeKeyAttackerStatus === 'absent'
+    });
+
     // Confidence Score (0.0 to 1.0)
     const confidenceScore = Number((
       (dataQualityScore * 0.45) +
@@ -1196,6 +1282,9 @@ export function evaluateFixtureMarkets(
     if (dataDeficiencyReason) {
       qualificationStatus = 'UNQUALIFIED_HIGH_UNCERTAINTY';
       evidenceTier = 'Unqualified: Insufficient Data / Trivially Safe';
+    } else if (isGenericPick) {
+      qualificationStatus = 'UNQUALIFIED_MARGINAL';
+      evidenceTier = 'Generic Pick: Within ±2.5% of Baseline (Dropped)';
     } else if (effectiveUncertainty > 0.25 || dataQualityScore < 0.65 || context.sampleSizeMatches < 6) {
       qualificationStatus = 'UNQUALIFIED_HIGH_UNCERTAINTY';
       evidenceTier = 'Unqualified: High Uncertainty (Abstain)';
@@ -1254,13 +1343,19 @@ export function evaluateFixtureMarkets(
         ...c.dataPoints,
         { metricName: 'League Baseline Frequency', value: `${(baseRate * 100).toFixed(1)}%` },
         { metricName: 'Edge Over Baseline', value: `${edgeOverBaseline >= 0 ? '+' : ''}${(edgeOverBaseline * 100).toFixed(1)}%` },
+        { metricName: 'Fragility Index', value: `${(fragilityScore * 100).toFixed(0)}%` },
       ],
       stateTags,
       lineupStatus,
       topFactors,
       alternativesRejected,
       isProbabilityBasedAnalysis,
-      dataDeficiencyReason
+      dataDeficiencyReason,
+      situationalPatterns,
+      matchupSummary: attackingDefendingMatchup.summary,
+      similarFixturesSummary: similarFixturesComparison,
+      fragilityScore,
+      fragilityFlags
     });
 
     return {
@@ -1309,7 +1404,14 @@ export function evaluateFixtureMarkets(
       topFactorContributions: topFactors.slice(0, 3),
       correlationWarnings: localCorrelationWarnings,
       alternativesRejected,
-      explanation
+      explanation,
+      fragilityScore,
+      fragilityFlags,
+      similarFixturesComparison,
+      attackingDefendingMatchup,
+      fixtureProfile,
+      isGenericPick,
+      isSubstituteOnly: isSubOnly
     };
   });
 
@@ -1338,9 +1440,13 @@ export function evaluateFixtureMarkets(
   candidatesByFamily.forEach((cands, fam) => {
     if (cands.length === 0) return;
 
-    // Reject candidates with hard data deficiency or trivially safe lines with no edge
+    // Reject candidates with hard data deficiency, trivially safe lines, substitute-only types, or generic picks
     const eligible = cands.filter(c => {
       if (c.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY') return false;
+      // Substitute-only families (e.g. Asian handicap, European handicap, DNB) cannot be primary family winners
+      if (c.isSubstituteOnly) return false;
+      // Generic picks within 2.5% of base rate are dropped from top picks
+      if (c.isGenericPick) return false;
       const baseRate = c.baselineProbability ?? 0.50;
       const edge = c.edgeOverBaseline ?? 0;
       // Reject trivially safe lines (base rate >= 85%) unless model shows clear edge (>= +4%)
@@ -1432,6 +1538,10 @@ export function evaluateFixtureMarkets(
   // Ranked options: at most ONE per family per fixture (up to maxRankedOptions)
   const rankedOptions = scoredFamilyWinners.slice(0, maxRankedOptions);
 
+  // Compute goal margin distribution from Dixon-Coles bivariate scorelines
+  const isHomeFavorite = context.homeAttackRating >= context.awayAttackRating;
+  const goalMarginDistribution = calculateGoalMarginDistribution(goalDist.matrix, isHomeFavorite);
+
   // Determine Top Pick: MUST belong to a validated family with verified positive edge
   let topPick: MarketPrediction | null = null;
   let noRecommendationReason: string | undefined = undefined;
@@ -1445,6 +1555,17 @@ export function evaluateFixtureMarkets(
     if (candidateTop && (candidateTop.edgeOverBaseline ?? 0) >= 0.01 && candidateTop.modelProbability >= 0.48) {
       topPick = candidateTop;
       topPick.isTopPick = true;
+
+      // Evaluate lower-variance substitute for top pick if fragility is elevated
+      topPick.substituteOption = evaluateLowerVarianceSubstitute({
+        primaryPrediction: topPick,
+        context,
+        marginDist: goalMarginDistribution,
+        fragilityScore: topPick.fragilityScore ?? 0.20,
+        fragilityFlags: topPick.fragilityFlags ?? [],
+        allCandidates: processed
+      });
+
       // Record recommendation in telemetry monitor
       marketMonitor.recordRecommendation(
         context.fixtureId,
@@ -1458,6 +1579,20 @@ export function evaluateFixtureMarkets(
   } else {
     noRecommendationReason = "No strong recommendation: all market families failed minimum data completeness or edge thresholds for this fixture.";
   }
+
+  // Also evaluate substitutes for other ranked options that exhibit fragility
+  rankedOptions.forEach(opt => {
+    if (!opt.substituteOption && (opt.fragilityScore ?? 0) >= 0.40) {
+      opt.substituteOption = evaluateLowerVarianceSubstitute({
+        primaryPrediction: opt,
+        context,
+        marginDist: goalMarginDistribution,
+        fragilityScore: opt.fragilityScore ?? 0.40,
+        fragilityFlags: opt.fragilityFlags ?? [],
+        allCandidates: processed
+      });
+    }
+  });
 
   // Update non-winner candidates' rankingScore in processed list for consistent UI table rendering
   processed.forEach(p => {
@@ -1477,7 +1612,11 @@ export function evaluateFixtureMarkets(
     topPick,
     noRecommendationReason,
     contextEvaluation: contextEval,
-    familyWinners
+    familyWinners,
+    fixtureProfile,
+    goalMarginDistribution,
+    attackingDefendingMatchup,
+    situationalPatterns
   };
 }
 
@@ -1500,8 +1639,36 @@ function generateGroundedExplanation(params: {
   alternativesRejected: { alternative: string; modelProbability: number; reasonRejected: string }[];
   isProbabilityBasedAnalysis: boolean;
   dataDeficiencyReason?: string | null;
+  situationalPatterns?: SituationalPatternInsight[];
+  matchupSummary?: string;
+  similarFixturesSummary?: SimilarFixturesComparison;
+  fragilityScore?: number;
+  fragilityFlags?: string[];
+  substituteOption?: SubstituteOption | null;
 }): PredictionExplanation {
-  const { context, selection, modelProbability, odds, implied, ev, edge, qualificationStatus, predictionId, stateTags, lineupStatus, topFactors, alternativesRejected, isProbabilityBasedAnalysis, dataDeficiencyReason } = params;
+  const { 
+    context, 
+    selection, 
+    modelProbability, 
+    odds, 
+    implied, 
+    ev, 
+    edge, 
+    qualificationStatus, 
+    predictionId, 
+    stateTags, 
+    lineupStatus, 
+    topFactors, 
+    alternativesRejected, 
+    isProbabilityBasedAnalysis, 
+    dataDeficiencyReason,
+    situationalPatterns,
+    matchupSummary,
+    similarFixturesSummary,
+    fragilityScore,
+    fragilityFlags,
+    substituteOption
+  } = params;
 
   const keySupportingFactors: string[] = [];
   const counterarguments: string[] = [];
@@ -1516,6 +1683,27 @@ function generateGroundedExplanation(params: {
     keySupportingFactors.push(`${f.factorName} (Weight: ${(f.weight * 100).toFixed(0)}%): ${f.impactDescription}`);
   });
 
+  // Supporting situational patterns
+  if (situationalPatterns && situationalPatterns.length > 0) {
+    situationalPatterns.slice(0, 2).forEach(p => {
+      keySupportingFactors.push(
+        `Situational Pattern [${p.name}]: ${p.description} (N=${p.sampleSize}, shrunk hit rate ${(p.shrunkHitRate * 100).toFixed(1)}% vs ${(p.leagueBaseline * 100).toFixed(1)}% base, 95% CI: [${(p.confidenceInterval95[0] * 100).toFixed(1)}%, ${(p.confidenceInterval95[1] * 100).toFixed(1)}%])`
+      );
+    });
+  }
+
+  // Attacking vs Defending Matchup summary
+  if (matchupSummary) {
+    keySupportingFactors.push(`Attacking/Defending Matchup: ${matchupSummary}`);
+  }
+
+  // Similar historical fixtures retrieval comparison
+  if (similarFixturesSummary) {
+    keySupportingFactors.push(
+      `Similar Historical Fixtures: Sample of ${similarFixturesSummary.marketSampleSize} most similar European fixtures hit at ${(similarFixturesSummary.marketHitRate * 100).toFixed(1)}% (95% CI: [${(similarFixturesSummary.ci95[0] * 100).toFixed(1)}%, ${(similarFixturesSummary.ci95[1] * 100).toFixed(1)}%]). Model divergence: ${(similarFixturesSummary.divergenceFromModel * 100).toFixed(1)}%.`
+    );
+  }
+
   if (odds && implied && ev !== undefined && edge !== undefined) {
     keySupportingFactors.push(
       `Market price at ${odds.toFixed(2)} decimal odds implies ${(implied * 100).toFixed(1)}%, yielding an estimated +${(edge * 100).toFixed(1)}% statistical edge (EV: +${(ev * 100).toFixed(1)}%).`
@@ -1523,6 +1711,19 @@ function generateGroundedExplanation(params: {
   } else if (isProbabilityBasedAnalysis) {
     keySupportingFactors.push(
       `Probability-based analysis: No verified bookmaker odds published. Modeled purely from underlying expected metrics at ${(modelProbability * 100).toFixed(1)}%.`
+    );
+  }
+
+  // Fragility flags and counterarguments
+  if (fragilityScore !== undefined && fragilityScore >= 0.40) {
+    counterarguments.push(
+      `Fragility Index: Elevated at ${(fragilityScore * 100).toFixed(0)}%. Risk flags: ${(fragilityFlags || []).join('; ')}`
+    );
+  }
+
+  if (substituteOption) {
+    counterarguments.push(
+      `Lower-variance substitute active: ${substituteOption.selection} (${substituteOption.varianceReductionPct}% lower variance) recommended to hedge primary fragility.`
     );
   }
 

@@ -26,6 +26,7 @@ import { Fixture, MarketPrediction } from '@/types';
 import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import { checkDerby } from '@/lib/prediction/contextFactors';
 import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
+import { evaluateLiveMatchState } from '@/lib/prediction/liveMatchState';
 
 export default function MatchAnalysisPage() {
   const params = useParams();
@@ -111,9 +112,22 @@ export default function MatchAnalysisPage() {
   const topPick = isBasketball ? (basketballPredictions[0] || null) : (footballEvaluation?.topPick || null);
   const noRecommendationReason = isBasketball ? undefined : footballEvaluation?.noRecommendationReason;
 
+  // Live match state tracking
+  const liveState = useMemo(() => {
+    if (!fixture) return undefined;
+    return evaluateLiveMatchState(fixture);
+  }, [fixture]);
+
   // Selected prediction for explanation inspection
   const [selectedPredictionOverride, setSelectedPredictionOverride] = useState<MarketPrediction | null>(null);
-  const selectedPrediction = selectedPredictionOverride || topPick || (predictions[0] ?? null);
+  const rawSelected = selectedPredictionOverride || topPick || (predictions[0] ?? null);
+  const selectedPrediction = useMemo(() => {
+    if (!rawSelected) return null;
+    return {
+      ...rawSelected,
+      liveStateStatus: liveState
+    };
+  }, [rawSelected, liveState]);
   const setSelectedPrediction = (p: MarketPrediction | null) => setSelectedPredictionOverride(p);
 
   if (isLoading) {
