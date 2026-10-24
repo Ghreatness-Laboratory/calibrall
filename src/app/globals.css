@@ -26,12 +26,12 @@
   --foreground: var(--text);
 }
 
-/* Native App: Single primary scroller without overscroll bouncing */
+/* Standard document scrolling */
 html {
-  height: auto;
-  overflow-x: clip;
+  min-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   background-color: var(--bg);
-  overscroll-behavior: none;
 }
 
 /* GLOBAL TEXT RULE: Disable automatic browser hyphenation everywhere */
@@ -45,9 +45,7 @@ html {
 
 body {
   min-height: 100dvh;
-  overflow-y: auto;
-  overflow-x: clip;
-  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
   background-color: var(--bg);
   color: var(--text);
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -59,7 +57,6 @@ body {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior: none;
 }
 
 /* Minimal native-like scrollbars */
