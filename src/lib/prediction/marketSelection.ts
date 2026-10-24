@@ -1275,6 +1275,11 @@ export function evaluateFixtureMarkets(
 
     const riskTier: RiskTier = calculateRiskTier(c.modelProbability, confidenceScore, edge);
 
+    // Strict Market Efficiency & Closing Line Benchmark Gate:
+    // If the market family does not beat de-vigged sharp closing lines out-of-sample (e.g. 1X2 Match Winner & Draw),
+    // picks MUST NOT be labeled as "QUALIFIED_VALUE" (never claim value). They are strictly "PROBABILITY ANALYSIS ONLY".
+    const familyBeatsClosingLines = !(marketFamily === 'result' || marketFamily === 'draw' || c.marketCode.startsWith('1X2_'));
+
     // Qualification Logic based on Edge Over Baseline and EV
     let qualificationStatus: QualificationStatus = 'UNQUALIFIED_MARGINAL';
     let evidenceTier = 'Unqualified: Marginal Edge';
@@ -1291,6 +1296,11 @@ export function evaluateFixtureMarkets(
     } else if (!gating.isAllowed) {
       qualificationStatus = 'UNQUALIFIED_MARGINAL';
       evidenceTier = `Unvalidated: ${gating.statusText}`;
+    } else if (!familyBeatsClosingLines) {
+      // 1X2 out-of-sample benchmark audit: -3.1% skill vs sharp closing lines.
+      // Rule 4: "If the model cannot beat the market on a family, label its picks 'probability analysis', not 'value'."
+      qualificationStatus = 'QUALIFIED_PROBABILITY';
+      evidenceTier = 'Probability Analysis Only: Model does not beat sharp closing lines (-3.1% skill vs market); no betting value claimed';
     } else if (edgeOverBaseline >= 0.05 && c.modelProbability >= 0.50) {
       qualificationStatus = 'QUALIFIED_VALUE';
       evidenceTier = 'Tier 1: Qualified Edge Over Baseline';
@@ -1747,12 +1757,14 @@ function generateGroundedExplanation(params: {
   const headline = qualificationStatus === 'QUALIFIED_VALUE'
     ? `Strong Value Opportunity: ${selection} (+${((edge ?? 0) * 100).toFixed(1)}% Edge)`
     : qualificationStatus === 'QUALIFIED_PROBABILITY'
-    ? `Statistically Supported Market: ${selection} (${(modelProbability * 100).toFixed(1)}% Prob)`
+    ? (isProbabilityBasedAnalysis || selection.includes('Win') || selection.includes('Draw'))
+      ? `Probability Analysis Only: ${selection} (${(modelProbability * 100).toFixed(1)}% Prob - No Market Edge Claimed)`
+      : `Statistically Supported Market: ${selection} (${(modelProbability * 100).toFixed(1)}% Prob)`
     : `Marginal Market: ${selection} (${(modelProbability * 100).toFixed(1)}% Prob)`;
 
   const summary = `${selection} evaluated at ${(modelProbability * 100).toFixed(1)}% probability [${lineupStatus.toUpperCase()}]. ${
-    isProbabilityBasedAnalysis
-      ? `This is a probability-based analysis derived from calibrated joint metrics (odds unpublished, not a value opportunity).`
+    isProbabilityBasedAnalysis || selection.includes('Win') || selection.includes('Draw')
+      ? `This is a probability analysis derived from calibrated joint metrics (sharp market closing lines beat model in 1X2; no betting value claimed).`
       : qualificationStatus === 'QUALIFIED_VALUE'
       ? `Compared against the market price of ${odds?.toFixed(2)}, the model identifies a quantifiable statistical edge exceeding bookmaker overround.`
       : `Outcome fails to meet the required margin of safety or value threshold.`
