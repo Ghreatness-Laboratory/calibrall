@@ -19,13 +19,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Calibrall | Football & NBA Basketball Statistical Projection Platform',
-  description: 'Calibrall statistical projection platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.',
+  title: 'MATCHMIND | Football & NBA Basketball Statistical Projection Platform',
+  description: 'Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Calibrall',
+    title: 'MATCHMIND',
   },
   icons: {
     icon: [
@@ -38,8 +38,8 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: 'Calibrall | Football & NBA Basketball Statistical Projection Platform',
-    description: 'Calibrall statistical projection platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.',
+    title: 'MATCHMIND | Football & NBA Basketball Statistical Projection Platform',
+    description: 'Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.',
     type: 'website',
   },
 };
