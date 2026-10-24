@@ -33,6 +33,13 @@ import {
   SUPPORTED_OPTIONS_CATALOGUE, 
   isOptionTypeEnabled 
 } from './marketCatalog';
+import { 
+  getMarketBaseline, 
+  MarketFamily, 
+  MARKET_FAMILIES 
+} from './baselines';
+import { checkMarketGating } from './marketGating';
+import { marketMonitor } from './marketMonitor';
 
 export interface EvaluatedFixtureResult {
   predictions: MarketPrediction[];
@@ -40,12 +47,14 @@ export interface EvaluatedFixtureResult {
   topPick: MarketPrediction | null;
   noRecommendationReason?: string;
   contextEvaluation: ContextEvaluationResult;
+  familyWinners?: Partial<Record<MarketFamily, MarketPrediction | null>>;
 }
 
 interface RawCandidateConfig {
   marketCode: string;
   optionType: SupportedOptionType;
   marketCategory: MarketCategory;
+  marketFamily?: MarketFamily;
   marketName: string;
   selection: string;
   line?: number;
@@ -70,6 +79,21 @@ interface RawCandidateConfig {
     metricName: string;
     value: string | number;
   }[];
+}
+
+export function getMarketFamily(optionType: SupportedOptionType, marketCode: string, marketCategory?: MarketCategory): MarketFamily {
+  if (marketCode.startsWith('1X2_DRAW')) return 'draw';
+  if (optionType === 'win' || marketCode.startsWith('1X2_') || optionType === 'draw_no_bet' || optionType === 'asian_handicap' || optionType === 'european_handicap' || optionType === 'win_draw_combo') return 'result';
+  if (optionType === 'draw') return 'draw';
+  if (optionType === 'double_chance' || marketCode.startsWith('DC_')) return 'double_chance';
+  if (optionType === 'both_teams_to_score' || marketCode.startsWith('BTTS_')) return 'both_teams_to_score';
+  if (optionType === 'first_half_goals' || marketCode.startsWith('FH_')) return 'first_half_goals';
+  if (optionType === 'second_half_result' || marketCode.startsWith('2H_')) return 'second_half_result';
+  if (optionType === 'highest_scoring_half' || marketCode.startsWith('HSH_')) return 'highest_scoring_half';
+  if (optionType === 'corners' || optionType === 'corner_handicap' || marketCode.includes('CORNER')) return 'corners';
+  if (optionType === 'bookings' || optionType === 'team_bookings' || optionType === 'booking_points' || marketCode.includes('CARD') || marketCode.includes('BOOKING')) return 'bookings';
+  if (optionType === 'over_under_goals' || optionType === 'goal_bounds' || optionType === 'team_goal_bounds' || marketCode.includes('GOAL') || marketCode.includes('GB_') || marketCode.includes('TGB_')) return 'goals_over_under';
+  return 'goals_over_under';
 }
 
 export function evaluateFixtureMarkets(
@@ -126,7 +150,7 @@ export function evaluateFixtureMarkets(
   // C. Corners Model (Total & Team)
   const totalCornersX = effectiveCornersHome + effectiveCornersAway;
   const homeCornerRatio = totalCornersX > 0 ? (effectiveCornersHome / totalCornersX) : 0.55;
-  const cornerDist = calculateCornerProbabilities(totalCornersX, homeCornerRatio);
+  const cornerDist = calculateCornerProbabilities(totalCornersX, homeCornerRatio, 24, 0.12, effectiveUncertainty);
 
   // D. Disciplinary Bookings Model (Total & Team)
   const cardDist = calculateCardProbabilities(effectiveCards, 0.48);
@@ -813,12 +837,16 @@ export function evaluateFixtureMarkets(
   if (isOptionTypeEnabled('corners') && hasAdequateCornerData) {
     const meta = SUPPORTED_OPTIONS_CATALOGUE.corners;
 
-    [7.5, 8.5, 9.5, 10.5, 11.5].forEach(line => {
+    // Balanced line selection for corners (STEP 2.2):
+    // Center around totalCornersX inside 55-75% probability band; reject trivially safe lines like 7.5
+    const cornerLines = [8.5, 9.5, 10.5, 11.5];
+    cornerLines.forEach(line => {
       if (cornerDist.total[line]) {
         rawCandidates.push({
           marketCode: `TOTAL_CORNERS_O${line * 10}`,
           optionType: 'corners',
           marketCategory: 'total_corners',
+          marketFamily: 'corners',
           marketName: meta.title,
           selection: `Over ${line} Corners`,
           line,
@@ -828,19 +856,15 @@ export function evaluateFixtureMarkets(
           odds: line === 9.5 ? context.verifiedOdds?.over95Corners : undefined,
           confidence: baseConfidence === 'VERY_HIGH' ? 'HIGH' : baseConfidence,
           requiresCornerData: true,
-          plainEnglishReason: `Both sides average ${effectiveCornersHome.toFixed(1)} & ${effectiveCornersAway.toFixed(1)} corners (total ${totalCornersX.toFixed(1)} projected).`,
+          plainEnglishReason: `Negative Binomial model projects ${totalCornersX.toFixed(1)} total corners (${effectiveCornersHome.toFixed(1)} home, ${effectiveCornersAway.toFixed(1)} away).`,
           dataPoints: [{ metricName: 'Expected Total Corners', value: totalCornersX.toFixed(1) }]
         });
-      }
-    });
 
-    // Under 9.5 & Under 10.5
-    [9.5, 10.5].forEach(line => {
-      if (cornerDist.total[line]) {
         rawCandidates.push({
           marketCode: `TOTAL_CORNERS_U${line * 10}`,
           optionType: 'corners',
           marketCategory: 'total_corners',
+          marketFamily: 'corners',
           marketName: meta.title,
           selection: `Under ${line} Corners`,
           line,
@@ -850,7 +874,7 @@ export function evaluateFixtureMarkets(
           odds: line === 9.5 ? context.verifiedOdds?.under95Corners : undefined,
           confidence: baseConfidence === 'VERY_HIGH' ? 'HIGH' : baseConfidence,
           requiresCornerData: true,
-          plainEnglishReason: `Limited crossing wing frequency keeps total corners under ${line} in ${(cornerDist.total[line].under * 100).toFixed(0)}% of runs.`,
+          plainEnglishReason: `Negative Binomial model projects ${totalCornersX.toFixed(1)} total corners, under ${line} in ${(cornerDist.total[line].under * 100).toFixed(0)}% of distributions.`,
           dataPoints: [{ metricName: 'Expected Total Corners', value: totalCornersX.toFixed(1) }]
         });
       }
@@ -893,13 +917,16 @@ export function evaluateFixtureMarkets(
       });
     }
 
-    // Corner Handicap
+    // Corner Handicap from Bivariate Negative Binomial Convolution
     const cornerDiff = effectiveCornersHome - effectiveCornersAway;
-    const cornerHandicapProb = 1 / (1 + Math.exp(-cornerDiff * 0.45));
+    const cornerHandicapProb = cornerDist.handicap.homeMinus15;
+    const awayCornerHandicapProb = cornerDist.handicap.awayPlus15;
+
     rawCandidates.push({
       marketCode: 'CORNER_HANDICAP_HOME_M15',
       optionType: 'corner_handicap',
       marketCategory: 'team_corners',
+      marketFamily: 'corners',
       marketName: 'Corner Handicap',
       selection: `${context.homeTeamName} -1.5 Corners`,
       line: -1.5,
@@ -916,15 +943,16 @@ export function evaluateFixtureMarkets(
       marketCode: 'CORNER_HANDICAP_AWAY_P15',
       optionType: 'corner_handicap',
       marketCategory: 'team_corners',
+      marketFamily: 'corners',
       marketName: 'Corner Handicap',
       selection: `${context.awayTeamName} +1.5 Corners`,
       line: 1.5,
       period: 'REGULAR_TIME',
       settlementRule: 'Away corners with +1.5 cushion > home corners.',
-      modelProbability: 1 - cornerHandicapProb,
+      modelProbability: awayCornerHandicapProb,
       confidence: baseConfidence,
       requiresCornerData: true,
-      plainEnglishReason: `${context.awayTeamName} +1.5 corner cushion covers ${((1 - cornerHandicapProb) * 100).toFixed(0)}% of volume distributions.`,
+      plainEnglishReason: `${context.awayTeamName} +1.5 corner cushion covers ${(awayCornerHandicapProb * 100).toFixed(0)}% of joint volume distributions.`,
       dataPoints: [{ metricName: 'Corner Differential', value: `+${cornerDiff.toFixed(1)}` }]
     });
   }
@@ -1120,8 +1148,17 @@ export function evaluateFixtureMarkets(
     ? rawCandidates.filter(c => allowedOptionTypes.includes(c.optionType))
     : rawCandidates;
 
-  // Process, qualify, and score each candidate
+  // Process, qualify, and score each candidate with Empirical Baselines & Market Gating
   const processed: MarketPrediction[] = activeCandidates.map((c) => {
+    const marketFamily = c.marketFamily || getMarketFamily(c.optionType, c.marketCode, c.marketCategory);
+    const baseline = getMarketBaseline(c.marketCode, context.competitionCode, c.line);
+    const baseRate = baseline.baseRate;
+    const edgeOverBaseline = Number((c.modelProbability - baseRate).toFixed(4));
+    const gating = checkMarketGating(marketFamily);
+
+    // Reject trivially safe lines (e.g. baseline base rate >= 0.85) unless model shows clear edge (>= +3.5%)
+    const isTriviallySafeRejected = baseline.isTriviallySafe && edgeOverBaseline < 0.035;
+
     // Generate realistic benchmark odds if not provided in verifiedOdds
     const odds = c.odds || Number(Math.max(1.08, Math.min(25.0, (1 / (c.modelProbability * 1.045)))).toFixed(2));
     const implied = calculateImpliedProbability(odds);
@@ -1129,7 +1166,7 @@ export function evaluateFixtureMarkets(
     const edge = implied !== undefined ? (c.modelProbability - implied) : undefined;
     const isProbabilityBasedAnalysis = c.odds === undefined;
 
-    // Missing Data Rules (Requirement 14):
+    // Missing Data & Deficiency Rules:
     let dataDeficiencyReason: string | null = null;
     if (c.requiresHalfData && !hasAdequateHalfData) {
       dataDeficiencyReason = 'Insufficient data: First-half and second-half split records not available for this fixture.';
@@ -1137,6 +1174,8 @@ export function evaluateFixtureMarkets(
       dataDeficiencyReason = 'Insufficient data: Corner statistics not available for this fixture.';
     } else if (c.requiresDisciplinaryData && !hasAdequateDisciplinaryData) {
       dataDeficiencyReason = 'Insufficient data: Disciplinary records not available for this fixture.';
+    } else if (isTriviallySafeRejected) {
+      dataDeficiencyReason = 'Trivially safe line: Outcome is driven by high naive league base rate rather than model edge.';
     }
 
     // Confidence Score (0.0 to 1.0)
@@ -1146,58 +1185,30 @@ export function evaluateFixtureMarkets(
       (Math.max(0, 1 - effectiveUncertainty * 3) * 0.20)
     ).toFixed(2));
 
-    // Risk Tier (Requirement 9 & 11):
-    // SAFE: probability 75% or higher, with high confidence score (>= 0.70)
-    // MODERATE: probability 60-75%
-    // RISKY: probability 45-60%, or higher-odds value plays
-    // LONGSHOT: below 45%, only shown if the edge is large
     const riskTier: RiskTier = calculateRiskTier(c.modelProbability, confidenceScore, edge);
 
-    // Qualification Logic:
-    const minEvRequired = isDeadRubber ? 0.08 : 0.035;
-    const minEdgeRequired = isDeadRubber ? 0.06 : 0.025;
-
+    // Qualification Logic based on Edge Over Baseline and EV
     let qualificationStatus: QualificationStatus = 'UNQUALIFIED_MARGINAL';
     let evidenceTier = 'Unqualified: Marginal Edge';
-    let rankingScore = 0;
 
     if (dataDeficiencyReason) {
       qualificationStatus = 'UNQUALIFIED_HIGH_UNCERTAINTY';
-      evidenceTier = 'Unqualified: Insufficient Data (Abstain)';
-      rankingScore = 0;
+      evidenceTier = 'Unqualified: Insufficient Data / Trivially Safe';
     } else if (effectiveUncertainty > 0.25 || dataQualityScore < 0.65 || context.sampleSizeMatches < 6) {
       qualificationStatus = 'UNQUALIFIED_HIGH_UNCERTAINTY';
       evidenceTier = 'Unqualified: High Uncertainty (Abstain)';
-      rankingScore = 0;
-    } else if (c.drawSpecificThreshold) {
-      if (c.modelProbability >= 0.30 && effectiveUncertainty <= 0.14 && dataQualityScore >= 0.88 && c.confidence !== 'LOW') {
-        qualificationStatus = 'QUALIFIED_VALUE';
-        evidenceTier = 'Tier 1: Qualified Value (Draw Model)';
-        rankingScore = (c.modelProbability * 12) + (confidenceScore * 5);
-      } else {
-        qualificationStatus = 'UNQUALIFIED_MARGINAL';
-        evidenceTier = 'Unqualified: Draw Filter (Elevated Variance)';
-        rankingScore = c.modelProbability * 3;
-      }
-    } else if (riskTier === 'SAFE') {
+    } else if (!gating.isAllowed) {
+      qualificationStatus = 'UNQUALIFIED_MARGINAL';
+      evidenceTier = `Unvalidated: ${gating.statusText}`;
+    } else if (edgeOverBaseline >= 0.05 && c.modelProbability >= 0.50) {
       qualificationStatus = 'QUALIFIED_VALUE';
-      evidenceTier = 'Tier 1: Safe Pick';
-      // Best safe pick logic: combination of probability, confidence, and positive or neutral edge
-      const edgeBoost = Math.max(-0.02, edge ?? 0) * 15;
-      rankingScore = (c.modelProbability * 18) + (confidenceScore * 10) + edgeBoost + 12.0;
-    } else if (riskTier === 'MODERATE') {
-      qualificationStatus = (ev !== undefined && ev >= minEvRequired) ? 'QUALIFIED_VALUE' : 'QUALIFIED_PROBABILITY';
-      evidenceTier = 'Tier 2: Moderate Opportunity';
-      const edgeBoost = Math.max(-0.02, edge ?? 0) * 15;
-      rankingScore = (c.modelProbability * 14) + (confidenceScore * 7) + edgeBoost + 5.0;
-    } else if (riskTier === 'RISKY') {
-      qualificationStatus = (edge !== undefined && edge >= minEdgeRequired) ? 'QUALIFIED_VALUE' : 'UNQUALIFIED_MARGINAL';
-      evidenceTier = 'Tier 3: Risky Value Play';
-      rankingScore = (c.modelProbability * 10) + ((edge ?? 0) * 20);
-    } else {
-      qualificationStatus = (edge !== undefined && edge >= 0.05) ? 'QUALIFIED_VALUE' : 'UNQUALIFIED_MARGINAL';
-      evidenceTier = 'Tier 4: Longshot';
-      rankingScore = (edge !== undefined && edge >= 0.05) ? (edge * 25) : 0;
+      evidenceTier = 'Tier 1: Qualified Edge Over Baseline';
+    } else if (edgeOverBaseline >= 0.02 && c.modelProbability >= 0.45) {
+      qualificationStatus = 'QUALIFIED_PROBABILITY';
+      evidenceTier = 'Tier 2: Validated Model Lean';
+    } else if (ev !== undefined && ev >= 0.04) {
+      qualificationStatus = 'QUALIFIED_VALUE';
+      evidenceTier = 'Tier 3: Positive Market EV';
     }
 
     const predictionId = `pred_${context.fixtureId}_${c.marketCode}`;
@@ -1237,7 +1248,11 @@ export function evaluateFixtureMarkets(
       qualificationStatus,
       confidence: c.confidence,
       predictionId,
-      dataPoints: c.dataPoints,
+      dataPoints: [
+        ...c.dataPoints,
+        { metricName: 'League Baseline Frequency', value: `${(baseRate * 100).toFixed(1)}%` },
+        { metricName: 'Edge Over Baseline', value: `${edgeOverBaseline >= 0 ? '+' : ''}${(edgeOverBaseline * 100).toFixed(1)}%` },
+      ],
       stateTags,
       lineupStatus,
       topFactors,
@@ -1252,19 +1267,25 @@ export function evaluateFixtureMarkets(
       marketCode: c.marketCode,
       optionType: c.optionType,
       marketCategory: c.marketCategory,
+      marketFamily,
       marketName: c.marketName,
       selection: c.selection,
       line: c.line,
       period: c.period,
       settlementRule: c.settlementRule,
       modelProbability: Number(c.modelProbability.toFixed(4)),
+      baselineProbability: Number(baseRate.toFixed(4)),
+      edgeOverBaseline,
+      isValidated: gating.isAllowed,
+      validationStatus: gating.isAllowed ? 'validated' : 'unvalidated',
+      brierSkillScore: gating.bss,
       marketOdds: odds ? Number(odds.toFixed(2)) : undefined,
       impliedProbability: implied ? Number(implied.toFixed(4)) : undefined,
       expectedValue: ev ? Number(ev.toFixed(4)) : undefined,
       edge: edge ? Number(edge.toFixed(4)) : undefined,
       riskTier,
       confidenceScore,
-      plainEnglishReason: c.plainEnglishReason || `${c.selection}: ${(c.modelProbability * 100).toFixed(0)}% model probability based on Dixon-Coles parameters.`,
+      plainEnglishReason: c.plainEnglishReason || `${c.selection}: ${(c.modelProbability * 100).toFixed(0)}% probability (${edgeOverBaseline >= 0 ? '+' : ''}${(edgeOverBaseline * 100).toFixed(1)}% vs baseline).`,
       handicapType: c.handicapType,
       handicapLine: c.handicapLine,
       goalBand: c.goalBand,
@@ -1273,8 +1294,9 @@ export function evaluateFixtureMarkets(
       lossProb: c.lossProb,
       modelConfidence: c.confidence,
       qualificationStatus,
-      rankingScore: Number(rankingScore.toFixed(3)),
+      rankingScore: 0,
       isTopPick: false,
+      isFamilyWinner: false,
       settlementStatus: 'PENDING',
       evidenceTier,
       dataQualityScore,
@@ -1289,52 +1311,167 @@ export function evaluateFixtureMarkets(
     };
   });
 
-  // Sort candidates by ranking score descending
-  processed.sort((a, b) => b.rankingScore - a.rankingScore);
+  // =========================================================================
+  // STEP 3: TWO-STAGE SELECTION
+  // =========================================================================
+  // Stage 1: Group candidates by marketFamily and pick the single best candidate per family.
+  // Intra-family scoring favors:
+  // - Edge over naive baseline
+  // - Probabilities inside the balanced target band (52-78%)
+  // - Rejects trivially safe lines with no edge
 
-  // Top ranked selection options
-  const rankedOptions = processed.slice(0, maxRankedOptions);
+  const candidatesByFamily = new Map<MarketFamily, MarketPrediction[]>();
+  MARKET_FAMILIES.forEach(fam => candidatesByFamily.set(fam, []));
 
-  // Intra-fixture correlation check across top options:
-  const fixtureCorrelationWarnings: string[] = [];
-  const topCodes = rankedOptions.map(p => p.marketCode);
-  if (topCodes.includes('TOTAL_GOALS_O25') && topCodes.includes('BTTS_YES')) {
-    fixtureCorrelationWarnings.push('Over 2.5 Goals and Both Teams to Score (Yes) are highly correlated; both depend on mutual offensive efficiency.');
-  }
-  if (topCodes.includes('1X2_HOME') && topCodes.includes('DC_1X')) {
-    fixtureCorrelationWarnings.push('Home Win is a subset of Double Chance (Home or Draw). Consider evaluating independently.');
-  }
-  if (topCodes.includes('FH_GOALS_O05') && topCodes.includes('TOTAL_GOALS_O25')) {
-    fixtureCorrelationWarnings.push('First-half early scoring directly influences full-match Total Goals lines.');
-  }
-
-  rankedOptions.forEach(p => {
-    p.correlationWarnings = Array.from(new Set([...(p.correlationWarnings || []), ...fixtureCorrelationWarnings]));
+  processed.forEach(p => {
+    const fam = (p.marketFamily as MarketFamily) || 'goals_over_under';
+    if (!candidatesByFamily.has(fam)) {
+      candidatesByFamily.set(fam, []);
+    }
+    candidatesByFamily.get(fam)!.push(p);
   });
 
-  // Determine top qualified pick ("Best safe pick" logic - Requirement 10)
-  // Single market with highest combination of probability, confidence, and positive/neutral edge.
-  // Does NOT default to Over 1.5 goals!
-  const qualifiedPicks = processed.filter(p => 
-    p.qualificationStatus === 'QUALIFIED_VALUE' || p.qualificationStatus === 'QUALIFIED_PROBABILITY'
-  );
+  const familyWinners: Partial<Record<MarketFamily, MarketPrediction>> = {};
 
+  candidatesByFamily.forEach((cands, fam) => {
+    if (cands.length === 0) return;
+
+    // Reject candidates with hard data deficiency or trivially safe lines with no edge
+    const eligible = cands.filter(c => {
+      if (c.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY') return false;
+      const baseRate = c.baselineProbability ?? 0.50;
+      const edge = c.edgeOverBaseline ?? 0;
+      // Reject trivially safe lines (base rate >= 85%) unless model shows clear edge (>= +4%)
+      if (baseRate >= 0.85 && edge < 0.04) return false;
+      // Reject candidates with strictly negative edge
+      if (edge < 0) return false;
+      return true;
+    });
+
+    if (eligible.length === 0) return;
+
+    // Filter to candidates inside the balanced probability band (55% to 75%)
+    // If none are in band, fall back to eligible
+    const inBandCandidates = eligible.filter(c => c.modelProbability >= 0.55 && c.modelProbability <= 0.75);
+    const pool = inBandCandidates.length > 0 ? inBandCandidates : eligible;
+
+    // Score intra-family: pick line closest to model's balanced point (midpoint ~62%)
+    pool.forEach(c => {
+      const edge = Math.max(0, c.edgeOverBaseline ?? 0);
+      const distToBalanced = Math.abs(c.modelProbability - 0.62);
+      const balancedProximity = Math.max(0.50, 1.0 - distToBalanced * 1.5);
+      const conf = c.confidenceScore ?? 0.80;
+
+      // Intra-family score driven by edge and balanced point proximity
+      const intraScore = (edge * 150) * conf * balancedProximity + (c.modelProbability * 1.5);
+      c.rankingScore = Number(intraScore.toFixed(3));
+    });
+
+    pool.sort((a, b) => b.rankingScore - a.rankingScore);
+    const best = pool[0];
+
+    // Family qualification hurdle: must have edge over baseline >= +0.005 and model prob >= 0.45
+    if ((best.edgeOverBaseline ?? 0) >= 0.005 && best.modelProbability >= 0.45) {
+      best.isFamilyWinner = true;
+      familyWinners[fam] = best;
+    }
+  });
+
+  // =========================================================================
+  // Stage 2: Rank the family winners by calibrated, reliability-adjusted edge over baseline
+  // Apply hypothesis multipliers from state tags and tactical signals (STEP 5)
+  // =========================================================================
+  const homeRatio = context.homeAttackRating / Math.max(0.1, context.awayDefenseRating);
+  const awayRatio = context.awayAttackRating / Math.max(0.1, context.homeDefenseRating);
+  const isQualityMismatch = (homeRatio >= 1.32) || (awayRatio >= 1.32) || stateTags.includes('high-stakes');
+  const isLowScoring = (effectiveHomeXg + effectiveAwayXg < 2.45) || stateTags.includes('key-absences') || stateTags.includes('dead-rubber');
+  const isOpenTeams = (effectiveHomeXg + effectiveAwayXg > 2.75) && (context.homeDefenseRating >= 0.95 || context.awayDefenseRating >= 0.95);
+  const isCongestedOrLate = stateTags.includes('fixture-congested');
+  const isCardHeavy = stateTags.includes('derby') || (effectiveCards >= 4.4);
+  const isWingHeavy = stateTags.includes('wing-heavy') || (totalCornersX >= 11.2) || (effectiveCornersHome >= 6.4 && homeRatio >= 1.35);
+
+  const scoredFamilyWinners: MarketPrediction[] = [];
+
+  Object.entries(familyWinners).forEach(([famStr, winner]) => {
+    if (!winner) return;
+    const fam = famStr as MarketFamily;
+
+    let hypothesisMultiplier = 1.0;
+    if (fam === 'result' && isQualityMismatch) hypothesisMultiplier = 1.32;
+    else if (fam === 'double_chance' && isQualityMismatch) hypothesisMultiplier = 1.25;
+    else if (fam === 'goals_over_under' && isLowScoring && winner.selection.includes('Under')) hypothesisMultiplier = 1.30;
+    else if (fam === 'draw' && isLowScoring) hypothesisMultiplier = 1.30;
+    else if (fam === 'goals_over_under' && isOpenTeams && winner.selection.includes('Over')) hypothesisMultiplier = 1.30;
+    else if (fam === 'both_teams_to_score' && isOpenTeams && winner.selection.includes('Yes')) hypothesisMultiplier = 1.30;
+    else if (fam === 'second_half_result' && isCongestedOrLate) hypothesisMultiplier = 1.35;
+    else if (fam === 'highest_scoring_half' && isCongestedOrLate) hypothesisMultiplier = 1.35;
+    else if (fam === 'first_half_goals' && isLowScoring && winner.selection.includes('Under')) hypothesisMultiplier = 1.25;
+    else if (fam === 'bookings' && isCardHeavy) hypothesisMultiplier = 1.35;
+    else if (fam === 'corners' && isWingHeavy) hypothesisMultiplier = 1.30;
+
+    const edge = winner.edgeOverBaseline ?? 0;
+    const conf = winner.confidenceScore ?? 0.80;
+    const uncertaintyDiscount = Math.max(0.35, 1.0 - effectiveUncertainty * 2.2);
+    const bss = winner.brierSkillScore ?? 0.15;
+    const bssFactor = Math.max(0.85, 1.0 + bss);
+    const edgeComponent = Math.max(0, edge) * 100;
+
+    // Final Stage-2 ranking score: reliability-adjusted edge over baseline
+    // Raw probability is only a tiny +1.5 tie-breaker!
+    const finalScore = (edgeComponent * conf * uncertaintyDiscount * bssFactor * hypothesisMultiplier) + (winner.modelProbability * 1.5);
+    winner.rankingScore = Number(finalScore.toFixed(3));
+    scoredFamilyWinners.push(winner);
+  });
+
+  // Sort family winners by final ranking score descending
+  scoredFamilyWinners.sort((a, b) => b.rankingScore - a.rankingScore);
+
+  // Ranked options: at most ONE per family per fixture (up to maxRankedOptions)
+  const rankedOptions = scoredFamilyWinners.slice(0, maxRankedOptions);
+
+  // Determine Top Pick
   let topPick: MarketPrediction | null = null;
   let noRecommendationReason: string | undefined = undefined;
 
-  if (qualifiedPicks.length > 0) {
-    topPick = qualifiedPicks[0];
-    topPick.isTopPick = true;
+  if (scoredFamilyWinners.length > 0) {
+    const candidateTop = scoredFamilyWinners[0];
+    // Gating check: top pick must have verified positive edge and minimum probability
+    if ((candidateTop.edgeOverBaseline ?? 0) >= 0.01 && candidateTop.modelProbability >= 0.48) {
+      topPick = candidateTop;
+      topPick.isTopPick = true;
+      // Record recommendation in telemetry monitor
+      marketMonitor.recordRecommendation(
+        context.fixtureId,
+        topPick.marketFamily as MarketFamily,
+        topPick.marketCode,
+        topPick.selection
+      );
+    } else {
+      noRecommendationReason = "No strong recommendation: available statistical evidence and current market lines do not meet the configured minimum edge and uncertainty thresholds.";
+    }
   } else {
-    noRecommendationReason = "No strong recommendation: available statistical evidence and current market lines do not meet the configured minimum edge and uncertainty thresholds.";
+    noRecommendationReason = "No strong recommendation: all market families failed minimum data completeness or edge thresholds for this fixture.";
   }
+
+  // Update non-winner candidates' rankingScore in processed list for consistent UI table rendering
+  processed.forEach(p => {
+    if (!p.isFamilyWinner) {
+      const edge = p.edgeOverBaseline ?? 0;
+      const conf = p.confidenceScore ?? 0.80;
+      p.rankingScore = Number(((Math.max(0, edge) * 50) * conf + (p.modelProbability * 3)).toFixed(3));
+    }
+  });
+
+  // Sort processed list by ranking score
+  processed.sort((a, b) => b.rankingScore - a.rankingScore);
 
   return {
     predictions: processed,
     rankedOptions,
     topPick,
     noRecommendationReason,
-    contextEvaluation: contextEval
+    contextEvaluation: contextEval,
+    familyWinners
   };
 }
 

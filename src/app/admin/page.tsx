@@ -6,16 +6,21 @@ import {
   Database, 
   RefreshCw, 
   CheckCircle2, 
-  Cpu
+  Cpu,
+  AlertTriangle,
+  BarChart3,
+  ShieldCheck
 } from 'lucide-react';
 import { getStoredUser } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
+import { MonitoringReport } from '@/lib/prediction/marketMonitor';
 
 export default function AdminPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'SUCCESS'>('IDLE');
   const [lastSync, setLastSync] = useState<string>('Just now');
   const [unpublishedModels, setUnpublishedModels] = useState<string[]>([]);
+  const [monitoringReport, setMonitoringReport] = useState<MonitoringReport | null>(null);
 
   const [syncLogs, setSyncLogs] = useState([
     { id: 'job_9841', provider: 'football-data.org', records: 48, status: 'Completed', time: '10 mins ago' },
@@ -24,8 +29,21 @@ export default function AdminPage() {
     { id: 'job_9838', provider: 'prediction_settlement', records: 14, status: 'Completed', time: '1 hour ago' },
   ]);
 
+  const fetchMonitoring = async () => {
+    try {
+      const res = await fetch('/api/v1/monitoring');
+      if (res.ok) {
+        const data = await res.json();
+        setMonitoringReport(data.report);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     setUser(getStoredUser());
+    fetchMonitoring();
   }, []);
 
   const handleTriggerSync = async () => {
@@ -155,6 +173,88 @@ export default function AdminPage() {
         <div className="p-3 bg-[#b8e63a]/15 border border-[#b8e63a]/30 rounded-[8px] text-[12px] font-mono text-[#b8e63a] flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           <span>Sync complete at {lastSync}. Fixtures and market lines refreshed.</span>
+        </div>
+      )}
+
+      {/* STEP 6: Market Family Concentration & Recommendation Telemetry */}
+      {monitoringReport && (
+        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+            <div>
+              <h2 className="font-[500] text-[#e8efe9] text-[14px] flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-[#b8e63a]" />
+                <span>Market family recommendation telemetry (Trailing {monitoringReport.sampleWindow} fixtures)</span>
+              </h2>
+              <p className="text-[11px] text-[#8fa69a] mt-0.5">
+                Diagnostic monitoring only. Alert threshold configured at {monitoringReport.thresholdPct}% ceiling.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded-[4px] bg-white/[0.04] text-[#8fa69a] border border-white/[0.06]">
+                Window: {monitoringReport.sampleWindow} picks
+              </span>
+            </div>
+          </div>
+
+          {monitoringReport.hasActiveAlert && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-[8px] flex items-start gap-2.5 text-[12px] text-amber-300">
+              <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-400 shrink-0" />
+              <div className="space-y-1">
+                <div className="font-[500]">Concentration Alert Triggered:</div>
+                {monitoringReport.alertMessages.map((msg, i) => (
+                  <div key={i} className="text-[11px] text-amber-200/90 font-mono">{msg}</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!monitoringReport.hasActiveAlert && (
+            <div className="p-2.5 bg-[#b8e63a]/10 border border-[#b8e63a]/20 rounded-[8px] flex items-center gap-2 text-[12px] text-[#b8e63a]">
+              <ShieldCheck className="w-4 h-4" />
+              <span>Balanced distribution verified: No market family exceeds the 40% concentration warning ceiling.</span>
+            </div>
+          )}
+
+          {/* Family Shares Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1">
+            {monitoringReport.familyShares.map((m) => {
+              const isOverCeiling = m.exceedsThreshold;
+              return (
+                <div 
+                  key={m.family}
+                  className={`p-2.5 rounded-[8px] border transition-colors ${
+                    isOverCeiling 
+                      ? 'bg-amber-500/10 border-amber-500/30' 
+                      : 'bg-[#0a1812]/50 border-white/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[11px] text-[#8fa69a]">
+                    <span className="truncate pr-1 font-[500] text-[#e8efe9]">{m.displayName}</span>
+                    <span className="font-mono text-[#b8e63a]">{m.count}</span>
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between">
+                    <span className={`text-[15px] font-[600] font-mono ${isOverCeiling ? 'text-amber-400' : 'text-[#e8efe9]'}`}>
+                      {m.sharePct}%
+                    </span>
+                    <span className="text-[10px] text-[#8fa69a] font-mono">
+                      of top picks
+                    </span>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="w-full bg-white/[0.06] h-1.5 rounded-full mt-2 overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-300 ${isOverCeiling ? 'bg-amber-400' : 'bg-[#b8e63a]'}`}
+                      style={{ width: `${Math.min(100, (m.sharePct / 40) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          <div className="text-[11px] text-[#8fa69a] italic pt-1 border-t border-white/[0.04]">
+            * Note: This monitoring system is diagnostic. As per engineering specifications, hard quotas or artificial quality threshold reductions are strictly prohibited.
+          </div>
         </div>
       )}
 

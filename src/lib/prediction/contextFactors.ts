@@ -329,6 +329,30 @@ export const STATE_TAG_REGISTRY: Record<StateTag, FixtureStateTagInfo> = {
     affectedMarkets: ['total_goals', 'team_goals', 'bookings', 'match_result'],
     hypothesis: 'Pre-lineup projections carry temporary uncertainty margin and must be automatically re-evaluated at T-60.',
   },
+  'wing-heavy': {
+    tag: 'wing-heavy',
+    label: 'Wing-Heavy Possession Matchup',
+    description: 'Tactical clash featuring dominant flank overloads, frequent byline deliveries, and defensive box clearances.',
+    uncertaintyMultiplier: 1.05,
+    affectedMarkets: ['total_corners', 'team_corners'],
+    hypothesis: 'Wide attacking patterns significantly elevate corner volume without inflating central goal conversion.',
+  },
+  'slow-starter': {
+    tag: 'slow-starter',
+    label: 'Slow Starting Profiling',
+    description: 'Teams historically averaging fewer than 0.40 first-half goals and skewing offensive production heavily into second halves.',
+    uncertaintyMultiplier: 1.10,
+    affectedMarkets: ['half_time', 'total_goals'],
+    hypothesis: 'Methodical early game pacing skews goal distribution into second half (+25% 2H weighting).',
+  },
+  'high-fatigue': {
+    tag: 'high-fatigue',
+    label: 'High Squad Fatigue Indicator',
+    description: 'Cumulative travel distance and condensed calendar creating diminished late-stage defensive recovery.',
+    uncertaintyMultiplier: 1.20,
+    affectedMarkets: ['half_time', 'total_goals', 'bookings'],
+    hypothesis: 'Late-game defensive exhaustion causes breakdown in transitional structure in the final 30 minutes.',
+  },
 };
 
 // ====================================================================

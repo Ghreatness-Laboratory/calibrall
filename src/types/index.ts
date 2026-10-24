@@ -87,7 +87,10 @@ export type StateTag =
   | 'key-absences' 
   | 'new-manager' 
   | 'low-sample' 
-  | 'lineup-unconfirmed';
+  | 'lineup-unconfirmed'
+  | 'wing-heavy'
+  | 'slow-starter'
+  | 'high-fatigue';
 
 export type FactorCode = 
   | 'team_form' 
@@ -333,6 +336,13 @@ export interface MarketPrediction {
   lineupStatus: 'confirmed' | 'pre-lineup';
   topFactorContributions: FactorContribution[]; // Top 3 measured factors contributing to this line
   correlationWarnings?: string[]; // Warnings regarding intra-fixture line correlations
+  marketFamily?: string;
+  baselineProbability?: number;
+  edgeOverBaseline?: number;
+  isFamilyWinner?: boolean;
+  isValidated?: boolean;
+  validationStatus?: 'validated' | 'unvalidated' | 'insufficient_sample';
+  brierSkillScore?: number;
   alternativesRejected?: {
     alternative: string;
     modelProbability: number;

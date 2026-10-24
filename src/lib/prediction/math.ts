@@ -548,14 +548,39 @@ export function generateHalfByHalfGoalDistribution(
 }
 
 /**
+ * Negative Binomial probability mass function for overdispersed event counts (e.g. corners).
+ * Parameterized by mean mu and overdispersion alpha >= 0 (Variance = mu + alpha * mu^2).
+ * When alpha == 0, equivalent to Poisson(mu).
+ */
+export function negBinomialProb(mu: number, k: number, alpha: number = 0.12): number {
+  if (mu <= 0) return k === 0 ? 1 : 0;
+  if (alpha <= 0.001) return poissonProb(mu, k);
+
+  const r = 1 / alpha;
+  const p = r / (r + mu);
+
+  if (k === 0) return Math.pow(p, r);
+
+  // Stable recurrence relation
+  let prob = Math.pow(p, r);
+  for (let i = 1; i <= k; i++) {
+    prob *= ((i - 1 + r) / i) * (1 - p);
+    if (prob <= 0) return 0;
+  }
+  return prob;
+}
+
+/**
  * Corners distribution calculations
- * Total corners model using Poisson & overdispersion-tested count distribution,
- * plus Team corners (Home & Away)
+ * Total corners model using Negative Binomial overdispersed count distribution (alpha = 0.12),
+ * plus Team corners (Home & Away), with calibrated probability capping and uncertainty widening.
  */
 export function calculateCornerProbabilities(
   expectedCorners: number, 
   homeCornersRatio: number = 0.55,
-  maxCorners: number = 24
+  maxCorners: number = 24,
+  overdispersionAlpha: number = 0.12,
+  uncertaintyMargin: number = 0.0
 ) {
   const cornerLines = [7.5, 8.5, 9.5, 10.5, 11.5, 12.5];
   const results: Record<number, { over: number; under: number }> = {};
@@ -563,22 +588,38 @@ export function calculateCornerProbabilities(
     results[l] = { over: 0, under: 0 };
   });
 
-  // Calculate cumulative probabilities for total match corners
+  // Calculate cumulative probabilities using Negative Binomial
   for (let c = 0; c <= maxCorners; c++) {
-    const p = poissonProb(expectedCorners, c);
+    const p = negBinomialProb(expectedCorners, c, overdispersionAlpha);
     cornerLines.forEach(l => {
       if (c > l) results[l].over += p;
       else results[l].under += p;
     });
   }
 
+  // Normalize, widen uncertainty when data is thin, and cap extreme probabilities to [0.08, 0.92]
   cornerLines.forEach(l => {
     const sum = results[l].over + results[l].under;
     if (sum > 0) {
-      results[l].over /= sum;
-      results[l].under /= sum;
+      let over = results[l].over / sum;
+      if (uncertaintyMargin > 0) {
+        over = over * (1 - uncertaintyMargin) + 0.50 * uncertaintyMargin;
+      }
+      over = Math.min(0.92, Math.max(0.08, over));
+      results[l].over = over;
+      results[l].under = 1 - over;
     }
   });
+
+  // Strict monotonicity: P(O12.5) <= P(O11.5) <= ... <= P(O7.5)
+  for (let i = cornerLines.length - 2; i >= 0; i--) {
+    const lowerLine = cornerLines[i];
+    const higherLine = cornerLines[i + 1];
+    if (results[higherLine].over > results[lowerLine].over) {
+      results[higherLine].over = results[lowerLine].over;
+      results[higherLine].under = 1 - results[higherLine].over;
+    }
+  }
 
   // Team Corners
   const homeCornersExpected = expectedCorners * homeCornersRatio;
@@ -596,8 +637,8 @@ export function calculateCornerProbabilities(
   });
 
   for (let c = 0; c <= 16; c++) {
-    const pHome = poissonProb(homeCornersExpected, c);
-    const pAway = poissonProb(awayCornersExpected, c);
+    const pHome = negBinomialProb(homeCornersExpected, c, overdispersionAlpha * 1.15);
+    const pAway = negBinomialProb(awayCornersExpected, c, overdispersionAlpha * 1.15);
     teamLines.forEach(l => {
       if (c > l) {
         teamCorners.home[l].over += pHome;
@@ -609,9 +650,50 @@ export function calculateCornerProbabilities(
     });
   }
 
+  // Joint convolution for Corner Handicap (-1.5 / +1.5)
+  let homeMinus15 = 0;
+  let awayPlus15 = 0;
+  for (let h = 0; h <= 16; h++) {
+    const ph = negBinomialProb(homeCornersExpected, h, overdispersionAlpha * 1.15);
+    for (let a = 0; a <= 16; a++) {
+      const pa = negBinomialProb(awayCornersExpected, a, overdispersionAlpha * 1.15);
+      const joint = ph * pa;
+      if (h - a > 1.5) homeMinus15 += joint;
+      if (a - h + 1.5 > 0) awayPlus15 += joint;
+    }
+  }
+
+  teamLines.forEach(l => {
+    const sumHome = teamCorners.home[l].over + teamCorners.home[l].under;
+    if (sumHome > 0) {
+      let over = teamCorners.home[l].over / sumHome;
+      if (uncertaintyMargin > 0) over = over * (1 - uncertaintyMargin) + 0.50 * uncertaintyMargin;
+      over = Math.min(0.92, Math.max(0.08, over));
+      teamCorners.home[l].over = over;
+      teamCorners.home[l].under = 1 - over;
+    }
+    const sumAway = teamCorners.away[l].over + teamCorners.away[l].under;
+    if (sumAway > 0) {
+      let over = teamCorners.away[l].over / sumAway;
+      if (uncertaintyMargin > 0) over = over * (1 - uncertaintyMargin) + 0.50 * uncertaintyMargin;
+      over = Math.min(0.92, Math.max(0.08, over));
+      teamCorners.away[l].over = over;
+      teamCorners.away[l].under = 1 - over;
+    }
+  });
+
+  if (uncertaintyMargin > 0) {
+    homeMinus15 = homeMinus15 * (1 - uncertaintyMargin) + 0.40 * uncertaintyMargin;
+    awayPlus15 = awayPlus15 * (1 - uncertaintyMargin) + 0.60 * uncertaintyMargin;
+  }
+
   return {
     total: results,
     team: teamCorners,
+    handicap: {
+      homeMinus15: Math.min(0.88, Math.max(0.12, homeMinus15)),
+      awayPlus15: Math.min(0.88, Math.max(0.12, awayPlus15)),
+    }
   };
 }
 
