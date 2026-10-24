@@ -76,9 +76,32 @@ export class WhyPanelGenerator {
       factorsFor.push(`Calibrated expectation incorporates conservative safety margins`);
     }
 
+    // Additional context factors
+    if (features.managerMatchup) {
+      factorsFor.push(cleanDisplayText(features.managerMatchup.matchupNarrative));
+    }
+    if (features.weatherCondition && features.weatherCondition.isAvailable) {
+      factorsFor.push(cleanDisplayText(`Kickoff weather: ${features.weatherCondition.summary}`));
+    }
+    if (features.h2hContext && features.h2hContext.filteredRecentCount > 0) {
+      factorsFor.push(cleanDisplayText(features.h2hContext.summaryText));
+    }
+    if (features.externalBenchmark) {
+      factorsFor.push(cleanDisplayText(`Consensus alignment: ${features.externalBenchmark.explanation}`));
+    }
+
     // 2. Build Factors AGAINST (Honest counterarguments)
     if (features.isDerby) {
       factorsAgainst.push(`Derby emotion and disciplinary volatility expand outcome variance`);
+    }
+    if (features.managerMatchup && (features.managerMatchup.isHomeNewManager || features.managerMatchup.isAwayNewManager)) {
+      factorsAgainst.push(`New manager regime active (sample size under current tactics restricted; uncertainty widened)`);
+    }
+    if (features.marketPrior.isHighDisagreement) {
+      factorsAgainst.push(cleanDisplayText(features.marketPrior.disagreementNotice || 'High disagreement between model and market closing line'));
+    }
+    if (features.weather.isMissing) {
+      factorsAgainst.push(`Kickoff weather forecast coordinates unverified (uncertainty expansion penalty applied)`);
     }
     if (features.homeFatigue.hadMidweekEuropean || features.awayFatigue.hadMidweekEuropean) {
       factorsAgainst.push(`Midweek European travel and physical fatigue reduce late game pressing`);

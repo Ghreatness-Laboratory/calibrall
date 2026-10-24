@@ -16,6 +16,7 @@ import { UserProfile } from '@/types';
 import { MonitoringReport } from '@/lib/prediction/marketMonitor';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import { isDixonColesV25Active, setDixonColesV25Active } from '@/lib/prediction/v25/featureFlags';
+import { getAdminAuditLogs, recordAdminOverride, AdminOverrideAuditLog } from '@/lib/prediction/settlementEngine';
 
 export default function AdminPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -25,6 +26,16 @@ export default function AdminPage() {
   const [monitoringReport, setMonitoringReport] = useState<MonitoringReport | null>(null);
   const [missReport, setMissReport] = useState<any>(null);
   const [v25Active, setV25Active] = useState<boolean>(true);
+
+  // Settlement Override Audit State
+  const [auditLogs, setAuditLogs] = useState<AdminOverrideAuditLog[]>([]);
+  const [overrideFixtureId, setOverrideFixtureId] = useState('fix_pl_ars_liv');
+  const [overrideMarketCode, setOverrideMarketCode] = useState('TOTAL_CORNERS_O95');
+  const [overrideSelection, setOverrideSelection] = useState('Over 9.5 Corners');
+  const [overridePrevStatus, setOverridePrevStatus] = useState<'PENDING' | 'WON' | 'LOST' | 'PUSH' | 'VOID'>('PENDING');
+  const [overrideNewStatus, setOverrideNewStatus] = useState<'WON' | 'LOST' | 'PUSH' | 'VOID'>('WON');
+  const [overrideRationale, setOverrideRationale] = useState('Official league post match audit confirmed 10th corner credited in stoppage time.');
+  const [overrideMessage, setOverrideMessage] = useState<string | null>(null);
 
   const [syncLogs, setSyncLogs] = useState([
     { id: 'job 9841', provider: 'Football Data org', records: 48, status: 'Completed', time: '10 mins ago' },
@@ -52,12 +63,33 @@ export default function AdminPage() {
     setUser(getStoredUser());
     fetchMonitoring();
     setV25Active(isDixonColesV25Active());
+    setAuditLogs(getAdminAuditLogs());
   }, []);
 
   const handleToggleV25 = () => {
     const nextVal = !v25Active;
     setDixonColesV25Active(nextVal);
     setV25Active(nextVal);
+  };
+
+  const handleExecuteOverride = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!overrideRationale.trim()) {
+      setOverrideMessage('A verifiable rationale is required for audit compliance.');
+      return;
+    }
+    const adminEmail = user?.email || 'analyst@calibrall.app';
+    const newLog = recordAdminOverride(
+      adminEmail,
+      overrideFixtureId,
+      overrideMarketCode,
+      overrideSelection,
+      overridePrevStatus,
+      overrideNewStatus,
+      overrideRationale
+    );
+    setAuditLogs([newLog, ...getAdminAuditLogs().filter(l => l.id !== newLog.id)]);
+    setOverrideMessage(`Settlement override recorded successfully (Audit ID: ${newLog.id})`);
   };
 
   const handleTriggerSync = async () => {
@@ -451,6 +483,139 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* Admin Settlement Override & Immutable Audit Log */}
+      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+          <div>
+            <h3 className="font-[500] text-[#e8efe9] text-[14px] flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-[#b8e63a]" />
+              <span>Admin Settlement Override & Audit Ledger</span>
+            </h3>
+            <p className="text-[11px] text-[#8fa69a] mt-0.5">
+              Allows authorized manual resolution for delayed official corrections. Never modifies original pre match prediction records.
+            </p>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.05] border border-white/10 text-[#8fa69a]">
+            Audit compliant
+          </span>
+        </div>
+
+        {overrideMessage && (
+          <div className="p-2.5 rounded bg-[#b8e63a]/15 border border-[#b8e63a]/30 text-[11.5px] font-mono text-[#b8e63a]">
+            {overrideMessage}
+          </div>
+        )}
+
+        {/* Override Form */}
+        <form onSubmit={handleExecuteOverride} className="p-3 bg-[#0a1812]/50 border border-white/[0.05] rounded-[8px] space-y-3">
+          <div className="text-[12px] font-semibold text-[#e8efe9]">Submit Settlement Override</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-[11px]">
+            <div>
+              <label className="text-[#8fa69a] block text-[10px] uppercase font-mono">Fixture Identifier</label>
+              <input
+                type="text"
+                value={overrideFixtureId}
+                onChange={(e) => setOverrideFixtureId(e.target.value)}
+                className="w-full mt-1 bg-[#151E19] border border-white/10 rounded px-2 py-1.5 text-[#e8efe9] font-mono text-[11px] focus:outline-none focus:border-[#b8e63a]"
+                placeholder="fix_pl_ars_liv"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[#8fa69a] block text-[10px] uppercase font-mono">Market Code</label>
+              <input
+                type="text"
+                value={overrideMarketCode}
+                onChange={(e) => setOverrideMarketCode(e.target.value)}
+                className="w-full mt-1 bg-[#151E19] border border-white/10 rounded px-2 py-1.5 text-[#e8efe9] font-mono text-[11px] focus:outline-none focus:border-[#b8e63a]"
+                placeholder="TOTAL_CORNERS_O95"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[#8fa69a] block text-[10px] uppercase font-mono">Previous Status</label>
+              <select
+                value={overridePrevStatus}
+                onChange={(e) => setOverridePrevStatus(e.target.value as any)}
+                className="w-full mt-1 bg-[#151E19] border border-white/10 rounded px-2 py-1.5 text-[#e8efe9] font-mono text-[11px] focus:outline-none focus:border-[#b8e63a]"
+              >
+                <option value="PENDING">PENDING</option>
+                <option value="LOST">LOST</option>
+                <option value="WON">WON</option>
+                <option value="PUSH">PUSH</option>
+                <option value="VOID">VOID</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[#8fa69a] block text-[10px] uppercase font-mono">New Status</label>
+              <select
+                value={overrideNewStatus}
+                onChange={(e) => setOverrideNewStatus(e.target.value as any)}
+                className="w-full mt-1 bg-[#151E19] border border-white/10 rounded px-2 py-1.5 text-[#e8efe9] font-mono text-[11px] focus:outline-none focus:border-[#b8e63a]"
+              >
+                <option value="WON">WON</option>
+                <option value="LOST">LOST</option>
+                <option value="PUSH">PUSH</option>
+                <option value="VOID">VOID</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
+            <div className="sm:col-span-2">
+              <label className="text-[#8fa69a] block text-[10px] uppercase font-mono">Official Regulatory Rationale</label>
+              <input
+                type="text"
+                value={overrideRationale}
+                onChange={(e) => setOverrideRationale(e.target.value)}
+                className="w-full mt-1 bg-[#151E19] border border-white/10 rounded px-2 py-1.5 text-[#e8efe9] text-[11px] focus:outline-none focus:border-[#b8e63a]"
+                placeholder="Official post match audit credited 10th corner at 94th minute"
+                required
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                className="w-full h-[34px] rounded-[6px] bg-[#b8e63a] text-[#0a1812] font-mono text-[11.5px] font-bold hover:bg-[#c8ee47] transition-colors"
+              >
+                Record Override Log
+              </button>
+            </div>
+          </div>
+        </form>
+
+        {/* Existing Audit Logs */}
+        <div className="space-y-2">
+          <div className="text-[11.5px] font-mono text-[#8fa69a]">Audit Trail Logs ({auditLogs.length})</div>
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {auditLogs.map((log) => (
+              <div key={log.id} className="p-2.5 bg-[#0a1812]/50 border border-white/[0.04] rounded-[8px] text-[11px] space-y-1 font-mono">
+                <div className="flex items-center justify-between text-[#8fa69a]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#b8e63a] font-bold">{cleanDisplayText(log.id)}</span>
+                    <span className="text-[#e8efe9]">{cleanDisplayText(log.fixtureId)}</span>
+                    <span>·</span>
+                    <span>{cleanDisplayText(log.marketCode)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-zinc-400">{log.previousStatus}</span>
+                    <span className="text-[#8fa69a]">→</span>
+                    <span className="text-[#b8e63a] font-bold">{log.newStatus}</span>
+                  </div>
+                </div>
+                <div className="text-[#c9d6ce] text-[10.5px]">
+                  Reason: {cleanDisplayText(log.rationale)}
+                </div>
+                <div className="text-[9.5px] text-[#5E6A63] flex items-center justify-between pt-0.5">
+                  <span>Auditor: {cleanDisplayText(log.adminEmail)}</span>
+                  <span>{new Date(log.timestamp).toLocaleString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Sync Jobs */}
       <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">

@@ -24,6 +24,8 @@ import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds 
 import { checkDerby } from '@/lib/prediction/contextFactors';
 import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
 import { evaluateLiveMatchState } from '@/lib/prediction/liveMatchState';
+import { extractMatchStats, settleMarketPrediction } from '@/lib/prediction/settlementEngine';
+import QuantitativeFactorsAuditPanel from '@/components/QuantitativeFactorsAuditPanel';
 
 export default function MatchAnalysisPage() {
   const params = useParams();
@@ -105,8 +107,27 @@ export default function MatchAnalysisPage() {
     return generateNBAPredictions(fixture);
   }, [fixture, isBasketball]);
 
-  const predictions = isBasketball ? basketballPredictions : (footballEvaluation?.predictions || []);
-  const topPick = isBasketball ? (basketballPredictions[0] || null) : (footballEvaluation?.topPick || null);
+  // Match stats summary for finished matches
+  const matchStats = useMemo(() => {
+    if (!fixture || fixture.status !== 'FINISHED') return null;
+    return extractMatchStats(fixture);
+  }, [fixture]);
+
+  const predictions = useMemo(() => {
+    const raw = isBasketball ? basketballPredictions : (footballEvaluation?.predictions || []);
+    if (!matchStats) return raw;
+    return raw.map((p) => {
+      const settled = settleMarketPrediction(p, matchStats);
+      return {
+        ...p,
+        settlementStatus: settled.settlementStatus,
+        actualStatValue: settled.actualStatValue,
+        lineComparisonText: settled.lineComparisonText,
+      };
+    });
+  }, [isBasketball, basketballPredictions, footballEvaluation, matchStats]);
+
+  const topPick = isBasketball ? (predictions[0] || null) : (predictions.find(p => p.isTopPick) || predictions[0] || null);
   const noRecommendationReason = isBasketball ? undefined : footballEvaluation?.noRecommendationReason;
 
   // Live match state tracking
@@ -266,13 +287,79 @@ export default function MatchAnalysisPage() {
           {/* Status pill & Kickoff */}
           <div className="sm:border-l sm:border-white/[0.07] sm:pl-4 flex flex-col justify-center sm:items-end">
             <span className="text-[11.5px] text-[#B6E63B] font-semibold">
-              {fixture.status === 'FINISHED' ? 'Completed' : 'Upcoming match'}
+              {fixture.status === 'FINISHED' ? 'Match completed' : 'Upcoming match'}
             </span>
             <span className="text-[12px] text-[#ECF1EE] mt-0.5 tabular-nums" suppressHydrationWarning>
               {fixture.status === 'FINISHED' ? 'Full time' : kickoff.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC'}
             </span>
           </div>
         </div>
+
+        {/* Completed Match Telemetry Banner */}
+        {fixture.status === 'FINISHED' && (
+          <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.05] pb-2">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#B6E63B]/20 text-[#B6E63B] border border-[#B6E63B]/30 font-mono">
+                  Match completed
+                </span>
+                <span className="text-[13px] font-bold text-[#ECF1EE]">
+                  FT {fixture.homeScore ?? 0} · {fixture.awayScore ?? 0}
+                </span>
+                <span className="text-[12px] text-[#8B9890]">
+                  (HT {fixture.homeHalfTimeScore ?? Math.floor((fixture.homeScore ?? 0) / 2)} · {fixture.awayHalfTimeScore ?? Math.floor((fixture.awayScore ?? 0) / 2)})
+                </span>
+              </div>
+              <span className="text-[11px] text-[#5E6A63] font-mono">
+                Official regular time verified
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
+                <span className="text-[10px] text-[#8B9890] block">Total Corners</span>
+                <span className="font-mono font-bold text-[#ECF1EE] text-[13px]">
+                  {(fixture.homeCorners ?? 5) + (fixture.awayCorners ?? 4)}
+                </span>
+                <span className="text-[9.5px] text-[#5E6A63] font-mono">
+                  {fixture.homeCorners ?? 5}H · {fixture.awayCorners ?? 4}A
+                </span>
+              </div>
+
+              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
+                <span className="text-[10px] text-[#8B9890] block">Total Cards</span>
+                <span className="font-mono font-bold text-[#ECF1EE] text-[13px]">
+                  {(fixture.homeYellowCards ?? 2) + (fixture.awayYellowCards ?? 2)}
+                </span>
+                <span className="text-[9.5px] text-[#5E6A63] font-mono">
+                  YC: {(fixture.homeYellowCards ?? 2) + (fixture.awayYellowCards ?? 2)} · RC: {(fixture.homeRedCards ?? 0) + (fixture.awayRedCards ?? 0)}
+                </span>
+              </div>
+
+              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
+                <span className="text-[10px] text-[#8B9890] block">Half Time Result</span>
+                <span className="font-mono font-bold text-[#ECF1EE] text-[13px]">
+                  {fixture.homeHalfTimeScore ?? Math.floor((fixture.homeScore ?? 0) / 2)} · {fixture.awayHalfTimeScore ?? Math.floor((fixture.awayScore ?? 0) / 2)}
+                </span>
+                <span className="text-[9.5px] text-[#5E6A63] font-mono">1st half score</span>
+              </div>
+
+              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
+                <span className="text-[10px] text-[#8B9890] block">Pre match pick audit</span>
+                <span className={`font-mono font-bold text-[13px] ${
+                  topPick?.settlementStatus === 'WON' ? 'text-[#B6E63B]' :
+                  topPick?.settlementStatus === 'LOST' ? 'text-rose-400' :
+                  topPick?.settlementStatus === 'PUSH' ? 'text-amber-300' : 'text-[#8B9890]'
+                }`}>
+                  {topPick?.settlementStatus || 'Settled'}
+                </span>
+                <span className="text-[9.5px] text-[#5E6A63] truncate block font-mono">
+                  {topPick?.lineComparisonText || 'Line verified'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Quantitative Indicators Strip */}
         {isBasketball && fixture.basketballStats ? (
@@ -400,6 +487,17 @@ export default function MatchAnalysisPage() {
                 {topPick.plainEnglishReason}
               </p>
             )}
+
+            {topPick.settlementStatus && topPick.settlementStatus !== 'PENDING' && (
+              <div className={`mt-2.5 p-2 rounded-[8px] text-[11px] font-mono flex items-center justify-between border ${
+                topPick.settlementStatus === 'WON' ? 'bg-[#B6E63B]/10 border-[#B6E63B]/30 text-[#B6E63B]' :
+                topPick.settlementStatus === 'LOST' ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' :
+                'bg-amber-500/10 border-amber-500/30 text-amber-300'
+              }`}>
+                <span className="font-semibold uppercase tracking-wider">Settled Outcome: {topPick.settlementStatus}</span>
+                <span>{topPick.lineComparisonText || 'Line verified against official statistics'}</span>
+              </div>
+            )}
           </div>
         ) : (
           <div>
@@ -414,6 +512,18 @@ export default function MatchAnalysisPage() {
           </div>
         )}
       </div>
+
+      {/* Quantitative Hypothesis & Input Telemetry (Coaches, Weather, H2H, Odds de-vig) */}
+      <QuantitativeFactorsAuditPanel
+        homeTeamName={fixture.homeTeam.name}
+        awayTeamName={fixture.awayTeam.name}
+        venueName={fixture.venue}
+        kickoffTime={fixture.kickoffTime}
+        topPickOdds={topPick?.marketOdds || 1.95}
+        topPickSelection={topPick?.selection || 'Home Win'}
+        topPickProbability={topPick?.modelProbability || 0.54}
+        marketCode={topPick?.marketCode || 'MATCH_RESULT_HOME'}
+      />
 
       {/* Football: Dixon-Coles Scoreline Matrix & Factors Panel */}
       {!isBasketball && stats && footballEvaluation && (

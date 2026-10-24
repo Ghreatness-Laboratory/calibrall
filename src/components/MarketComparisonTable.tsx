@@ -187,6 +187,19 @@ export default function MarketComparisonTable({
                   </span>
                 </>
               )}
+              {pred.settlementStatus && pred.settlementStatus !== 'PENDING' && (
+                <>
+                  <span>·</span>
+                  <span className={`px-1.5 py-0.2 rounded-full font-mono text-[9px] font-bold ${
+                    pred.settlementStatus === 'WON' ? 'bg-[#B6E63B]/20 text-[#B6E63B] border border-[#B6E63B]/30' :
+                    pred.settlementStatus === 'LOST' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                    pred.settlementStatus === 'PUSH' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                    'bg-zinc-500/20 text-zinc-400 border border-zinc-500/30'
+                  }`}>
+                    {pred.settlementStatus}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -216,6 +229,19 @@ export default function MarketComparisonTable({
         {/* Expanded detail */}
         {isExpanded && (
           <div className="px-3.5 pb-3.5 pt-1 bg-[#151E19]/60 border-t border-white/[0.05] text-[12px] space-y-2">
+            {pred.settlementStatus && pred.settlementStatus !== 'PENDING' && (
+              <div className="p-2.5 rounded-[8px] bg-[#101713] border border-white/[0.07] text-[11px] flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[#8B9890] font-mono text-[10px] uppercase">Settlement Outcome:</span>
+                <span className={`font-mono font-semibold ${
+                  pred.settlementStatus === 'WON' ? 'text-[#B6E63B]' :
+                  pred.settlementStatus === 'LOST' ? 'text-rose-400' :
+                  pred.settlementStatus === 'PUSH' ? 'text-amber-300' : 'text-[#8B9890]'
+                }`}>
+                  {cleanDisplayText(pred.lineComparisonText || pred.settlementStatus)}
+                </span>
+              </div>
+            )}
+
             <div className="text-[11px] text-[#8B9890] leading-relaxed">
               <span className="text-[#ECF1EE] font-medium">Settlement rule: </span>
               {cleanDisplayText(pred.settlementRule)}

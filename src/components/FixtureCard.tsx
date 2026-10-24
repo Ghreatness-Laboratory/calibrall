@@ -3,11 +3,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Fixture, MarketPrediction } from '@/types';
-import { Bookmark, ChevronRight } from 'lucide-react';
+import { Bookmark, ChevronRight, CheckCircle2, XCircle, MinusCircle, AlertCircle } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
 import TeamCrest from '@/components/TeamCrest';
 import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { settleMarketPrediction, extractMatchStats } from '@/lib/prediction/settlementEngine';
 
 interface Props {
   fixture: Fixture;
@@ -38,6 +39,16 @@ export default function FixtureCard({
   };
 
   const isFinished = fixture.status === 'FINISHED';
+  const isInPlay = fixture.status === 'IN_PLAY';
+  const isPaused = fixture.status === 'PAUSED';
+
+  const stats = useMemo(() => extractMatchStats(fixture), [fixture]);
+
+  const settledTopPrediction = useMemo(() => {
+    if (!topPrediction || !isFinished) return null;
+    return settleMarketPrediction(topPrediction, stats);
+  }, [topPrediction, isFinished, stats]);
+
   const kickoffFormatted = useMemo(() => {
     try {
       const d = new Date(fixture.kickoffTime);
@@ -88,11 +99,26 @@ export default function FixtureCard({
           <span className="truncate">{cleanDisplayText(fixture.competition.name)}</span>
           <span className="text-[#5E6A63]">·</span>
           <span className="tabular-nums shrink-0">MD {fixture.matchday}</span>
+          {isFinished && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-[#B6E63B]/[0.12] text-[#B6E63B] font-mono text-[9.5px] font-semibold border border-[#B6E63B]/30">
+              Match completed
+            </span>
+          )}
+          {isInPlay && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-rose-500/20 text-rose-300 font-mono text-[9.5px] font-semibold animate-pulse border border-rose-500/30">
+              LIVE {stats.minute}&apos;
+            </span>
+          )}
+          {isPaused && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-amber-500/20 text-amber-300 font-mono text-[9.5px] font-semibold border border-amber-500/30">
+              HT
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[11.5px] text-[#8B9890] tabular-nums" suppressHydrationWarning>
-            {isFinished ? 'FT' : kickoffFormatted}
+            {isFinished ? 'FT' : (isInPlay ? `${stats.minute}'` : kickoffFormatted)}
           </span>
           <button
             onClick={handleToggleBookmark}
@@ -128,7 +154,7 @@ export default function FixtureCard({
               </span>
               {isFinished && (
                 <span className="text-[13px] font-[600] text-[#ECF1EE] ml-auto mr-2 tabular-nums">
-                  {fixture.homeScore ?? 0}
+                  {stats.homeScore}
                 </span>
               )}
             </div>
@@ -145,7 +171,7 @@ export default function FixtureCard({
               </span>
               {isFinished && (
                 <span className="text-[13px] font-[600] text-[#ECF1EE] ml-auto mr-2 tabular-nums">
-                  {fixture.awayScore ?? 0}
+                  {stats.awayScore}
                 </span>
               )}
             </div>
@@ -157,6 +183,20 @@ export default function FixtureCard({
             <ChevronRight className="w-4 h-4 text-[#B6E63B]" strokeWidth={2} />
           </div>
         </div>
+
+        {/* When match is completed, show completed statistics row */}
+        {isFinished && (
+          <div className="mt-2 pt-2 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-2 text-[10.5px] text-[#8B9890] font-mono">
+            <div>
+              <span className="text-[#ECF1EE] font-semibold">FT: {stats.homeScore} · {stats.awayScore}</span>
+              <span className="text-[#5E6A63] ml-1.5">(HT: {stats.homeHalfTimeScore} · {stats.awayHalfTimeScore})</span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span>Corners: {stats.totalCorners} ({stats.homeCorners}H · {stats.awayCorners}A)</span>
+              <span>Cards: {stats.totalCardPoints}</span>
+            </div>
+          </div>
+        )}
 
         {/* Pick block inset in a raised surface (radius 11) */}
         <div className="mt-2.5">
@@ -189,13 +229,34 @@ export default function FixtureCard({
                 </span>
               </div>
 
+              {/* Settlement Banner when match completed */}
+              {settledTopPrediction && (
+                <div className={`mt-1 px-2.5 py-1.5 rounded-[8px] flex items-center justify-between text-[11px] font-mono border ${
+                  settledTopPrediction.settlementStatus === 'WON'
+                    ? 'bg-[#B6E63B]/[0.12] border-[#B6E63B]/40 text-[#B6E63B]'
+                    : settledTopPrediction.settlementStatus === 'PUSH'
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                    : 'bg-white/[0.04] border-white/[0.08] text-[#8B9890]'
+                }`}>
+                  <div className="flex items-center gap-1.5">
+                    {settledTopPrediction.settlementStatus === 'WON' && <CheckCircle2 className="w-3.5 h-3.5 text-[#B6E63B]" />}
+                    {settledTopPrediction.settlementStatus === 'LOST' && <XCircle className="w-3.5 h-3.5 text-rose-400" />}
+                    {settledTopPrediction.settlementStatus === 'PUSH' && <MinusCircle className="w-3.5 h-3.5 text-amber-400" />}
+                    <span>{cleanDisplayText(settledTopPrediction.lineComparisonText)}</span>
+                  </div>
+                  <span className="font-bold uppercase tracking-wider">{settledTopPrediction.settlementStatus}</span>
+                </div>
+              )}
+
               {/* Row 3: 4px progress bar below */}
-              <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-300 bg-[#B6E63B]"
-                  style={{ width: `${probProgress}%` }}
-                />
-              </div>
+              {!isFinished && (
+                <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300 bg-[#B6E63B]"
+                    style={{ width: `${probProgress}%` }}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-[#151E19] rounded-[11px] p-2.5 flex items-center justify-between text-[11.5px] text-[#8B9890]">

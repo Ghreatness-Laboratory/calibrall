@@ -378,6 +378,8 @@ export interface MarketPrediction {
   engineVersion?: string;
   dataCompletenessScore?: number;
   abstainReason?: string;
+  actualStatValue?: string | number;
+  lineComparisonText?: string;
 }
 
 export type FixtureProfile = 
