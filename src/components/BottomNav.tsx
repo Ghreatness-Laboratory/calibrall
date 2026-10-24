@@ -91,12 +91,13 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#0F1814]/90 backdrop-blur-md border-t border-[#1B2A23]"
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#0D1117] border-t border-[#232C3A] flex flex-col justify-between"
       style={{
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        height: 'calc(84px + env(safe-area-inset-bottom, 0px))',
+        paddingBottom: 'env(safe-area-inset-bottom, 8px)',
       }}
     >
-      <div className="grid grid-cols-5 w-full h-[62px]">
+      <div className="grid grid-cols-5 w-full pt-1.5 px-1 items-center">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -104,22 +105,24 @@ export default function BottomNav() {
               key={tab.id}
               href={tab.href}
               aria-current={tab.isActive ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center transition-colors duration-150 touch-press select-none ${
-                tab.isActive
-                  ? 'text-[#B8E63A]'
-                  : 'text-[#8B9B93] hover:text-[#E9EFEB]'
-              }`}
+              className="flex flex-col items-center justify-center transition-colors duration-120 touch-press select-none py-0.5"
             >
-              {tab.isActive && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-[2px] bg-[#B8E63A] rounded-full" />
-              )}
-              <div className="relative pt-0.5">
-                <Icon className="w-[21px] h-[21px]" strokeWidth={1.7} />
+              <div
+                className={`w-[48px] h-[28px] rounded-full flex items-center justify-center transition-colors ${
+                  tab.isActive ? 'bg-[#A8E05F]/[0.14]' : 'bg-transparent'
+                }`}
+              >
+                <Icon
+                  className={`w-[22px] h-[22px] transition-colors ${
+                    tab.isActive ? 'text-[#A8E05F]' : 'text-[#7B8696]'
+                  }`}
+                  strokeWidth={1.8}
+                />
               </div>
 
               <span
-                className={`text-[10px] font-[500] leading-tight mt-0.5 whitespace-nowrap tracking-tight ${
-                  tab.isActive ? 'text-[#B8E63A]' : 'text-[#8B9B93]'
+                className={`text-[10.5px] font-medium leading-none mt-1 whitespace-nowrap transition-colors ${
+                  tab.isActive ? 'text-[#A8E05F]' : 'text-[#7B8696]'
                 }`}
               >
                 {tab.label}
@@ -127,6 +130,11 @@ export default function BottomNav() {
             </Link>
           );
         })}
+      </div>
+
+      {/* Thin home-indicator safe area at the very bottom */}
+      <div className="w-full flex justify-center pb-1">
+        <div className="w-[134px] h-[4px] bg-[#EDF1F6]/20 rounded-full" />
       </div>
     </nav>
   );

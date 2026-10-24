@@ -3,17 +3,11 @@
 import React from 'react';
 import Link from 'next/link';
 import { 
-  ArrowRight, 
-  BarChart3, 
-  TrendingUp, 
-  Zap, 
-  AlertCircle,
   ChevronRight,
   ShieldCheck,
   Calendar,
-  Layers,
-  Cpu,
-  Target
+  Zap,
+  AlertCircle
 } from 'lucide-react';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
@@ -27,7 +21,7 @@ import HomeCreatorsTeaser from '@/components/creators/HomeCreatorsTeaser';
 
 export default function HomeClient() {
   const { sport, isSwitching } = useSport();
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures('ALL', 'ALL', sport);
+  const { fixtures, isLoading } = useLiveFixtures('ALL', 'ALL', sport);
 
   const isBasketball = sport === 'basketball';
 
@@ -63,293 +57,200 @@ export default function HomeClient() {
     };
   });
 
-  const footballModels = [
-    { 
-      title: 'Dixon Coles goals model', 
-      subtitle: 'Bivariate Poisson joint distributions',
-      icon: Cpu 
-    },
-    { 
-      title: 'NegBinomial corner lines', 
-      subtitle: 'Volume variance and game state',
-      icon: TrendingUp 
-    },
-    { 
-      title: 'Grounded explanations', 
-      subtitle: 'Quantitative audits, zero hype',
-      icon: ShieldCheck 
-    },
-  ];
-
-  const basketballModels = [
-    { 
-      title: 'Exact Efficiency Model', 
-      subtitle: 'A offense = OffEff × Poss; A defense = DefEff × OppPoss',
-      icon: Cpu 
-    },
-    { 
-      title: 'Possessions & Pace Normalization', 
-      subtitle: 'Zero arbitrary biases or unverified inflation',
-      icon: TrendingUp 
-    },
-    { 
-      title: 'Grounded mathematical audit', 
-      subtitle: 'Full transparent calculation steps exposed',
-      icon: ShieldCheck 
-    },
-  ];
-
-  // Skeleton Loader for smooth transitions
-  if (isSwitching) {
-    return (
-      <div className="space-y-6 py-4 animate-pulse">
-        <div className="h-4 w-32 bg-[#151E19] rounded-[6px]" />
-        <div className="h-14 w-full max-w-md bg-[#151E19] rounded-[10px]" />
-        <div className="h-10 w-full bg-[#151E19] rounded-[11px]" />
-        <div className="grid grid-cols-3 gap-2.5">
-          <div className="h-16 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
-          <div className="h-16 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
-          <div className="h-16 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
-        </div>
-        <div className="h-44 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
-      </div>
-    );
-  }
-
   const brierValue = isBasketball 
     ? VERIFIED_NBA_PERFORMANCE_REPORT.brierScore.toFixed(3) 
     : VERIFIED_PERFORMANCE_REPORT.brierScore.toFixed(3);
 
-  return (
-    <div className="space-y-3 py-1">
-      {/* 4. HOME SCREEN HERO */}
-      <section className="space-y-3 pt-0.5">
-        {/* Mono Eyebrow */}
-        <div className="text-[10.5px] font-mono uppercase tracking-[0.14em] text-[#B8E63A] font-[600]">
-          STATISTICAL EDGE ENGINE
+  if (isSwitching) {
+    return (
+      <div className="space-y-3 py-2 animate-pulse">
+        <div className="h-6 w-48 bg-[#141A23] rounded-[10px]" />
+        <div className="h-12 w-full bg-[#141A23] rounded-[14px]" />
+        <div className="grid grid-cols-3 gap-2">
+          <div className="h-[66px] bg-[#141A23] rounded-[14px]" />
+          <div className="h-[66px] bg-[#141A23] rounded-[14px]" />
+          <div className="h-[66px] bg-[#141A23] rounded-[14px]" />
         </div>
+        <div className="h-44 bg-[#141A23] rounded-[18px]" />
+      </div>
+    );
+  }
 
-        {/* H1 Heading: 22px/1.2 weight 700 */}
-        <h1 className="text-[22px] leading-[1.2] font-[700] tracking-[-0.015em] text-[#E9EFEB]">
-          {isBasketball ? (
-            <>
-              Stop guessing NBA margins.<br />
-              <span className="text-[#B8E63A]">Calculate where the edge lies.</span>
-            </>
-          ) : (
-            <>
-              Stop guessing match winners.<br />
-              <span className="text-[#B8E63A]">Find where the edge lies.</span>
-            </>
-          )}
+  return (
+    <div className="space-y-4 py-1">
+      {/* Hero headline 22px: Both lines the same weight: line 1 white, line 2 muted. Do not color single words. */}
+      <section className="space-y-2 pt-1">
+        <h1 className="text-[22px] leading-[28px] font-semibold tracking-[-0.015em]">
+          <div className="text-[#EDF1F6]">
+            {isBasketball ? 'Stop guessing NBA margins.' : 'Stop guessing match winners.'}
+          </div>
+          <div className="text-[#8A95A5]">
+            {isBasketball ? 'Calculate where the edge lies.' : 'Find where the edge lies.'}
+          </div>
         </h1>
 
-        {/* Short description */}
-        <p className="text-[13px] font-[400] leading-[1.55] text-[#8B9B93] max-w-lg">
+        {/* Short description 13px */}
+        <p className="text-[13px] leading-[18px] text-[#8A95A5]">
           {isBasketball
-            ? 'Calibrall independently models offensive and defensive efficiency per 100 possessions to surface verified NBA spreads, totals, and leans.'
-            : 'Calibrall evaluates goals, corners, both teams to score, cards and 1X2 lines to surface verified expected value, and abstains when data is thin.'}
+            ? 'Possession efficiency models for NBA spreads, totals, and leans. We abstain when the edge is thin.'
+            : 'Probabilistic models for goals, corners, cards and 1X2. We abstain when the data is thin.'}
         </p>
 
         {/* Action Buttons */}
-        <div className="space-y-2 pt-0.5">
-          {/* Primary Button */}
+        <div className="space-y-2 pt-1">
+          {/* Primary CTA 46px high, label 15 semibold ("Open analytics terminal", no arrow) */}
           <Link
             href="/dashboard"
-            className="w-full h-[44px] rounded-[12px] bg-[#B8E63A] hover:bg-[#c8ee47] active:bg-[#a5cf30] text-[#0A0F0D] text-[13.5px] font-[600] flex items-center justify-center gap-2 transition-transform duration-140 active:scale-[0.985] touch-press"
+            className="w-full h-[46px] rounded-[14px] bg-[#A8E05F] hover:bg-[#b5e870] active:scale-[0.98] text-[#0D1117] text-[15px] font-semibold flex items-center justify-center transition-all duration-120 touch-press"
           >
-            <span>{isBasketball ? 'Launch NBA analytics terminal' : 'Launch analytics terminal'}</span>
-            <ArrowRight className="w-4 h-4" strokeWidth={1.7} />
+            <span>Open analytics terminal</span>
           </Link>
 
-          {/* Ghost Row: Verify track record with Brier in lime mono */}
+          {/* Secondary row 44px (surface, 1px border, chevron) */}
           <Link
             href="/performance"
-            className="w-full h-[44px] px-4 rounded-[11px] border border-white/[0.07] bg-[#101713] hover:bg-[#151E19] text-[#ECF1EE] text-[13px] font-medium flex items-center justify-between transition-transform duration-150 active:scale-[0.98]"
+            className="w-full h-[44px] px-3.5 rounded-[14px] border border-[#232C3A] bg-[#141A23] hover:bg-[#1A222E] active:scale-[0.98] text-[#EDF1F6] text-[13px] font-medium flex items-center justify-between transition-all duration-120 touch-press"
           >
             <span>Verify track record</span>
-            <div className="flex items-center gap-1.5 font-mono text-[11.5px] tabular-nums">
-              <span className="text-[#5E6A63]">Brier</span>
-              <span className="text-[#B6E63B] font-semibold">{brierValue}</span>
+            <div className="flex items-center gap-1.5 text-[12px] text-[#8A95A5] tabular-nums">
+              <span>Brier {brierValue}</span>
+              <ChevronRight className="w-4 h-4 text-[#8A95A5]" strokeWidth={2} />
             </div>
           </Link>
         </div>
 
-        {/* Row of Three Equal Stat Tiles */}
-        <div className="grid grid-cols-3 gap-2.5 pt-1">
-          <div className="p-3 bg-[#101713] border border-white/[0.07] rounded-[14px] flex flex-col justify-center">
-            <span className="text-[10px] font-mono uppercase tracking-[0.08em] text-[#8B9890]">
-              BRIER SCORE
+        {/* Stat tiles: 3 across, 66px high, label 11 muted, value 20 semibold */}
+        <div className="grid grid-cols-3 gap-2 pt-1">
+          <div className="h-[66px] p-2.5 bg-[#141A23] border border-[#232C3A] rounded-[14px] flex flex-col justify-between">
+            <span className="text-[11px] text-[#8A95A5] font-normal leading-tight">
+              Brier score
             </span>
-            <span className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums mt-0.5">
+            <span className="text-[20px] font-semibold text-[#EDF1F6] tabular-nums leading-none">
               {brierValue}
             </span>
           </div>
 
-          <div className="p-3 bg-[#101713] border border-white/[0.07] rounded-[14px] flex flex-col justify-center">
-            <span className="text-[10px] font-mono uppercase tracking-[0.08em] text-[#8B9890]">
-              MARKETS
+          <div className="h-[66px] p-2.5 bg-[#141A23] border border-[#232C3A] rounded-[14px] flex flex-col justify-between">
+            <span className="text-[11px] text-[#8A95A5] font-normal leading-tight">
+              Markets
             </span>
-            <span className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums mt-0.5">
+            <span className="text-[20px] font-semibold text-[#EDF1F6] tabular-nums leading-none">
               {isBasketball ? '3' : '18'}
             </span>
           </div>
 
-          <div className="p-3 bg-[#101713] border border-white/[0.07] rounded-[14px] flex flex-col justify-center">
-            <span className="text-[10px] font-mono uppercase tracking-[0.08em] text-[#8B9890]">
-              MIN. EDGE
+          <div className="h-[66px] p-2.5 bg-[#141A23] border border-[#232C3A] rounded-[14px] flex flex-col justify-between">
+            <span className="text-[11px] text-[#8A95A5] font-normal leading-tight">
+              Min. edge
             </span>
-            <span className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums mt-0.5">
+            <span className="text-[20px] font-semibold text-[#EDF1F6] tabular-nums leading-none">
               +3.0%
             </span>
-          </div>
-        </div>
-
-        {/* Models Grouped List Card */}
-        <div className="space-y-2 pt-2">
-          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#5E6A63] font-semibold">
-            INFERENCE MODELS
-          </div>
-          <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] divide-y divide-white/[0.07] overflow-hidden">
-            {(isBasketball ? basketballModels : footballModels).map((item, idx) => {
-              const Icon = item.icon;
-              return (
-                <div key={idx} className="p-3.5 flex items-center gap-3">
-                  <div className="w-[30px] h-[30px] min-w-[30px] rounded-[8px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] flex items-center justify-center shrink-0">
-                    <Icon className="w-4 h-4" strokeWidth={2} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-[13px] font-semibold text-[#ECF1EE] leading-tight">
-                      {item.title}
-                    </h3>
-                    <p className="text-[11.5px] text-[#8B9890] leading-tight mt-0.5 truncate">
-                      {item.subtitle}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       </section>
 
       {/* NBA Interactive Tool (when Basketball active) */}
       {isBasketball && (
-        <section className="pt-2">
+        <section className="pt-1">
           <NBAScoreProjectionTool />
         </section>
       )}
 
-      {/* Live Fixtures Preview */}
+      {/* Live fixtures heading + small "Pipeline active" dot chip beside it */}
       <section className="space-y-3 pt-2">
-        <div className="flex items-center justify-between pb-2 border-b border-white/[0.07]">
-          <h2 className="text-[13px] font-semibold text-[#ECF1EE]">
-            {isBasketball ? 'NBA Matchups Today' : 'Live Fixtures Today'}
+        <div className="flex items-center justify-between pb-1">
+          <h2 className="text-[16px] font-semibold text-[#EDF1F6]">
+            {isBasketball ? 'Live matchups' : 'Live fixtures'}
           </h2>
-          <span 
-            suppressHydrationWarning
-            className="text-[10px] font-mono px-2 py-0.5 rounded-[5px] border border-white/[0.07] bg-[#151E19] text-[#B6E63B] tabular-nums"
-          >
-            {liveDataAvailable ? 'Active pipeline' : (lastUpdated ? `Sync ${lastUpdated}` : 'Live')}
-          </span>
+
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#141A23] border border-[#232C3A] text-[11px] text-[#8A95A5]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A8E05F]" />
+            <span>Pipeline active</span>
+          </div>
         </div>
 
+        {/* Fixtures list: 12px gaps */}
         {fixtures.length > 0 ? (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-              {isBasketball
-                ? fixtures.slice(0, 3).map((f) => <NBAGameCard key={f.id} fixture={f} />)
-                : showcaseFootballFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
-                    <FixtureCard
-                      key={fixture.id}
-                      fixture={fixture}
-                      topPrediction={topPick}
-                      noRecommendationReason={noRecommendationReason}
-                    />
-                  ))}
-            </div>
+          <div className="space-y-3">
+            {isBasketball
+              ? fixtures.slice(0, 3).map((f) => <NBAGameCard key={f.id} fixture={f} />)
+              : showcaseFootballFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
+                  <FixtureCard
+                    key={fixture.id}
+                    fixture={fixture}
+                    topPrediction={topPick}
+                    noRecommendationReason={noRecommendationReason}
+                  />
+                ))}
 
-            <div className="pt-1 flex items-center justify-between text-[11.5px] text-[#5E6A63]">
+            <div className="pt-1 flex items-center justify-between text-[12px] text-[#5F6B7C]">
               <span>
-                Displaying {Math.min(3, fixtures.length)} of {fixtures.length} {isBasketball ? 'matchups' : 'scheduled fixtures'}
+                Showing {Math.min(3, fixtures.length)} of {fixtures.length} {isBasketball ? 'games' : 'fixtures'}
               </span>
-              <Link href="/matches" className="text-[#B6E63B] hover:underline flex items-center gap-1 font-medium">
-                <span>View all fixtures & markets</span>
-                <ChevronRight className="w-3.5 h-3.5" strokeWidth={2} />
+              <Link href="/matches" className="text-[#A8E05F] hover:underline flex items-center gap-1 font-semibold text-[13px]">
+                <span>View all fixtures</span>
+                <ChevronRight className="w-4 h-4" strokeWidth={2} />
               </Link>
             </div>
-          </>
+          </div>
         ) : (
-          <div className="p-6 rounded-[14px] bg-[#101713] border border-dashed border-white/[0.12] text-center space-y-2 flex flex-col items-center justify-center">
-            <div className="w-[34px] h-[34px] rounded-[9px] bg-[#151E19] border border-white/[0.07] flex items-center justify-center text-[#8B9890]">
-              <Calendar className="w-4 h-4" strokeWidth={2} />
+          <div className="p-6 rounded-[18px] bg-[#141A23] border border-[#232C3A] text-center space-y-2 flex flex-col items-center justify-center">
+            <div className="w-[36px] h-[36px] rounded-[10px] bg-[#1A222E] border border-[#232C3A] flex items-center justify-center text-[#8A95A5]">
+              <Calendar className="w-4 h-4" strokeWidth={1.8} />
             </div>
-            <div className="text-[13px] font-semibold text-[#ECF1EE]">
-              No games scheduled for today.
+            <div className="text-[14px] font-semibold text-[#EDF1F6]">
+              No games scheduled today
             </div>
-            <p className="text-[11.5px] text-[#8B9890] max-w-xs mx-auto leading-relaxed">
-              Upcoming matchups will display automatically. Check the upcoming fixtures tab.
+            <p className="text-[12px] text-[#8A95A5] max-w-xs leading-relaxed">
+              Upcoming matchups will appear here automatically. Check the upcoming tab in Fixtures.
             </p>
           </div>
         )}
       </section>
 
-      {/* 5. ARCHITECTURE SECTION */}
-      <section className="pt-2 space-y-3">
-        <div className="space-y-1 text-left">
-          <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#5aa9e6] font-semibold block">
-            ARCHITECTURE PHILOSOPHY
-          </span>
-          <h2 className="text-[18px] font-bold leading-[1.25] tracking-[-0.02em] text-[#ECF1EE] text-left">
-            Why match winners are often the worst market
-          </h2>
-          <p className="text-[13px] leading-[1.55] text-[#8B9890] text-left max-w-lg">
-            Standard prediction services force a 1X2 pick on every match regardless of efficiency. Calibrall scans multiple lines across the authorized catalog to isolate true mispricings, and abstains when edges are absent.
-          </p>
-        </div>
+      {/* Philosophy cards */}
+      <section className="pt-2 space-y-2.5">
+        <h2 className="text-[16px] font-semibold text-[#EDF1F6]">
+          Why match winners are often the worst market
+        </h2>
+        <p className="text-[13px] leading-[18px] text-[#8A95A5]">
+          Standard tipsters force a 1X2 pick on every fixture. Calibrall evaluates multiple lines to find calibrated value and abstains when edges are absent.
+        </p>
 
-        {/* Two Compact Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-          <div className="p-3.5 bg-[#101713] border border-white/[0.07] rounded-[14px] space-y-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-[30px] h-[30px] rounded-[8px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] flex items-center justify-center shrink-0">
-                <Zap className="w-4 h-4" strokeWidth={2} />
-              </div>
-              <h3 className="text-[13px] font-semibold text-[#ECF1EE]">
-                Multi market ranking
-              </h3>
+          <div className="p-3.5 bg-[#141A23] border border-[#232C3A] rounded-[18px] space-y-1.5">
+            <div className="flex items-center gap-2 text-[#A8E05F]">
+              <Zap className="w-4 h-4" strokeWidth={2} />
+              <h3 className="text-[14px] font-semibold text-[#EDF1F6]">Multi market ranking</h3>
             </div>
-            <p className="text-[12px] leading-[1.55] text-[#8B9890]">
-              We evaluate goals, corners, cards, and result lines simultaneously to isolate where the greatest statistical edge resides.
+            <p className="text-[12.5px] leading-[17px] text-[#8A95A5]">
+              We evaluate totals, both teams to score, corners, cards and results simultaneously to find where real value lies.
             </p>
           </div>
 
-          <div className="p-3.5 bg-[#101713] border border-white/[0.07] rounded-[14px] space-y-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-[30px] h-[30px] rounded-[8px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-4 h-4" strokeWidth={2} />
-              </div>
-              <h3 className="text-[13px] font-semibold text-[#ECF1EE]">
-                Discipline to abstain
-              </h3>
+          <div className="p-3.5 bg-[#141A23] border border-[#232C3A] rounded-[18px] space-y-1.5">
+            <div className="flex items-center gap-2 text-[#A8E05F]">
+              <ShieldCheck className="w-4 h-4" strokeWidth={2} />
+              <h3 className="text-[14px] font-semibold text-[#EDF1F6]">Discipline to abstain</h3>
             </div>
-            <p className="text-[12px] leading-[1.55] text-[#8B9890]">
-              When modeled probability fails to clear the required margin of safety (+3.0% edge), the engine abstains rather than inventing a pick.
+            <p className="text-[12.5px] leading-[17px] text-[#8A95A5]">
+              When modeled probability fails to clear the hurdle (+3.0% edge), the engine abstains rather than inventing a pick.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Built by Ghreatness Labs Teaser Section */}
+      {/* Creators Teaser */}
       <HomeCreatorsTeaser />
 
-      {/* Responsible use disclaimer below as a muted amber-bordered card at 11.5px */}
-      <section className="pt-1">
-        <div className="rounded-[16px] p-3 border border-[#e3b341]/25 bg-[#0F1814] flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 text-[#e3b341] shrink-0 mt-0.5" strokeWidth={1.7} />
-          <div className="text-[11.5px] leading-[1.55] text-[#e3b341]/85">
-            <strong className="font-[600] text-[#E9EFEB]">Responsible use: </strong>
-            Calibrall is a statistical modeling terminal providing objective probabilistic estimates and Poisson matrices. Sporting events are stochastic systems; high modeled probability is never a guarantee of outcome. Calibrall does not accept wagers or provide financial advice. 18+ only.
+      {/* Responsible use disclaimer */}
+      <section className="pt-1 pb-4">
+        <div className="rounded-[18px] p-3.5 border border-[#E8B64A]/30 bg-[#141A23] flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-[#E8B64A] shrink-0 mt-0.5" strokeWidth={1.8} />
+          <div className="text-[12px] leading-[18px] text-[#8A95A5]">
+            <strong className="font-semibold text-[#EDF1F6]">Responsible use: </strong>
+            Calibrall is a statistical modeling terminal providing objective probabilistic estimates. Sporting events contain natural variance; modeled probabilities never guarantee outcomes. Calibrall does not accept wagers or provide financial advice. 18+ only.
           </div>
         </div>
       </section>

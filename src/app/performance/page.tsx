@@ -59,100 +59,74 @@ export default function PerformancePage() {
   ];
 
   return (
-    <div className="space-y-4 py-1">
-      {/* 1. HEADER: Mono eyebrow, H2, subtitle */}
-      <div className="space-y-1 pb-2 border-b border-white/[0.07]">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#B6E63B] font-semibold block">
-            MEASURED RESEARCH AUDIT ({isBasketball ? 'BASKETBALL / NBA' : 'FOOTBALL'})
-          </span>
-          <span className="text-[10px] font-mono text-[#8B9890] px-2 py-0.5 rounded-full bg-[#151E19] border border-white/[0.07]">
-            Model v3.0.0 PROMOTED
-          </span>
-        </div>
-        <h2 className="text-[19px] font-bold leading-[1.25] tracking-[-0.02em] text-[#ECF1EE]">
-          Model calibration & benchmark programme
-        </h2>
-        <p className="text-[12px] text-[#8B9890] leading-[1.4]">
-          Out of sample backtesting against naive baselines and devigged bookmaker closing odds. Real data only, real numbers, zero cherry picking.
+    <div className="space-y-3.5 py-1">
+      {/* 1. Header: 24px semibold with 13px muted subtitle */}
+      <div className="space-y-0.5">
+        <h1 className="text-[24px] font-semibold leading-[30px] text-[#EDF1F6] tracking-[-0.015em]">
+          Record & calibration
+        </h1>
+        <p className="text-[13px] text-[#8A95A5]">
+          Out of sample backtesting against naive baselines and closing odds. Real data only.
         </p>
-
-        {/* Small mono chip showing validation window */}
-        <div className="pt-1.5 flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#8B9890] bg-[#101713] border border-white/[0.07] px-3 h-[30px] rounded-[9px] tabular-nums">
-            <Calendar className="w-3.5 h-3.5 text-[#B6E63B]" strokeWidth={2} />
-            <span>Test Window: 2024 to 2025 Season (Untouched Holdout)</span>
-          </div>
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#8B9890] bg-[#101713] border border-white/[0.07] px-3 h-[30px] rounded-[9px] tabular-nums">
-            <Activity className="w-3.5 h-3.5 text-[#B6E63B]" strokeWidth={2} />
-            <span>Walk forward folds: 4 Seasons (2021/22 to 2024/25)</span>
-          </div>
-        </div>
       </div>
 
-      {/* 2. VERIFICATION CHARTER: Compact card */}
-      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-1.5">
-        <div className="flex items-center gap-2 text-[#B6E63B] font-semibold text-[12.5px]">
+      {/* Verification Charter: 18px radius surface card */}
+      <div className="bg-[#141A23] border border-[#232C3A] rounded-[18px] p-3.5 space-y-1.5">
+        <div className="flex items-center gap-2 text-[#A8E05F] font-semibold text-[13px]">
           <ShieldCheck className="w-4 h-4 shrink-0" strokeWidth={2} />
-          <span>The Calibrall Research Charter: Dual Benchmark Honesty Protocol</span>
+          <span>Research charter & dual benchmark protocol</span>
         </div>
-        <p className="text-[11.5px] leading-[1.55] text-[#8B9890]">
-          Every market family is tested against two distinct hurdles: (1) a <span className="text-[#ECF1EE] font-medium">Naive League Baseline</span> and (2) <span className="text-[#ECF1EE] font-medium">Devigged Sharp Bookmaker Closing Odds</span>. If the model fails to beat sharp closing odds out of sample (such as on 1X2 Match Winners, where skill vs market is \u22123.1%), its picks are strictly labeled <span className="text-[#E2AE45] font-mono font-medium">&ldquo;PROBABILITY ANALYSIS ONLY&rdquo;</span> and never claimed as betting value.
+        <p className="text-[12px] leading-[17px] text-[#8A95A5]">
+          Every market is tested against a naive baseline and devigged sharp bookmaker closing odds. Where the model does not beat sharp closing lines out of sample, picks are labeled probability analysis only.
         </p>
       </div>
 
-      {/* 3. OVERALL RESEARCH SCORECARD TILES */}
+      {/* Overall Scorecard Tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3">
-          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8B9890]">Overall Brier Score</div>
-          <div className="flex items-baseline gap-2 mt-1">
-            <div className="text-[20px] font-bold text-[#ECF1EE] font-mono tabular-nums">
+        <div className="bg-[#141A23] border border-[#232C3A] rounded-[14px] p-3 flex flex-col justify-between h-[80px]">
+          <div className="text-[11px] text-[#8A95A5]">Overall Brier score</div>
+          <div className="flex items-baseline gap-1.5">
+            <div className="text-[20px] font-semibold text-[#EDF1F6] tabular-nums">
               {researchAudit.overallBrierAfter.toFixed(3)}
             </div>
-            <div className="text-[10.5px] font-mono text-[#B6E63B] tabular-nums">
-              was {researchAudit.overallBrierBefore.toFixed(3)} (\u221212.1%)
+            <div className="text-[11px] text-[#A8E05F] tabular-nums">
+              (\u221212.1%)
             </div>
           </div>
-          <div className="text-[11px] text-[#5E6A63] mt-0.5">Lower is better (out of sample)</div>
+          <div className="text-[10.5px] text-[#5F6B7C]">Out of sample</div>
         </div>
 
-        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3">
-          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8B9890]">Logarithmic Loss</div>
-          <div className="flex items-baseline gap-2 mt-1">
-            <div className="text-[20px] font-bold text-[#ECF1EE] font-mono tabular-nums">
+        <div className="bg-[#141A23] border border-[#232C3A] rounded-[14px] p-3 flex flex-col justify-between h-[80px]">
+          <div className="text-[11px] text-[#8A95A5]">Logarithmic loss</div>
+          <div className="flex items-baseline gap-1.5">
+            <div className="text-[20px] font-semibold text-[#EDF1F6] tabular-nums">
               {researchAudit.overallLogLossAfter.toFixed(3)}
             </div>
-            <div className="text-[10.5px] font-mono text-[#B6E63B] tabular-nums">
-              was {researchAudit.overallLogLossBefore.toFixed(3)} (\u22124.1%)
+            <div className="text-[11px] text-[#A8E05F] tabular-nums">
+              (\u22124.1%)
             </div>
           </div>
-          <div className="text-[11px] text-[#5E6A63] mt-0.5">Strict multi class scoring</div>
+          <div className="text-[10.5px] text-[#5F6B7C]">Multi class scoring</div>
         </div>
 
-        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3">
-          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8B9890]">Calibration ECE</div>
-          <div className="flex items-baseline gap-2 mt-1">
-            <div className="text-[20px] font-bold text-[#B6E63B] font-mono tabular-nums">
+        <div className="bg-[#141A23] border border-[#232C3A] rounded-[14px] p-3 flex flex-col justify-between h-[80px]">
+          <div className="text-[11px] text-[#8A95A5]">Calibration ECE</div>
+          <div className="flex items-baseline gap-1.5">
+            <div className="text-[20px] font-semibold text-[#A8E05F] tabular-nums">
               1.8%
             </div>
-            <div className="text-[10.5px] font-mono text-[#8B9890] tabular-nums">
-              95% CI: [1.2%, 2.4%]
-            </div>
           </div>
-          <div className="text-[11px] text-[#5E6A63] mt-0.5">Expected Calibration Error</div>
+          <div className="text-[10.5px] text-[#5F6B7C]">Expected error</div>
         </div>
 
-        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3">
-          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8B9890]">Average CLV</div>
-          <div className="flex items-baseline gap-2 mt-1">
-            <div className="text-[20px] font-bold text-[#B6E63B] font-mono tabular-nums">
+        <div className="bg-[#141A23] border border-[#232C3A] rounded-[14px] p-3 flex flex-col justify-between h-[80px]">
+          <div className="text-[11px] text-[#8A95A5]">Average CLV</div>
+          <div className="flex items-baseline gap-1.5">
+            <div className="text-[20px] font-semibold text-[#A8E05F] tabular-nums">
               +2.8%
             </div>
-            <div className="text-[10.5px] font-mono text-[#8B9890] tabular-nums">
-              on Value Picks
-            </div>
           </div>
-          <div className="text-[11px] text-[#5E6A63] mt-0.5">Closing Line Value beat rate</div>
+          <div className="text-[10.5px] text-[#5F6B7C]">Closing line value</div>
         </div>
       </div>
 
