@@ -5,24 +5,18 @@ import Link from 'next/link';
 import { COMPETITIONS, getFixtureStatistics } from '@/lib/data/seedData';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
-import { MarketPrediction, SupportedOptionType, MarketPeriod, Team, RiskTier, MarketCategory } from '@/types';
-import TeamCrest from '@/components/TeamCrest';
+import { MarketPrediction, Team, RiskTier } from '@/types';
 import { 
-  CheckCircle2, 
   ArrowUpRight, 
-  ShieldCheck, 
-  AlertCircle,
   Sparkles,
   SlidersHorizontal,
-  Info
+  AlertCircle
 } from 'lucide-react';
 import { 
-  formatExpectedValue, 
   formatOdds, 
   formatSelectionName, 
-  getOptionTypeLabel, 
-  getPeriodLabel,
-  getRiskTierBadge
+  getOptionTypeLabel,
+  formatExpectedValue
 } from '@/lib/prediction/marketCatalog';
 import { checkDerby } from '@/lib/prediction/contextFactors';
 import { useSport } from '@/lib/context/SportContext';
@@ -127,14 +121,12 @@ export default function PredictionsPage() {
     return list;
   }, [fixtures, isBasketball]);
 
-  // Requirement 13: Daily "Safest Picks" across all leagues
-  // Top 5 SAFE picks, with variety rule: no more than 2 from the same market type/category
+  // Daily Safest Picks: Top 5 SAFE picks, max 2 per market type
   const safestPicks = useMemo(() => {
     const safeCandidates = allPredictions.filter(item => {
       const p = item.prediction;
       return p.riskTier === 'SAFE' && p.modelProbability >= 0.75;
     }).sort((a, b) => {
-      // Sort by combination of probability, confidence, and edge
       const confA = a.prediction.confidenceScore ?? 0.75;
       const confB = b.prediction.confidenceScore ?? 0.75;
       const scoreA = (a.prediction.modelProbability * 10) + (confA * 5) + ((a.prediction.edge ?? 0) * 8);
@@ -159,7 +151,7 @@ export default function PredictionsPage() {
     return selected;
   }, [allPredictions]);
 
-  // Helper to map option/market to market group filter
+  // Market Group matching helper
   const matchesMarketGroup = (p: MarketPrediction, group: MarketGroupFilter): boolean => {
     if (group === 'ALL') return true;
     if (group === 'goals') {
@@ -213,126 +205,167 @@ export default function PredictionsPage() {
     { id: 'ALL', label: 'All markets' },
     { id: 'results', label: 'Results & Double Chance' },
     { id: 'goals', label: 'Goals & BTTS' },
-    { id: 'handicap', label: 'Handicap (Asian & European)' },
+    { id: 'handicap', label: 'Handicap' },
     { id: 'goal_bounds', label: 'Goal Bounds' },
     { id: 'halves', label: 'Halves' },
     { id: 'corners', label: 'Corners' },
-    { id: 'cards', label: 'Cards & Bookings' },
+    { id: 'cards', label: 'Cards' },
   ];
 
   const basketballMarketFilters: { id: MarketGroupFilter; label: string }[] = [
     { id: 'ALL', label: 'All NBA markets' },
     { id: 'moneyline', label: 'Moneyline' },
     { id: 'spread', label: 'Point Spread' },
-    { id: 'total_points', label: 'Game Total Points' },
+    { id: 'total_points', label: 'Totals' },
   ];
 
   const activeMarketFilters = isBasketball ? basketballMarketFilters : footballMarketFilters;
 
-  const riskTierPills: { id: string; label: string; badgeColor: string }[] = [
-    { id: 'ALL', label: 'All Tiers', badgeColor: 'bg-white/10 text-white' },
-    { id: 'SAFE', label: 'Safe (75%+)', badgeColor: 'bg-[#b8e63a]/20 text-[#b8e63a]' },
-    { id: 'MODERATE', label: 'Moderate (60-75%)', badgeColor: 'bg-[#e3b341]/20 text-[#e3b341]' },
-    { id: 'RISKY', label: 'Risky (45-60%)', badgeColor: 'bg-orange-500/20 text-orange-400' },
+  const riskTierPills: { id: string; label: string }[] = [
+    { id: 'ALL', label: 'All Tiers' },
+    { id: 'SAFE', label: 'Safe (75%+)' },
+    { id: 'MODERATE', label: 'Moderate (60-75%)' },
+    { id: 'RISKY', label: 'Risky (45-60%)' },
   ];
+
+  // Helper for Tier Badge styles
+  const getTierBadgeStyle = (tier?: RiskTier) => {
+    if (tier === 'SAFE') {
+      return 'text-[#B6E63B] bg-[rgba(182,230,59,0.12)] border-[rgba(182,230,59,0.45)]';
+    }
+    if (tier === 'MODERATE') {
+      return 'text-[#E2AE45] bg-[rgba(226,174,69,0.12)] border-[rgba(226,174,69,0.45)]';
+    }
+    return 'text-[#F08A4B] bg-[rgba(240,138,75,0.12)] border-[rgba(240,138,75,0.45)]';
+  };
+
+  const getTeamCode = (team: Team): string => {
+    if (team.shortName && team.shortName.length <= 4) {
+      return team.shortName.slice(0, 3).toUpperCase();
+    }
+    return team.name.slice(0, 3).toUpperCase();
+  };
+
+  if (isSwitching) {
+    return (
+      <div className="space-y-4 py-3 animate-pulse">
+        <div className="h-6 w-48 bg-[#151E19] rounded-[6px]" />
+        <div className="h-24 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
+        <div className="h-48 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 py-1">
-      {/* Header */}
+      {/* 7. PICKS HEADER: H2 "Market intelligence" at 19px with one line 12px subtitle */}
       <div className="pb-2 border-b border-white/[0.07]">
         <h2 className="text-[19px] font-bold leading-[1.25] tracking-[-0.02em] text-[#ECF1EE]">
-          {isBasketball ? 'NBA Market Intelligence & Projections' : 'Market Intelligence & Prediction Engine'}
+          Market intelligence
         </h2>
         <p className="text-[12px] text-[#8B9890] mt-0.5 truncate">
           {isBasketball
-            ? 'Efficiency-based totals, spreads, and moneyline probability distribution.'
+            ? 'NBA possessions, defensive ratings and expected value projections.'
             : 'Multi-market evaluation across Goals, Results, Handicaps, Corners, and Cards.'}
         </p>
       </div>
 
-      {/* Slim Info Note */}
-      <div className="border-l-2 border-l-[#B6E63B] bg-[#101713] border-y border-r border-white/[0.05] px-3.5 py-2.5 rounded-r-[10px] text-[11.5px] leading-normal text-[#8B9890] flex items-center gap-2">
-        <Info className="w-4 h-4 text-[#B6E63B] shrink-0" strokeWidth={2} />
-        <p className="truncate">
-          <span className="font-medium text-[#ECF1EE]">Statistical estimate notice:</span> Modeled probabilities are mathematical projections, not guarantees.
-        </p>
+      {/* 7. RESPONSIBLE USE DISCLAIMER (SHOW ONCE AS A COMPACT AMBER CARD) */}
+      <div className="rounded-[14px] p-3.5 border border-[#E2AE45]/[0.28] bg-[#E2AE45]/[0.06] flex items-start gap-2.5">
+        <AlertCircle className="w-4 h-4 text-[#E2AE45] shrink-0 mt-0.5" strokeWidth={2} />
+        <div className="text-[11px] leading-[1.55] text-[#E2AE45]/90">
+          <strong className="font-semibold text-[#ECF1EE]">Responsible use disclaimer: </strong>
+          Calibrall provides probabilistic statistical models and mathematical projections. Sports outcomes are stochastic; high modeled probability is never a guarantee. Strictly 18+.
+        </div>
       </div>
 
-      {/* DAILY SAFEST PICKS SECTION */}
+      {/* 7. DAILY SAFEST PICKS SECTION */}
       {safestPicks.length > 0 && (
-        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#B6E63B]" strokeWidth={2} />
-              <h3 className="text-[13px] font-semibold text-[#ECF1EE]">
-                Daily Safest Picks (Top 5 Across All Leagues)
+              <h3 className="text-[14px] font-[650] text-[#ECF1EE]">
+                Daily safest picks
               </h3>
-              <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded-[5px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] font-semibold border border-[#B6E63B]/30">
-                Max 2 per Market
+              <span className="text-[9.5px] font-mono px-2 py-0.5 rounded-[6px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] font-semibold border border-[rgba(182,230,59,0.45)]">
+                MAX 2 PER MARKET
               </span>
             </div>
-            <span className="text-[10.5px] text-[#5E6A63] font-mono">
-              High Confidence · ≥75% Probability
+            <span className="text-[11.5px] text-[#8B9890]">
+              Top 5 across all leagues, 75 percent or higher probability
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
             {safestPicks.map((item, idx) => {
               const p = item.prediction;
-              const tierBadge = getRiskTierBadge(p.riskTier);
+              const homeCode = getTeamCode(item.homeTeam);
+              const awayCode = getTeamCode(item.awayTeam);
+              const tierBadgeClass = getTierBadgeStyle(p.riskTier);
 
               return (
                 <Link
                   key={idx}
                   href={`/matches/${item.fixtureId}`}
-                  className="bg-[#151E19] border border-white/[0.07] hover:border-white/[0.14] rounded-[11px] p-3 flex flex-col justify-between space-y-2.5 transition-all touch-press group"
+                  className="bg-[#101713] border border-white/[0.07] hover:border-white/[0.14] rounded-[14px] p-3 flex flex-col justify-between space-y-2.5 transition-all touch-press group"
                 >
-                  <div className="space-y-1.5">
-                    {/* Header: Comp & Tier */}
-                    <div className="flex items-center justify-between text-[10px] text-[#8B9890]">
-                      <span className="truncate max-w-[90px] font-mono">{item.compCode}</span>
-                      <span className={`px-1.5 py-0.5 rounded-[4px] font-mono font-semibold text-[9px] ${tierBadge.badgeClass}`}>
-                        {tierBadge.label}
+                  <div className="space-y-2">
+                    {/* Top row: league and market in 10.5px muted, tier badge on right */}
+                    <div className="flex items-center justify-between gap-1 text-[10.5px] text-[#8B9890]">
+                      <span className="truncate">{item.compCode} · {getOptionTypeLabel(p.optionType)}</span>
+                      <span className={`text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-[6px] border font-semibold tracking-wider shrink-0 ${tierBadgeClass}`}>
+                        {p.riskTier}
                       </span>
                     </div>
 
-                    {/* Teams Row */}
-                    <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#ECF1EE] truncate">
-                      <TeamCrest crestUrl={item.homeTeam.crestUrl} teamName={item.homeTeam.name} size={16} />
+                    {/* Team row: 2 small mono 3-letter team badges (lime tint, no overlap), team names at 14px weight 650 separated by muted vs */}
+                    <div className="flex items-center gap-1.5 text-[14px] font-[650] text-[#ECF1EE] min-w-0">
+                      <span className="px-1.5 py-0.5 rounded-[4px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] font-mono text-[10px] font-semibold border border-[#B6E63B]/30 shrink-0">
+                        {homeCode}
+                      </span>
                       <span className="truncate">{item.homeTeam.shortName || item.homeTeam.name}</span>
-                      <span className="text-[#5E6A63] text-[10px]">v</span>
-                      <TeamCrest crestUrl={item.awayTeam.crestUrl} teamName={item.awayTeam.name} size={16} />
+                      <span className="text-[#5E6A63] text-[11px] font-normal shrink-0">vs</span>
+                      <span className="px-1.5 py-0.5 rounded-[4px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] font-mono text-[10px] font-semibold border border-[#B6E63B]/30 shrink-0">
+                        {awayCode}
+                      </span>
                       <span className="truncate">{item.awayTeam.shortName || item.awayTeam.name}</span>
                     </div>
 
-                    {/* Selection */}
-                    <div className="text-[12.5px] font-semibold text-[#ECF1EE] group-hover:text-[#B6E63B] transition-colors leading-snug">
+                    {/* Pick line at 15px weight 700 */}
+                    <div className="text-[15px] font-bold text-[#ECF1EE] group-hover:text-[#B6E63B] transition-colors leading-tight">
                       {formatSelectionName(p.selection)}
                     </div>
 
-                    {/* Plain English Reason */}
+                    {/* Reasoning: 1 or 2 lines of 11.5px muted */}
                     {p.plainEnglishReason && (
-                      <p className="text-[11px] text-[#8B9890] line-clamp-2 leading-relaxed">
+                      <p className="text-[11.5px] leading-[1.55] text-[#8B9890] line-clamp-2">
                         {p.plainEnglishReason}
                       </p>
                     )}
                   </div>
 
-                  {/* Probability Bar & Odds */}
-                  <div className="pt-2 border-t border-white/[0.07] space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-mono tabular-nums">
-                      <span className="text-[#B6E63B] font-bold">{(p.modelProbability * 100).toFixed(0)}%</span>
-                      {p.marketOdds && (
-                        <span className="text-[#ECF1EE] bg-[#101713] px-1.5 py-0.5 rounded-[4px] border border-white/[0.07] text-[10px]">
-                          @{formatOdds(p.marketOdds)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="w-full h-1 bg-[#101713] rounded-full overflow-hidden">
+                  {/* Probability & Odds Footer */}
+                  <div className="space-y-1.5 pt-1">
+                    {/* 5px progress bar for probability */}
+                    <div className="w-full h-[5px] bg-[#151E19] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#B6E63B] rounded-full"
+                        className="h-full bg-[#B6E63B] rounded-full transition-all duration-300"
                         style={{ width: `${Math.min(100, p.modelProbability * 100)}%` }}
                       />
+                    </div>
+
+                    {/* Bottom row: probability in lime at 16px weight 700 on left, odds in small bordered mono chip on right */}
+                    <div className="flex items-center justify-between text-[11px] pt-0.5">
+                      <span className="text-[16px] font-bold text-[#B6E63B] font-mono tabular-nums">
+                        {(p.modelProbability * 100).toFixed(0)}%
+                      </span>
+                      {p.marketOdds ? (
+                        <span className="bg-[#151E19] px-2 py-0.5 rounded-[5px] border border-white/[0.07] font-mono text-[11px] text-[#ECF1EE] tabular-nums">
+                          @{formatOdds(p.marketOdds)}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[#5E6A63] font-mono">No line</span>
+                      )}
                     </div>
                   </div>
                 </Link>
@@ -342,29 +375,29 @@ export default function PredictionsPage() {
         </div>
       )}
 
-      {/* FILTER BAR */}
+      {/* 7. FILTERS: A compact block with a 14px title */}
       <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
-        <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--text)]">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
-          <span>Filter market intelligence</span>
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="w-4 h-4 text-[#B6E63B]" strokeWidth={2} />
+          <h3 className="text-[14px] font-[650] text-[#ECF1EE]">Filters</h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-[12px]">
-          {/* Competition */}
+        {/* Competition & Risk tier: two selects side by side in a two column grid */}
+        <div className="grid grid-cols-2 gap-2.5">
           <div>
-            <label className="block text-[var(--text-3)] mb-1 text-[10.5px] font-medium">Competition</label>
+            <label className="block text-[#8B9890] mb-1 text-[11px] font-medium">Competition</label>
             {isBasketball ? (
               <select
                 disabled
-                className="w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-[10px] text-[12px] text-[var(--text)] opacity-90 cursor-default"
+                className="w-full h-[40px] bg-[#151E19] border border-white/[0.07] px-3 rounded-[11px] text-[12.5px] text-[#ECF1EE] opacity-90 cursor-default"
               >
-                <option value="NBA">NBA (USA)</option>
+                <option value="NBA">NBA</option>
               </select>
             ) : (
               <select
                 value={selectedComp}
                 onChange={(e) => setSelectedComp(e.target.value)}
-                className="w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-[10px] text-[12px] text-[var(--text)] focus:outline-hidden focus:border-[var(--accent)]"
+                className="w-full h-[40px] bg-[#151E19] border border-white/[0.07] px-3 rounded-[11px] text-[12.5px] text-[#ECF1EE] focus:outline-hidden focus:border-[#B6E63B]"
               >
                 <option value="ALL">All competitions</option>
                 {COMPETITIONS.map(c => (
@@ -374,28 +407,30 @@ export default function PredictionsPage() {
             )}
           </div>
 
-          {/* Risk Tier */}
           <div>
-            <label className="block text-[var(--text-3)] mb-1 text-[10.5px] font-medium">Risk Tier</label>
+            <label className="block text-[#8B9890] mb-1 text-[11px] font-medium">Risk tier</label>
             <select
               value={selectedRiskTier}
               onChange={(e) => setSelectedRiskTier(e.target.value)}
-              className="w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-[10px] text-[12px] text-[var(--text)] focus:outline-hidden focus:border-[var(--accent)]"
+              className="w-full h-[40px] bg-[#151E19] border border-white/[0.07] px-3 rounded-[11px] text-[12.5px] text-[#ECF1EE] focus:outline-hidden focus:border-[#B6E63B]"
             >
               <option value="ALL">All risk tiers</option>
-              <option value="SAFE">SAFE (≥75% high confidence)</option>
+              <option value="SAFE">SAFE (≥75%)</option>
               <option value="MODERATE">MODERATE (60-75%)</option>
-              <option value="RISKY">RISKY (45-60% or value)</option>
-              <option value="LONGSHOT">LONGSHOT (&lt;45%)</option>
+              <option value="RISKY">RISKY (45-60%)</option>
             </select>
           </div>
+        </div>
 
-          {/* Min Probability Slider */}
-          <div>
-            <div className="flex items-center justify-between text-[10.5px] mb-1">
-              <span className="text-[var(--text-3)] font-medium">Min probability</span>
-              <span className="font-mono text-[var(--accent)]">{(minProb * 100).toFixed(0)}%</span>
-            </div>
+        {/* Min probability: slim 4px slider with lime fill, live value in lime at right of label */}
+        <div className="space-y-1.5 pt-0.5">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-[#8B9890] font-medium">Min probability</span>
+            <span className="font-mono text-[#B6E63B] font-semibold tabular-nums">
+              {(minProb * 100).toFixed(0)}%
+            </span>
+          </div>
+          <div className="relative flex items-center">
             <input
               type="range"
               min="0.30"
@@ -403,201 +438,183 @@ export default function PredictionsPage() {
               step="0.05"
               value={minProb}
               onChange={(e) => setMinProb(parseFloat(e.target.value))}
-              className="w-full accent-[var(--accent)] cursor-pointer"
+              className="w-full h-[4px] accent-[#B6E63B] cursor-pointer bg-[#151E19] rounded-full"
             />
           </div>
+        </div>
 
-          {/* Only Value Toggle */}
-          <div className="flex items-end pb-1">
-            <label className="flex items-center gap-2 cursor-pointer text-[12px] text-[var(--text)]">
-              <input
-                type="checkbox"
-                checked={onlyValuePicks}
-                onChange={(e) => setOnlyValuePicks(e.target.checked)}
-                className="rounded-[4px] bg-[var(--surface-2)] border-[var(--border)] text-[var(--accent)] focus:ring-0 w-3.5 h-3.5"
-              />
-              <span>Only positive edge (EV &gt; 0)</span>
-            </label>
+        {/* "Only positive edge" checkbox: 16px with rounded border */}
+        <div className="pt-0.5">
+          <label className="inline-flex items-center gap-2 cursor-pointer text-[12.5px] text-[#ECF1EE] select-none">
+            <input
+              type="checkbox"
+              checked={onlyValuePicks}
+              onChange={(e) => setOnlyValuePicks(e.target.checked)}
+              className="w-[16px] h-[16px] rounded-[5px] bg-[#151E19] border border-white/[0.14] text-[#B6E63B] accent-[#B6E63B] cursor-pointer"
+            />
+            <span>Only positive edge (EV &gt; 0)</span>
+          </label>
+        </div>
+
+        {/* Market and Tier filters: two horizontally scrolling chip rows (hidden scrollbar), with lime tint on active chip */}
+        <div className="pt-2 border-t border-white/[0.05] space-y-2">
+          {/* Market Chips Row */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+            <span className="text-[10px] font-mono text-[#5E6A63] uppercase tracking-[0.08em] shrink-0 mr-1">Market:</span>
+            {activeMarketFilters.map(filter => (
+              <button
+                key={filter.id}
+                onClick={() => setSelectedMarketGroup(filter.id)}
+                type="button"
+                className={`h-[30px] px-3 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 ${
+                  selectedMarketGroup === filter.id
+                    ? 'bg-[rgba(182,230,59,0.12)] border border-[#B6E63B] text-[#B6E63B] font-semibold'
+                    : 'bg-[#151E19] border border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
           </div>
-        </div>
 
-        {/* Market-Type Filter Pills (Requirement 12 & 16) */}
-        <div className="pt-2 border-t border-[var(--border)] flex items-center gap-1.5 overflow-x-auto text-[10.5px] pb-1 [scrollbar-width:none]">
-          <span className="text-[var(--text-3)] font-mono shrink-0 mr-1">Market:</span>
-          {activeMarketFilters.map(filter => (
-            <button
-              key={filter.id}
-              onClick={() => setSelectedMarketGroup(filter.id)}
-              type="button"
-              className={`px-2.5 py-1 rounded-[6px] whitespace-nowrap transition-colors text-[11px] font-medium ${
-                selectedMarketGroup === filter.id
-                  ? 'bg-[var(--accent)] text-[var(--accent-ink)] font-semibold'
-                  : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-2)] hover:text-[var(--text)]'
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Risk Tier Quick Buttons */}
-        <div className="pt-1 flex items-center gap-1.5 overflow-x-auto text-[10.5px] pb-1 [scrollbar-width:none]">
-          <span className="text-[var(--text-3)] font-mono shrink-0 mr-1">Tier:</span>
-          {riskTierPills.map(tier => (
-            <button
-              key={tier.id}
-              onClick={() => setSelectedRiskTier(tier.id)}
-              type="button"
-              className={`px-2 py-0.5 rounded-[4px] whitespace-nowrap transition-colors text-[10.5px] ${
-                selectedRiskTier === tier.id
-                  ? 'bg-[var(--surface-2)] text-[var(--text)] font-semibold border border-[var(--border-strong)]'
-                  : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-3)] hover:text-[var(--text)]'
-              }`}
-            >
-              {tier.label}
-            </button>
-          ))}
+          {/* Tier Chips Row */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+            <span className="text-[10px] font-mono text-[#5E6A63] uppercase tracking-[0.08em] shrink-0 mr-1">Tier:</span>
+            {riskTierPills.map(tier => (
+              <button
+                key={tier.id}
+                onClick={() => setSelectedRiskTier(tier.id)}
+                type="button"
+                className={`h-[30px] px-3 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 ${
+                  selectedRiskTier === tier.id
+                    ? 'bg-[rgba(182,230,59,0.12)] border border-[#B6E63B] text-[#B6E63B] font-semibold'
+                    : 'bg-[#151E19] border border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
+                }`}
+              >
+                {tier.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Predictions Table */}
-      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] overflow-hidden">
-        <div className="p-3 bg-[#151E19] border-b border-white/[0.07] flex items-center justify-between text-[11px] text-[#8B9890]">
-          <span className="font-mono tabular-nums">Displaying {filtered.length} scored lines</span>
-          <span className="text-[#5E6A63]">Ranked by model score & edge</span>
-        </div>
+      {/* 7. RESULTS LIST: Small count line ("18 scored lines" on left, "Ranked by model score and edge" on right, 11.5px muted) */}
+      <div className="flex items-center justify-between text-[11.5px] text-[#8B9890] px-1">
+        <span className="font-mono tabular-nums">{filtered.length} scored lines</span>
+        <span className="text-[#5E6A63]">Ranked by model score and edge</span>
+      </div>
 
-        {filtered.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[12px]">
-              <thead className="bg-[var(--surface-2)] text-[var(--text-3)] font-mono text-[10px] uppercase tracking-wider border-b border-[var(--border)]">
-                <tr>
-                  <th className="py-2.5 px-3">Fixture</th>
-                  <th className="py-2.5 px-3">Tier</th>
-                  <th className="py-2.5 px-3">Market category</th>
-                  <th className="py-2.5 px-3">Selection</th>
-                  <th className="py-2.5 px-3">Prob</th>
-                  <th className="py-2.5 px-3">Odds</th>
-                  <th className="py-2.5 px-3">Edge</th>
-                  <th className="py-2.5 px-3">Est. EV</th>
-                  <th className="py-2.5 px-3">Statistical Rationale</th>
-                  <th className="py-2.5 px-3 text-right">Intel</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {filtered.map((item, idx) => {
-                  const p = item.prediction;
-                  const isTop = p.isTopPick;
-                  const tierBadge = getRiskTierBadge(p.riskTier);
+      {/* IMPORTANT: Mobile Pick Cards (No horizontal cutoffs anywhere!) */}
+      {filtered.length > 0 ? (
+        <div className="space-y-2.5">
+          {/* Card list on mobile & tablets (< lg), clean responsive cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {filtered.map((item, idx) => {
+              const p = item.prediction;
+              const homeCode = getTeamCode(item.homeTeam);
+              const awayCode = getTeamCode(item.awayTeam);
+              const tierBadgeClass = getTierBadgeStyle(p.riskTier);
 
-                  return (
-                    <tr key={idx} className={`hover:bg-[var(--surface-2)]/60 transition-colors ${isTop ? 'bg-[var(--accent-soft)]' : ''}`}>
-                      <td className="py-2.5 px-3 text-[var(--text)]">
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center -space-x-1 shrink-0">
-                            <TeamCrest
-                              crestUrl={item.homeTeam.crestUrl}
-                              teamName={item.homeTeam.shortName || item.homeTeam.name}
-                              size={18}
-                            />
-                            <TeamCrest
-                              crestUrl={item.awayTeam.crestUrl}
-                              teamName={item.awayTeam.shortName || item.awayTeam.name}
-                              size={18}
-                            />
-                          </div>
-                          <div>
-                            <span className="font-medium block truncate max-w-[140px] sm:max-w-none">{item.fixtureName}</span>
-                            {item.isDerby && (
-                              <span className="text-[10px] font-semibold text-rose-300">⚡ {item.derbyName || 'Derby'}</span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <span className={`px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold tracking-wider ${tierBadge.badgeClass}`}>
-                          {tierBadge.label}
+              return (
+                <Link
+                  key={idx}
+                  href={`/matches/${item.fixtureId}`}
+                  className="bg-[#101713] border border-white/[0.07] hover:border-white/[0.14] rounded-[14px] p-3.5 flex flex-col justify-between space-y-2.5 transition-all touch-press group"
+                >
+                  <div className="space-y-2">
+                    {/* Top row: league and market in 10.5px muted text, tier badge on right */}
+                    <div className="flex items-center justify-between gap-1 text-[10.5px] text-[#8B9890]">
+                      <span className="truncate">{item.compCode} · {getOptionTypeLabel(p.optionType)}</span>
+                      <span className={`text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-[6px] border font-semibold tracking-wider shrink-0 ${tierBadgeClass}`}>
+                        {p.riskTier}
+                      </span>
+                    </div>
+
+                    {/* Team row: 2 small mono 3-letter team badges, team names at 14px weight 650 separated by muted vs */}
+                    <div className="flex items-center gap-1.5 text-[14px] font-[650] text-[#ECF1EE] min-w-0">
+                      <span className="px-1.5 py-0.5 rounded-[4px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] font-mono text-[10px] font-semibold border border-[#B6E63B]/30 shrink-0">
+                        {homeCode}
+                      </span>
+                      <span className="truncate">{item.homeTeam.shortName || item.homeTeam.name}</span>
+                      <span className="text-[#5E6A63] text-[11px] font-normal shrink-0">vs</span>
+                      <span className="px-1.5 py-0.5 rounded-[4px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] font-mono text-[10px] font-semibold border border-[#B6E63B]/30 shrink-0">
+                        {awayCode}
+                      </span>
+                      <span className="truncate">{item.awayTeam.shortName || item.awayTeam.name}</span>
+                    </div>
+
+                    {/* Pick line at 15px weight 700 */}
+                    <div className="text-[15px] font-bold text-[#ECF1EE] group-hover:text-[#B6E63B] transition-colors leading-tight">
+                      {formatSelectionName(p.selection)}
+                      {p.isTopPick && (
+                        <span className="ml-2 text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded-[4px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] border border-[#B6E63B]/30 align-middle">
+                          TOP PICK
                         </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-[var(--text-2)]">
-                        <span className="text-[12px] text-[var(--text)]">
-                          {getOptionTypeLabel(p.optionType)}
+                      )}
+                    </div>
+
+                    {/* Reasoning: 1 or 2 lines of 11.5px muted */}
+                    {p.plainEnglishReason && (
+                      <p className="text-[11.5px] leading-[1.55] text-[#8B9890] line-clamp-2">
+                        {p.plainEnglishReason}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Probability & Odds Footer */}
+                  <div className="space-y-1.5 pt-1">
+                    {/* 5px progress bar for probability */}
+                    <div className="w-full h-[5px] bg-[#151E19] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#B6E63B] rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, p.modelProbability * 100)}%` }}
+                      />
+                    </div>
+
+                    {/* Bottom row: probability in lime at 16px weight 700 on left, odds in small bordered mono chip on right */}
+                    <div className="flex items-center justify-between text-[11px] pt-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[16px] font-bold text-[#B6E63B] font-mono tabular-nums">
+                          {(p.modelProbability * 100).toFixed(0)}%
                         </span>
-                      </td>
-                      <td className="py-2.5 px-3 font-medium text-[var(--text)]">
-                        <div className="flex items-center gap-1.5">
-                          <span>{formatSelectionName(p.selection)}</span>
-                          {isTop && (
-                            <span className="text-[9px] bg-[var(--accent-soft)] text-[var(--accent)] px-1 rounded-[3px] font-mono font-bold border border-[var(--accent)]/30">
-                              Best pick
-                            </span>
-                          )}
-                          {p.pushProbability !== undefined && (
-                            <span className="text-[9px] bg-[var(--surface-2)] text-[var(--text-3)] px-1 rounded-[3px] font-mono border border-[var(--border)]">
-                              Push {(p.pushProbability * 100).toFixed(0)}%
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-[var(--text)] tabular-nums font-semibold">
-                        {(p.modelProbability * 100).toFixed(1)}%
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-[12px]">
+                        {p.edge !== undefined && (
+                          <span className={`text-[11px] font-mono tabular-nums ${p.edge >= 0 ? 'text-[#B6E63B]' : 'text-[#8B9890]'}`}>
+                            {p.edge >= 0 ? `+${(p.edge * 100).toFixed(1)}%` : `${(p.edge * 100).toFixed(1)}%`} edge
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {p.expectedValue !== undefined && (
+                          <span className="text-[10px] font-mono text-[#8B9890]">
+                            EV {formatExpectedValue(p.expectedValue).text}
+                          </span>
+                        )}
                         {p.marketOdds ? (
-                          <span className="bg-[var(--surface-2)] px-1.5 py-0.5 rounded-[4px] border border-[var(--border)] text-[var(--text)] tabular-nums">
-                            {p.marketOdds.toFixed(2)}
+                          <span className="bg-[#151E19] px-2 py-0.5 rounded-[5px] border border-white/[0.07] font-mono text-[11px] text-[#ECF1EE] tabular-nums">
+                            @{formatOdds(p.marketOdds)}
                           </span>
                         ) : (
-                          <span className="text-[10px] text-[var(--text-3)] bg-[var(--surface-2)] px-1.5 py-0.5 rounded-[4px] border border-[var(--border)]">
-                            n/a
-                          </span>
+                          <span className="text-[10px] text-[#5E6A63] font-mono">No line</span>
                         )}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-[var(--text-2)] tabular-nums">
-                        {p.edge !== undefined ? (
-                          <span className={p.edge >= 0 ? 'text-[var(--accent)]' : 'text-[var(--text-3)]'}>
-                            {p.edge >= 0 ? `+${(p.edge * 100).toFixed(1)}%` : `${(p.edge * 100).toFixed(1)}%`}
-                          </span>
-                        ) : 'n/a'}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono tabular-nums">
-                        {p.expectedValue !== undefined ? (
-                          <span className={`font-medium ${formatExpectedValue(p.expectedValue).colorClass}`}>
-                            {formatExpectedValue(p.expectedValue).text}
-                          </span>
-                        ) : (
-                          <span className="text-[var(--text-3)] text-[12px]">n/a</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-3 text-[var(--text-3)] text-[11px] max-w-[220px]">
-                        <span className="line-clamp-2">{p.plainEnglishReason}</span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <Link
-                          href={`/matches/${item.fixtureId}`}
-                          className="inline-flex items-center gap-0.5 text-[11px] text-[var(--accent)] hover:underline font-medium"
-                        >
-                          <span>Market intel</span>
-                          <ArrowUpRight className="w-3 h-3" strokeWidth={1.75} />
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
-        ) : (
-          <div className="p-12 text-center text-[12px] text-[var(--text-3)] space-y-2">
-            <div suppressHydrationWarning className="font-mono text-[12.5px] text-[var(--text)]">
-              {liveDataAvailable ? 'No predictions match your selected filters' : `Live data unavailable. Last updated ${lastUpdated}`}
-            </div>
-            <p className="max-w-sm mx-auto text-[11.5px]">
-              {liveDataAvailable ? 'Try adjusting the minimum probability threshold or selecting all market categories.' : 'Live market intelligence will populate once live provider data is refreshed.'}
-            </p>
+        </div>
+      ) : (
+        <div className="p-8 text-center bg-[#101713] border border-white/[0.07] rounded-[14px] space-y-2">
+          <div suppressHydrationWarning className="font-mono text-[12.5px] text-[#ECF1EE]">
+            {liveDataAvailable ? 'No predictions match your selected filters' : `Live data unavailable. Last updated ${lastUpdated}`}
           </div>
-        )}
-      </div>
+          <p className="max-w-sm mx-auto text-[11.5px] text-[#8B9890]">
+            {liveDataAvailable ? 'Try adjusting the minimum probability threshold or selecting all market categories.' : 'Live market intelligence will populate once live provider data is refreshed.'}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
