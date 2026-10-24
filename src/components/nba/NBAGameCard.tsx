@@ -14,7 +14,18 @@ export default function NBAGameCard({ fixture }: NBAGameCardProps) {
   const stats = fixture.basketballStats;
   const isFinished = fixture.status === 'FINISHED';
   const kickoffDate = new Date(fixture.kickoffTime);
-  const timeStr = kickoffDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
+  const now = new Date();
+  const isToday = kickoffDate.toDateString() === now.toDateString();
+  const isTomorrow = new Date(now.getTime() + 86400000).toDateString() === kickoffDate.toDateString();
+
+  const localTime = kickoffDate.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const localDatePrefix = isToday ? '' : isTomorrow ? 'Tomorrow, ' : kickoffDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ';
+  const timeStr = `${localDatePrefix}${localTime}`;
+
+  const seasonDisplay = fixture.seasonYear || '2026-27';
 
   const homeName = fixture.homeTeam.shortName || fixture.homeTeam.name;
   const awayName = fixture.awayTeam.shortName || fixture.awayTeam.name;
@@ -45,16 +56,21 @@ export default function NBAGameCard({ fixture }: NBAGameCardProps) {
   return (
     <Link href={`/matches/${fixture.id}`} className="block">
       <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 flex flex-col justify-between transition-transform duration-150 touch-press space-y-2">
-        {/* Header: "NBA · 2026–27" caption, "Final" neutral chip right */}
+        {/* Header: Dynamic season caption, local time or live status */}
         <div className="flex items-center justify-between text-[11.5px] text-[#8B9890]">
           <div className="flex items-center gap-1.5">
-            <span>NBA · 2026–27</span>
+            <span>NBA · {seasonDisplay}</span>
           </div>
 
           <div>
             {isFinished ? (
               <span className="px-2 py-0.5 rounded-full text-[10.5px] bg-[#151E19] text-[#8B9890] border border-white/[0.07] font-medium">
                 Final
+              </span>
+            ) : fixture.status === 'IN_PLAY' ? (
+              <span className="px-2 py-0.5 rounded-full text-[10.5px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] border border-[#B6E63B]/40 font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#B6E63B] animate-pulse" />
+                <span>LIVE</span>
               </span>
             ) : (
               <span className="px-2 py-0.5 rounded-full text-[10.5px] bg-[#151E19] text-[#8B9890] border border-white/[0.07] font-medium tabular-nums">

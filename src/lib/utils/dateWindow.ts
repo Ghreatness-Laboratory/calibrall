@@ -38,3 +38,56 @@ export function computeRequestDateWindow(): RequestDateWindow {
     lastUpdatedFormatted,
   };
 }
+
+export interface NBADateWindow {
+  dateFrom: string; // YYYY-MM-DD
+  dateTo: string;   // YYYY-MM-DD
+  datesList: string[]; // ['20261023', '20261024', ...]
+  nowUTC: Date;
+  nowIso: string;
+  lastUpdatedFormatted: string; // "hh:mm UTC"
+}
+
+export function computeNBADateWindow(daysBefore: number = 1, daysAfter: number = 14): NBADateWindow {
+  const now = new Date();
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+  // Window start in UTC (today - daysBefore)
+  const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysBefore));
+  const sYyyy = startDate.getUTCFullYear();
+  const sMm = String(startDate.getUTCMonth() + 1).padStart(2, '0');
+  const sDd = String(startDate.getUTCDate()).padStart(2, '0');
+  const dateFrom = `${sYyyy}-${sMm}-${sDd}`;
+
+  // Window end in UTC (today + daysAfter)
+  const endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysAfter));
+  const eYyyy = endDate.getUTCFullYear();
+  const eMm = String(endDate.getUTCMonth() + 1).padStart(2, '0');
+  const eDd = String(endDate.getUTCDate()).padStart(2, '0');
+  const dateTo = `${eYyyy}-${eMm}-${eDd}`;
+
+  // Generate list of date strings for query param (?dates=YYYYMMDD)
+  const datesList: string[] = [];
+  const totalDays = daysBefore + daysAfter;
+  for (let i = 0; i <= totalDays; i++) {
+    const cur = new Date(startDate.getTime() + (i * ONE_DAY_MS));
+    const cy = cur.getUTCFullYear();
+    const cm = String(cur.getUTCMonth() + 1).padStart(2, '0');
+    const cd = String(cur.getUTCDate()).padStart(2, '0');
+    datesList.push(`${cy}${cm}${cd}`);
+  }
+
+  const hh = String(now.getUTCHours()).padStart(2, '0');
+  const min = String(now.getUTCMinutes()).padStart(2, '0');
+  const lastUpdatedFormatted = `${hh}:${min} UTC`;
+
+  return {
+    dateFrom,
+    dateTo,
+    datesList,
+    nowUTC: now,
+    nowIso: now.toISOString(),
+    lastUpdatedFormatted,
+  };
+}
+

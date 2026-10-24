@@ -1,5 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/v1/sync?sport=basketball",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/v1/sync?sport=football",
+      "schedule": "0 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/sw.js",

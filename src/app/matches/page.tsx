@@ -30,7 +30,7 @@ export default function MatchesPage() {
   const [selectedFootballGroup, setSelectedFootballGroup] = useState<FootballMarketGroup>('ALL');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  const { fixtures, isLoading, refetch } = useLiveFixtures(
+  const { fixtures, isLoading, lastUpdated, isDelayed, refetch } = useLiveFixtures(
     isBasketball ? 'NBA' : selectedComp, 
     selectedStatus, 
     sport
@@ -182,7 +182,7 @@ export default function MatchesPage() {
             Fixtures and markets
           </h2>
           <p className="text-[12px] text-[#8B9890] leading-tight">
-            {scheduledCount} · Active matchday pipelines
+            {scheduledCount} · Active matchday pipelines {lastUpdated ? `· Last updated ${lastUpdated}` : ''}
           </p>
         </div>
 
@@ -197,6 +197,14 @@ export default function MatchesPage() {
           <RotateCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#B6E63B]' : ''}`} strokeWidth={2} />
         </button>
       </div>
+
+      {/* Notice if sync is delayed by more than 2 hours */}
+      {isDelayed && (
+        <div className="p-2.5 rounded-[10px] bg-[#E2AE45]/10 border border-[#E2AE45]/30 text-[#E2AE45] text-[11.5px] flex items-center gap-2">
+          <Info className="w-3.5 h-3.5 shrink-0" />
+          <span>Data delayed: Live fixture pipeline sync was delayed by more than 2 hours. Showing latest verified schedule.</span>
+        </div>
+      )}
 
       {/* Slim info note: 11.5px text, 2px lime left border, small info icon */}
       <div className="border-l-2 border-[#B6E63B] bg-[#101713] rounded-r-[10px] px-3 py-2 flex items-center gap-2">

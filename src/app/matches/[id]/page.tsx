@@ -213,13 +213,13 @@ export default function MatchAnalysisPage() {
             <span className="flex items-center gap-1" suppressHydrationWarning>
               <Calendar className="w-3.5 h-3.5" strokeWidth={1.8} />
               <span suppressHydrationWarning>
-                {kickoff.toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                {kickoff.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
               </span>
             </span>
             <span className="flex items-center gap-1" suppressHydrationWarning>
               <Clock className="w-3.5 h-3.5" strokeWidth={1.8} />
               <span suppressHydrationWarning>
-                {String(kickoff.getUTCHours()).padStart(2, '0')}:{String(kickoff.getUTCMinutes()).padStart(2, '0')} UTC
+                {kickoff.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
               </span>
             </span>
           </div>

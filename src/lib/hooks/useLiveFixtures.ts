@@ -8,6 +8,7 @@ export interface LiveFixturesHookResult {
   isLoading: boolean;
   liveDataAvailable: boolean;
   lastUpdated: string;
+  isDelayed?: boolean;
   error?: string;
   refetch: () => Promise<void>;
 }
@@ -21,6 +22,7 @@ export function useLiveFixtures(
   const [isLoading, setIsLoading] = useState(true);
   const [liveDataAvailable, setLiveDataAvailable] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [isDelayed, setIsDelayed] = useState<boolean>(false);
   const [error, setError] = useState<string | undefined>();
 
   const load = useCallback(async () => {
@@ -58,6 +60,7 @@ export function useLiveFixtures(
       const list = json.data || [];
       setFixtures(list);
       setLiveDataAvailable(Boolean(json.liveDataAvailable && list.length > 0));
+      setIsDelayed(Boolean(json.isDelayed));
       if (json.lastUpdated) {
         setLastUpdated(json.lastUpdated);
       } else {
@@ -88,5 +91,6 @@ export function useLiveFixtures(
     return () => clearInterval(timer);
   }, [load]);
 
-  return { fixtures, isLoading, liveDataAvailable, lastUpdated, error, refetch: load };
+  return { fixtures, isLoading, liveDataAvailable, lastUpdated, isDelayed, error, refetch: load };
 }
+

@@ -7,7 +7,7 @@
     "build": "NODE_ENV=production next build",
     "start": "next start -p 3000 -H 0.0.0.0",
     "lint": "next lint && npx tsx src/tests/no_hyphen_display.test.ts",
-    "test": "npx tsx src/tests/no_hyphen_display.test.ts && npx tsx src/tests/v25_engine.test.ts && npx tsx src/tests/v25_chelsea_tottenham_regression.test.ts"
+    "test": "npx tsx src/tests/no_hyphen_display.test.ts && npx tsx src/tests/v25_engine.test.ts && npx tsx src/tests/v25_chelsea_tottenham_regression.test.ts && npx tsx src/tests/basketball_staleness.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.6",

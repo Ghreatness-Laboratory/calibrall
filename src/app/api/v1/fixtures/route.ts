@@ -23,6 +23,8 @@ export async function GET(request: Request) {
         total: result.fixtures.length,
         liveDataAvailable: result.liveDataAvailable,
         lastUpdated: result.lastUpdated,
+        isDelayed: result.isDelayed,
+        season: result.season,
         filters: { sport, status },
         timestamp: new Date().toISOString(),
       },

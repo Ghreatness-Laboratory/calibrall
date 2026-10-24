@@ -3,8 +3,26 @@ import { NBATeamStats } from '@/types';
 import { Fixture, Competition, Team, PerformanceReport, MarketPrediction } from '@/types';
 import { calculateNBAScoreProjection } from '../prediction/nbaMath';
 
-export const NBA_SEASONS = ['2024-25', '2023-24', '2022-23'] as const;
+export const NBA_SEASONS = ['2026-27', '2025-26', '2024-25', '2023-24', '2022-23'] as const;
 export type NBASeason = typeof NBA_SEASONS[number];
+
+/**
+ * Dynamically computes active NBA season based on any given date.
+ * NBA regular season begins in October (month 9) of year N and spans to June of year N+1.
+ */
+export function computeNBASeason(date: Date = new Date()): string {
+  const d = new Date(date);
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth(); // 9 = October
+  if (month >= 9) {
+    const nextYear = String((year + 1) % 100).padStart(2, '0');
+    return `${year}-${nextYear}`;
+  } else {
+    const yearShort = String(year % 100).padStart(2, '0');
+    return `${year - 1}-${yearShort}`;
+  }
+}
+
 
 export const NBA_COMPETITION: Competition = {
   id: 'comp_nba',
@@ -28,11 +46,11 @@ export const NBA_TEAMS_CATALOG: Record<string, {
   division: string;
   city: string;
   color: string;
-  statsBySeason: Record<NBASeason, {
+  statsBySeason: Partial<Record<NBASeason, {
     offensiveEfficiency: number;
     defensiveEfficiency: number;
     possessions: number;
-  }>;
+  }>>;
 }> = {
   BOS: {
     name: 'Boston Celtics',
@@ -426,10 +444,12 @@ export const NBA_TEAMS_CATALOG: Record<string, {
   },
 };
 
-export function getNBATeamStats(teamAbbr: string, season: NBASeason = '2024-25'): NBATeamStats | null {
+export function getNBATeamStats(teamAbbr: string, season?: string): NBATeamStats | null {
   const team = NBA_TEAMS_CATALOG[teamAbbr];
   if (!team) return null;
-  const stats = team.statsBySeason[season] || team.statsBySeason['2024-25'];
+  const currentSeason = season || computeNBASeason();
+  const seasonStatsMap = team.statsBySeason as Record<string, { offensiveEfficiency: number; defensiveEfficiency: number; possessions: number }>;
+  const stats = seasonStatsMap[currentSeason] || seasonStatsMap['2024-25'] || Object.values(seasonStatsMap)[0];
   return {
     teamId: `nba_${teamAbbr.toLowerCase()}`,
     teamName: team.name,
@@ -439,8 +459,8 @@ export function getNBATeamStats(teamAbbr: string, season: NBASeason = '2024-25')
     offensiveEfficiency: stats.offensiveEfficiency,
     defensiveEfficiency: stats.defensiveEfficiency,
     possessions: stats.possessions,
-    season,
-    lastUpdated: 'Today at 06:00 UTC',
+    season: currentSeason,
+    lastUpdated: 'Live updated',
     source: 'Official NBA Advanced Stats (ORtg/100, DRtg/100, PACE)',
   };
 }
@@ -458,20 +478,24 @@ export function getAllNBATeamsList() {
 }
 
 // Helper to convert NBA team into Team entity
-function createNBATeam(abbr: string): Team {
+export function createNBATeam(abbr: string): Team {
   const cat = NBA_TEAMS_CATALOG[abbr] || NBA_TEAMS_CATALOG.BOS;
+  const currentSeason = computeNBASeason();
+  const seasonStatsMap = cat.statsBySeason as Record<string, { offensiveEfficiency: number; defensiveEfficiency: number; possessions: number }>;
+  const stats = seasonStatsMap[currentSeason] || seasonStatsMap['2024-25'] || Object.values(seasonStatsMap)[0];
   return {
     id: `team_nba_${abbr.toLowerCase()}`,
     name: cat.name,
     shortName: cat.name.split(' ').pop() || cat.name,
     tla: cat.abbreviation,
-    crestUrl: `https://crests.football-data.org/${abbr}.png`,
-    attackRating: 1.5,
-    defenseRating: 1.0,
+    crestUrl: `https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/${abbr.toLowerCase()}.png`,
+    attackRating: Math.round(stats.offensiveEfficiency * 100),
+    defenseRating: Math.round(stats.defensiveEfficiency * 100),
     cornerAttackRating: 0,
     disciplineRating: 0,
   };
 }
+
 
 // Pre-computed NBA Fixtures for today, upcoming, and completed
 export function getNBASeedFixtures(): Fixture[] {
@@ -539,8 +563,8 @@ export function getNBASeedFixtures(): Fixture[] {
   ];
 
   return fixturesData.map(f => {
-    const homeStats = NBA_TEAMS_CATALOG[f.homeAbbr].statsBySeason['2024-25'];
-    const awayStats = NBA_TEAMS_CATALOG[f.awayAbbr].statsBySeason['2024-25'];
+    const homeStats = NBA_TEAMS_CATALOG[f.homeAbbr].statsBySeason['2024-25']!;
+    const awayStats = NBA_TEAMS_CATALOG[f.awayAbbr].statsBySeason['2024-25']!;
 
     const proj = calculateNBAScoreProjection(
       {

@@ -25,7 +25,7 @@ import SportSwitcher from '@/components/SportSwitcher';
 
 export default function HomeClient() {
   const { sport, isSwitching } = useSport();
-  const { fixtures } = useLiveFixtures('ALL', 'ALL', sport);
+  const { fixtures, lastUpdated, isDelayed } = useLiveFixtures('ALL', 'ALL', sport);
 
   const isBasketball = sport === 'basketball';
 
@@ -229,15 +229,30 @@ export default function HomeClient() {
       {/* Live fixtures heading + small "Pipeline active" dot chip beside it */}
       <section className="space-y-3 pt-2">
         <div className="flex items-center justify-between pb-1">
-          <h2 className="text-[18px] leading-[1.25] font-[700] tracking-[-0.02em] text-[#ECF1EE]">
-            {isBasketball ? 'Live matchups' : 'Live fixtures'}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-[18px] leading-[1.25] font-[700] tracking-[-0.02em] text-[#ECF1EE]">
+              {isBasketball ? 'Live matchups' : 'Live fixtures'}
+            </h2>
+            {isBasketball && lastUpdated && (
+              <span className="text-[11px] text-[#8B9890] font-mono tabular-nums">
+                · Last updated {lastUpdated}
+              </span>
+            )}
+          </div>
 
           <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#151E19] border border-white/[0.07] text-[10px] font-mono text-[#8B9890]">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#B6E63B] shrink-0" />
-            <span>Pipeline active</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${isDelayed ? 'bg-[#E2AE45]' : 'bg-[#B6E63B]'} shrink-0`} />
+            <span>{isDelayed ? 'Data delayed' : 'Pipeline active'}</span>
           </div>
         </div>
+
+        {/* Notice when basketball sync is delayed by more than 2 hours */}
+        {isBasketball && isDelayed && (
+          <div className="p-2.5 rounded-[10px] bg-[#E2AE45]/10 border border-[#E2AE45]/30 text-[#E2AE45] text-[11.5px] flex items-center gap-2">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            <span>Data delayed: Basketball live pipeline sync was delayed by more than 2 hours. Displaying latest verified schedule.</span>
+          </div>
+        )}
 
         {/* Fixtures list: 12px gaps */}
         {fixtures.length > 0 ? (
@@ -269,10 +284,12 @@ export default function HomeClient() {
               <Calendar className="w-4 h-4" strokeWidth={2} />
             </div>
             <div className="text-[14px] font-semibold text-[#ECF1EE]">
-              No games scheduled today
+              {isBasketball ? 'No games scheduled in current window' : 'No games scheduled today'}
             </div>
             <p className="text-[12px] text-[#8B9890] max-w-xs leading-relaxed">
-              Upcoming matchups will appear here automatically. Check the upcoming tab in Fixtures.
+              {isBasketball
+                ? 'No NBA matchups found for the window (today - 1 to +14 days). Live sync checks every 15 minutes.'
+                : 'Upcoming matchups will appear here automatically. Check the upcoming tab in Fixtures.'}
             </p>
           </div>
         )}
