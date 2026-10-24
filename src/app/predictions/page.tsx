@@ -237,41 +237,41 @@ export default function PredictionsPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 py-1">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
-        <div>
-          <h1 className="text-[18px] font-[620] text-[var(--text)] flex items-center gap-2">
-            <span>Market intelligence & prediction engine</span>
-          </h1>
-          <p className="text-[12.5px] text-[var(--text-2)] mt-0.5">
-            Full-market evaluation across Results, Handicaps, Goal Bounds, Halves, Corners, and Cards.
-          </p>
-        </div>
-      </div>
-
-      {/* Responsible Use Disclaimer Banner (Requirement 15) */}
-      <div className="p-3 bg-[rgba(217,164,65,0.04)] border border-[rgba(217,164,65,0.3)] rounded-[10px] flex items-start gap-2.5 text-[11px] text-[var(--text-3)] leading-relaxed">
-        <Info className="w-3.5 h-3.5 text-[var(--warn)] shrink-0 mt-0.5" strokeWidth={1.75} />
-        <p>
-          <strong className="text-[var(--text-2)] font-semibold">Responsible statistical notice:</strong> All predictions, probabilities, and model lines are mathematical estimates computed via Dixon-Coles bivariate Poisson and negative binomial regression models, not guaranteed outcomes. Past statistical performance does not ensure future returns.
+      <div className="pb-2 border-b border-white/[0.07]">
+        <h2 className="text-[19px] font-bold leading-[1.25] tracking-[-0.02em] text-[#ECF1EE]">
+          {isBasketball ? 'NBA Market Intelligence & Projections' : 'Market Intelligence & Prediction Engine'}
+        </h2>
+        <p className="text-[12px] text-[#8B9890] mt-0.5 truncate">
+          {isBasketball
+            ? 'Efficiency-based totals, spreads, and moneyline probability distribution.'
+            : 'Multi-market evaluation across Goals, Results, Handicaps, Corners, and Cards.'}
         </p>
       </div>
 
-      {/* DAILY SAFEST PICKS SECTION (Requirement 13) */}
+      {/* Slim Info Note */}
+      <div className="border-l-2 border-l-[#B6E63B] bg-[#101713] border-y border-r border-white/[0.05] px-3.5 py-2.5 rounded-r-[10px] text-[11.5px] leading-normal text-[#8B9890] flex items-center gap-2">
+        <Info className="w-4 h-4 text-[#B6E63B] shrink-0" strokeWidth={2} />
+        <p className="truncate">
+          <span className="font-medium text-[#ECF1EE]">Statistical estimate notice:</span> Modeled probabilities are mathematical projections, not guarantees.
+        </p>
+      </div>
+
+      {/* DAILY SAFEST PICKS SECTION */}
       {safestPicks.length > 0 && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3.5 space-y-3">
+        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
-              <h2 className="text-[13.5px] font-[620] text-[var(--text)]">
+              <Sparkles className="w-4 h-4 text-[#B6E63B]" strokeWidth={2} />
+              <h3 className="text-[13px] font-semibold text-[#ECF1EE]">
                 Daily Safest Picks (Top 5 Across All Leagues)
-              </h2>
-              <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded-[5px] bg-[var(--accent-soft)] text-[var(--accent)] font-semibold border border-[var(--accent)]/30">
-                Variety Rule Active (Max 2 per Market)
+              </h3>
+              <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded-[5px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] font-semibold border border-[#B6E63B]/30">
+                Max 2 per Market
               </span>
             </div>
-            <span className="text-[10.5px] text-[var(--text-3)] font-mono">
+            <span className="text-[10.5px] text-[#5E6A63] font-mono">
               High Confidence · ≥75% Probability
             </span>
           </div>
@@ -285,52 +285,52 @@ export default function PredictionsPage() {
                 <Link
                   key={idx}
                   href={`/matches/${item.fixtureId}`}
-                  className="bg-[var(--surface-2)] border border-[var(--border)] hover:border-[var(--border-strong)] rounded-[10px] p-3 flex flex-col justify-between space-y-2.5 transition-all group"
+                  className="bg-[#151E19] border border-white/[0.07] hover:border-white/[0.14] rounded-[11px] p-3 flex flex-col justify-between space-y-2.5 transition-all touch-press group"
                 >
                   <div className="space-y-1.5">
                     {/* Header: Comp & Tier */}
-                    <div className="flex items-center justify-between text-[10px] text-[var(--text-3)]">
-                      <span className="truncate max-w-[90px]">{item.compCode}</span>
-                      <span className={`px-1.5 py-0.2 rounded-[4px] font-mono font-bold text-[9px] ${tierBadge.badgeClass}`}>
+                    <div className="flex items-center justify-between text-[10px] text-[#8B9890]">
+                      <span className="truncate max-w-[90px] font-mono">{item.compCode}</span>
+                      <span className={`px-1.5 py-0.5 rounded-[4px] font-mono font-semibold text-[9px] ${tierBadge.badgeClass}`}>
                         {tierBadge.label}
                       </span>
                     </div>
 
                     {/* Teams Row */}
-                    <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text)] truncate">
+                    <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#ECF1EE] truncate">
                       <TeamCrest crestUrl={item.homeTeam.crestUrl} teamName={item.homeTeam.name} size={16} />
                       <span className="truncate">{item.homeTeam.shortName || item.homeTeam.name}</span>
-                      <span className="text-[var(--text-3)] text-[10px]">v</span>
+                      <span className="text-[#5E6A63] text-[10px]">v</span>
                       <TeamCrest crestUrl={item.awayTeam.crestUrl} teamName={item.awayTeam.name} size={16} />
                       <span className="truncate">{item.awayTeam.shortName || item.awayTeam.name}</span>
                     </div>
 
                     {/* Selection */}
-                    <div className="text-[12.5px] font-[600] text-[var(--text)] group-hover:text-[var(--accent)] transition-colors leading-snug">
+                    <div className="text-[12.5px] font-semibold text-[#ECF1EE] group-hover:text-[#B6E63B] transition-colors leading-snug">
                       {formatSelectionName(p.selection)}
                     </div>
 
                     {/* Plain English Reason */}
                     {p.plainEnglishReason && (
-                      <p className="text-[10.5px] text-[var(--text-3)] line-clamp-2 leading-relaxed">
+                      <p className="text-[11px] text-[#8B9890] line-clamp-2 leading-relaxed">
                         {p.plainEnglishReason}
                       </p>
                     )}
                   </div>
 
                   {/* Probability Bar & Odds */}
-                  <div className="pt-2 border-t border-[var(--border)] space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-mono">
-                      <span className="text-[var(--accent)] font-bold">{(p.modelProbability * 100).toFixed(0)}%</span>
+                  <div className="pt-2 border-t border-white/[0.07] space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-mono tabular-nums">
+                      <span className="text-[#B6E63B] font-bold">{(p.modelProbability * 100).toFixed(0)}%</span>
                       {p.marketOdds && (
-                        <span className="text-[var(--text)] bg-[var(--surface)] px-1.5 py-0.5 rounded-[4px] border border-[var(--border)] text-[10px]">
+                        <span className="text-[#ECF1EE] bg-[#101713] px-1.5 py-0.5 rounded-[4px] border border-white/[0.07] text-[10px]">
                           @{formatOdds(p.marketOdds)}
                         </span>
                       )}
                     </div>
-                    <div className="w-full h-1 bg-[var(--surface)] rounded-full overflow-hidden">
+                    <div className="w-full h-1 bg-[#101713] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[var(--accent)] rounded-full"
+                        className="h-full bg-[#B6E63B] rounded-full"
                         style={{ width: `${Math.min(100, p.modelProbability * 100)}%` }}
                       />
                     </div>
@@ -342,8 +342,8 @@ export default function PredictionsPage() {
         </div>
       )}
 
-      {/* FILTER BAR (Requirements 12 & 16) */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3.5 space-y-3">
+      {/* FILTER BAR */}
+      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
         <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--text)]">
           <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
           <span>Filter market intelligence</span>
@@ -461,10 +461,10 @@ export default function PredictionsPage() {
       </div>
 
       {/* Predictions Table */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] overflow-hidden">
-        <div className="p-3 bg-[var(--surface-2)] border-b border-[var(--border)] flex items-center justify-between text-[11px] text-[var(--text-3)]">
-          <span className="font-mono">Displaying {filtered.length} scored lines</span>
-          <span>Ranked by model score & statistical edge</span>
+      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] overflow-hidden">
+        <div className="p-3 bg-[#151E19] border-b border-white/[0.07] flex items-center justify-between text-[11px] text-[#8B9890]">
+          <span className="font-mono tabular-nums">Displaying {filtered.length} scored lines</span>
+          <span className="text-[#5E6A63]">Ranked by model score & edge</span>
         </div>
 
         {filtered.length > 0 ? (

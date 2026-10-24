@@ -15,13 +15,11 @@ import {
 import { COMPETITIONS } from '@/lib/data/seedData';
 import { SUPPORTED_OPTIONS_CATALOGUE } from '@/lib/prediction/marketCatalog';
 import { 
-  Sliders, 
   User, 
-  Clock, 
-  Save, 
   CheckCircle2, 
   Contrast,
-  ShieldCheck
+  Sliders,
+  Save
 } from 'lucide-react';
 import AccountInstallRow from '@/components/pwa/AccountInstallRow';
 
@@ -82,21 +80,21 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-4 py-1">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-white/[0.07]">
         <div>
-          <h1 className="text-[18px] font-[500] text-[#e8efe9]">
-            Analytical settings & preferences
-          </h1>
-          <p className="text-[12px] text-[#8fa69a] mt-0.5">
+          <h2 className="text-[19px] font-bold leading-[1.25] tracking-[-0.02em] text-[#ECF1EE]">
+            Account & Analytical Preferences
+          </h2>
+          <p className="text-[12px] text-[#8B9890] mt-0.5">
             Configure default statistical thresholds, competition scopes, model bounds, and catalog filters.
           </p>
         </div>
 
         {saveStatus && (
-          <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#b8e63a] bg-[#b8e63a]/15 border border-[#b8e63a]/30 px-2.5 py-1 rounded-[6px]">
-            <CheckCircle2 className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#B6E63B] bg-[rgba(182,230,59,0.12)] border border-[#B6E63B]/30 px-2.5 py-1 rounded-[6px]">
+            <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={2} />
             <span>{saveStatus}</span>
           </div>
         )}
@@ -105,92 +103,92 @@ export default function SettingsPage() {
       {/* PWA Install in Account tab */}
       <AccountInstallRow />
 
-      <form onSubmit={handleSave} className="space-y-5 text-[12px]">
+      <form onSubmit={handleSave} className="space-y-4 text-[12px]">
         {/* Profile Card */}
-        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
-          <h2 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
-            <User className="w-4 h-4 text-[#e8efe9]" />
+        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
+          <h3 className="text-[13px] font-semibold text-[#ECF1EE] flex items-center gap-2">
+            <User className="w-4 h-4 text-[#B6E63B]" strokeWidth={2} />
             <span>Profile & account tier</span>
-          </h2>
+          </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Full name</label>
+              <label className="block text-[#8B9890] mb-1 text-[11px] font-medium">Full name</label>
               <input
                 type="text"
                 value={user.fullName}
                 onChange={(e) => setUser({ ...user, fullName: e.target.value })}
-                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
+                className="w-full h-[40px] bg-[#151E19] border border-white/[0.07] px-3 rounded-[11px] text-[13px] text-[#ECF1EE] focus:outline-hidden focus:border-[#B6E63B]"
               />
             </div>
             <div>
-              <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Email address</label>
+              <label className="block text-[#8B9890] mb-1 text-[11px] font-medium">Email address</label>
               <input
                 type="email"
                 value={user.email}
                 disabled
-                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#8fa69a] opacity-70 cursor-not-allowed"
+                className="w-full h-[40px] bg-[#151E19] border border-white/[0.07] px-3 rounded-[11px] text-[13px] text-[#5E6A63] cursor-not-allowed"
               />
             </div>
           </div>
 
-          <div className="pt-2 flex items-center justify-between text-[11px] text-[#8fa69a] border-t border-white/[0.06]">
+          <div className="pt-2 flex items-center justify-between text-[11.5px] text-[#8B9890] border-t border-white/[0.05]">
             <div>
-              Role: <span className="font-mono text-[#e8efe9] capitalize">{user.role}</span>
+              Role: <span className="font-mono text-[#ECF1EE] capitalize">{user.role}</span>
             </div>
             <div>
-              Subscription: <span className="font-mono text-[#b8e63a] capitalize">{user.subscriptionTier}</span>
+              Subscription: <span className="font-mono text-[#B6E63B] capitalize font-semibold">{user.subscriptionTier}</span>
             </div>
           </div>
         </div>
 
         {/* Display Mode */}
-        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
+        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
-              <Contrast className="w-4 h-4 text-[#b8e63a]" />
+            <h3 className="text-[13px] font-semibold text-[#ECF1EE] flex items-center gap-2">
+              <Contrast className="w-4 h-4 text-[#B6E63B]" strokeWidth={2} />
               <span>Terminal display mode</span>
-            </h2>
-            <span className="text-[11px] font-mono text-[#8fa69a]">
-              {isMonochrome ? 'Black & white active' : 'Color active'}
+            </h3>
+            <span className="text-[10px] font-mono text-[#5E6A63]">
+              {isMonochrome ? 'Noir active' : 'Color active'}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => handleToggleMonochrome(false)}
-              className={`p-3 rounded-[8px] border text-left transition-all ${
+              className={`p-3 rounded-[11px] border text-left transition-all touch-press ${
                 !isMonochrome
-                  ? 'bg-[#0a1812] border-[#b8e63a] ring-1 ring-[#b8e63a]'
-                  : 'bg-[#0a1812] border-white/[0.08] opacity-70 hover:opacity-100'
+                  ? 'bg-[#151E19] border-[#B6E63B]'
+                  : 'bg-[#151E19] border-white/[0.07] opacity-60 hover:opacity-100'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="font-[500] text-[13px] text-[#e8efe9]">Color mode</span>
-                {!isMonochrome && <CheckCircle2 className="w-3.5 h-3.5 text-[#b8e63a]" />}
+                <span className="font-semibold text-[13px] text-[#ECF1EE]">Dark Green Palette</span>
+                {!isMonochrome && <CheckCircle2 className="w-4 h-4 text-[#B6E63B]" strokeWidth={2} />}
               </div>
-              <p className="text-[11px] text-[#8fa69a] leading-normal">
-                Fintech dark green palette (#0a1812, #0f2219) with lime accents (#b8e63a) and official club crests.
+              <p className="text-[11.5px] text-[#8B9890] leading-normal">
+                Fintech palette (#0A0F0D, #101713) with lime accents (#B6E63B) and official club crests.
               </p>
             </button>
 
             <button
               type="button"
               onClick={() => handleToggleMonochrome(true)}
-              className={`p-3 rounded-[8px] border text-left transition-all ${
+              className={`p-3 rounded-[11px] border text-left transition-all touch-press ${
                 isMonochrome
                   ? 'bg-white text-black border-white'
-                  : 'bg-[#0a1812] border-white/[0.08] opacity-70 hover:opacity-100'
+                  : 'bg-[#151E19] border-white/[0.07] opacity-60 hover:opacity-100'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className={`font-[500] text-[13px] ${isMonochrome ? 'text-black' : 'text-[#e8efe9]'}`}>
-                  Black & white (Noir terminal)
+                <span className={`font-semibold text-[13px] ${isMonochrome ? 'text-black' : 'text-[#ECF1EE]'}`}>
+                  Noir Monochrome
                 </span>
-                {isMonochrome && <CheckCircle2 className="w-3.5 h-3.5 text-black" />}
+                {isMonochrome && <CheckCircle2 className="w-4 h-4 text-black" strokeWidth={2} />}
               </div>
-              <p className={`text-[11px] leading-normal ${isMonochrome ? 'text-gray-700' : 'text-[#8fa69a]'}`}>
+              <p className={`text-[11.5px] leading-normal ${isMonochrome ? 'text-neutral-700' : 'text-[#8B9890]'}`}>
                 High-contrast monochrome paper view with pure grayscale highlights.
               </p>
             </button>
@@ -198,33 +196,37 @@ export default function SettingsPage() {
         </div>
 
         {/* Statistical Thresholds */}
-        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
-          <h2 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[#b8e63a]" />
-            <span>Model qualification thresholds</span>
-          </h2>
+        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
+          <h3 className="text-[13px] font-semibold text-[#ECF1EE] flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-[#B6E63B]" strokeWidth={2} />
+            <span>Model Gating & Edge Hurdles</span>
+          </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[#8fa69a] font-[500]">Minimum probability cutoff</span>
-                <span className="font-mono font-[500] text-[#b8e63a]">{(prefs.minProbabilityThreshold * 100).toFixed(1)}%</span>
+                <label className="text-[#8B9890] text-[11px] font-medium">Min Model Probability</label>
+                <span className="font-mono text-[#B6E63B] font-semibold tabular-nums">
+                  {(prefs.minProbabilityThreshold * 100).toFixed(0)}%
+                </span>
               </div>
               <input
                 type="range"
-                min="0.50"
+                min="0.40"
                 max="0.80"
                 step="0.01"
                 value={prefs.minProbabilityThreshold}
                 onChange={(e) => setPrefs({ ...prefs, minProbabilityThreshold: parseFloat(e.target.value) })}
-                className="w-full accent-[#b8e63a] cursor-pointer"
+                className="w-full accent-[#B6E63B] cursor-pointer"
               />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[#8fa69a] font-[500]">Minimum statistical edge (EV margin)</span>
-                <span className="font-mono font-[500] text-[#e8efe9]">+{(prefs.minEdgeThreshold * 100).toFixed(1)}%</span>
+                <label className="text-[#8B9890] text-[11px] font-medium">Min Statistical Edge (vs Book)</label>
+                <span className="font-mono text-[#B6E63B] font-semibold tabular-nums">
+                  +{(prefs.minEdgeThreshold * 100).toFixed(1)}%
+                </span>
               </div>
               <input
                 type="range"
@@ -233,132 +235,45 @@ export default function SettingsPage() {
                 step="0.005"
                 value={prefs.minEdgeThreshold}
                 onChange={(e) => setPrefs({ ...prefs, minEdgeThreshold: parseFloat(e.target.value) })}
-                className="w-full accent-[#b8e63a] cursor-pointer"
+                className="w-full accent-[#B6E63B] cursor-pointer"
               />
             </div>
           </div>
         </div>
 
         {/* Preferred Competitions */}
-        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
-          <h2 className="text-[14px] font-[500] text-[#e8efe9]">Preferred competitions</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-2.5">
+          <label className="block text-[#ECF1EE] text-[13px] font-semibold">Active Competition Scopes</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {COMPETITIONS.map(c => {
               const active = prefs.preferredCompetitions.includes(c.code);
               return (
                 <button
-                  type="button"
                   key={c.code}
-                  onClick={() => toggleCompetition(c.code)}
-                  className={`p-2.5 rounded-[8px] border text-left flex items-center justify-between transition-colors ${
-                    active ? 'bg-[#b8e63a]/15 border-[#b8e63a] text-[#e8efe9]' : 'bg-[#0a1812] border-white/[0.08] text-[#8fa69a]'
-                  }`}
-                >
-                  <span className="font-[500] text-[12px]">{c.code}</span>
-                  {active && <CheckCircle2 className="w-3.5 h-3.5 text-[#b8e63a]" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Supported Options Catalogue */}
-        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#b8e63a]" />
-              <span>Supported options catalogue</span>
-            </h2>
-            <span className="text-[11px] font-mono text-[#8fa69a]">
-              10 authorized launch types
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {Object.entries(SUPPORTED_OPTIONS_CATALOGUE).map(([key, opt]) => {
-              const optType = key as SupportedOptionType;
-              const activeList = prefs.preferredOptionTypes || [
-                'win', 'draw', 'double_chance', 'over_under_goals', 'both_teams_to_score',
-                'corners', 'bookings', 'highest_scoring_half', 'first_half_goals', 'second_half_result'
-              ];
-              const isSelected = activeList.includes(optType);
-
-              return (
-                <button
                   type="button"
-                  key={optType}
-                  onClick={() => toggleOptionType(optType)}
-                  className={`p-2.5 rounded-[8px] border text-left transition-all ${
-                    isSelected
-                      ? 'bg-[#0a1812] border-[#b8e63a] ring-1 ring-[#b8e63a]/40 text-[#e8efe9]'
-                      : 'bg-[#0a1812]/50 border-white/[0.06] text-[#8fa69a] opacity-60 hover:opacity-100'
+                  onClick={() => toggleCompetition(c.code)}
+                  className={`h-[36px] px-3 rounded-[9px] border text-[11.5px] font-medium flex items-center justify-between transition-colors touch-press ${
+                    active
+                      ? 'bg-[rgba(182,230,59,0.12)] border-[#B6E63B] text-[#B6E63B]'
+                      : 'bg-[#151E19] border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2 mb-0.5">
-                    <div>
-                      <div className="font-[500] text-[12px] text-[#e8efe9]">
-                        {opt.title}
-                      </div>
-                      <span className="text-[10px] font-mono text-[#b8e63a]">
-                        Period: {opt.period}
-                      </span>
-                    </div>
-                    {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-[#b8e63a] shrink-0" />}
-                  </div>
-                  <p className="text-[11px] text-[#8fa69a] line-clamp-2 mt-0.5">
-                    {opt.settlementRule}
-                  </p>
+                  <span className="truncate">{c.name}</span>
+                  {active && <CheckCircle2 className="w-3.5 h-3.5 text-[#B6E63B] shrink-0 ml-1" strokeWidth={2} />}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Notifications & Timezone */}
-        <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
-          <h2 className="text-[14px] font-[500] text-[#e8efe9] flex items-center gap-2">
-            <Clock className="w-4 h-4 text-[#e3b341]" />
-            <span>Timezone & alerts</span>
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[#8fa69a] mb-1 text-[11px] font-[500]">Display timezone</label>
-              <select
-                value={prefs.timezone}
-                onChange={(e) => setPrefs({ ...prefs, timezone: e.target.value })}
-                className="w-full bg-[#0a1812] border border-white/[0.08] px-3 py-1.5 rounded-[8px] text-[#e8efe9] focus:outline-hidden focus:border-[#b8e63a]"
-              >
-                <option value="UTC">UTC (Universal Coordinated Time)</option>
-                <option value="Europe/London">Europe / London (BST/GMT)</option>
-                <option value="America/New_York">America / New York (EST)</option>
-                <option value="Europe/Berlin">Europe / Berlin (CET)</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 pt-4 sm:pt-6">
-              <input
-                type="checkbox"
-                id="emailNotifs"
-                checked={prefs.emailNotificationsEnabled}
-                onChange={(e) => setPrefs({ ...prefs, emailNotificationsEnabled: e.target.checked })}
-                className="rounded bg-[#0a1812] border-white/20 text-[#b8e63a] focus:ring-0 w-3.5 h-3.5"
-              />
-              <label htmlFor="emailNotifs" className="text-[12px] text-[#8fa69a] cursor-pointer">
-                Enable line movement alerts for saved fixtures
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Save button */}
-        <div className="flex items-center justify-between pt-1">
+        {/* Save Button */}
+        <div className="pt-2">
           <button
             type="submit"
-            className="h-[42px] px-5 rounded-[8px] bg-[#b8e63a] hover:bg-[#c8ee47] text-[#0a1812] font-[500] text-[14px] flex items-center gap-2 transition-colors"
+            className="w-full h-[46px] rounded-[11px] bg-[#B6E63B] hover:bg-[#c8ee47] active:bg-[#a5cf30] text-[#0A0F0D] font-semibold text-[13px] flex items-center justify-center gap-2 transition-transform active:scale-[0.98] touch-press shadow-xs"
           >
-            <Save className="w-4 h-4" />
-            <span>Save preferences</span>
+            <Save className="w-4 h-4" strokeWidth={2} />
+            <span>Save Preferences</span>
           </button>
         </div>
       </form>

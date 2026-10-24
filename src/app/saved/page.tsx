@@ -65,15 +65,15 @@ export default function SavedMatchesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 py-1">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
+      <div className="flex items-center justify-between gap-3 pb-2 border-b border-white/[0.07]">
         <div>
-          <h1 className="text-[18px] font-[500] text-[#e8efe9] flex items-center gap-2">
-            <Bookmark className="w-4 h-4 text-[#e3b341] fill-[#e3b341]" />
-            <span>Saved fixtures watchlist</span>
-          </h1>
-          <p className="text-[12px] text-[#8fa69a] mt-0.5">
+          <h2 className="text-[19px] font-bold leading-[1.25] tracking-[-0.02em] text-[#ECF1EE] flex items-center gap-2">
+            <Bookmark className="w-4 h-4 text-[#E2AE45] fill-[#E2AE45]" />
+            <span>Saved Watchlist</span>
+          </h2>
+          <p className="text-[12px] text-[#8B9890] mt-0.5">
             Track prioritized matches, monitor pre-match market movements, and receive line updates.
           </p>
         </div>
@@ -82,17 +82,17 @@ export default function SavedMatchesPage() {
           <button
             onClick={handleClearAll}
             type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[#0f2219] hover:bg-white/[0.04] border border-white/[0.08] text-[12px] font-[500] text-[#8fa69a] hover:text-[#e8efe9] transition-colors"
+            className="flex items-center gap-1.5 px-3 h-[34px] rounded-[10px] bg-[#101713] hover:bg-[#151E19] border border-white/[0.07] text-[12px] font-medium text-[#8B9890] hover:text-[#ECF1EE] transition-transform active:scale-[0.98] touch-press"
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear watchlist</span>
+            <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
+            <span>Clear all</span>
           </button>
         )}
       </div>
 
       {/* Content */}
       {isLoaded && savedFixtures.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {savedFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
             fixture.sport === 'basketball' ? (
               <NBAGameCard key={fixture.id} fixture={fixture} />
@@ -108,29 +108,31 @@ export default function SavedMatchesPage() {
           ))}
         </div>
       ) : isLoaded && savedIds.length > 0 && !liveDataAvailable ? (
-        <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-3">
-          <Bookmark className="w-8 h-8 mx-auto text-[#8fa69a]/40" />
-          <h3 suppressHydrationWarning className="text-[#e8efe9] font-[500] text-[15px]">
+        <div className="p-8 text-center bg-[#101713] border border-white/[0.07] rounded-[14px] space-y-2.5">
+          <Bookmark className="w-8 h-8 mx-auto text-[#5E6A63]" />
+          <h3 suppressHydrationWarning className="text-[#ECF1EE] font-semibold text-[14px]">
             Live data unavailable.{lastUpdated ? ` Last updated ${lastUpdated}` : ''}
           </h3>
-          <p className="text-[12px] text-[#8fa69a] max-w-sm mx-auto">
+          <p className="text-[12px] text-[#8B9890] max-w-sm mx-auto">
             You have {savedIds.length} bookmarked fixture{savedIds.length > 1 ? 's' : ''}. Live fixture data will display once live API synchronization completes.
           </p>
         </div>
       ) : (
-        <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-3">
-          <Bookmark className="w-8 h-8 mx-auto text-[#8fa69a]/40" />
-          <h3 className="text-[#e8efe9] font-[500] text-[15px]">Your watchlist is empty</h3>
-          <p className="text-[12px] text-[#8fa69a] max-w-sm mx-auto">
-            You haven&apos;t bookmarked any fixtures yet. Click the bookmark icon on any fixture card or analysis page to monitor line updates.
+        <div className="border border-dashed border-white/[0.12] rounded-[14px] bg-[#101713] p-8 text-center flex flex-col items-center justify-center space-y-2.5">
+          <div className="w-[46px] h-[46px] rounded-[12px] bg-[#151E19] border border-white/[0.07] flex items-center justify-center text-[#8B9890]">
+            <Bookmark className="w-5 h-5 text-[#E2AE45]" strokeWidth={2} />
+          </div>
+          <h3 className="text-[15px] font-semibold text-[#ECF1EE]">Your watchlist is empty</h3>
+          <p className="text-[12.5px] leading-relaxed text-[#8B9890] max-w-xs mx-auto">
+            Click the bookmark icon on any fixture card or analysis page to monitor lines.
           </p>
           <div className="pt-1">
             <Link
               href="/matches"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[8px] bg-[#b8e63a] hover:bg-[#c8ee47] text-[#0a1812] font-[500] text-[13px] transition-colors"
+              className="inline-flex items-center gap-1.5 h-[38px] px-4 rounded-[11px] bg-[#B6E63B] hover:bg-[#c8ee47] text-[#0A0F0D] font-semibold text-[12.5px] transition-transform active:scale-[0.98] touch-press shadow-xs"
             >
               <span>Explore fixtures</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-3.5 h-3.5" strokeWidth={2} />
             </Link>
           </div>
         </div>

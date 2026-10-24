@@ -184,22 +184,22 @@ export default function MatchAnalysisPage() {
           <button
             onClick={handleToggleBookmark}
             type="button"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-[500] border transition-colors ${
+            className={`flex items-center gap-1.5 px-3 h-[36px] rounded-[11px] text-[12px] font-medium border transition-colors touch-press ${
               isSaved
-                ? 'bg-[#e3b341]/10 text-[#e3b341] border-[#e3b341]/30'
-                : 'bg-[#0f2219] border-white/[0.08] text-[#8fa69a] hover:text-[#e8efe9]'
+                ? 'bg-[#E2AE45]/15 text-[#E2AE45] border-[#E2AE45]/30'
+                : 'bg-[#101713] border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
             }`}
           >
-            <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-[#e3b341]' : ''}`} />
+            <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-[#E2AE45]' : ''}`} strokeWidth={2} />
             <span>{isSaved ? 'Saved to watchlist' : 'Save fixture'}</span>
           </button>
         </div>
       </div>
 
       {/* Match Header Card */}
-      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-5 space-y-5">
+      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-4 space-y-4">
         {/* League and meta row */}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-[#8fa69a] border-b border-white/[0.08] pb-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-[#8B9890] border-b border-white/[0.07] pb-3">
           <div className="flex items-center gap-2">
             <TeamCrest
               crestUrl={fixture.competition.emblemUrl}

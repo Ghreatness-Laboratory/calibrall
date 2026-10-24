@@ -4,16 +4,16 @@ import React from 'react';
 import Link from 'next/link';
 import { 
   ArrowRight, 
-  Check, 
   BarChart3, 
   TrendingUp, 
   Zap, 
   AlertCircle,
   ChevronRight,
   ShieldCheck,
-  Calculator,
-  Activity,
-  Calendar
+  Calendar,
+  Layers,
+  Cpu,
+  Target
 } from 'lucide-react';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
@@ -62,251 +62,290 @@ export default function HomeClient() {
     };
   });
 
-  const footballFeatureChecklist = [
-    { title: 'Dixon-Coles goals model', desc: 'Bivariate Poisson joint distributions' },
-    { title: 'NegBinomial corner lines', desc: 'Volume variance and game-state adjustments' },
-    { title: 'Grounded explanations', desc: 'Quantitative audits with zero generated hype' },
-    { title: 'No forced picks', desc: 'Engine abstains whenever edges are marginal' },
+  const footballModels = [
+    { 
+      title: 'Dixon Coles goals model', 
+      subtitle: 'Bivariate Poisson joint distributions',
+      icon: Cpu 
+    },
+    { 
+      title: 'NegBinomial corner lines', 
+      subtitle: 'Volume variance and game state',
+      icon: TrendingUp 
+    },
+    { 
+      title: 'Grounded explanations', 
+      subtitle: 'Quantitative audits, zero hype',
+      icon: ShieldCheck 
+    },
   ];
 
-  const basketballFeatureChecklist = [
-    { title: 'Exact Efficiency Model', desc: 'A_off = OffEff × Poss; A_def = DefEff × OppPoss' },
-    { title: 'No Arbitrary Biases', desc: 'Zero pace blending or unverified home court inflation' },
-    { title: '30 NBA Franchises', desc: 'Official ORtg/100, DRtg/100, PACE auto-filled & editable' },
-    { title: 'Sportsbook Margin Leans', desc: 'Precise Over/Under and ATS spread differentials' },
+  const basketballModels = [
+    { 
+      title: 'Exact Efficiency Model', 
+      subtitle: 'A_off = OffEff × Poss; A_def = DefEff × OppPoss',
+      icon: Cpu 
+    },
+    { 
+      title: 'Possessions & Pace Normalization', 
+      subtitle: 'Zero arbitrary biases or unverified inflation',
+      icon: TrendingUp 
+    },
+    { 
+      title: 'Grounded mathematical audit', 
+      subtitle: 'Full transparent calculation steps exposed',
+      icon: ShieldCheck 
+    },
   ];
 
+  // Skeleton Loader for smooth transitions
   if (isSwitching) {
     return (
-      <div className="space-y-6 py-8 animate-pulse">
-        <div className="h-6 w-48 bg-white/10 rounded-[6px]" />
-        <div className="h-16 w-3/4 bg-white/10 rounded-[8px]" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
-          <div className="h-44 bg-[#0f2219] rounded-[12px] border border-white/10" />
-          <div className="h-44 bg-[#0f2219] rounded-[12px] border border-white/10" />
-          <div className="h-44 bg-[#0f2219] rounded-[12px] border border-white/10" />
+      <div className="space-y-6 py-4 animate-pulse">
+        <div className="h-4 w-32 bg-[#151E19] rounded-[6px]" />
+        <div className="h-14 w-full max-w-md bg-[#151E19] rounded-[10px]" />
+        <div className="h-10 w-full bg-[#151E19] rounded-[11px]" />
+        <div className="grid grid-cols-3 gap-2.5">
+          <div className="h-16 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
+          <div className="h-16 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
+          <div className="h-16 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
         </div>
+        <div className="h-44 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
       </div>
     );
   }
 
+  const brierValue = isBasketball 
+    ? VERIFIED_NBA_PERFORMANCE_REPORT.brierScore.toFixed(3) 
+    : VERIFIED_PERFORMANCE_REPORT.brierScore.toFixed(3);
+
   return (
-    <div className="space-y-[30px] py-2">
-      {/* Hero Section */}
-      <section className="space-y-[18px] pt-1 pb-6 border-b border-[var(--border)]">
-        {/* 4. Tagline strip: single row, 10.5px, one-line; remove duplicate 'Every call, on record'; show short mono version tag at right */}
-        <div className="flex items-center justify-between text-[10.5px] font-mono text-[var(--text-3)] pb-2.5 border-b border-[var(--border)] w-full overflow-hidden">
-          <div className="flex items-center gap-2 truncate">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0 shadow-[0_0_0_3px_var(--accent-soft)]" />
-            <span className="text-[var(--text-2)] uppercase tracking-[0.04em] truncate">
-              {isBasketball ? 'NBA POSSESSION-EFFICIENCY MODEL' : 'BIVARIATE POISSON INFERENCE PIPELINE'}
-            </span>
-          </div>
-          <span className="text-[10px] text-[var(--text-3)] shrink-0 ml-2">v2.4.1</span>
+    <div className="space-y-6 py-2">
+      {/* 4. HOME SCREEN HERO */}
+      <section className="space-y-4 pt-1">
+        {/* Mono Eyebrow */}
+        <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#B6E63B] font-semibold">
+          STATISTICAL EDGE ENGINE
         </div>
 
-        {/* 5. Hero: mono eyebrow "STATISTICAL EDGE ENGINE" above H2; second sentence of H2 in --accent */}
-        <div className="space-y-2.5">
-          <div className="text-[10.5px] font-mono uppercase tracking-[0.12em] text-[var(--accent)] font-[600]">
-            STATISTICAL EDGE ENGINE
-          </div>
-
+        {/* H1 Heading */}
+        <h1 className="text-[23px] leading-[1.2] font-bold tracking-[-0.025em] text-[#ECF1EE]">
           {isBasketball ? (
             <>
-              <h2 className="text-[25px] leading-[1.18] font-[650] tracking-[-0.025em] text-[var(--text)]">
-                Stop guessing NBA margins.<br />
-                <span className="text-[var(--accent)]">Calculate where the efficiency edge lies.</span>
-              </h2>
-              <p className="text-[12.8px] leading-[1.6] text-[var(--text-2)] max-w-xl">
-                Independent NBA score projection engine. Evaluate offensive efficiency, defensive efficiency, and possessions per game to isolate true team totals, spreads, and moneyline edges.
-              </p>
+              Stop guessing NBA margins.<br />
+              <span className="text-[#B6E63B]">Calculate where the edge lies.</span>
             </>
           ) : (
             <>
-              <h2 className="text-[25px] leading-[1.18] font-[650] tracking-[-0.025em] text-[var(--text)]">
-                Stop guessing match winners.<br />
-                <span className="text-[var(--accent)]">Find where the statistical edge lies.</span>
-              </h2>
-              <p className="text-[12.8px] leading-[1.6] text-[var(--text-2)] max-w-xl">
-                Calibrall independently evaluates all available football markets—total goals, corners, both teams to score, cards, and 1X2 lines—to identify qualified probability and verified expected value. When data is insufficient, it abstains.
-              </p>
+              Stop guessing match winners.<br />
+              <span className="text-[#B6E63B]">Find where the edge lies.</span>
             </>
           )}
-        </div>
+        </h1>
 
-        {/* 6. Primary CTA & Secondary row */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+        {/* Short description */}
+        <p className="text-[13px] leading-[1.55] text-[#8B9890] max-w-lg">
+          {isBasketball
+            ? 'Calibrall independently models offensive and defensive efficiency per 100 possessions to surface verified NBA spreads, totals, and leans.'
+            : 'Calibrall evaluates goals, corners, both teams to score, cards and 1X2 lines to surface verified expected value, and abstains when data is thin.'}
+        </p>
+
+        {/* Action Buttons */}
+        <div className="space-y-2 pt-1">
+          {/* Primary Button */}
           <Link
             href="/dashboard"
-            className="w-full sm:w-auto h-[44px] px-5 py-[12px] rounded-[10px] bg-[var(--accent)] hover:bg-[#c8ee47] active:bg-[#a5cf30] text-[var(--accent-ink)] text-[13.5px] font-[600] flex items-center justify-center gap-2 transition-colors shadow-xs"
+            className="w-full h-[46px] rounded-[11px] bg-[#B6E63B] hover:bg-[#c8ee47] active:bg-[#a5cf30] text-[#0A0F0D] text-[14px] font-[650] flex items-center justify-center gap-2 transition-transform duration-150 active:scale-[0.98] shadow-xs"
           >
-            <span>{isBasketball ? 'Launch NBA Projection Tool' : 'Launch analytics terminal'}</span>
-            <ArrowRight className="w-[15px] h-[15px]" strokeWidth={2} />
+            <span>{isBasketball ? 'Launch NBA analytics terminal' : 'Launch analytics terminal'}</span>
+            <ArrowRight className="w-4 h-4" strokeWidth={2} />
           </Link>
 
+          {/* Ghost Row: Verify track record with Brier in lime mono */}
           <Link
             href="/performance"
-            className="w-full sm:w-auto h-[42px] px-4 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)] text-[var(--text)] text-[12.5px] font-[550] flex items-center justify-between sm:justify-center gap-4 transition-colors"
+            className="w-full h-[44px] px-4 rounded-[11px] border border-white/[0.07] bg-[#101713] hover:bg-[#151E19] text-[#ECF1EE] text-[13px] font-medium flex items-center justify-between transition-transform duration-150 active:scale-[0.98]"
           >
             <span>Verify track record</span>
-            <span className="font-mono text-[11px] tracking-tight">
-              <span className="text-[var(--text-3)]">Brier </span>
-              <span className="text-[var(--accent)] font-[550]">
-                {isBasketball ? VERIFIED_NBA_PERFORMANCE_REPORT.brierScore.toFixed(3) : VERIFIED_PERFORMANCE_REPORT.brierScore.toFixed(3)}
-              </span>
-            </span>
+            <div className="flex items-center gap-1.5 font-mono text-[11.5px] tabular-nums">
+              <span className="text-[#5E6A63]">Brier</span>
+              <span className="text-[#B6E63B] font-semibold">{brierValue}</span>
+            </div>
           </Link>
         </div>
 
-        {/* 7. Feature checklist: ONE grouped card with 1px dividers between rows (not four separate cards) */}
-        <div className="border border-[var(--border)] bg-[var(--surface)] rounded-[12px] divide-y divide-[var(--border)] overflow-hidden max-w-xl mt-3">
-          {(isBasketball ? basketballFeatureChecklist : footballFeatureChecklist).map((item, idx) => (
-            <div
-              key={idx}
-              className="p-3 sm:px-3.5 sm:py-2.5 flex items-start sm:items-center gap-2.5"
-            >
-              {/* 18px checkbox tile with --accent-soft fill and thin accent border */}
-              <div className="w-[18px] h-[18px] min-w-[18px] rounded-[5px] bg-[var(--accent-soft)] border border-[var(--accent)]/40 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                <Check className="w-3 h-3 text-[var(--accent)]" strokeWidth={2.2} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[12.5px] font-[600] text-[var(--text)] leading-tight">
-                  {item.title}
-                </div>
-                <div className="text-[11.5px] text-[var(--text-3)] leading-tight mt-0.5 truncate">
-                  {item.desc}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Interactive NBA Projection Tool Section (when Basketball is selected) */}
-        {isBasketball && (
-          <div className="pt-6">
-            <NBAScoreProjectionTool />
-          </div>
-        )}
-
-        {/* 8. Live fixtures: header row with title (13.5px/620) + mono timestamp chip */}
-        <div className="pt-6">
-          <div className="flex items-center justify-between pb-2.5 border-b border-[var(--border)] mb-3.5">
-            <h3 className="text-[13.5px] font-[620] text-[var(--text)]">
-              {isBasketball ? 'NBA Games Today & Upcoming' : 'Live Fixtures'}
-            </h3>
-            <span 
-              suppressHydrationWarning
-              className="text-[10.5px] font-mono px-2 py-0.5 rounded-[5px] border border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent)]"
-            >
-              {liveDataAvailable ? 'Active verification' : (lastUpdated ? `Updated ${lastUpdated}` : 'Live data pipeline')}
+        {/* Row of Three Equal Stat Tiles */}
+        <div className="grid grid-cols-3 gap-2.5 pt-1">
+          <div className="p-3 bg-[#101713] border border-white/[0.07] rounded-[14px] flex flex-col justify-center">
+            <span className="text-[10px] font-mono uppercase tracking-[0.08em] text-[#8B9890]">
+              BRIER SCORE
+            </span>
+            <span className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums mt-0.5">
+              {brierValue}
             </span>
           </div>
 
-          {fixtures.length > 0 ? (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                {isBasketball
-                  ? fixtures.slice(0, 3).map((f) => <NBAGameCard key={f.id} fixture={f} />)
-                  : showcaseFootballFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
-                      <FixtureCard
-                        key={fixture.id}
-                        fixture={fixture}
-                        topPrediction={topPick}
-                        noRecommendationReason={noRecommendationReason}
-                      />
-                    ))}
-              </div>
+          <div className="p-3 bg-[#101713] border border-white/[0.07] rounded-[14px] flex flex-col justify-center">
+            <span className="text-[10px] font-mono uppercase tracking-[0.08em] text-[#8B9890]">
+              MARKETS
+            </span>
+            <span className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums mt-0.5">
+              {isBasketball ? '3' : '18'}
+            </span>
+          </div>
 
-              <div className="mt-3 pt-2.5 border-t border-[var(--border)] flex items-center justify-between text-[11.5px] text-[var(--text-3)]">
-                <span>
-                  Displaying {Math.min(3, fixtures.length)} of {fixtures.length} {isBasketball ? 'NBA matchups' : 'live evaluated fixtures'}
-                </span>
-                <Link href="/matches" className="text-[var(--accent)] hover:underline flex items-center gap-1 font-[550]">
-                  <span>View all {isBasketball ? 'NBA matchups & lines' : 'available fixtures & markets'}</span>
-                  <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.75} />
-                </Link>
-              </div>
-            </>
-          ) : (
-            /* Empty state: dashed 1px --border-strong card, 34px icon tile (calendar), title 12.5px, helper text 11.5px --text-3, centered */
-            <div className="p-6 rounded-[12px] bg-[var(--surface)] border border-dashed border-[var(--border-strong)] text-center space-y-2 flex flex-col items-center justify-center">
-              <div className="w-[34px] h-[34px] rounded-[8px] bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center text-[var(--text-2)] mb-0.5">
-                <Calendar className="w-4 h-4" strokeWidth={1.75} />
-              </div>
-              <div className="text-[12.5px] font-[600] text-[var(--text)]">
-                No games scheduled for today.
-              </div>
-              <p className="text-[11.5px] text-[var(--text-3)] max-w-sm mx-auto leading-relaxed">
-                Next scheduled matchups will display automatically. Check the upcoming tab in Fixtures.
-              </p>
-            </div>
-          )}
+          <div className="p-3 bg-[#101713] border border-white/[0.07] rounded-[14px] flex flex-col justify-center">
+            <span className="text-[10px] font-mono uppercase tracking-[0.08em] text-[#8B9890]">
+              MIN. EDGE
+            </span>
+            <span className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums mt-0.5">
+              +3.0%
+            </span>
+          </div>
+        </div>
+
+        {/* Models Grouped List Card */}
+        <div className="space-y-2 pt-2">
+          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#5E6A63] font-semibold">
+            INFERENCE MODELS
+          </div>
+          <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] divide-y divide-white/[0.07] overflow-hidden">
+            {(isBasketball ? basketballModels : footballModels).map((item, idx) => {
+              const Icon = item.icon;
+              return (
+                <div key={idx} className="p-3.5 flex items-center gap-3">
+                  <div className="w-[30px] h-[30px] min-w-[30px] rounded-[8px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4" strokeWidth={2} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-[13px] font-semibold text-[#ECF1EE] leading-tight">
+                      {item.title}
+                    </h3>
+                    <p className="text-[11.5px] text-[#8B9890] leading-tight mt-0.5 truncate">
+                      {item.subtitle}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* 9. Architecture section: eyebrow in --info, H3 18px, body 12.5px. Feature cards get 30px rounded icon tile, stroke icons 15px, title 13px/620, desc 12px/1.55 */}
-      <section className="pt-2 space-y-3.5">
+      {/* NBA Interactive Tool (when Basketball active) */}
+      {isBasketball && (
+        <section className="pt-2">
+          <NBAScoreProjectionTool />
+        </section>
+      )}
+
+      {/* Live Fixtures Preview */}
+      <section className="space-y-3 pt-2">
+        <div className="flex items-center justify-between pb-2 border-b border-white/[0.07]">
+          <h2 className="text-[13px] font-semibold text-[#ECF1EE]">
+            {isBasketball ? 'NBA Matchups Today' : 'Live Fixtures Today'}
+          </h2>
+          <span 
+            suppressHydrationWarning
+            className="text-[10px] font-mono px-2 py-0.5 rounded-[5px] border border-white/[0.07] bg-[#151E19] text-[#B6E63B] tabular-nums"
+          >
+            {liveDataAvailable ? 'Active pipeline' : (lastUpdated ? `Sync ${lastUpdated}` : 'Live')}
+          </span>
+        </div>
+
+        {fixtures.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              {isBasketball
+                ? fixtures.slice(0, 3).map((f) => <NBAGameCard key={f.id} fixture={f} />)
+                : showcaseFootballFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
+                    <FixtureCard
+                      key={fixture.id}
+                      fixture={fixture}
+                      topPrediction={topPick}
+                      noRecommendationReason={noRecommendationReason}
+                    />
+                  ))}
+            </div>
+
+            <div className="pt-1 flex items-center justify-between text-[11.5px] text-[#5E6A63]">
+              <span>
+                Displaying {Math.min(3, fixtures.length)} of {fixtures.length} {isBasketball ? 'matchups' : 'scheduled fixtures'}
+              </span>
+              <Link href="/matches" className="text-[#B6E63B] hover:underline flex items-center gap-1 font-medium">
+                <span>View all fixtures & markets</span>
+                <ChevronRight className="w-3.5 h-3.5" strokeWidth={2} />
+              </Link>
+            </div>
+          </>
+        ) : (
+          <div className="p-6 rounded-[14px] bg-[#101713] border border-dashed border-white/[0.12] text-center space-y-2 flex flex-col items-center justify-center">
+            <div className="w-[34px] h-[34px] rounded-[9px] bg-[#151E19] border border-white/[0.07] flex items-center justify-center text-[#8B9890]">
+              <Calendar className="w-4 h-4" strokeWidth={2} />
+            </div>
+            <div className="text-[13px] font-semibold text-[#ECF1EE]">
+              No games scheduled for today.
+            </div>
+            <p className="text-[11.5px] text-[#8B9890] max-w-xs mx-auto leading-relaxed">
+              Upcoming matchups will display automatically. Check the upcoming fixtures tab.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* 5. ARCHITECTURE SECTION */}
+      <section className="pt-2 space-y-3">
         <div className="space-y-1 text-left">
-          <span className="text-[10.5px] font-mono uppercase tracking-[0.12em] text-[var(--info)] font-[600] block">
+          <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#5aa9e6] font-semibold block">
             ARCHITECTURE PHILOSOPHY
           </span>
-          <h3 className="text-[18px] font-[620] leading-[1.25] tracking-[-0.01em] text-[var(--text)] text-left">
-            {isBasketball ? 'Why Possessions & Efficiency Outperform Simple Scoring Averages' : 'Why match winners are often the worst market'}
-          </h3>
-          <p className="text-[12.5px] leading-[1.6] text-[var(--text-2)] text-left max-w-xl">
-            {isBasketball 
-              ? 'Raw points per game fails to isolate pace distortions. By decoupling offensive points per possession from opponent pace and defensive allowance, our engine computes true game states.'
-              : 'Standard prediction tools force a 1X2 pick on every match regardless of efficiency. Calibrall scans up to 18 market lines across the 10 authorized catalog types to isolate statistical mispricings.'}
+          <h2 className="text-[18px] font-bold leading-[1.25] tracking-[-0.02em] text-[#ECF1EE] text-left">
+            Why match winners are often the worst market
+          </h2>
+          <p className="text-[13px] leading-[1.55] text-[#8B9890] text-left max-w-lg">
+            Standard prediction services force a 1X2 pick on every match regardless of efficiency. Calibrall scans multiple lines across the authorized catalog to isolate true mispricings, and abstains when edges are absent.
           </p>
         </div>
 
-        {/* Feature cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
-          <div className="p-3.5 bg-[var(--surface)] border border-[var(--border)] rounded-[12px] flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-[30px] h-[30px] rounded-[8px] bg-[var(--info)]/10 border border-[var(--info)]/20 flex items-center justify-center text-[var(--info)] shrink-0">
-                  <Zap className="w-[15px] h-[15px]" strokeWidth={1.75} />
-                </div>
-                <h4 className="text-[13px] font-[620] text-[var(--text)]">
-                  {isBasketball ? 'Pace & Possession Normalization' : 'Multi-market ranking'}
-                </h4>
+        {/* Two Compact Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+          <div className="p-3.5 bg-[#101713] border border-white/[0.07] rounded-[14px] space-y-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-[30px] h-[30px] rounded-[8px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] flex items-center justify-center shrink-0">
+                <Zap className="w-4 h-4" strokeWidth={2} />
               </div>
-              <p className="text-[12px] leading-[1.55] text-[var(--text-2)] mt-2">
-                {isBasketball
-                  ? 'Each team’s defense is tested specifically against the opponent’s expected pace. Possessions are never artificially blended.'
-                  : 'We rank 1X2, Over/Under, BTTS, Corners, and Cards simultaneously to find the single highest expected value candidate.'}
-              </p>
+              <h3 className="text-[13px] font-semibold text-[#ECF1EE]">
+                Multi market ranking
+              </h3>
             </div>
+            <p className="text-[12px] leading-[1.55] text-[#8B9890]">
+              We evaluate goals, corners, cards, and result lines simultaneously to isolate where the greatest statistical edge resides.
+            </p>
           </div>
 
-          <div className="p-3.5 bg-[var(--surface)] border border-[var(--border)] rounded-[12px] flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-[30px] h-[30px] rounded-[8px] bg-[var(--accent-soft)] border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] shrink-0">
-                  <ShieldCheck className="w-[15px] h-[15px]" strokeWidth={1.75} />
-                </div>
-                <h4 className="text-[13px] font-[620] text-[var(--text)]">
-                  {isBasketball ? 'Grounded Mathematical Audit' : 'Discipline to abstain'}
-                </h4>
+          <div className="p-3.5 bg-[#101713] border border-white/[0.07] rounded-[14px] space-y-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-[30px] h-[30px] rounded-[8px] bg-[rgba(182,230,59,0.12)] text-[#B6E63B] flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-4 h-4" strokeWidth={2} />
               </div>
-              <p className="text-[12px] leading-[1.55] text-[var(--text-2)] mt-2">
-                {isBasketball
-                  ? 'Every single step (A_off, B_off, A_def, B_def, projected scores, margins, totals) is exposed in plain text for verifiable transparency.'
-                  : 'If no market presents at least a +3.0% probability edge and verified data coverage, the engine labels the match "No recommendation".'}
-              </p>
+              <h3 className="text-[13px] font-semibold text-[#ECF1EE]">
+                Discipline to abstain
+              </h3>
             </div>
+            <p className="text-[12px] leading-[1.55] text-[#8B9890]">
+              When modeled probability fails to clear the required margin of safety (+3.0% edge), the engine abstains rather than inventing a pick.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* 10. Responsible-use disclaimer: warm amber-tinted card (border rgba(217,164,65,.3), bg rgba(217,164,65,.04)), 15px alert icon, 11px text --text-3 with bold lead-in in --text-2 */}
-      <section className="pt-1">
-        <div className="rounded-[12px] p-3.5 border border-[rgba(217,164,65,0.30)] bg-[rgba(217,164,65,0.04)] flex items-start gap-2.5">
-          <AlertCircle className="w-[15px] h-[15px] text-[var(--warn)] shrink-0 mt-0.5" strokeWidth={1.75} />
-          <div className="text-[11px] leading-[1.6] text-[var(--text-3)]">
-            <strong className="font-[600] text-[var(--text-2)]">Responsible use disclaimer: </strong>
-            Calibrall is an institutional statistical modeling terminal providing objective probabilistic estimates, Poisson goal matrices, and market edge metrics. Football matches and sporting events are stochastic systems; high model probability is never a guarantee of outcome. Calibrall does not accept wagers or provide financial advice. 18+ only.
+      {/* 5. BUG FIX: RESPONSIBLE USE DISCLAIMER (ONLY ONCE ON THE PAGE) */}
+      <section className="pt-2">
+        <div className="rounded-[14px] p-3.5 border border-[#E2AE45]/[0.28] bg-[#E2AE45]/[0.06] flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-[#E2AE45] shrink-0 mt-0.5" strokeWidth={2} />
+          <div className="text-[11px] leading-[1.55] text-[#E2AE45]/90">
+            <strong className="font-semibold text-[#ECF1EE]">Responsible use disclaimer: </strong>
+            Calibrall is a statistical modeling terminal providing objective probabilistic estimates and Poisson matrices. Sporting events are stochastic systems; high modeled probability is never a guarantee of outcome. Calibrall does not accept wagers or provide financial advice. 18+ only.
           </div>
         </div>
       </section>

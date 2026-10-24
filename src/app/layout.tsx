@@ -12,20 +12,20 @@ import { SportProvider } from '@/lib/context/SportContext';
 import SportSwitcher from '@/components/SportSwitcher';
 
 export const viewport: Viewport = {
-  themeColor: '#0a1812',
+  themeColor: '#0A0F0D',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
 };
 
 export const metadata: Metadata = {
-  title: 'MATCHMIND | Football & NBA Basketball Statistical Projection Platform',
-  description: 'Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.',
+  title: 'Calibrall | Football & NBA Basketball Statistical Projection Platform',
+  description: 'Calibrall statistical projection platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'MATCHMIND',
+    title: 'Calibrall',
   },
   icons: {
     icon: [
@@ -38,8 +38,8 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: 'MATCHMIND | Football & NBA Basketball Statistical Projection Platform',
-    description: 'Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.',
+    title: 'Calibrall | Football & NBA Basketball Statistical Projection Platform',
+    description: 'Calibrall statistical projection platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.',
     type: 'website',
   },
 };
@@ -56,7 +56,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Calibrall" />
-        <meta name="theme-color" content="#0a1812" />
+        <meta name="theme-color" content="#0A0F0D" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.webmanifest" />
         <script
@@ -65,7 +65,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-[100dvh] bg-[var(--bg)] text-[var(--text)] flex flex-col antialiased selection:bg-[var(--accent)] selection:text-[var(--accent-ink)] pb-[calc(88px+env(safe-area-inset-bottom,0px))] md:pb-0">
+      <body className="min-h-[100dvh] bg-[#0A0F0D] text-[#ECF1EE] flex flex-col antialiased selection:bg-[#B6E63B] selection:text-[#0A0F0D] pb-[calc(76px+env(safe-area-inset-bottom,0px))] md:pb-6">
         <InstallPromptProvider>
           <SportProvider>
             <Navbar />

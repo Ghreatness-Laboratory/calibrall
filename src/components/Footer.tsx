@@ -1,86 +1,109 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 export default function Footer() {
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    analytics: false,
+    navigation: false,
+    governance: false,
+  });
+
+  const toggleSection = (key: string) => {
+    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const sections = [
+    {
+      id: 'analytics',
+      title: 'Analytics and models',
+      links: [
+        { label: 'Dixon-Coles goals engine', href: '/methodology' },
+        { label: 'Negative binomial corners', href: '/methodology' },
+        { label: 'Disciplinary card model', href: '/methodology' },
+        { label: 'Brier score calibration', href: '/performance' },
+      ],
+    },
+    {
+      id: 'navigation',
+      title: 'Navigation',
+      links: [
+        { label: 'Dashboard', href: '/dashboard' },
+        { label: 'Fixtures & matches', href: '/matches' },
+        { label: 'Model predictions', href: '/predictions' },
+        { label: 'Market explorer', href: '/markets' },
+        { label: 'Subscription tiers', href: '/pricing' },
+      ],
+    },
+    {
+      id: 'governance',
+      title: 'Governance',
+      links: [
+        { label: 'Responsible use', href: '/responsible-use' },
+        { label: 'Terms of service', href: '/responsible-use' },
+        { label: 'Privacy policy', href: '/responsible-use' },
+        { label: 'Model version: Dixon-Coles v2.4.1', href: '/methodology' },
+      ],
+    },
+  ];
+
   return (
-    <footer className="bg-[var(--bg)] border-t border-[var(--border)] mt-14 text-[12px] text-[var(--text-2)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 space-y-6">
-        {/* Responsible Use Notice: warm amber-tinted card */}
-        <div className="p-3.5 rounded-[12px] bg-[rgba(217,164,65,0.04)] border border-[rgba(217,164,65,0.30)] flex items-start gap-2.5">
-          <AlertCircle className="w-[15px] h-[15px] text-[var(--warn)] shrink-0 mt-0.5" strokeWidth={1.75} />
-          <div className="text-[11px] text-[var(--text-3)] leading-[1.6]">
-            <strong className="font-[600] text-[var(--text-2)]">Responsible use disclaimer: </strong>
-            Calibrall is an analytical terminal providing objective statistical estimates, Poisson goal matrices, and market edge comparisons. Football matches are inherently stochastic; statistical probability is not a guarantee of outcome. Calibrall does not accept wagers or provide financial advice. 18+ only.
-          </div>
+    <footer className="mt-10 pb-6 border-t border-white/[0.07] pt-4 text-[12px] text-[#8B9890]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-2">
+        {/* Three Collapsible Accordion Rows */}
+        <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] divide-y divide-white/[0.07] overflow-hidden">
+          {sections.map((section) => {
+            const isOpen = openSections[section.id];
+            return (
+              <div key={section.id} className="transition-colors">
+                <button
+                  onClick={() => toggleSection(section.id)}
+                  type="button"
+                  className="w-full min-h-[44px] px-4 py-3 flex items-center justify-between text-left hover:bg-[#151E19]/60 transition-colors select-none"
+                  aria-expanded={isOpen}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-semibold text-[#ECF1EE]">
+                      {section.title}
+                    </span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] bg-[#151E19] text-[#5E6A63] border border-white/[0.05]">
+                      {section.links.length} items
+                    </span>
+                  </div>
+                  <ChevronDown
+                    className={`w-4 h-4 text-[#8B9890] transition-transform duration-200 ${
+                      isOpen ? 'rotate-180 text-[#B6E63B]' : ''
+                    }`}
+                    strokeWidth={2}
+                  />
+                </button>
+
+                {isOpen && (
+                  <div className="px-4 pb-3 pt-1 bg-[#0A0F0D]/40">
+                    <ul className="space-y-1.5 text-[12px]">
+                      {section.links.map((link, idx) => (
+                        <li key={idx}>
+                          <Link
+                            href={link.href}
+                            className="text-[#8B9890] hover:text-[#ECF1EE] transition-colors block py-0.5"
+                          >
+                            {link.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* 11. Footer: 24px logo tile aligned top (flex: none so it never squishes), name 12.5px/620, description 11px --text-3 */}
-          <div className="space-y-1.5">
-            <div className="flex items-start gap-2">
-              <div
-                className="w-[24px] h-[24px] min-w-[24px] rounded-[6px] overflow-hidden border border-[var(--border)] bg-[#f4f1ea] mt-0.5 shrink-0"
-                style={{ flex: 'none' }}
-              >
-                <img
-                  src="/assets/aistudio/calibrall-profile-light_3415fbe5.png"
-                  alt="Calibrall logo"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="min-w-0">
-                <span className="font-[620] text-[var(--text)] text-[12.5px] leading-tight block">
-                  Calibrall
-                </span>
-                <p className="text-[10.5px] text-[var(--text-3)] leading-tight mt-0.5">Every call, on record.</p>
-              </div>
-            </div>
-            <p className="text-[11px] text-[var(--text-3)] leading-normal mt-1.5">
-              Market intelligence terminal for European football fixtures across goals, corners, cards, and match results.
-            </p>
-          </div>
-
-          <div>
-            <h4 className="text-[var(--text)] font-[600] text-[12.5px] mb-2">Analytics & models</h4>
-            <ul className="space-y-1 text-[11.5px] text-[var(--text-2)]">
-              <li><Link href="/methodology" className="hover:text-[var(--text)] transition-colors">Dixon-Coles goals engine</Link></li>
-              <li><Link href="/methodology" className="hover:text-[var(--text)] transition-colors">Negative binomial corners</Link></li>
-              <li><Link href="/methodology" className="hover:text-[var(--text)] transition-colors">Disciplinary card model</Link></li>
-              <li><Link href="/performance" className="hover:text-[var(--text)] transition-colors">Brier score calibration</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-[var(--text)] font-[600] text-[12.5px] mb-2">Navigation</h4>
-            <ul className="space-y-1 text-[11.5px] text-[var(--text-2)]">
-              <li><Link href="/dashboard" className="hover:text-[var(--text)] transition-colors">Dashboard</Link></li>
-              <li><Link href="/matches" className="hover:text-[var(--text)] transition-colors">Fixtures</Link></li>
-              <li><Link href="/predictions" className="hover:text-[var(--text)] transition-colors">Predictions</Link></li>
-              <li><Link href="/markets" className="hover:text-[var(--text)] transition-colors">Market explorer</Link></li>
-              <li><Link href="/pricing" className="hover:text-[var(--text)] transition-colors">Subscription tiers</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-[var(--text)] font-[600] text-[12.5px] mb-2">Governance</h4>
-            <ul className="space-y-1 text-[11.5px] text-[var(--text-2)]">
-              <li><Link href="/responsible-use" className="hover:text-[var(--text)] transition-colors">Responsible use</Link></li>
-              <li><Link href="/responsible-use" className="hover:text-[var(--text)] transition-colors">Terms of service</Link></li>
-              <li><Link href="/responsible-use" className="hover:text-[var(--text)] transition-colors">Privacy policy</Link></li>
-              <li><span className="text-[var(--accent)] font-mono text-[10.5px]">Dixon-Coles v2.4</span></li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="border-t border-[var(--border)] pt-4 flex flex-col sm:flex-row items-center justify-between text-[var(--text-3)] text-[10.5px]">
-          <div>
-            © {new Date().getFullYear()} Calibrall. All rights reserved.
-          </div>
-          <div className="flex items-center gap-4 mt-2 sm:mt-0 font-mono">
-            <span>Latency: ~18ms</span>
-            <span>PostgreSQL RLS Active</span>
-          </div>
+        {/* Small Centered Footer Line at 10.5px in subtle text color (#5E6A63) */}
+        <div className="text-center pt-4 text-[10.5px] font-mono text-[#5E6A63]">
+          © {new Date().getFullYear()} Calibrall · Every call, on record.
         </div>
       </div>
     </footer>

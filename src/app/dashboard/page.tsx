@@ -178,32 +178,32 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 py-1">
       {/* Top Header & Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-white/[0.07]">
         <div>
-          <h1 className="text-[18px] font-[620] text-[var(--text)] flex items-center gap-2">
+          <h2 className="text-[19px] font-bold leading-[1.25] tracking-[-0.02em] text-[#ECF1EE] flex items-center gap-2">
             <span>{isBasketball ? 'NBA Analytics & Market Terminal' : 'Market Intelligence Dashboard'}</span>
-            <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded-[5px] border border-[var(--accent)]/40 text-[var(--accent)] font-semibold">
+            <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded-[5px] border border-[#B6E63B]/40 text-[#B6E63B] font-semibold">
               LIVE
             </span>
-          </h1>
-          <p className="text-[12.5px] text-[var(--text-2)] mt-0.5">
+          </h2>
+          <p className="text-[12px] text-[#8B9890] mt-0.5">
             {isBasketball 
               ? 'Multi-team efficiency modeling, projected totals, spreads, and pace analysis for all 30 NBA franchises.'
-              : 'Real-time multi-market evaluation across the 10 authorized catalog types. Every call, on record.'}
+              : 'Real-time multi-market evaluation across the authorized catalog types. Every call, on record.'}
           </p>
         </div>
 
         {/* Search */}
         <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[var(--text-3)]" strokeWidth={1.75} />
+          <Search className="w-4 h-4 absolute left-3 top-3 text-[#5E6A63]" strokeWidth={2} />
           <input
             type="text"
             placeholder={isBasketball ? "Search NBA franchise..." : "Search club or league..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-[var(--surface)] border border-[var(--border)] pl-8 pr-3 py-1.5 rounded-[10px] text-[12px] text-[var(--text)] placeholder-[var(--text-3)] focus:outline-hidden focus:border-[var(--accent)] w-52 sm:w-60"
+            className="w-full sm:w-64 h-[40px] bg-[#151E19] border border-white/[0.07] pl-9 pr-3 rounded-[11px] text-[13px] text-[#ECF1EE] placeholder-[#5E6A63] focus:outline-hidden focus:border-[#B6E63B]"
           />
         </div>
       </div>
