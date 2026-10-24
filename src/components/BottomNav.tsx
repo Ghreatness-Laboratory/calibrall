@@ -91,12 +91,12 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#101713]/90 backdrop-blur-md border-t border-white/[0.07]"
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#0F1814]/90 backdrop-blur-md border-t border-[#1B2A23]"
       style={{
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <div className="grid grid-cols-5 w-full h-[64px]">
+      <div className="grid grid-cols-5 w-full h-[62px]">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -104,19 +104,22 @@ export default function BottomNav() {
               key={tab.id}
               href={tab.href}
               aria-current={tab.isActive ? 'page' : undefined}
-              className={`min-h-[44px] flex flex-col items-center justify-center transition-colors duration-150 touch-press select-none ${
+              className={`relative flex flex-col items-center justify-center transition-colors duration-150 touch-press select-none ${
                 tab.isActive
-                  ? 'text-[#B6E63B]'
-                  : 'text-[#8B9890] hover:text-[#ECF1EE]'
+                  ? 'text-[#B8E63A]'
+                  : 'text-[#8B9B93] hover:text-[#E9EFEB]'
               }`}
             >
-              <div className="relative">
-                <Icon className="w-5 h-5" strokeWidth={2} />
+              {tab.isActive && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-[2px] bg-[#B8E63A] rounded-full" />
+              )}
+              <div className="relative pt-0.5">
+                <Icon className="w-[21px] h-[21px]" strokeWidth={1.7} />
               </div>
 
               <span
-                className={`text-[10px] leading-tight mt-1 whitespace-nowrap tracking-tight ${
-                  tab.isActive ? 'font-semibold text-[#B6E63B]' : 'font-medium text-[#8B9890]'
+                className={`text-[10px] font-[500] leading-tight mt-0.5 whitespace-nowrap tracking-tight ${
+                  tab.isActive ? 'text-[#B8E63A]' : 'text-[#8B9B93]'
                 }`}
               >
                 {tab.label}

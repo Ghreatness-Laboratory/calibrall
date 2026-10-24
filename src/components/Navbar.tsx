@@ -83,30 +83,30 @@ export default function Navbar() {
 
   return (
     <header
-      className="sticky top-0 z-40 bg-[#0A0F0D]/95 backdrop-blur-md border-b border-white/[0.07]"
+      className="sticky top-0 z-40 bg-[#0A0F0D]/95 backdrop-blur-md border-b border-[#1B2A23]"
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
       {/* 1. Main Top App Bar: 52px high */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-[52px]">
-          {/* Left: 32px Logo Tile + Calibrall (15px/650) + Tagline (11px muted) */}
+          {/* Left: 30px Logo Tile + Calibrall (15px/700) + Tagline (11px muted) */}
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2.5 group touch-press">
-              <div className="w-[32px] h-[32px] min-w-[32px] min-h-[32px] rounded-[9px] overflow-hidden border border-white/[0.07] flex items-center justify-center bg-[#f4f1ea] shrink-0">
+              <div className="w-[30px] h-[30px] min-w-[30px] min-h-[30px] rounded-[8px] overflow-hidden border border-[#1B2A23] flex items-center justify-center bg-[#f4f1ea] shrink-0">
                 <Image
                   src="/assets/aistudio/calibrall-profile-light_3415fbe5.png"
                   alt="Calibrall logo"
-                  width={32}
-                  height={32}
+                  width={30}
+                  height={30}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
               </div>
               <div className="flex flex-col">
-                <span className="text-[15px] font-[650] text-[#ECF1EE] leading-tight group-hover:text-[#B6E63B] transition-colors whitespace-nowrap tracking-[-0.01em]">
+                <span className="text-[15px] font-[700] text-[#E9EFEB] leading-tight group-hover:text-[#B8E63A] transition-colors whitespace-nowrap tracking-[-0.015em]">
                   Calibrall
                 </span>
-                <span className="text-[11px] text-[#8B9890] leading-tight whitespace-nowrap mt-0.5">
+                <span className="text-[11px] font-[400] text-[#8B9B93] leading-tight whitespace-nowrap mt-0.5">
                   Every call, on record.
                 </span>
               </div>
@@ -122,8 +122,8 @@ export default function Navbar() {
                     href={item.href}
                     className={`px-3 py-1.5 rounded-[8px] text-[12px] font-medium transition-colors ${
                       active
-                        ? 'bg-[#151E19] text-[#B6E63B]'
-                        : 'text-[#8B9890] hover:text-[#ECF1EE] hover:bg-[#101713]'
+                        ? 'bg-[#142019] text-[#B8E63A]'
+                        : 'text-[#8B9B93] hover:text-[#E9EFEB] hover:bg-[#0F1814]'
                     }`}
                   >
                     {item.label}
@@ -139,28 +139,28 @@ export default function Navbar() {
 
             <Link
               href="/matches"
-              className="hidden sm:flex w-[32px] h-[32px] rounded-[9px] border border-white/[0.07] bg-[#101713] text-[#8B9890] hover:text-[#ECF1EE] items-center justify-center transition-colors touch-press"
+              className="hidden sm:flex w-[32px] h-[32px] rounded-[8px] border border-[#1B2A23] bg-[#0F1814] text-[#8B9B93] hover:text-[#E9EFEB] items-center justify-center transition-colors touch-press"
               title="Search fixtures"
               aria-label="Search fixtures"
             >
-              <Search className="w-3.5 h-3.5" strokeWidth={2} />
+              <Search className="w-3.5 h-3.5" strokeWidth={1.7} />
             </Link>
 
             {/* Outlined mono PRO badge */}
             <Link
               href="/pricing"
-              className="text-[9.5px] font-mono font-semibold px-2 py-[2px] rounded-[5px] border border-[#B6E63B]/40 text-[#B6E63B] tracking-wider leading-none hover:bg-[rgba(182,230,59,0.12)] transition-colors"
+              className="text-[10px] font-mono font-[600] px-2 py-[2px] rounded-full border border-[#B8E63A]/40 text-[#B8E63A] bg-[#B8E63A]/[0.06] tracking-wider leading-none hover:bg-[#B8E63A]/[0.15] transition-colors"
               title="Subscription tier: PRO"
             >
               PRO
             </Link>
 
-            {/* 30px circular avatar with min-44px touch hitbox */}
+            {/* 30px circular avatar */}
             <div className="relative">
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 type="button"
-                className="w-[30px] h-[30px] rounded-full border border-white/[0.07] bg-[#151E19] text-[#ECF1EE] hover:border-[#B6E63B]/50 flex items-center justify-center text-[11.5px] font-mono font-semibold transition-colors touch-press"
+                className="w-[30px] h-[30px] rounded-full border border-[#1B2A23] bg-[#142019] text-[#E9EFEB] hover:border-[#B8E63A]/50 flex items-center justify-center text-[11px] font-mono font-[600] transition-colors touch-press"
                 title="Account menu"
                 aria-label="Account menu"
               >
@@ -234,16 +234,16 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* 2. Slim Mono Status Line under the bar: 10px, with small lime dot */}
-      <div className="h-[24px] bg-[#0A0F0D] border-t border-white/[0.04] px-4 sm:px-6 text-[10px] font-mono flex items-center justify-between text-[#8B9890] whitespace-nowrap overflow-hidden">
+      {/* 2. Slim Mono Status Line under the bar: hairline top and bottom borders, 10.5px mono, green dot */}
+      <div className="h-[26px] bg-[#0A0F0D] border-t border-b border-[#1B2A23] px-4 sm:px-6 text-[10.5px] font-mono flex items-center justify-between text-[#8B9B93] whitespace-nowrap overflow-hidden">
         <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#B6E63B] shrink-0" />
-          <span className="text-[#ECF1EE]">Dixon Coles v2.4 online</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-[#B8E63A] shrink-0" />
+          <span className="text-[#E9EFEB]">Dixon Coles v2.4 online</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <span suppressHydrationWarning className="text-[#5E6A63] tabular-nums">
-            {timeStr || '16:20 UTC'}
+          <span suppressHydrationWarning className="text-[#5E6F67] tabular-nums">
+            {timeStr || '18:12 UTC'}
           </span>
         </div>
       </div>

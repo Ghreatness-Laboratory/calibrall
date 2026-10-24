@@ -121,45 +121,45 @@ export default function HomeClient() {
     : VERIFIED_PERFORMANCE_REPORT.brierScore.toFixed(3);
 
   return (
-    <div className="space-y-6 py-2">
+    <div className="space-y-3 py-1">
       {/* 4. HOME SCREEN HERO */}
-      <section className="space-y-4 pt-1">
+      <section className="space-y-3 pt-0.5">
         {/* Mono Eyebrow */}
-        <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#B6E63B] font-semibold">
+        <div className="text-[10.5px] font-mono uppercase tracking-[0.14em] text-[#B8E63A] font-[600]">
           STATISTICAL EDGE ENGINE
         </div>
 
-        {/* H1 Heading */}
-        <h1 className="text-[23px] leading-[1.2] font-bold tracking-[-0.025em] text-[#ECF1EE]">
+        {/* H1 Heading: 22px/1.2 weight 700 */}
+        <h1 className="text-[22px] leading-[1.2] font-[700] tracking-[-0.015em] text-[#E9EFEB]">
           {isBasketball ? (
             <>
               Stop guessing NBA margins.<br />
-              <span className="text-[#B6E63B]">Calculate where the edge lies.</span>
+              <span className="text-[#B8E63A]">Calculate where the edge lies.</span>
             </>
           ) : (
             <>
               Stop guessing match winners.<br />
-              <span className="text-[#B6E63B]">Find where the edge lies.</span>
+              <span className="text-[#B8E63A]">Find where the edge lies.</span>
             </>
           )}
         </h1>
 
         {/* Short description */}
-        <p className="text-[13px] leading-[1.55] text-[#8B9890] max-w-lg">
+        <p className="text-[13px] font-[400] leading-[1.55] text-[#8B9B93] max-w-lg">
           {isBasketball
             ? 'Calibrall independently models offensive and defensive efficiency per 100 possessions to surface verified NBA spreads, totals, and leans.'
             : 'Calibrall evaluates goals, corners, both teams to score, cards and 1X2 lines to surface verified expected value, and abstains when data is thin.'}
         </p>
 
         {/* Action Buttons */}
-        <div className="space-y-2 pt-1">
+        <div className="space-y-2 pt-0.5">
           {/* Primary Button */}
           <Link
             href="/dashboard"
-            className="w-full h-[46px] rounded-[11px] bg-[#B6E63B] hover:bg-[#c8ee47] active:bg-[#a5cf30] text-[#0A0F0D] text-[14px] font-[650] flex items-center justify-center gap-2 transition-transform duration-150 active:scale-[0.98] shadow-xs"
+            className="w-full h-[44px] rounded-[12px] bg-[#B8E63A] hover:bg-[#c8ee47] active:bg-[#a5cf30] text-[#0A0F0D] text-[13.5px] font-[600] flex items-center justify-center gap-2 transition-transform duration-140 active:scale-[0.985] touch-press"
           >
             <span>{isBasketball ? 'Launch NBA analytics terminal' : 'Launch analytics terminal'}</span>
-            <ArrowRight className="w-4 h-4" strokeWidth={2} />
+            <ArrowRight className="w-4 h-4" strokeWidth={1.7} />
           </Link>
 
           {/* Ghost Row: Verify track record with Brier in lime mono */}
@@ -343,12 +343,12 @@ export default function HomeClient() {
       {/* Built by Ghreatness Labs Teaser Section */}
       <HomeCreatorsTeaser />
 
-      {/* 5. BUG FIX: RESPONSIBLE USE DISCLAIMER (ONLY ONCE ON THE PAGE) */}
-      <section className="pt-2">
-        <div className="rounded-[14px] p-3.5 border border-[#E2AE45]/[0.28] bg-[#E2AE45]/[0.06] flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 text-[#E2AE45] shrink-0 mt-0.5" strokeWidth={2} />
-          <div className="text-[11px] leading-[1.55] text-[#E2AE45]/90">
-            <strong className="font-semibold text-[#ECF1EE]">Responsible use disclaimer: </strong>
+      {/* Responsible use disclaimer below as a muted amber-bordered card at 11.5px */}
+      <section className="pt-1">
+        <div className="rounded-[16px] p-3 border border-[#e3b341]/25 bg-[#0F1814] flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-[#e3b341] shrink-0 mt-0.5" strokeWidth={1.7} />
+          <div className="text-[11.5px] leading-[1.55] text-[#e3b341]/85">
+            <strong className="font-[600] text-[#E9EFEB]">Responsible use: </strong>
             Calibrall is a statistical modeling terminal providing objective probabilistic estimates and Poisson matrices. Sporting events are stochastic systems; high modeled probability is never a guarantee of outcome. Calibrall does not accept wagers or provide financial advice. 18+ only.
           </div>
         </div>

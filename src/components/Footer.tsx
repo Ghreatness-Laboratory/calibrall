@@ -76,10 +76,10 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="mt-10 pb-6 border-t border-white/[0.07] pt-4 text-[12px] text-[#8B9890]">
+    <footer className="mt-8 pb-6 border-t border-[#1B2A23] pt-4 text-[12px] text-[#8B9B93]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-3">
         {/* Three Collapsible Accordion Rows */}
-        <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] divide-y divide-white/[0.07] overflow-hidden">
+        <div className="border border-[#1B2A23] bg-[#0F1814] rounded-[16px] divide-y divide-[#1B2A23] overflow-hidden">
           {sections.map((section) => {
             const isOpen = openSections[section.id];
             return (
@@ -87,22 +87,22 @@ export default function Footer() {
                 <button
                   onClick={() => toggleSection(section.id)}
                   type="button"
-                  className="w-full min-h-[44px] px-4 py-3 flex items-center justify-between text-left hover:bg-[#151E19]/60 transition-colors select-none"
+                  className="w-full min-h-[44px] px-4 py-3 flex items-center justify-between text-left hover:bg-[#142019]/60 transition-colors select-none"
                   aria-expanded={isOpen}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-semibold text-[#ECF1EE]">
+                    <span className="text-[13px] font-[600] text-[#E9EFEB]">
                       {section.title}
                     </span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] bg-[#151E19] text-[#5E6A63] border border-white/[0.05]">
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] bg-[#142019] text-[#5E6F67] border border-[#1B2A23]">
                       {section.links.length} items
                     </span>
                   </div>
                   <ChevronDown
-                    className={`w-4 h-4 text-[#8B9890] transition-transform duration-200 ${
-                      isOpen ? 'rotate-180 text-[#B6E63B]' : ''
+                    className={`w-4 h-4 text-[#8B9B93] transition-transform duration-200 ${
+                      isOpen ? 'rotate-180 text-[#B8E63A]' : ''
                     }`}
-                    strokeWidth={2}
+                    strokeWidth={1.7}
                   />
                 </button>
 
@@ -113,12 +113,12 @@ export default function Footer() {
                         <li key={idx}>
                           <Link
                             href={link.href}
-                            className={`hover:text-[#ECF1EE] transition-colors flex items-center gap-1.5 py-0.5 ${
-                              link.isCreator ? 'text-[#B6E63B]' : 'text-[#8B9890]'
+                            className={`hover:text-[#E9EFEB] transition-colors flex items-center gap-1.5 py-0.5 ${
+                              link.isCreator ? 'text-[#B8E63A]' : 'text-[#8B9B93]'
                             }`}
                           >
                             {link.isCreator && (
-                              <Building2 className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" strokeWidth={2} />
+                              <Building2 className="w-3.5 h-3.5 text-[#B8E63A] shrink-0" strokeWidth={1.7} />
                             )}
                             <span>{link.label}</span>
                           </Link>
@@ -132,9 +132,9 @@ export default function Footer() {
           })}
         </div>
 
-        {/* Social icon row */}
+        {/* Social icon row: 40px buttons */}
         {activeSocials.length > 0 && (
-          <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
+          <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
             {activeSocials.map((platform) => (
               <a
                 key={platform.key}
@@ -142,16 +142,16 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`Ghreatness Labs on ${platform.name}`}
-                className="w-[34px] h-[34px] min-w-[34px] min-h-[34px] rounded-[8px] border-[0.5px] border-white/[0.08] bg-[#101713] hover:bg-[#151E19] text-[#8fa69a] hover:text-[#e8efe9] flex items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-[#B6E63B]"
+                className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-[10px] border border-[#1B2A23] bg-[#0F1814] hover:bg-[#142019] text-[#8B9B93] hover:text-[#E9EFEB] flex items-center justify-center transition-colors touch-press focus-visible:outline-2 focus-visible:outline-[#B8E63A]"
               >
-                <SocialIcon platform={platform.key} size={16} />
+                <SocialIcon platform={platform.key} size={18} />
               </a>
             ))}
           </div>
         )}
 
         {/* Footer Copyright */}
-        <div className="text-center pt-1 text-[11px] font-[400] text-[#5E6A63]">
+        <div className="text-center pt-1 text-[11px] font-[400] text-[#5E6F67]">
           © 2024 to {currentYear} Ghreatness Labs. All rights reserved.
         </div>
       </div>
