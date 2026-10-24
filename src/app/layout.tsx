@@ -11,7 +11,7 @@ import OfflineBanner from '@/components/pwa/OfflineBanner';
 import { SportProvider } from '@/lib/context/SportContext';
 
 export const viewport: Viewport = {
-  themeColor: '#0D1117',
+  themeColor: '#0A0F0D',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -55,7 +55,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Calibrall" />
-        <meta name="theme-color" content="#0D1117" />
+        <meta name="theme-color" content="#0A0F0D" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.webmanifest" />
         <script
@@ -64,7 +64,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-[100dvh] bg-[#0D1117] text-[#EDF1F6] flex flex-col antialiased selection:bg-[#A8E05F] selection:text-[#0D1117] pb-[calc(84px+env(safe-area-inset-bottom,0px))] md:pb-6">
+      <body className="min-h-[100dvh] bg-[#0A0F0D] text-[#ECF1EE] flex flex-col antialiased selection:bg-[#B6E63B] selection:text-[#0A0F0D] pb-[calc(76px+env(safe-area-inset-bottom,0px))] md:pb-6">
         <InstallPromptProvider>
           <SportProvider>
             <Navbar />

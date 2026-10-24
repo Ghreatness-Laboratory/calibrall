@@ -170,7 +170,8 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       missing.push('FOOTBALL_DATA_API_KEY');
     }
 
-    if (process.env.SPORTMONKS_API_TOKEN?.trim()) {
+    const sportmonksKey = process.env.SPORTMONKS_API_TOKEN?.trim() || process.env.SPORTSMONK_API_KEY?.trim() || process.env.SPORTMONKS_API_KEY?.trim();
+    if (sportmonksKey) {
       providers.push('Sportmonks');
     } else {
       missing.push('SPORTMONKS_API_TOKEN');
@@ -182,7 +183,8 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       missing.push('API-Football');
     }
 
-    if (process.env.ODDS_API_KEY?.trim()) {
+    const oddsKey = process.env.ODDS_API_KEY?.trim() || process.env.THE_ODDS_API_KEY?.trim();
+    if (oddsKey) {
       providers.push('The Odds API');
     } else {
       missing.push('ODDS_API_KEY');
@@ -286,7 +288,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     }
 
     // 4. Secondary Provider Fallback: Sportmonks
-    const sportmonksToken = process.env.SPORTMONKS_API_TOKEN?.trim();
+    const sportmonksToken = process.env.SPORTMONKS_API_TOKEN?.trim() || process.env.SPORTSMONK_API_KEY?.trim() || process.env.SPORTMONKS_API_KEY?.trim();
     if (sportmonksToken) {
       try {
         const smUrl = `https://api.sportmonks.com/v3/football/fixtures/between/${dateFrom}/${dateTo}?api_token=${sportmonksToken}&include=participants;league`;

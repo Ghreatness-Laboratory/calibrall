@@ -60,73 +60,73 @@ export default function PerformancePage() {
 
   return (
     <div className="space-y-3.5 py-1">
-      {/* 1. Header: 24px semibold with 13px muted subtitle */}
+      {/* 1. Header: 23px font-700 with 12px muted subtitle */}
       <div className="space-y-0.5">
-        <h1 className="text-[24px] font-semibold leading-[30px] text-[#EDF1F6] tracking-[-0.015em]">
+        <h1 className="text-[23px] font-[700] leading-[1.2] text-[#ECF1EE] tracking-[-0.025em]">
           Record & calibration
         </h1>
-        <p className="text-[13px] text-[#8A95A5]">
+        <p className="text-[12px] text-[#8B9890]">
           Out of sample backtesting against naive baselines and closing odds. Real data only.
         </p>
       </div>
 
-      {/* Verification Charter: 18px radius surface card */}
-      <div className="bg-[#141A23] border border-[#232C3A] rounded-[18px] p-3.5 space-y-1.5">
-        <div className="flex items-center gap-2 text-[#A8E05F] font-semibold text-[13px]">
+      {/* Verification Charter: 14px radius surface card */}
+      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 space-y-1.5">
+        <div className="flex items-center gap-2 text-[#B6E63B] font-[600] text-[13px]">
           <ShieldCheck className="w-4 h-4 shrink-0" strokeWidth={2} />
           <span>Research charter & dual benchmark protocol</span>
         </div>
-        <p className="text-[12px] leading-[17px] text-[#8A95A5]">
+        <p className="text-[12px] leading-[1.5] text-[#8B9890]">
           Every market is tested against a naive baseline and devigged sharp bookmaker closing odds. Where the model does not beat sharp closing lines out of sample, picks are labeled probability analysis only.
         </p>
       </div>
 
       {/* Overall Scorecard Tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="bg-[#141A23] border border-[#232C3A] rounded-[14px] p-3 flex flex-col justify-between h-[80px]">
-          <div className="text-[11px] text-[#8A95A5]">Overall Brier score</div>
+        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+          <div className="text-[10.5px] text-[#8B9890]">Overall Brier score</div>
           <div className="flex items-baseline gap-1.5">
-            <div className="text-[20px] font-semibold text-[#EDF1F6] tabular-nums">
+            <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
               {researchAudit.overallBrierAfter.toFixed(3)}
             </div>
-            <div className="text-[11px] text-[#A8E05F] tabular-nums">
+            <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
               (\u221212.1%)
             </div>
           </div>
-          <div className="text-[10.5px] text-[#5F6B7C]">Out of sample</div>
+          <div className="text-[10px] text-[#5E6A63]">Out of sample</div>
         </div>
 
-        <div className="bg-[#141A23] border border-[#232C3A] rounded-[14px] p-3 flex flex-col justify-between h-[80px]">
-          <div className="text-[11px] text-[#8A95A5]">Logarithmic loss</div>
+        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+          <div className="text-[10.5px] text-[#8B9890]">Logarithmic loss</div>
           <div className="flex items-baseline gap-1.5">
-            <div className="text-[20px] font-semibold text-[#EDF1F6] tabular-nums">
+            <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
               {researchAudit.overallLogLossAfter.toFixed(3)}
             </div>
-            <div className="text-[11px] text-[#A8E05F] tabular-nums">
+            <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
               (\u22124.1%)
             </div>
           </div>
-          <div className="text-[10.5px] text-[#5F6B7C]">Multi class scoring</div>
+          <div className="text-[10px] text-[#5E6A63]">Multi class scoring</div>
         </div>
 
-        <div className="bg-[#141A23] border border-[#232C3A] rounded-[14px] p-3 flex flex-col justify-between h-[80px]">
-          <div className="text-[11px] text-[#8A95A5]">Calibration ECE</div>
+        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+          <div className="text-[10.5px] text-[#8B9890]">Calibration ECE</div>
           <div className="flex items-baseline gap-1.5">
-            <div className="text-[20px] font-semibold text-[#A8E05F] tabular-nums">
+            <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
               1.8%
             </div>
           </div>
-          <div className="text-[10.5px] text-[#5F6B7C]">Expected error</div>
+          <div className="text-[10px] text-[#5E6A63]">Expected error</div>
         </div>
 
-        <div className="bg-[#141A23] border border-[#232C3A] rounded-[14px] p-3 flex flex-col justify-between h-[80px]">
-          <div className="text-[11px] text-[#8A95A5]">Average CLV</div>
+        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+          <div className="text-[10.5px] text-[#8B9890]">Average CLV</div>
           <div className="flex items-baseline gap-1.5">
-            <div className="text-[20px] font-semibold text-[#A8E05F] tabular-nums">
+            <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
               +2.8%
             </div>
           </div>
-          <div className="text-[10.5px] text-[#5F6B7C]">Closing line value</div>
+          <div className="text-[10px] text-[#5E6A63]">Closing line value</div>
         </div>
       </div>
 

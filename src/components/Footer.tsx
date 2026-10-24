@@ -76,10 +76,10 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="mt-8 pb-6 border-t border-[#1B2A23] pt-4 text-[12px] text-[#8B9B93]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-3">
+    <footer className="mt-6 pb-6 border-t border-white/[0.07] pt-4 text-[12px] text-[#8B9890]">
+      <div className="max-w-xl md:max-w-4xl lg:max-w-7xl mx-auto px-4 space-y-3">
         {/* Three Collapsible Accordion Rows */}
-        <div className="border border-[#1B2A23] bg-[#0F1814] rounded-[16px] divide-y divide-[#1B2A23] overflow-hidden">
+        <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] divide-y divide-white/[0.07] overflow-hidden">
           {sections.map((section) => {
             const isOpen = openSections[section.id];
             return (
@@ -87,38 +87,39 @@ export default function Footer() {
                 <button
                   onClick={() => toggleSection(section.id)}
                   type="button"
-                  className="w-full min-h-[44px] px-4 py-3 flex items-center justify-between text-left hover:bg-[#142019]/60 transition-colors select-none"
+                  className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-[#151E19] transition-colors select-none touch-press"
                   aria-expanded={isOpen}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-[600] text-[#E9EFEB]">
+                    <span className="text-[13px] font-[600] text-[#ECF1EE]">
                       {section.title}
                     </span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] bg-[#142019] text-[#5E6F67] border border-[#1B2A23]">
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] bg-[#151E19] text-[#5E6A63] border border-white/[0.07]">
                       {section.links.length} items
                     </span>
                   </div>
+
                   <ChevronDown
-                    className={`w-4 h-4 text-[#8B9B93] transition-transform duration-200 ${
-                      isOpen ? 'rotate-180 text-[#B8E63A]' : ''
+                    className={`w-4 h-4 text-[#8B9890] transition-transform duration-200 ${
+                      isOpen ? 'rotate-180 text-[#B6E63B]' : ''
                     }`}
-                    strokeWidth={1.7}
+                    strokeWidth={2}
                   />
                 </button>
 
                 {isOpen && (
-                  <div className="px-4 pb-3 pt-1 bg-[#0A0F0D]/40">
+                  <div className="px-3.5 pb-3 pt-1 bg-[#0A0F0D]/40">
                     <ul className="space-y-1.5 text-[12px]">
                       {section.links.map((link, idx) => (
                         <li key={idx}>
                           <Link
                             href={link.href}
-                            className={`hover:text-[#E9EFEB] transition-colors flex items-center gap-1.5 py-0.5 ${
-                              link.isCreator ? 'text-[#B8E63A]' : 'text-[#8B9B93]'
+                            className={`hover:text-[#ECF1EE] transition-colors flex items-center gap-1.5 py-0.5 ${
+                              link.isCreator ? 'text-[#B6E63B]' : 'text-[#8B9890]'
                             }`}
                           >
                             {link.isCreator && (
-                              <Building2 className="w-3.5 h-3.5 text-[#B8E63A] shrink-0" strokeWidth={1.7} />
+                              <Building2 className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" strokeWidth={2} />
                             )}
                             <span>{link.label}</span>
                           </Link>
@@ -132,7 +133,7 @@ export default function Footer() {
           })}
         </div>
 
-        {/* Social icon row: 40px buttons */}
+        {/* Social icon row */}
         {activeSocials.length > 0 && (
           <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
             {activeSocials.map((platform) => (
@@ -142,22 +143,17 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`Ghreatness Labs on ${platform.name}`}
-                className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-[10px] border border-[#1B2A23] bg-[#0F1814] hover:bg-[#142019] text-[#8B9B93] hover:text-[#E9EFEB] flex items-center justify-center transition-colors touch-press focus-visible:outline-2 focus-visible:outline-[#B8E63A]"
+                className="w-[36px] h-[36px] min-w-[36px] min-h-[36px] rounded-[10px] border border-white/[0.07] bg-[#101713] hover:bg-[#151E19] text-[#8B9890] hover:text-[#ECF1EE] flex items-center justify-center transition-colors touch-press focus-visible:outline-2 focus-visible:outline-[#B6E63B]"
               >
-                <SocialIcon platform={platform.key} size={18} />
+                <SocialIcon platform={platform.key} size={16} />
               </a>
             ))}
           </div>
         )}
 
-        {/* Mandatory Responsible Gaming Disclaimer */}
-        <div className="text-center pt-2 text-[11.5px] text-[#8B9B93]/90 max-w-xl mx-auto leading-relaxed">
-          Statistical analysis, not financial or betting advice. 18+. Gamble responsibly.
-        </div>
-
-        {/* Footer Copyright */}
-        <div className="text-center pt-1 text-[11px] font-[400] text-[#5E6F67]">
-          © 2024 to {currentYear} Ghreatness Labs. All rights reserved.
+        {/* Ending centered footer line at 10.5px in subtle text color */}
+        <div className="text-center pt-1 text-[10.5px] text-[#5E6A63]">
+          © 2024 to {currentYear} Calibrall. All model projections recorded on ledger.
         </div>
       </div>
     </footer>

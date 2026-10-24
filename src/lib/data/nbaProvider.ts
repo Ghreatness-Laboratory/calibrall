@@ -37,7 +37,7 @@ export class NBADataProvider {
    * Health check for NBA stats provider
    */
   async getHealth(): Promise<NBAProviderHealth> {
-    const ballDontLieKey = process.env.BALLDONTLIE_API_KEY?.trim();
+    const ballDontLieKey = process.env.BALLDONTLIE_API_KEY?.trim() || process.env.BALL_DONT_LIE_API_KEY?.trim();
     const nbaApiKey = process.env.NBA_API_KEY?.trim();
 
     const isConfigured = Boolean(ballDontLieKey || nbaApiKey);
@@ -133,7 +133,7 @@ export class NBADataProvider {
       }
     }
 
-    const ballDontLieKey = process.env.BALLDONTLIE_API_KEY?.trim();
+    const ballDontLieKey = process.env.BALLDONTLIE_API_KEY?.trim() || process.env.BALL_DONT_LIE_API_KEY?.trim();
     let statsResult: Record<string, NBATeamStats> = {};
     let isLive = false;
     let errorMsg: string | undefined;

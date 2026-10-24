@@ -130,24 +130,24 @@ export default function MatchAnalysisPage() {
   if (isLoading) {
     return (
       <div className="py-16 text-center space-y-3">
-        <div className="w-5 h-5 border-2 border-[#A8E05F] border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-[12px] text-[#8A95A5]">Loading match data...</p>
+        <div className="w-5 h-5 border-2 border-[#B6E63B] border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-[12px] text-[#8B9890]">Loading match data...</p>
       </div>
     );
   }
 
   if (!fixture || (!isBasketball && (!stats || !footballEvaluation)) || (isBasketball && basketballPredictions.length === 0)) {
     return (
-      <div className="py-16 text-center space-y-3 bg-[#141A23] border border-[#232C3A] rounded-[18px] p-6">
-        <h2 suppressHydrationWarning className="text-[15px] font-semibold text-[#EDF1F6]">
+      <div className="py-16 text-center space-y-3 bg-[#101713] border border-white/[0.07] rounded-[14px] p-6">
+        <h2 suppressHydrationWarning className="text-[15px] font-semibold text-[#ECF1EE]">
           Live data unavailable.{lastUpdated ? ` Last updated ${lastUpdated}` : ''}
         </h2>
-        <p className="text-[12px] text-[#8A95A5] max-w-sm mx-auto">
+        <p className="text-[12px] text-[#8B9890] max-w-sm mx-auto">
           {isBasketball 
             ? 'The requested NBA matchup data could not be retrieved.' 
             : 'The requested match data could not be retrieved.'}
         </p>
-        <Link href="/matches" className="inline-block px-4 py-2 rounded-[14px] bg-[#1A222E] border border-[#232C3A] text-[13px] text-[#EDF1F6] hover:bg-white/[0.05]">
+        <Link href="/matches" className="inline-block px-4 py-2 rounded-[11px] bg-[#151E19] border border-white/[0.07] text-[13px] text-[#ECF1EE] hover:bg-white/[0.05]">
           Return to fixtures
         </Link>
       </div>
@@ -171,7 +171,7 @@ export default function MatchAnalysisPage() {
       <div className="flex items-center justify-between pb-1">
         <Link
           href="/matches"
-          className="inline-flex items-center gap-1.5 text-[12.5px] text-[#8A95A5] hover:text-[#EDF1F6] transition-colors touch-press"
+          className="inline-flex items-center gap-1.5 text-[12.5px] text-[#8B9890] hover:text-[#ECF1EE] transition-colors touch-press"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to fixtures</span>
@@ -180,24 +180,24 @@ export default function MatchAnalysisPage() {
         <button
           onClick={handleToggleBookmark}
           type="button"
-          className={`flex items-center gap-1.5 px-3 h-[36px] rounded-[12px] text-[12px] font-medium border transition-colors touch-press ${
+          className={`flex items-center gap-1.5 px-3 h-[36px] rounded-[11px] text-[12px] font-medium border transition-colors touch-press ${
             isSaved
-              ? 'bg-[#E8B64A]/[0.15] text-[#E8B64A] border-[#E8B64A]/30'
-              : 'bg-[#141A23] border-[#232C3A] text-[#8A95A5] hover:text-[#EDF1F6]'
+              ? 'bg-[rgba(226,174,69,0.12)] text-[#E2AE45] border-[#E2AE45]/30'
+              : 'bg-[#101713] border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
           }`}
         >
-          <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-[#E8B64A]' : ''}`} strokeWidth={2} />
+          <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-[#E2AE45]' : ''}`} strokeWidth={2} />
           <span>{isSaved ? 'Saved' : 'Save'}</span>
         </button>
       </div>
 
       {/* Match Header Card */}
-      <div className="bg-[#141A23] border border-[#232C3A] rounded-[18px] p-3.5 space-y-3">
+      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
         {/* League and meta row */}
-        <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#8A95A5] border-b border-[#232C3A] pb-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#8B9890] border-b border-white/[0.07] pb-2.5">
           <div className="flex items-center gap-1.5 truncate">
-            <span className="font-semibold text-[#EDF1F6]">{fixture.competition.name}</span>
-            <span className="text-[#5F6B7C]">·</span>
+            <span className="font-semibold text-[#ECF1EE]">{fixture.competition.name}</span>
+            <span className="text-[#5E6A63]">·</span>
             <span className="tabular-nums">MD {fixture.matchday}</span>
             {(() => {
               const derby = (fixture.isDerby && fixture.derbyName) ? { name: fixture.derbyName } : checkDerby(fixture.homeTeam.name, fixture.awayTeam.name);
@@ -209,7 +209,7 @@ export default function MatchAnalysisPage() {
             })()}
           </div>
 
-          <div className="flex items-center gap-3 text-[11.5px] text-[#8A95A5] tabular-nums">
+          <div className="flex items-center gap-3 text-[11.5px] text-[#8B9890] tabular-nums">
             <span className="flex items-center gap-1" suppressHydrationWarning>
               <Calendar className="w-3.5 h-3.5" strokeWidth={1.8} />
               <span suppressHydrationWarning>
@@ -232,16 +232,16 @@ export default function MatchAnalysisPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <TeamCrest crestUrl={fixture.homeTeam.crestUrl} teamName={fixture.homeTeam.name} size={28} />
-                <span className="text-[15px] font-semibold text-[#EDF1F6] leading-tight truncate">
+                <span className="text-[15px] font-semibold text-[#ECF1EE] leading-tight truncate">
                   {homeName}
                 </span>
               </div>
               {fixture.status === 'FINISHED' ? (
-                <span className="text-[15px] font-semibold text-[#EDF1F6] tabular-nums">
+                <span className="text-[15px] font-semibold text-[#ECF1EE] tabular-nums">
                   {fixture.homeScore ?? 0}
                 </span>
               ) : (
-                <span className="text-[12px] text-[#5F6B7C]">Home</span>
+                <span className="text-[12px] text-[#5E6A63]">Home</span>
               )}
             </div>
 
@@ -249,26 +249,26 @@ export default function MatchAnalysisPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <TeamCrest crestUrl={fixture.awayTeam.crestUrl} teamName={fixture.awayTeam.name} size={28} />
-                <span className="text-[15px] font-semibold text-[#EDF1F6] leading-tight truncate">
+                <span className="text-[15px] font-semibold text-[#ECF1EE] leading-tight truncate">
                   {awayName}
                 </span>
               </div>
               {fixture.status === 'FINISHED' ? (
-                <span className="text-[15px] font-semibold text-[#EDF1F6] tabular-nums">
+                <span className="text-[15px] font-semibold text-[#ECF1EE] tabular-nums">
                   {fixture.awayScore ?? 0}
                 </span>
               ) : (
-                <span className="text-[12px] text-[#5F6B7C]">Away</span>
+                <span className="text-[12px] text-[#5E6A63]">Away</span>
               )}
             </div>
           </div>
 
           {/* Status pill & Kickoff */}
-          <div className="sm:border-l sm:border-[#232C3A] sm:pl-4 flex flex-col justify-center sm:items-end">
-            <span className="text-[11.5px] text-[#A8E05F] font-semibold">
+          <div className="sm:border-l sm:border-white/[0.07] sm:pl-4 flex flex-col justify-center sm:items-end">
+            <span className="text-[11.5px] text-[#B6E63B] font-semibold">
               {fixture.status === 'FINISHED' ? 'Completed' : 'Upcoming match'}
             </span>
-            <span className="text-[12px] text-[#EDF1F6] mt-0.5 tabular-nums" suppressHydrationWarning>
+            <span className="text-[12px] text-[#ECF1EE] mt-0.5 tabular-nums" suppressHydrationWarning>
               {fixture.status === 'FINISHED' ? 'Full time' : kickoff.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC'}
             </span>
           </div>
@@ -276,90 +276,90 @@ export default function MatchAnalysisPage() {
 
         {/* Quantitative Indicators Strip */}
         {isBasketball && fixture.basketballStats ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#232C3A]">
-            <div className="p-2.5 bg-[#1A222E] rounded-[14px]">
-              <span className="text-[11px] text-[#8A95A5] block">Offensive Efficiency</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/[0.07]">
+            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
+              <span className="text-[11px] text-[#8B9890] block">Offensive Efficiency</span>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#EDF1F6] tabular-nums">
+                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">
                   {fixture.basketballStats.homeOffEff.toFixed(3)}
                 </span>
-                <span className="text-[10.5px] text-[#5F6B7C] ml-auto tabular-nums">
+                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
                   vs {fixture.basketballStats.awayOffEff.toFixed(3)}
                 </span>
               </div>
             </div>
 
-            <div className="p-2.5 bg-[#1A222E] rounded-[14px]">
-              <span className="text-[11px] text-[#8A95A5] block">Defensive Efficiency</span>
+            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
+              <span className="text-[11px] text-[#8B9890] block">Defensive Efficiency</span>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#EDF1F6] tabular-nums">
+                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">
                   {fixture.basketballStats.homeDefEff.toFixed(3)}
                 </span>
-                <span className="text-[10.5px] text-[#5F6B7C] ml-auto tabular-nums">
+                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
                   vs {fixture.basketballStats.awayDefEff.toFixed(3)}
                 </span>
               </div>
             </div>
 
-            <div className="p-2.5 bg-[#1A222E] rounded-[14px]">
-              <span className="text-[11px] text-[#8A95A5] block">Pace (Poss/G)</span>
+            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
+              <span className="text-[11px] text-[#8B9890] block">Pace (Poss/G)</span>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#EDF1F6] tabular-nums">
+                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">
                   {fixture.basketballStats.homePoss.toFixed(1)}
                 </span>
-                <span className="text-[10.5px] text-[#5F6B7C] ml-auto tabular-nums">
+                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
                   vs {fixture.basketballStats.awayPoss.toFixed(1)}
                 </span>
               </div>
             </div>
 
-            <div className="p-2.5 bg-[#1A222E] rounded-[14px]">
-              <span className="text-[11px] text-[#8A95A5] block">Projected Total</span>
+            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
+              <span className="text-[11px] text-[#8B9890] block">Projected Total</span>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#A8E05F] tabular-nums">
+                <span className="text-[14px] font-semibold text-[#B6E63B] tabular-nums font-mono">
                   {fixture.basketballStats.projectedTotal?.toFixed(1)} pts
                 </span>
-                <span className="text-[10.5px] text-[#5F6B7C] ml-auto tabular-nums">
+                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
                   Margin {fixture.basketballStats.projectedMargin?.toFixed(1)}
                 </span>
               </div>
             </div>
           </div>
         ) : stats ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#232C3A]">
-            <div className="p-2.5 bg-[#1A222E] rounded-[14px]">
-              <span className="text-[11px] text-[#8A95A5] block">Expected goals (xG)</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/[0.07]">
+            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
+              <span className="text-[11px] text-[#8B9890] block">Expected goals (xG)</span>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#EDF1F6] tabular-nums">{stats.homeXg.toFixed(2)} to {stats.awayXg.toFixed(2)}</span>
-                <span className="text-[10.5px] text-[#5F6B7C] ml-auto tabular-nums">({totalXg.toFixed(2)})</span>
+                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">{stats.homeXg.toFixed(2)} to {stats.awayXg.toFixed(2)}</span>
+                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">({totalXg.toFixed(2)})</span>
               </div>
             </div>
 
-            <div className="p-2.5 bg-[#1A222E] rounded-[14px]">
-              <span className="text-[11px] text-[#8A95A5] block">Corner expectation</span>
+            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
+              <span className="text-[11px] text-[#8B9890] block">Corner expectation</span>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#EDF1F6] tabular-nums">{totalCorners.toFixed(1)}</span>
-                <span className="text-[10.5px] text-[#5F6B7C] ml-auto tabular-nums">
+                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">{totalCorners.toFixed(1)}</span>
+                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
                   {stats.expectedCornersHome.toFixed(1)}H / {stats.expectedCornersAway.toFixed(1)}A
                 </span>
               </div>
             </div>
 
-            <div className="p-2.5 bg-[#1A222E] rounded-[14px]">
-              <span className="text-[11px] text-[#8A95A5] block">Projected cards</span>
+            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
+              <span className="text-[11px] text-[#8B9890] block">Projected cards</span>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#EDF1F6] tabular-nums">{stats.expectedCards.toFixed(1)}</span>
-                <span className="text-[10.5px] text-[#5F6B7C] ml-auto tabular-nums">Ref: {stats.expectedCards.toFixed(1)}</span>
+                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">{stats.expectedCards.toFixed(1)}</span>
+                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">Ref: {stats.expectedCards.toFixed(1)}</span>
               </div>
             </div>
 
-            <div className="p-2.5 bg-[#1A222E] rounded-[14px]">
-              <span className="text-[11px] text-[#8A95A5] block">Model confidence</span>
+            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
+              <span className="text-[11px] text-[#8B9890] block">Model confidence</span>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#A8E05F] tabular-nums">
+                <span className="text-[14px] font-semibold text-[#B6E63B] tabular-nums font-mono">
                   {((1 - stats.uncertaintyScore) * 100).toFixed(0)}%
                 </span>
-                <span className="text-[10.5px] text-[#5F6B7C] ml-auto tabular-nums">
+                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
                   {stats.sampleSizeMatches} games
                 </span>
               </div>
@@ -369,11 +369,11 @@ export default function MatchAnalysisPage() {
       </div>
 
       {/* Flagship Recommendation Banner */}
-      <div className="bg-[#141A23] border border-[#232C3A] rounded-[18px] p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
         {topPick ? (
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#A8E05F] font-semibold">
+              <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#B6E63B] font-semibold">
                 <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={2} />
                 <span>Primary qualified recommendation</span>
               </div>
@@ -386,29 +386,29 @@ export default function MatchAnalysisPage() {
                 );
               })()}
               {topPick.marketOdds && (
-                <span className="text-[11px] text-[#EDF1F6] bg-[#1A222E] px-2 py-0.5 rounded-full border border-[#232C3A] tabular-nums">
+                <span className="text-[11px] text-[#ECF1EE] bg-[#151E19] px-2 py-0.5 rounded-full border border-white/[0.07] tabular-nums font-mono">
                   @{formatOdds(topPick.marketOdds)}
                 </span>
               )}
             </div>
-            <h3 className="text-[15px] font-semibold text-[#EDF1F6]">
+            <h3 className="text-[15px] font-semibold text-[#ECF1EE]">
               {formatSelectionName(topPick.selection)} · {(topPick.modelProbability * 100).toFixed(1)}% probability
               {topPick.expectedValue !== undefined ? ` (${formatExpectedValue(topPick.expectedValue).text} EV)` : ''}
             </h3>
             {topPick.plainEnglishReason && (
-              <p className="text-[12px] text-[#8A95A5] mt-1 max-w-2xl leading-normal">
+              <p className="text-[12px] text-[#8B9890] mt-1 max-w-2xl leading-normal">
                 {topPick.plainEnglishReason}
               </p>
             )}
           </div>
         ) : (
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#8A95A5] mb-1">
+            <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#8B9890] mb-1">
               <AlertCircle className="w-3.5 h-3.5" strokeWidth={2} />
               <span>No qualified recommendation</span>
             </div>
-            <h3 className="text-[14px] font-semibold text-[#EDF1F6]">Statistical evidence insufficient</h3>
-            <p className="text-[12px] text-[#8A95A5] mt-0.5 max-w-2xl leading-normal">
+            <h3 className="text-[14px] font-semibold text-[#ECF1EE]">Statistical evidence insufficient</h3>
+            <p className="text-[12px] text-[#8B9890] mt-0.5 max-w-2xl leading-normal">
               {noRecommendationReason || "Current market lines reflect efficient pricing. Abstaining to maintain statistical calibration."}
             </p>
           </div>
@@ -450,8 +450,8 @@ export default function MatchAnalysisPage() {
         {/* Explanation Card */}
         <div className="lg:col-span-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-semibold text-[#EDF1F6]">Selected line evidence audit</h3>
-            <span className="text-[11px] text-[#A8E05F] font-semibold">Grounded facts</span>
+            <h3 className="text-[14px] font-semibold text-[#ECF1EE]">Selected line evidence audit</h3>
+            <span className="text-[11px] text-[#B6E63B] font-semibold">Grounded facts</span>
           </div>
 
           <ExplanationCard

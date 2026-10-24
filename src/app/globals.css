@@ -5,21 +5,22 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0D1117;
-  --surface: #141A23;
-  --surface-2: #1A222E;
-  --raised: #1A222E;
-  --border: #232C3A;
-  --border-strong: #2E3849;
-  --text: #EDF1F6;
-  --muted: #8A95A5;
-  --dim: #5F6B7C;
-  --accent: #A8E05F;
-  --accent-ink: #0D1117;
-  --accent-soft: rgba(168, 224, 95, 0.14);
-  --caution: #E8B64A;
+  --bg: #0A0F0D;
+  --surface: #101713;
+  --surface-2: #151E19;
+  --raised: #151E19;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --text: #ECF1EE;
+  --muted: #8B9890;
+  --subtle: #5E6A63;
+  --dim: #5E6A63;
+  --accent: #B6E63B;
+  --accent-ink: #0A0F0D;
+  --accent-soft: rgba(182, 230, 59, 0.12);
+  --caution: #E2AE45;
+  --warn: #E2AE45;
   --info: #5eb6e8;
-  --warn: #E8B64A;
 
   --background: var(--bg);
   --foreground: var(--text);
@@ -88,9 +89,9 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Focus ring: 2px accent, 2px offset */
+/* Focus ring: 2px, lime at 40 percent opacity */
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid rgba(182, 230, 59, 0.4);
   outline-offset: 2px;
 }
 
@@ -106,7 +107,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* Tactile touch pressed state for native mobile feel */
 .touch-press {
-  transition: transform 120ms ease, opacity 120ms ease;
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), opacity 160ms ease;
 }
 .touch-press:active {
   transform: scale(0.98);

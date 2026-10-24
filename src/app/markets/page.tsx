@@ -9,7 +9,6 @@ import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { ArrowUpRight, Clock, Info } from 'lucide-react';
 import { SupportedOptionType, Fixture } from '@/types';
-import TeamCrest from '@/components/TeamCrest';
 import { formatExpectedValue, formatOdds } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 
@@ -163,33 +162,31 @@ export default function MarketExplorerPage() {
 
   if (isSwitching) {
     return (
-      <div className="space-y-6 py-6 animate-pulse">
-        <div className="h-8 w-64 bg-white/10 rounded-[8px]" />
-        <div className="h-32 bg-[#0f2219] rounded-[12px] border border-white/10" />
+      <div className="space-y-4 py-3 animate-pulse">
+        <div className="h-6 w-48 bg-[#151E19] rounded-[6px]" />
+        <div className="h-28 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3.5 py-1">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
-        <div>
-          <h1 className="text-[18px] font-[500] text-[#e8efe9]">
-            {isBasketball ? 'NBA Cross Match Market Explorer' : 'Cross Match Market Explorer'}
-          </h1>
-          <p className="text-[12px] text-[#8fa69a] mt-0.5">
-            {isBasketball
-              ? 'Compare model probability, pricing, and margin differential across NBA matchups.'
-              : 'Compare model probability, pricing and edge for specific option lines across all European fixtures.'}
-          </p>
-        </div>
+      <div className="space-y-0.5 pb-1 border-b border-white/[0.07]">
+        <h1 className="text-[23px] font-[700] leading-[1.2] text-[#ECF1EE] tracking-[-0.025em]">
+          {isBasketball ? 'NBA cross match market explorer' : 'Cross match market explorer'}
+        </h1>
+        <p className="text-[12px] text-[#8B9890]">
+          {isBasketball
+            ? 'Compare model probability, pricing, and margin differential across NBA matchups.'
+            : 'Compare model probability, pricing, and edge for specific option lines across all European fixtures.'}
+        </p>
       </div>
 
       {/* Market Selector Card */}
-      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-3">
+      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
         {/* Step 1: Option Type Filter */}
-        <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] pb-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
           {optionFilterTabs.map(tab => (
             <button
               key={tab.id}
@@ -201,10 +198,10 @@ export default function MarketExplorerPage() {
                 }
               }}
               type="button"
-              className={`px-2 py-0.5 rounded-[4px] whitespace-nowrap transition-colors ${
+              className={`h-[30px] px-3 rounded-full text-[11px] whitespace-nowrap transition-colors touch-press shrink-0 ${
                 selectedOptionType === tab.id
-                  ? 'bg-[#b8e63a] text-[#0a1812] font-[500]'
-                  : 'bg-[#0a1812] text-[#8fa69a] hover:text-[#e8efe9] border border-white/[0.06]'
+                  ? 'bg-[rgba(182,230,59,0.12)] border border-[#B6E63B] text-[#B6E63B] font-semibold'
+                  : 'bg-[#151E19] text-[#8B9890] hover:text-[#ECF1EE] border border-white/[0.07]'
               }`}
             >
               {tab.label}
@@ -213,9 +210,9 @@ export default function MarketExplorerPage() {
         </div>
 
         {/* Step 2: Target Line Selector */}
-        <div className="pt-2 border-t border-white/[0.06]">
-          <div className="text-[11px] font-mono text-[#8fa69a] mb-2">
-            Target line ({filteredOptions.length} available):
+        <div className="pt-2 border-t border-white/[0.07]">
+          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8B9890] mb-2">
+            TARGET LINE ({filteredOptions.length} AVAILABLE):
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {filteredOptions.map(opt => (
@@ -223,10 +220,10 @@ export default function MarketExplorerPage() {
                 key={opt.code}
                 onClick={() => setSelectedMarketLine(opt.code)}
                 type="button"
-                className={`px-2.5 py-1 rounded-[6px] text-[12px] transition-colors font-[500] ${
+                className={`px-2.5 py-1 rounded-[8px] text-[12px] transition-colors font-medium touch-press ${
                   selectedMarketLine === opt.code
-                    ? 'bg-[#b8e63a] text-[#0a1812]'
-                    : 'bg-[#0a1812] hover:bg-white/[0.04] text-[#8fa69a] hover:text-[#e8efe9] border border-white/[0.08]'
+                    ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold shadow-sm'
+                    : 'bg-[#151E19] hover:bg-white/[0.04] text-[#8B9890] hover:text-[#ECF1EE] border border-white/[0.07]'
                 }`}
               >
                 {cleanDisplayText(opt.label)}
@@ -237,29 +234,29 @@ export default function MarketExplorerPage() {
       </div>
 
       {/* Comparisons Table */}
-      <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] overflow-hidden">
-        <div className="p-3 bg-[#0a1812]/50 border-b border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]">
+      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] overflow-hidden">
+        <div className="p-3 bg-[#151E19] border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]">
           <div>
-            <h2 className="font-[500] text-[#e8efe9] flex items-center gap-2">
+            <h2 className="font-semibold text-[#ECF1EE] flex items-center gap-2 text-[13px]">
               <span>Cross match comparison:</span>
-              <span className="text-[#b8e63a]">{cleanDisplayText(activeOption?.label)}</span>
+              <span className="text-[#B6E63B]">{cleanDisplayText(activeOption?.label)}</span>
             </h2>
-            <div className="text-[#8fa69a] text-[11px] mt-0.5 flex items-center gap-2">
+            <div className="text-[#8B9890] text-[11px] mt-0.5 flex items-center gap-2">
               <span className="flex items-center gap-1 font-mono">
-                <Clock className="w-3 h-3 text-[#b8e63a]" />
+                <Clock className="w-3 h-3 text-[#B6E63B]" />
                 <span>Period: {cleanDisplayText(activeOption?.period)}</span>
               </span>
               <span>·</span>
               <span>Ranked by modeled probability</span>
             </div>
           </div>
-          <span className="font-mono text-[#8fa69a] text-[11px]">{comparisons.length} fixtures</span>
+          <span className="font-mono text-[#8B9890] text-[11px] tabular-nums">{comparisons.length} fixtures</span>
         </div>
 
         {comparisons.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[12px]">
-              <thead className="bg-[#0a1812]/80 text-[#8fa69a] text-[11px] font-[500] border-b border-white/[0.06]">
+              <thead className="bg-[#101713] text-[#8B9890] text-[10px] font-mono uppercase tracking-[0.14em] border-b border-white/[0.07]">
                 <tr>
                   <th className="py-2.5 px-3">Fixture</th>
                   <th className="py-2.5 px-3">Modeled selection</th>
@@ -273,36 +270,36 @@ export default function MarketExplorerPage() {
                 {comparisons.map(({ fixture, prediction }) => (
                   <tr key={fixture.id} className="hover:bg-white/[0.02] transition-colors">
                     <td className="py-3 px-3">
-                      <div className="font-medium text-[#e8efe9]">
+                      <div className="font-medium text-[#ECF1EE]">
                         {fixture.homeTeam.name} vs {fixture.awayTeam.name}
                       </div>
-                      <div className="text-[11px] text-[#8fa69a] font-mono">
+                      <div className="text-[11px] text-[#8B9890] font-mono">
                         {fixture.competition.name}
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-[#e8efe9] font-medium">
+                    <td className="py-3 px-3 text-[#ECF1EE] font-medium">
                       {cleanDisplayText(prediction.selection)}
                     </td>
-                    <td className="py-3 px-3 font-mono font-semibold text-[#b8e63a]">
+                    <td className="py-3 px-3 font-mono font-semibold text-[#B6E63B] tabular-nums">
                       {(prediction.modelProbability * 100).toFixed(1)}%
                     </td>
-                    <td className="py-3 px-3 font-mono text-[#e8efe9]">
+                    <td className="py-3 px-3 font-mono text-[#ECF1EE] tabular-nums">
                       {prediction.marketOdds ? `@${formatOdds(prediction.marketOdds)}` : 'N/A'}
                     </td>
-                    <td className="py-3 px-3 font-mono text-[11px]">
+                    <td className="py-3 px-3 font-mono text-[11px] tabular-nums">
                       {prediction.expectedValue !== undefined && prediction.expectedValue !== null ? (
                         (() => {
                           const evData = formatExpectedValue(prediction.expectedValue);
                           return <span className={evData.colorClass}>{evData.text}</span>;
                         })()
                       ) : (
-                        <span className="text-[#8fa69a]">Probability based</span>
+                        <span className="text-[#8B9890]">Probability based</span>
                       )}
                     </td>
                     <td className="py-3 px-3 text-right">
                       <Link
                         href={`/matches/${fixture.id}`}
-                        className="inline-flex items-center gap-1 text-[11px] text-[#8fa69a] hover:text-[#b8e63a] font-medium"
+                        className="inline-flex items-center gap-1 text-[11px] text-[#8B9890] hover:text-[#B6E63B] font-medium touch-press"
                       >
                         <span>Analyze</span>
                         <ArrowUpRight className="w-3 h-3" />
@@ -314,8 +311,8 @@ export default function MarketExplorerPage() {
             </table>
           </div>
         ) : (
-          <div className="p-8 text-center text-[12px] text-[#8fa69a]">
-            No fixtures found matching this line line.
+          <div className="p-8 text-center text-[12px] text-[#8B9890]">
+            No fixtures found matching this line.
           </div>
         )}
       </div>

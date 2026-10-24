@@ -56,20 +56,20 @@ export default function FactorsAndStatePanel({
   } = contextEvaluation;
 
   return (
-    <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-5 space-y-5">
+    <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-4 space-y-4">
       {/* Panel Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.07] pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-[#b8e63a]" />
-            <h2 className="text-[15px] font-[500] text-[#e8efe9]">
+            <Cpu className="w-4 h-4 text-[#B6E63B]" />
+            <h2 className="text-[14px] font-semibold text-[#ECF1EE]">
               Context factors & state based weighing
             </h2>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] bg-[#0a1812] border border-white/[0.08] text-[#8fa69a]">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] bg-[#151E19] border border-white/[0.07] text-[#8B9890]">
               L2 shrinkage active
             </span>
           </div>
-          <p className="text-[12px] text-[#8fa69a] mt-0.5">
+          <p className="text-[11.5px] text-[#8B9890] mt-0.5">
             Pre match data points weighted through regularized models. Weights are mathematically trained, not hand picked.
           </p>
         </div>
@@ -77,12 +77,12 @@ export default function FactorsAndStatePanel({
         {/* Lineup Confirmation Status Pill */}
         <div>
           {lineupStatus === 'confirmed' ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-[#b8e63a]/15 border border-[#b8e63a]/30 text-[#b8e63a] font-mono text-[11px] font-[500]">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] bg-[rgba(182,230,59,0.12)] border border-[#B6E63B]/30 text-[#B6E63B] font-mono text-[11px] font-semibold">
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Official lineups confirmed</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-[#e3b341]/10 border border-[#e3b341]/30 text-[#e3b341] font-mono text-[11px] font-[500]">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] bg-[rgba(226,174,69,0.12)] border border-[#E2AE45]/30 text-[#E2AE45] font-mono text-[11px] font-semibold">
               <Clock className="w-3.5 h-3.5" />
               <span>Pre lineup mode (T &gt; 60m)</span>
             </div>
@@ -92,10 +92,10 @@ export default function FactorsAndStatePanel({
 
       {/* Pre lineup Warning Banner if applicable */}
       {lineupStatus === 'pre-lineup' && (
-        <div className="p-3 bg-[#0a1812]/50 border border-[#e3b341]/20 rounded-[8px] text-[12px] text-[#8fa69a] flex items-start gap-2">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#e3b341]" />
+        <div className="p-3 bg-[#151E19] border border-[#E2AE45]/20 rounded-[11px] text-[12px] text-[#8B9890] flex items-start gap-2">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#E2AE45]" />
           <div className="leading-normal">
-            <span className="text-[#e8efe9] font-[500]">Pre lineup state notice:</span> Official team sheets are not yet published. The engine applies an automatic <span className="text-[#e3b341] font-[500]">+22% uncertainty margin</span>. Projections will automatically re-run with confirmed starters upon team sheet submission.
+            <span className="text-[#ECF1EE] font-medium">Pre lineup state notice:</span> Official team sheets are not yet published. The engine applies an automatic <span className="text-[#E2AE45] font-semibold">+22% uncertainty margin</span>. Projections will automatically re-run with confirmed starters upon team sheet submission.
           </div>
         </div>
       )}
@@ -103,11 +103,11 @@ export default function FactorsAndStatePanel({
       {/* State Tags Grid */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-[11px]">
-          <span className="font-mono text-[#8fa69a] flex items-center gap-1.5">
+          <span className="font-mono text-[#8B9890] flex items-center gap-1.5">
             <span>Active state tags ({stateTags.length})</span>
           </span>
-          <span className="font-mono text-[#8fa69a]">
-            Uncertainty: <span className="text-[#e8efe9]">{compositeUncertaintyMultiplier.toFixed(2)}x</span> · Quality: <span className="text-[#b8e63a]">{(dataQualityScore * 100).toFixed(0)}%</span>
+          <span className="font-mono text-[#8B9890] tabular-nums">
+            Uncertainty: <span className="text-[#ECF1EE]">{compositeUncertaintyMultiplier.toFixed(2)}x</span> · Quality: <span className="text-[#B6E63B]">{(dataQualityScore * 100).toFixed(0)}%</span>
           </span>
         </div>
 
@@ -117,20 +117,20 @@ export default function FactorsAndStatePanel({
             return (
               <div 
                 key={tag} 
-                className="p-2.5 rounded-[8px] bg-[#0a1812]/50 border border-white/[0.06] space-y-1 hover:border-white/20 transition-colors"
+                className="p-2.5 rounded-[10px] bg-[#151E19] border border-white/[0.07] space-y-1 hover:border-white/20 transition-colors"
               >
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-mono font-[500] text-[#b8e63a]">
+                  <span className="font-mono font-semibold text-[#B6E63B]">
                     #{cleanDisplayText(tag)}
                   </span>
-                  <span className="font-mono text-[10px] text-[#8fa69a] bg-[#0a1812] px-1 py-0.5 rounded-[3px]">
+                  <span className="font-mono text-[10px] text-[#8B9890] bg-[#101713] px-1 py-0.5 rounded-[4px] border border-white/[0.05]">
                     {info?.uncertaintyMultiplier ? `+${((info.uncertaintyMultiplier - 1) * 100).toFixed(0)}% uncert` : 'Active'}
                   </span>
                 </div>
-                <div className="text-[12px] font-[500] text-[#e8efe9]">
+                <div className="text-[12px] font-semibold text-[#ECF1EE]">
                   {cleanDisplayText(info?.label ?? tag)}
                 </div>
-                <p className="text-[11px] text-[#8fa69a] leading-tight">
+                <p className="text-[11px] text-[#8B9890] leading-tight">
                   {cleanDisplayText(info?.hypothesis)}
                 </p>
               </div>
@@ -141,19 +141,19 @@ export default function FactorsAndStatePanel({
 
       {/* Missing Factors Flagging */}
       {missingFactors.length > 0 && (
-        <div className="p-3 bg-[#0a1812]/50 border border-rose-500/20 rounded-[8px] space-y-1.5 text-[12px]">
-          <div className="flex items-center gap-1.5 text-rose-300 font-[500]">
+        <div className="p-3 bg-[#151E19] border border-rose-500/20 rounded-[11px] space-y-1.5 text-[12px]">
+          <div className="flex items-center gap-1.5 text-rose-300 font-semibold">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>Missing factor penalties (Explicitly penalized · never zeroed)</span>
           </div>
           <div className="space-y-1 pt-1">
             {missingFactors.map((mf, i) => (
-              <div key={i} className="flex items-start justify-between bg-[#0a1812] p-2 rounded-[6px] border border-white/[0.04] text-[11px]">
+              <div key={i} className="flex items-start justify-between bg-[#101713] p-2 rounded-[8px] border border-white/[0.05] text-[11px]">
                 <div>
-                  <span className="font-[500] text-[#e8efe9]">{cleanDisplayText(mf.factorName)}</span>
-                  <p className="text-[#8fa69a]">{cleanDisplayText(mf.reason)}</p>
+                  <span className="font-medium text-[#ECF1EE]">{cleanDisplayText(mf.factorName)}</span>
+                  <p className="text-[#8B9890]">{cleanDisplayText(mf.reason)}</p>
                 </div>
-                <span className="font-mono text-rose-400 shrink-0 ml-2">
+                <span className="font-mono text-rose-400 shrink-0 ml-2 tabular-nums">
                   +{(mf.uncertaintyPenalty * 100).toFixed(0)}% uncertainty
                 </span>
               </div>
@@ -164,12 +164,12 @@ export default function FactorsAndStatePanel({
 
       {/* Correlation Warnings if present */}
       {correlationWarnings.length > 0 && (
-        <div className="p-3 bg-[#0a1812]/50 border border-white/[0.06] rounded-[8px] space-y-1 text-[11px]">
-          <div className="flex items-center gap-1.5 font-[500] text-[#e8efe9]">
-            <Info className="w-3.5 h-3.5 text-[#b8e63a]" />
+        <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-1 text-[11px]">
+          <div className="flex items-center gap-1.5 font-semibold text-[#ECF1EE]">
+            <Info className="w-3.5 h-3.5 text-[#B6E63B]" />
             <span>Inter market correlation warnings</span>
           </div>
-          <ul className="list-disc pl-4 space-y-0.5 text-[#8fa69a]">
+          <ul className="list-disc pl-4 space-y-0.5 text-[#8B9890]">
             {correlationWarnings.map((w, i) => (
               <li key={i}>{cleanDisplayText(w)}</li>
             ))}
@@ -180,10 +180,10 @@ export default function FactorsAndStatePanel({
       {/* Top Ranked Options */}
       <div className="space-y-2.5 pt-1">
         <div className="flex items-center justify-between">
-          <h3 className="text-[15px] font-[500] text-[#e8efe9]">
+          <h3 className="text-[14px] font-semibold text-[#ECF1EE]">
             Top {rankedOptions.length} ranked options
           </h3>
-          <span className="text-[11px] text-[#8fa69a]">
+          <span className="text-[11px] text-[#8B9890]">
             Authorized catalogue
           </span>
         </div>
@@ -221,33 +221,33 @@ export default function FactorsAndStatePanel({
               <div
                 key={opt.id}
                 onClick={() => onSelectOption && onSelectOption(opt)}
-                className={`p-[12px_14px] rounded-[12px] transition-colors cursor-pointer ${
+                className={`p-3 rounded-[11px] transition-colors cursor-pointer touch-press ${
                   showHighlight
-                    ? 'bg-[#0f2219] border-[0.5px] border-white/[0.08] border-l-2 border-l-[#b8e63a]'
+                    ? 'bg-[#151E19] border border-white/[0.07] border-l-2 border-l-[#B6E63B]'
                     : isSelected
-                    ? 'bg-[#0f2219] border-[0.5px] border-white/20 ring-1 ring-white/20'
-                    : 'bg-[#0f2219] border-[0.5px] border-white/[0.08] hover:border-white/20'
+                    ? 'bg-[#151E19] border border-white/20 ring-1 ring-white/20'
+                    : 'bg-[#151E19] border border-white/[0.07] hover:border-white/20'
                 }`}
               >
-                {/* Row 1: Rank (#1) in 11px mono muted, selection name at 14px/500, status chip on the right */}
+                {/* Row 1: Rank (#1) in 11px mono muted, selection name at 13.5px font-semibold, status chip on the right */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-mono text-[11px] text-[#8fa69a] shrink-0 w-5">
+                    <span className="font-mono text-[11px] text-[#8B9890] shrink-0 w-5">
                       #{idx + 1}
                     </span>
-                    <span className="font-[500] text-[#e8efe9] text-[14px] leading-tight truncate">
+                    <span className="font-semibold text-[#ECF1EE] text-[13.5px] leading-tight truncate">
                       {cleanDisplayText(selectionName)}
                     </span>
                   </div>
 
-                  {/* Status chip: small 11px chip, Abstain (amber outline) or Qualified (lime outline) */}
+                  {/* Status chip: small 11px chip */}
                   <div className="shrink-0">
                     {isQualified ? (
-                      <span className="inline-block text-[11px] font-[500] px-2 py-0.5 rounded-[4px] border border-[#b8e63a]/60 text-[#b8e63a] tracking-wide">
+                      <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-[6px] border border-[#B6E63B]/40 text-[#B6E63B] bg-[rgba(182,230,59,0.12)]">
                         Qualified
                       </span>
                     ) : (
-                      <span className="inline-block text-[11px] font-[500] px-2 py-0.5 rounded-[4px] border border-[#e3b341]/60 text-[#e3b341] tracking-wide">
+                      <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-[6px] border border-[#E2AE45]/40 text-[#E2AE45] bg-[rgba(226,174,69,0.12)]">
                         Abstain
                       </span>
                     )}
@@ -255,35 +255,35 @@ export default function FactorsAndStatePanel({
                 </div>
 
                 {/* Row 2: subline, 11px muted, indented under the name */}
-                <div className="pl-7 mt-1 text-[11px] text-[#8fa69a] leading-tight truncate">
+                <div className="pl-7 mt-1 text-[11px] text-[#8B9890] leading-tight truncate">
                   <span>{cleanDisplayText(optionTypeLabel)}</span>
                   <span className="mx-1.5 text-white/20">·</span>
                   <span>{cleanDisplayText(periodLabel)}</span>
                   <span className="mx-1.5 text-white/20">·</span>
-                  <span>Quality {(opt.dataQualityScore * 100).toFixed(0)}%</span>
+                  <span className="tabular-nums">Quality {(opt.dataQualityScore * 100).toFixed(0)}%</span>
                   <span className="mx-1.5 text-white/20">·</span>
                   <span>{cleanDisplayText(sublineReason)}</span>
                 </div>
 
                 {/* Row 3: 3 equal columns (Prob, Odds, EV). Labels 11px muted, values mono 13px, tabular-nums */}
-                <div className="grid grid-cols-3 gap-2 pt-2.5 mt-2.5 border-t border-white/[0.06] text-left">
+                <div className="grid grid-cols-3 gap-2 pt-2.5 mt-2.5 border-t border-white/[0.05] text-left">
                   <div>
-                    <span className="text-[11px] text-[#8fa69a] block">Prob</span>
-                    <span className="font-mono text-[13px] tabular-nums font-[500] text-[#e8efe9]">
+                    <span className="text-[10.5px] text-[#8B9890] block">Prob</span>
+                    <span className="font-mono text-[13px] tabular-nums font-semibold text-[#ECF1EE]">
                       {(opt.modelProbability * 100).toFixed(1)}%
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-[11px] text-[#8fa69a] block">Odds</span>
-                    <span className={`font-mono text-[13px] tabular-nums ${opt.marketOdds ? 'text-[#e8efe9]' : 'text-[#8fa69a]'}`}>
+                    <span className="text-[10.5px] text-[#8B9890] block">Odds</span>
+                    <span className={`font-mono text-[13px] tabular-nums ${opt.marketOdds ? 'text-[#ECF1EE]' : 'text-[#8B9890]'}`}>
                       {oddsFormatted}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-[11px] text-[#8fa69a] block">EV</span>
-                    <span className={`font-mono text-[13px] tabular-nums font-[500] ${evFormatted.colorClass}`}>
+                    <span className="text-[10.5px] text-[#8B9890] block">EV</span>
+                    <span className={`font-mono text-[13px] tabular-nums font-semibold ${evFormatted.colorClass}`}>
                       {cleanDisplayText(evFormatted.text)}
                     </span>
                   </div>
@@ -295,14 +295,14 @@ export default function FactorsAndStatePanel({
       </div>
 
       {/* Collapsible Factor Breakdown Table */}
-      <div className="pt-2 border-t border-white/[0.06]">
+      <div className="pt-2 border-t border-white/[0.07]">
         <button
           onClick={() => setShowAllFactors(!showAllFactors)}
           type="button"
-          className="flex items-center justify-between w-full text-[12px] text-[#8fa69a] hover:text-[#e8efe9] py-1"
+          className="flex items-center justify-between w-full text-[12px] text-[#8B9890] hover:text-[#ECF1EE] py-1 touch-press"
         >
-          <span className="flex items-center gap-1.5">
-            <Sliders className="w-3.5 h-3.5 text-[#b8e63a]" />
+          <span className="flex items-center gap-1.5 font-medium">
+            <Sliders className="w-3.5 h-3.5 text-[#B6E63B]" />
             <span>Detailed factor contributions & shrinkage ({activeFactors.length} factors)</span>
           </span>
           {showAllFactors ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -311,7 +311,7 @@ export default function FactorsAndStatePanel({
         {showAllFactors && (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-[11px]">
-              <thead className="bg-[#0a1812] text-[#8fa69a] font-mono text-[10px] uppercase border-b border-white/[0.06]">
+              <thead className="bg-[#151E19] text-[#8B9890] font-mono text-[10px] uppercase border-b border-white/[0.07]">
                 <tr>
                   <th className="py-2 px-3">Factor</th>
                   <th className="py-2 px-3">Category</th>
@@ -320,25 +320,25 @@ export default function FactorsAndStatePanel({
                   <th className="py-2 px-3">Ablation gain</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.04]">
+              <tbody className="divide-y divide-white/[0.05]">
                 {activeFactors.map((f, i) => {
                   const def = FACTOR_DEFINITIONS[f.factorCode];
                   return (
                     <tr key={i} className="hover:bg-white/[0.02] transition-colors">
                       <td className="py-2 px-3">
-                        <span className="font-[500] text-[#e8efe9] block">{cleanDisplayText(f.factorName)}</span>
-                        <span className="text-[10px] text-[#8fa69a] font-mono">{cleanDisplayText(f.factorCode)}</span>
+                        <span className="font-semibold text-[#ECF1EE] block">{cleanDisplayText(f.factorName)}</span>
+                        <span className="text-[10px] text-[#8B9890] font-mono">{cleanDisplayText(f.factorCode)}</span>
                       </td>
-                      <td className="py-2 px-3 uppercase text-[10px] font-mono text-[#8fa69a]">
+                      <td className="py-2 px-3 uppercase text-[10px] font-mono text-[#8B9890]">
                         {cleanDisplayText(f.category)}
                       </td>
-                      <td className="py-2 px-3 text-[#8fa69a]">
-                        <div><span className="text-[#e8efe9]">H:</span> {cleanDisplayText(f.homeValue)} · <span className="text-[#e8efe9]">A:</span> {cleanDisplayText(f.awayValue)}</div>
+                      <td className="py-2 px-3 text-[#8B9890]">
+                        <div><span className="text-[#ECF1EE]">H:</span> {cleanDisplayText(f.homeValue)} · <span className="text-[#ECF1EE]">A:</span> {cleanDisplayText(f.awayValue)}</div>
                       </td>
-                      <td className="py-2 px-3 font-mono text-[#e8efe9]">
+                      <td className="py-2 px-3 font-mono text-[#ECF1EE] tabular-nums">
                         {(f.shrinkageApplied * 100).toFixed(0)}%
                       </td>
-                      <td className="py-2 px-3 font-mono text-[#b8e63a]">
+                      <td className="py-2 px-3 font-mono text-[#B6E63B] tabular-nums">
                         &#8722;{def?.ablationGainBrier.toFixed(4)}
                       </td>
                     </tr>
@@ -351,10 +351,10 @@ export default function FactorsAndStatePanel({
       </div>
 
       {/* Mandatory Platform Disclaimer */}
-      <div className="p-2.5 bg-[#0a1812]/50 border border-white/[0.06] rounded-[8px] text-[11px] text-[#8fa69a] flex items-start gap-2">
-        <Info className="w-3.5 h-3.5 text-[#8fa69a] shrink-0 mt-0.5" />
+      <div className="p-2.5 bg-[#151E19] border border-white/[0.07] rounded-[11px] text-[11px] text-[#8B9890] flex items-start gap-2">
+        <Info className="w-3.5 h-3.5 text-[#8B9890] shrink-0 mt-0.5" />
         <p className="leading-normal">
-          <span className="text-[#e8efe9] font-[500]">Compliance note:</span> These selections are algorithmic research outputs. Calibrall is strictly an analytics terminal and does not facilitate wagers or guarantee outcomes.
+          <span className="text-[#ECF1EE] font-medium">Compliance note:</span> These selections are algorithmic research outputs. Calibrall is strictly an analytics terminal and does not facilitate wagers or guarantee outcomes.
         </p>
       </div>
     </div>
