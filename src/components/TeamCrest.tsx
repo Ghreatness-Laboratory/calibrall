@@ -58,6 +58,7 @@ export default function TeamCrest({
       style={styleDimension}
       className={`shrink-0 flex items-center justify-center overflow-hidden bg-transparent ${className}`}
     >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={crestUrl}
         alt={`${teamName} crest`}

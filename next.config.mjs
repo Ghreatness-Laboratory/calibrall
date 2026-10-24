@@ -6,7 +6,6 @@ const nextConfig = {
     domains: ['images.unsplash.com', 'media.api-sports.io', 'crests.football-data.org'],
     unoptimized: true,
   },
-  distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
   eslint: {
     ignoreDuringBuilds: true,
   },

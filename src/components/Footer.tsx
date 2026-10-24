@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Building2 } from 'lucide-react';
+import { creators, getSocialUrl } from '@/content/creators';
+import SocialIcon from '@/components/creators/SocialIcon';
 
 export default function Footer() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -35,6 +37,7 @@ export default function Footer() {
         { label: 'Model predictions', href: '/predictions' },
         { label: 'Market explorer', href: '/markets' },
         { label: 'Subscription tiers', href: '/pricing' },
+        { label: 'Meet the creators', href: '/creators', isCreator: true },
       ],
     },
     {
@@ -49,9 +52,32 @@ export default function Footer() {
     },
   ];
 
+  const footerSocials: {
+    key: 'x' | 'instagram' | 'linkedin' | 'telegram' | 'github' | 'youtube' | 'tiktok';
+    name: string;
+  }[] = [
+    { key: 'x', name: 'X' },
+    { key: 'instagram', name: 'Instagram' },
+    { key: 'linkedin', name: 'LinkedIn' },
+    { key: 'telegram', name: 'Telegram' },
+    { key: 'github', name: 'GitHub' },
+    { key: 'youtube', name: 'YouTube' },
+    { key: 'tiktok', name: 'TikTok' },
+  ];
+
+  const activeSocials = footerSocials
+    .map(p => {
+      const handle = creators.social[p.key];
+      const url = getSocialUrl(p.key, handle);
+      return { ...p, handle, url };
+    })
+    .filter(item => Boolean(item.handle && item.url));
+
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer className="mt-10 pb-6 border-t border-white/[0.07] pt-4 text-[12px] text-[#8B9890]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-2">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-3">
         {/* Three Collapsible Accordion Rows */}
         <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] divide-y divide-white/[0.07] overflow-hidden">
           {sections.map((section) => {
@@ -87,9 +113,14 @@ export default function Footer() {
                         <li key={idx}>
                           <Link
                             href={link.href}
-                            className="text-[#8B9890] hover:text-[#ECF1EE] transition-colors block py-0.5"
+                            className={`hover:text-[#ECF1EE] transition-colors flex items-center gap-1.5 py-0.5 ${
+                              link.isCreator ? 'text-[#B6E63B]' : 'text-[#8B9890]'
+                            }`}
                           >
-                            {link.label}
+                            {link.isCreator && (
+                              <Building2 className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" strokeWidth={2} />
+                            )}
+                            <span>{link.label}</span>
                           </Link>
                         </li>
                       ))}
@@ -101,9 +132,27 @@ export default function Footer() {
           })}
         </div>
 
-        {/* Small Centered Footer Line at 10.5px in subtle text color (#5E6A63) */}
-        <div className="text-center pt-4 text-[10.5px] font-mono text-[#5E6A63]">
-          © {new Date().getFullYear()} Calibrall · Every call, on record.
+        {/* Social icon row */}
+        {activeSocials.length > 0 && (
+          <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
+            {activeSocials.map((platform) => (
+              <a
+                key={platform.key}
+                href={platform.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Ghreatness Labs on ${platform.name}`}
+                className="w-[34px] h-[34px] min-w-[34px] min-h-[34px] rounded-[8px] border-[0.5px] border-white/[0.08] bg-[#101713] hover:bg-[#151E19] text-[#8fa69a] hover:text-[#e8efe9] flex items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-[#B6E63B]"
+              >
+                <SocialIcon platform={platform.key} size={16} />
+              </a>
+            ))}
+          </div>
+        )}
+
+        {/* Footer Copyright */}
+        <div className="text-center pt-1 text-[11px] font-[400] text-[#5E6A63]">
+          © 2024 to {currentYear} Ghreatness Labs. All rights reserved.
         </div>
       </div>
     </footer>

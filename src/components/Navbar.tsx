@@ -11,7 +11,8 @@ import {
   Contrast,
   Search,
   CheckCircle2,
-  Bookmark
+  Bookmark,
+  Building2
 } from 'lucide-react';
 import { getStoredUser, setStoredUser } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
@@ -200,6 +201,14 @@ export default function Navbar() {
                     >
                       <Sliders className="w-3.5 h-3.5 mr-2" strokeWidth={2} />
                       Settings & preferences
+                    </Link>
+                    <Link
+                      href="/creators"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center px-3.5 py-2 text-[#8B9890] hover:bg-[#151E19] hover:text-[#B6E63B] text-[12px]"
+                    >
+                      <Building2 className="w-3.5 h-3.5 mr-2 text-[#B6E63B]" strokeWidth={2} />
+                      Meet the creators
                     </Link>
                     <Link
                       href="/pricing"

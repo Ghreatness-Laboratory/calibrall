@@ -23,6 +23,7 @@ import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import NBAScoreProjectionTool from '@/components/nba/NBAScoreProjectionTool';
+import HomeCreatorsTeaser from '@/components/creators/HomeCreatorsTeaser';
 
 export default function HomeClient() {
   const { sport, isSwitching } = useSport();
@@ -338,6 +339,9 @@ export default function HomeClient() {
           </div>
         </div>
       </section>
+
+      {/* Built by Ghreatness Labs Teaser Section */}
+      <HomeCreatorsTeaser />
 
       {/* 5. BUG FIX: RESPONSIBLE USE DISCLAIMER (ONLY ONCE ON THE PAGE) */}
       <section className="pt-2">
