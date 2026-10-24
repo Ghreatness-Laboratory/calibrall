@@ -1143,10 +1143,12 @@ export function evaluateFixtureMarkets(
     });
   }
 
-  // Filter by allowedOptionTypes if provided by caller
-  const activeCandidates = allowedOptionTypes && allowedOptionTypes.length > 0
-    ? rawCandidates.filter(c => allowedOptionTypes.includes(c.optionType))
-    : rawCandidates;
+  // Filter by isOptionTypeEnabled and allowedOptionTypes
+  const activeCandidates = rawCandidates.filter(c => {
+    if (!isOptionTypeEnabled(c.optionType)) return false;
+    if (allowedOptionTypes && allowedOptionTypes.length > 0 && !allowedOptionTypes.includes(c.optionType)) return false;
+    return true;
+  });
 
   // Process, qualify, and score each candidate with Empirical Baselines & Market Gating
   const processed: MarketPrediction[] = activeCandidates.map((c) => {
@@ -1370,8 +1372,9 @@ export function evaluateFixtureMarkets(
     pool.sort((a, b) => b.rankingScore - a.rankingScore);
     const best = pool[0];
 
-    // Family qualification hurdle: must have edge over baseline >= +0.005 and model prob >= 0.45
-    if ((best.edgeOverBaseline ?? 0) >= 0.005 && best.modelProbability >= 0.45) {
+    // Family qualification hurdle: must be validated (not unvalidated), have edge over baseline >= +0.005, and model prob >= 0.45
+    const famGating = checkMarketGating(fam);
+    if (!famGating.cannotBeTopPick && (best.edgeOverBaseline ?? 0) >= 0.005 && best.modelProbability >= 0.45) {
       best.isFamilyWinner = true;
       familyWinners[fam] = best;
     }
@@ -1429,14 +1432,17 @@ export function evaluateFixtureMarkets(
   // Ranked options: at most ONE per family per fixture (up to maxRankedOptions)
   const rankedOptions = scoredFamilyWinners.slice(0, maxRankedOptions);
 
-  // Determine Top Pick
+  // Determine Top Pick: MUST belong to a validated family with verified positive edge
   let topPick: MarketPrediction | null = null;
   let noRecommendationReason: string | undefined = undefined;
 
   if (scoredFamilyWinners.length > 0) {
-    const candidateTop = scoredFamilyWinners[0];
-    // Gating check: top pick must have verified positive edge and minimum probability
-    if ((candidateTop.edgeOverBaseline ?? 0) >= 0.01 && candidateTop.modelProbability >= 0.48) {
+    // GATING ENFORCEMENT: Filter strictly to validated families (cannot be unvalidated)
+    const validatedWinners = scoredFamilyWinners.filter(c => c.isValidated);
+    const candidateTop = validatedWinners.length > 0 ? validatedWinners[0] : null;
+
+    // Top pick must have verified positive edge and minimum probability
+    if (candidateTop && (candidateTop.edgeOverBaseline ?? 0) >= 0.01 && candidateTop.modelProbability >= 0.48) {
       topPick = candidateTop;
       topPick.isTopPick = true;
       // Record recommendation in telemetry monitor
@@ -1447,7 +1453,7 @@ export function evaluateFixtureMarkets(
         topPick.selection
       );
     } else {
-      noRecommendationReason = "No strong recommendation: available statistical evidence and current market lines do not meet the configured minimum edge and uncertainty thresholds.";
+      noRecommendationReason = "No strong recommendation: available statistical evidence and current market lines do not meet the configured minimum edge, gating validation, or uncertainty thresholds.";
     }
   } else {
     noRecommendationReason = "No strong recommendation: all market families failed minimum data completeness or edge thresholds for this fixture.";

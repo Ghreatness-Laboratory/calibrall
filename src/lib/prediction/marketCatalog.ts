@@ -258,7 +258,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.035,
       minEdge: 0.025,
     },
-    isEnabled: true,
+    isEnabled: false,
   },
   asian_handicap: {
     type: 'asian_handicap',
@@ -279,7 +279,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.035,
       minEdge: 0.025,
     },
-    isEnabled: true,
+    isEnabled: false,
   },
   european_handicap: {
     type: 'european_handicap',
@@ -300,7 +300,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.04,
       minEdge: 0.03,
     },
-    isEnabled: true,
+    isEnabled: false,
   },
   goal_bounds: {
     type: 'goal_bounds',
@@ -320,7 +320,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.035,
       minEdge: 0.025,
     },
-    isEnabled: true,
+    isEnabled: false,
   },
   team_goal_bounds: {
     type: 'team_goal_bounds',
@@ -340,7 +340,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.035,
       minEdge: 0.025,
     },
-    isEnabled: true,
+    isEnabled: false,
   },
   corner_handicap: {
     type: 'corner_handicap',
@@ -362,7 +362,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.04,
       minEdge: 0.03,
     },
-    isEnabled: true,
+    isEnabled: false,
   },
   team_bookings: {
     type: 'team_bookings',
@@ -384,7 +384,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.04,
       minEdge: 0.03,
     },
-    isEnabled: true,
+    isEnabled: false,
   },
   booking_points: {
     type: 'booking_points',
@@ -406,7 +406,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.04,
       minEdge: 0.03,
     },
-    isEnabled: true,
+    isEnabled: false,
   },
   win_draw_combo: {
     type: 'win_draw_combo',
@@ -426,7 +426,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       minEv: 0.04,
       minEdge: 0.03,
     },
-    isEnabled: true,
+    isEnabled: false,
   },
   moneyline: {
     type: 'moneyline',
