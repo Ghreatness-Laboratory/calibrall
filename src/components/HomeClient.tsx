@@ -194,8 +194,11 @@ export default function HomeClient() {
             <h3 className="text-[13.5px] font-[620] text-[var(--text)]">
               {isBasketball ? 'NBA Games Today & Upcoming' : 'Live Fixtures'}
             </h3>
-            <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-[5px] border border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent)]">
-              {liveDataAvailable ? 'Active verification' : `Updated ${lastUpdated}`}
+            <span 
+              suppressHydrationWarning
+              className="text-[10.5px] font-mono px-2 py-0.5 rounded-[5px] border border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent)]"
+            >
+              {liveDataAvailable ? 'Active verification' : (lastUpdated ? `Updated ${lastUpdated}` : 'Live data pipeline')}
             </span>
           </div>
 

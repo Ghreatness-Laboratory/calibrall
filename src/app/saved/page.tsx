@@ -110,7 +110,9 @@ export default function SavedMatchesPage() {
       ) : isLoaded && savedIds.length > 0 && !liveDataAvailable ? (
         <div className="p-12 text-center bg-[#0f2219] border border-white/[0.08] rounded-[12px] space-y-3">
           <Bookmark className="w-8 h-8 mx-auto text-[#8fa69a]/40" />
-          <h3 className="text-[#e8efe9] font-[500] text-[15px]">Live data unavailable. Last updated {lastUpdated}</h3>
+          <h3 suppressHydrationWarning className="text-[#e8efe9] font-[500] text-[15px]">
+            Live data unavailable.{lastUpdated ? ` Last updated ${lastUpdated}` : ''}
+          </h3>
           <p className="text-[12px] text-[#8fa69a] max-w-sm mx-auto">
             You have {savedIds.length} bookmarked fixture{savedIds.length > 1 ? 's' : ''}. Live fixture data will display once live API synchronization completes.
           </p>

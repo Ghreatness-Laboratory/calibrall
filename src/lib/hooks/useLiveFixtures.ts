@@ -20,12 +20,7 @@ export function useLiveFixtures(
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [liveDataAvailable, setLiveDataAvailable] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(() => {
-    const now = new Date();
-    const hh = String(now.getUTCHours()).padStart(2, '0');
-    const mm = String(now.getUTCMinutes()).padStart(2, '0');
-    return `${hh}:${mm} UTC`;
-  });
+  const [lastUpdated, setLastUpdated] = useState<string>('');
   const [error, setError] = useState<string | undefined>();
 
   const load = useCallback(async () => {
@@ -41,7 +36,10 @@ export function useLiveFixtures(
       });
       if (!res.ok) {
         setLiveDataAvailable(false);
-        setError(`Live data unavailable. Last updated ${lastUpdated}`);
+        const now = new Date();
+        const stamp = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} UTC`;
+        setLastUpdated(prev => prev || stamp);
+        setError(`Live data unavailable. Last updated ${stamp}`);
         return;
       }
       const text = await res.text();
@@ -50,7 +48,10 @@ export function useLiveFixtures(
         json = JSON.parse(text);
       } catch {
         setLiveDataAvailable(false);
-        setError(`Live data unavailable. Last updated ${lastUpdated}`);
+        const now = new Date();
+        const stamp = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} UTC`;
+        setLastUpdated(prev => prev || stamp);
+        setError(`Live data unavailable. Last updated ${stamp}`);
         return;
       }
       
@@ -59,6 +60,10 @@ export function useLiveFixtures(
       setLiveDataAvailable(Boolean(json.liveDataAvailable && list.length > 0));
       if (json.lastUpdated) {
         setLastUpdated(json.lastUpdated);
+      } else {
+        const now = new Date();
+        const stamp = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} UTC`;
+        setLastUpdated(prev => prev || stamp);
       }
       if (json.error && list.length === 0) {
         setError(json.error);
@@ -67,11 +72,14 @@ export function useLiveFixtures(
       }
     } catch {
       setLiveDataAvailable(false);
-      setError(`Live data unavailable. Last updated ${lastUpdated}`);
+      const now = new Date();
+      const stamp = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} UTC`;
+      setLastUpdated(prev => prev || stamp);
+      setError(`Live data unavailable. Last updated ${stamp}`);
     } finally {
       setIsLoading(false);
     }
-  }, [competitionCode, status, sport, lastUpdated]);
+  }, [competitionCode, status, sport]);
 
   useEffect(() => {
     load();

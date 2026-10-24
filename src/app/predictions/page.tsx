@@ -589,7 +589,7 @@ export default function PredictionsPage() {
           </div>
         ) : (
           <div className="p-12 text-center text-[12px] text-[var(--text-3)] space-y-2">
-            <div className="font-mono text-[12.5px] text-[var(--text)]">
+            <div suppressHydrationWarning className="font-mono text-[12.5px] text-[var(--text)]">
               {liveDataAvailable ? 'No predictions match your selected filters' : `Live data unavailable. Last updated ${lastUpdated}`}
             </div>
             <p className="max-w-sm mx-auto text-[11.5px]">

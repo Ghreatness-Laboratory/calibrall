@@ -33,10 +33,7 @@ export default function MatchAnalysisPage() {
 
   const [fixture, setFixture] = useState<Fixture | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [lastUpdated, setLastUpdated] = useState<string>(() => {
-    const d = new Date();
-    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
-  });
+  const [lastUpdated, setLastUpdated] = useState<string>('');
 
   useEffect(() => {
     async function loadFixture() {
@@ -131,7 +128,9 @@ export default function MatchAnalysisPage() {
   if (!fixture || (!isBasketball && (!stats || !footballEvaluation)) || (isBasketball && basketballPredictions.length === 0)) {
     return (
       <div className="py-20 text-center space-y-4">
-        <h2 className="text-[16px] font-[500] text-[#e8efe9]">Live data unavailable. Last updated {lastUpdated}</h2>
+        <h2 suppressHydrationWarning className="text-[16px] font-[500] text-[#e8efe9]">
+          Live data unavailable.{lastUpdated ? ` Last updated ${lastUpdated}` : ''}
+        </h2>
         <p className="text-[13px] text-[#8fa69a]">
           {isBasketball 
             ? 'The requested NBA matchup data could not be retrieved from live statistical feeds.' 
