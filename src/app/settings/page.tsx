@@ -243,7 +243,7 @@ export default function SettingsPage() {
                     {isMonochrome ? 'Noir Monochrome Mode' : 'Dark Green Fintech Theme'}
                   </h3>
                   <p className="text-[11.5px] text-[#8B9890] leading-tight mt-0.5">
-                    {isMonochrome ? 'High-contrast grayscale terminal styling' : 'Calibrall signature #0A0F0D canvas with lime highlights'}
+                    {isMonochrome ? 'High contrast grayscale terminal styling' : 'Calibrall signature #0A0F0D canvas with lime highlights'}
                   </p>
                 </div>
               </div>
@@ -275,7 +275,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="text-[13px] font-[600] text-[#ECF1EE]">Responsible Use & Policy</h3>
-                  <p className="text-[11.5px] text-[#8B9890]">Non-wagering compliance, ethical guidelines, terms</p>
+                  <p className="text-[11.5px] text-[#8B9890]">Non wagering compliance, ethical guidelines, terms</p>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-[#5E6A63]" strokeWidth={2} />
@@ -291,7 +291,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="text-[13px] font-[600] text-[#ECF1EE]">Model Methodology & Whitepaper</h3>
-                  <p className="text-[11.5px] text-[#8B9890]">Dixon-Coles formulas, Poisson bivariate math, NBA pace</p>
+                  <p className="text-[11.5px] text-[#8B9890]">Dixon Coles formulas, Poisson bivariate math, NBA pace</p>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-[#5E6A63]" strokeWidth={2} />

@@ -72,7 +72,7 @@ export class ValidationAndBenchmarksEngine {
     // Feature Ablation Study: Rigorous evaluation of each feature's marginal out-of-sample contribution
     const ablationStudy: FeatureAblationRecord[] = [
       {
-        featureName: 'Baseline Raw Dixon-Coles',
+        featureName: 'Baseline Raw Dixon Coles',
         description: 'Bivariate Poisson with static league averages and fixed home advantage',
         standaloneLogLoss: 0.982,
         deltaLogLoss: 0.0,
@@ -80,16 +80,16 @@ export class ValidationAndBenchmarksEngine {
         statisticalRationale: 'Foundational baseline generating correlated joint scoreline distributions.',
       },
       {
-        featureName: 'Time-Decayed Form (xi = 0.0035/day)',
-        description: 'Exponential weighting prioritizing matches in past 200-day half-life window',
+        featureName: 'Time Decayed Form (xi = 0.0035/day)',
+        description: 'Exponential weighting prioritizing matches in past 200 day half life window',
         standaloneLogLoss: 0.968,
         deltaLogLoss: -0.014,
         retainedInProduction: true,
-        statisticalRationale: 'Statistically significant out-of-sample improvement in predictive log loss (p < 0.01).',
+        statisticalRationale: 'Statistically significant out of sample improvement in predictive log loss (p < 0.01).',
       },
       {
         featureName: 'Bayesian Shrinkage (K0 = 12/18)',
-        description: 'Pulls newly promoted and sparse-sample clubs towards league prior',
+        description: 'Pulls newly promoted and sparse sample clubs towards league prior',
         standaloneLogLoss: 0.959,
         deltaLogLoss: -0.009,
         retainedInProduction: true,
@@ -101,7 +101,7 @@ export class ValidationAndBenchmarksEngine {
         standaloneLogLoss: 0.948,
         deltaLogLoss: -0.011,
         retainedInProduction: true,
-        statisticalRationale: 'Substantially reduces noise from fluked finishes and low-sample goal anomalies.',
+        statisticalRationale: 'Substantially reduces noise from fluked finishes and low sample goal anomalies.',
       },
       {
         featureName: 'Rest & Congestion Adjustment (14d matches)',
@@ -109,10 +109,10 @@ export class ValidationAndBenchmarksEngine {
         standaloneLogLoss: 0.944,
         deltaLogLoss: -0.004,
         retainedInProduction: true,
-        statisticalRationale: 'Verified marginal gain in high-stakes European weeks.',
+        statisticalRationale: 'Verified marginal gain in high stakes European weeks.',
       },
       {
-        featureName: 'Referee Disciplinary Tendency (Z-Score)',
+        featureName: 'Referee Disciplinary Tendency (Z Score)',
         description: 'Hierarchical card model scaled by official historical yellow/red strictness',
         standaloneLogLoss: 0.941,
         deltaLogLoss: -0.003,
@@ -125,7 +125,7 @@ export class ValidationAndBenchmarksEngine {
         standaloneLogLoss: 0.943,
         deltaLogLoss: +0.002,
         retainedInProduction: false,
-        statisticalRationale: 'REJECTED: Increased out-of-sample error and failed bootstrap hurdle. Discarded from pipeline.',
+        statisticalRationale: 'REJECTED: Increased out of sample error and failed bootstrap hurdle. Discarded from pipeline.',
       },
     ];
 
@@ -170,7 +170,7 @@ export class ValidationAndBenchmarksEngine {
         bootstrapCi95Upper: 0.072,
         beatsMarketOutSample: true,
         recommendationClassification: 'VALUE_QUALIFIED',
-        honestDisclosureNote: 'Beats closing market line (Skill vs Market +4.4%, 95% CI > 0). Negative binomial variance and low-score bivariate tau correction isolate false totals.',
+        honestDisclosureNote: 'Beats closing market line (Skill vs Market +4.4%, 95% CI > 0). Negative binomial variance and low score bivariate tau correction isolate false totals.',
       },
       {
         familyKey: 'double_chance',
@@ -210,7 +210,7 @@ export class ValidationAndBenchmarksEngine {
         bootstrapCi95Upper: -0.004,
         beatsMarketOutSample: false,
         recommendationClassification: 'PROBABILITY_ANALYSIS_ONLY',
-        honestDisclosureNote: 'HONEST SCIENTIFIC REPORT: Model strongly outperforms naive baseline (+19.2% BSS) but DOES NOT beat de-vigged sharp market closing lines (-3.1%). Bookmaker liquidity is hyper-efficient in 1X2. Picks in this family are restricted to "Probability Analysis Only" (never claimed as betting value).',
+        honestDisclosureNote: 'HONEST SCIENTIFIC REPORT: Model strongly outperforms naive baseline (+19.2% BSS) but DOES NOT beat devigged sharp market closing lines (\u22123.1%). Bookmaker liquidity is hyper efficient in 1X2. Picks in this family are restricted to "Probability Analysis Only" (never claimed as betting value).',
       },
       {
         familyKey: 'corners_total',
@@ -254,7 +254,7 @@ export class ValidationAndBenchmarksEngine {
       },
       {
         familyKey: 'halves_goals',
-        familyDisplayName: 'First-Half Goals & Halves',
+        familyDisplayName: 'First Half Goals & Halves',
         sampleSize: 320,
         modelBrierScore: 0.158,
         baselineBrierScore: 0.205,
@@ -270,16 +270,16 @@ export class ValidationAndBenchmarksEngine {
         bootstrapCi95Upper: 0.044,
         beatsMarketOutSample: true,
         recommendationClassification: 'VALUE_QUALIFIED',
-        honestDisclosureNote: 'Derived strictly from joint scoreline matrix with 46%/54% first-to-second half temporal goal distribution.',
+        honestDisclosureNote: 'Derived strictly from joint scoreline matrix with 46%/54% first to second half temporal goal distribution.',
       },
     ];
 
     const championChallenger: ChampionChallengerState = {
-      championModelName: 'Dixon-Coles v2.4 (Static Poisson)',
+      championModelName: 'Dixon Coles v2.4 (Static Poisson)',
       championVersion: 'v2.4.1',
       championBrierScore: 0.198,
-      challengerModelName: 'Decayed-DC + Bayesian xG + Elo Ensemble',
-      challengerVersion: 'v3.0.0-PROMOTED',
+      challengerModelName: 'Decayed DC + Bayesian xG + Elo Ensemble',
+      challengerVersion: 'v3.0.0 PROMOTED',
       challengerBrierScore: 0.174,
       challengerDeltaBss: 0.121,
       challengerConfidenceLower: 0.085,
@@ -297,7 +297,7 @@ export class ValidationAndBenchmarksEngine {
       overallLogLossAfter: 0.941,
       ablationStudy,
       championChallenger,
-      testSeasonEvaluated: '2024-25 Season (Untouched Out-of-Sample Holdout)',
+      testSeasonEvaluated: '2024 to 2025 Season (Untouched Out of Sample Holdout)',
     };
   }
 }

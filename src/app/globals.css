@@ -30,6 +30,15 @@ html {
   background-color: var(--bg);
 }
 
+/* GLOBAL TEXT RULE: Disable automatic browser hyphenation everywhere */
+*, *::before, *::after {
+  hyphens: none !important;
+  -webkit-hyphens: none !important;
+  -moz-hyphens: none !important;
+  -ms-hyphens: none !important;
+  overflow-wrap: break-word;
+}
+
 body {
   min-height: 100dvh;
   overflow-y: auto;

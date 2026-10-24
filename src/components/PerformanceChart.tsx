@@ -29,7 +29,7 @@ export default function PerformanceChart({
           <span className="text-[21px] font-bold text-[#ECF1EE] font-mono tabular-nums leading-tight block">
             420
           </span>
-          <span className="text-[10.5px] text-[#5E6A63] block mt-1 font-mono">Out-of-sample</span>
+          <span className="text-[10.5px] text-[#5E6A63] block mt-1 font-mono">Out of sample</span>
         </div>
 
         {/* Tile 2: Overall hit rate */}
@@ -56,7 +56,7 @@ export default function PerformanceChart({
           <span className="text-[21px] font-bold text-[#B6E63B] font-mono tabular-nums leading-tight block">
             +{(roi * 100).toFixed(1)}%
           </span>
-          <span className="text-[10.5px] text-[#5E6A63] block mt-1 font-mono">1-unit flat stake</span>
+          <span className="text-[10.5px] text-[#5E6A63] block mt-1 font-mono">Flat 1 unit stake</span>
         </div>
       </div>
 
@@ -93,6 +93,9 @@ export default function PerformanceChart({
               const obsPct = b.observedFrequency * 100;
               const delta = obsPct - predPct;
               const isPositive = delta >= 0;
+              const formattedDelta = isPositive 
+                ? `+${delta.toFixed(1)}%` 
+                : `\u2212${Math.abs(delta).toFixed(1)}%`;
 
               return (
                 <div key={i} className="px-3 py-2 text-[11.5px] font-mono tabular-nums">
@@ -101,7 +104,7 @@ export default function PerformanceChart({
                     <span className="text-[#8B9890]">{predPct.toFixed(1)}%</span>
                     <span className="text-[#ECF1EE] font-semibold">{obsPct.toFixed(1)}%</span>
                     <span className={isPositive ? 'text-[#B6E63B] font-semibold' : 'text-[#F08A4B] font-semibold'}>
-                      {isPositive ? '+' : ''}{delta.toFixed(1)}%
+                      {formattedDelta}
                     </span>
                     <span className="text-right text-[#5E6A63]">{b.sampleCount}</span>
                   </div>
@@ -134,7 +137,7 @@ export default function PerformanceChart({
               <span>Observed</span>
             </span>
           </div>
-          <span className="text-[#5E6A63] font-mono">Out-of-sample validation</span>
+          <span className="text-[#5E6A63] font-mono">Out of sample validation</span>
         </div>
       </div>
     </div>

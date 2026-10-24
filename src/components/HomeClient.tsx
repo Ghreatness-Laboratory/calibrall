@@ -83,7 +83,7 @@ export default function HomeClient() {
   const basketballModels = [
     { 
       title: 'Exact Efficiency Model', 
-      subtitle: 'A_off = OffEff × Poss; A_def = DefEff × OppPoss',
+      subtitle: 'A offense = OffEff × Poss; A defense = DefEff × OppPoss',
       icon: Cpu 
     },
     { 

@@ -190,8 +190,8 @@ export default function DashboardPage() {
           </h2>
           <p className="text-[12px] text-[#8B9890] mt-0.5">
             {isBasketball 
-              ? 'Multi-team efficiency modeling, projected totals, spreads, and pace analysis for all 30 NBA franchises.'
-              : 'Real-time multi-market evaluation across the authorized catalog types. Every call, on record.'}
+              ? 'Multi team efficiency modeling, projected totals, spreads, and pace analysis for all 30 NBA franchises.'
+              : 'Real time multi market evaluation across the authorized catalog types. Every call, on record.'}
           </p>
         </div>
 
@@ -227,7 +227,7 @@ export default function DashboardPage() {
               <span className="font-mono text-[var(--text-3)] text-[10.5px]">Mean: 2.85 xG</span>
             </div>
             <p className="text-[12px] text-[var(--text-2)] leading-normal">
-              Elevated offensive volume in Barcelona vs Real Madrid (3.60 combined xG). Arsenal vs Liverpool exhibits balanced 1.62 - 1.48 expectation.
+              Elevated offensive volume in Barcelona vs Real Madrid (3.60 combined xG). Arsenal vs Liverpool exhibits balanced 1.62 to 1.48 expectation.
             </p>
           </div>
 

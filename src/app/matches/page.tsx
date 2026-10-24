@@ -190,7 +190,7 @@ export default function MatchesPage() {
           </h2>
           <p className="text-[12px] text-[#8B9890] mt-0.5 truncate">
             {isBasketball 
-              ? 'Real-time efficiency models and pace projections.' 
+              ? 'Real time efficiency models and pace projections.' 
               : 'Quantitative models and expected value discovery across Europe.'}
           </p>
         </div>

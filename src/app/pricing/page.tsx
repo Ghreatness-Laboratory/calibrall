@@ -102,7 +102,7 @@ export default function PricingPage() {
             <div>
               <h3 className="text-[15px] font-semibold text-[#ECF1EE]">Pro Terminal</h3>
               <div className="text-[22px] font-semibold text-[#ECF1EE] mt-1 font-mono tabular-nums">$29 <span className="text-[12px] text-[#8B9890] font-normal">/ mo</span></div>
-              <p className="text-[11.5px] text-[#8B9890] mt-1">Complete multi-market ranking, expected value analysis, corners & cards.</p>
+              <p className="text-[11.5px] text-[#8B9890] mt-1">Complete multi market ranking, expected value analysis, corners & cards.</p>
             </div>
 
             <ul className="space-y-2 text-[12px] text-[#8B9890]">

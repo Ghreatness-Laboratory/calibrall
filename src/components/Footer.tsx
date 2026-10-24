@@ -20,7 +20,7 @@ export default function Footer() {
       id: 'analytics',
       title: 'Analytics and models',
       links: [
-        { label: 'Dixon-Coles goals engine', href: '/methodology' },
+        { label: 'Dixon Coles goals engine', href: '/methodology' },
         { label: 'Negative binomial corners', href: '/methodology' },
         { label: 'Disciplinary card model', href: '/methodology' },
         { label: 'Brier score calibration', href: '/performance' },
@@ -44,7 +44,7 @@ export default function Footer() {
         { label: 'Responsible use', href: '/responsible-use' },
         { label: 'Terms of service', href: '/responsible-use' },
         { label: 'Privacy policy', href: '/responsible-use' },
-        { label: 'Model version: Dixon-Coles v2.4.1', href: '/methodology' },
+        { label: 'Model version: Dixon Coles v2.4.1', href: '/methodology' },
       ],
     },
   ];

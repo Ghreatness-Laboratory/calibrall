@@ -8,6 +8,7 @@ import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase
 import TeamCrest from '@/components/TeamCrest';
 import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import { checkDerby } from '@/lib/prediction/contextFactors';
+import { cleanDisplayText } from '@/lib/utils/formatText';
 
 interface Props {
   fixture: Fixture;
@@ -67,12 +68,12 @@ export default function FixtureCard({
       {/* Header row 11px muted: Competition name, Matchday, Clock + UTC time, Bookmark */}
       <div className="flex items-center justify-between text-[11px] text-[#8B9890]">
         <div className="flex items-center gap-1.5 truncate">
-          <span className="truncate text-[#8B9890]">{fixture.competition.name}</span>
+          <span className="truncate text-[#8B9890]">{cleanDisplayText(fixture.competition.name)}</span>
           <span className="text-[#5E6A63]">·</span>
           <span className="font-mono tabular-nums shrink-0">MD {fixture.matchday}</span>
           {derbyInfo && (
             <span className="ml-1 px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/25 truncate shrink-0">
-              ⚡ {derbyInfo.name}
+              ⚡ {cleanDisplayText(derbyInfo.name)}
             </span>
           )}
           {fixture.hasCoachChange && (
@@ -116,11 +117,11 @@ export default function FixtureCard({
               <div className="flex items-center gap-2.5 min-h-[24px] min-w-0">
                 <TeamCrest
                   crestUrl={fixture.homeTeam.crestUrl}
-                  teamName={homeName}
+                  teamName={cleanDisplayText(homeName)}
                   size={22}
                 />
                 <span className="text-[13px] font-semibold text-[#ECF1EE] leading-tight truncate group-hover:text-[#B6E63B] transition-colors">
-                  {homeName}
+                  {cleanDisplayText(homeName)}
                 </span>
               </div>
               {isFinished && (
@@ -135,11 +136,11 @@ export default function FixtureCard({
               <div className="flex items-center gap-2.5 min-h-[24px] min-w-0">
                 <TeamCrest
                   crestUrl={fixture.awayTeam.crestUrl}
-                  teamName={awayName}
+                  teamName={cleanDisplayText(awayName)}
                   size={22}
                 />
                 <span className="text-[13px] font-semibold text-[#ECF1EE] leading-tight truncate group-hover:text-[#B6E63B] transition-colors">
-                  {awayName}
+                  {cleanDisplayText(awayName)}
                 </span>
               </div>
               {isFinished && (
@@ -153,7 +154,7 @@ export default function FixtureCard({
           {/* Right column separated by a hairline */}
           <div className="col-span-4 border-l border-white/[0.07] pl-2.5 flex flex-col justify-center items-end text-right min-h-[48px]">
             <span className="text-[10px] text-[#5E6A63] truncate max-w-full font-mono">
-              {fixture.venue ? fixture.venue.split(' ')[0] : 'Stadium'}
+              {fixture.venue ? cleanDisplayText(fixture.venue.split(' ')[0]) : 'Stadium'}
             </span>
             <div className="flex items-center gap-1 text-[11.5px] font-medium text-[#B6E63B] mt-1 group-hover:underline">
               <span>Analysis</span>
@@ -172,7 +173,7 @@ export default function FixtureCard({
                   <span className="text-[#8B9890] font-medium">Top pick</span>
                   {tierBadge && (
                     <span className={`px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-semibold tracking-wider ${tierBadge.badgeClass}`}>
-                      {tierBadge.label}
+                      {cleanDisplayText(tierBadge.label)}
                     </span>
                   )}
                 </div>
@@ -184,7 +185,7 @@ export default function FixtureCard({
                   )}
                   {topPrediction.expectedValue !== undefined && (
                     <span className={formatExpectedValue(topPrediction.expectedValue).colorClass}>
-                      {formatExpectedValue(topPrediction.expectedValue).text} EV
+                      {cleanDisplayText(formatExpectedValue(topPrediction.expectedValue).text)} EV
                     </span>
                   )}
                 </div>
@@ -193,7 +194,7 @@ export default function FixtureCard({
               {/* Row 2: pick name (13px/600), probability in mono at right */}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[13px] font-semibold text-[#ECF1EE] truncate">
-                  {formatSelectionName(topPrediction.selection)}
+                  {cleanDisplayText(formatSelectionName(topPrediction.selection))}
                 </span>
                 <span className="font-mono text-[12.5px] font-semibold text-[#B6E63B] shrink-0 tabular-nums">
                   {(topPrediction.modelProbability * 100).toFixed(1)}%
@@ -203,7 +204,7 @@ export default function FixtureCard({
               {/* Row 3: Plain-English reason */}
               {topPrediction.plainEnglishReason && (
                 <p className="text-[11.5px] text-[#8B9890] line-clamp-2 leading-relaxed">
-                  {topPrediction.plainEnglishReason}
+                  {cleanDisplayText(topPrediction.plainEnglishReason)}
                 </p>
               )}
 
@@ -222,10 +223,10 @@ export default function FixtureCard({
                 <div className="pt-1.5 mt-1 border-t border-white/[0.05] flex items-center justify-between text-[10.5px]">
                   <span className="text-[#B6E63B] font-medium flex items-center gap-1 truncate">
                     <TrendingUp className="w-3 h-3 shrink-0" strokeWidth={2} />
-                    <span>Sub: {topPrediction.substituteOption.selection}</span>
+                    <span>Sub: {cleanDisplayText(topPrediction.substituteOption.selection)}</span>
                   </span>
                   <span className="font-mono text-[9.5px] text-[#5E6A63] shrink-0 ml-1 tabular-nums">
-                    −{topPrediction.substituteOption.varianceReductionPct}% var
+                    &#8722;{topPrediction.substituteOption.varianceReductionPct}% var
                   </span>
                 </div>
               )}
@@ -234,7 +235,7 @@ export default function FixtureCard({
             <div className="bg-[#151E19] rounded-[11px] border border-white/[0.07] p-2.5 flex items-center gap-2 text-[#8B9890] text-[11px]">
               <AlertCircle className="w-3.5 h-3.5 text-[#5E6A63] shrink-0" strokeWidth={2} />
               <span className="truncate">
-                {noRecommendationReason || 'No strong recommendation (Abstaining on marginal edge)'}
+                {cleanDisplayText(noRecommendationReason || 'No strong recommendation (Abstaining on marginal edge)')}
               </span>
             </div>
           )}

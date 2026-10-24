@@ -74,7 +74,7 @@ export default function SavedMatchesPage() {
             <span>Saved Watchlist</span>
           </h2>
           <p className="text-[12px] text-[#8B9890] mt-0.5">
-            Track prioritized matches, monitor pre-match market movements, and receive line updates.
+            Track prioritized matches, monitor pre match market movements, and receive line updates.
           </p>
         </div>
 

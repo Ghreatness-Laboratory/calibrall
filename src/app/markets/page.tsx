@@ -11,6 +11,7 @@ import { ArrowUpRight, Clock, Info } from 'lucide-react';
 import { SupportedOptionType, Fixture } from '@/types';
 import TeamCrest from '@/components/TeamCrest';
 import { formatExpectedValue, formatOdds } from '@/lib/prediction/marketCatalog';
+import { cleanDisplayText } from '@/lib/utils/formatText';
 
 const FOOTBALL_MARKET_OPTIONS: {
   code: string;
@@ -142,7 +143,7 @@ export default function MarketExplorerPage() {
     { id: 'win', label: '1. Win' },
     { id: 'draw', label: '2. Draw' },
     { id: 'double_chance', label: '3. Double chance' },
-    { id: 'over_under_goals', label: '4. Over/under' },
+    { id: 'over_under_goals', label: '4. Over or under' },
     { id: 'both_teams_to_score', label: '5. BTTS' },
     { id: 'corners', label: '6. Corners' },
     { id: 'bookings', label: '7. Bookings' },
@@ -175,7 +176,7 @@ export default function MarketExplorerPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
         <div>
           <h1 className="text-[18px] font-[500] text-[#e8efe9]">
-            {isBasketball ? 'NBA Cross-Match Market Explorer' : 'Cross-Match Market Explorer'}
+            {isBasketball ? 'NBA Cross Match Market Explorer' : 'Cross Match Market Explorer'}
           </h1>
           <p className="text-[12px] text-[#8fa69a] mt-0.5">
             {isBasketball
@@ -228,7 +229,7 @@ export default function MarketExplorerPage() {
                     : 'bg-[#0a1812] hover:bg-white/[0.04] text-[#8fa69a] hover:text-[#e8efe9] border border-white/[0.08]'
                 }`}
               >
-                {opt.label}
+                {cleanDisplayText(opt.label)}
               </button>
             ))}
           </div>
@@ -240,13 +241,13 @@ export default function MarketExplorerPage() {
         <div className="p-3 bg-[#0a1812]/50 border-b border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]">
           <div>
             <h2 className="font-[500] text-[#e8efe9] flex items-center gap-2">
-              <span>Cross-match comparison:</span>
-              <span className="text-[#b8e63a]">{activeOption?.label}</span>
+              <span>Cross match comparison:</span>
+              <span className="text-[#b8e63a]">{cleanDisplayText(activeOption?.label)}</span>
             </h2>
             <div className="text-[#8fa69a] text-[11px] mt-0.5 flex items-center gap-2">
               <span className="flex items-center gap-1 font-mono">
                 <Clock className="w-3 h-3 text-[#b8e63a]" />
-                <span>Period: {activeOption?.period}</span>
+                <span>Period: {cleanDisplayText(activeOption?.period)}</span>
               </span>
               <span>·</span>
               <span>Ranked by modeled probability</span>
@@ -280,13 +281,13 @@ export default function MarketExplorerPage() {
                       </div>
                     </td>
                     <td className="py-3 px-3 text-[#e8efe9] font-medium">
-                      {prediction.selection}
+                      {cleanDisplayText(prediction.selection)}
                     </td>
                     <td className="py-3 px-3 font-mono font-semibold text-[#b8e63a]">
                       {(prediction.modelProbability * 100).toFixed(1)}%
                     </td>
                     <td className="py-3 px-3 font-mono text-[#e8efe9]">
-                      {prediction.marketOdds ? `@${formatOdds(prediction.marketOdds)}` : '—'}
+                      {prediction.marketOdds ? `@${formatOdds(prediction.marketOdds)}` : 'N/A'}
                     </td>
                     <td className="py-3 px-3 font-mono text-[11px]">
                       {prediction.expectedValue !== undefined && prediction.expectedValue !== null ? (
@@ -295,7 +296,7 @@ export default function MarketExplorerPage() {
                           return <span className={evData.colorClass}>{evData.text}</span>;
                         })()
                       ) : (
-                        <span className="text-[#8fa69a]">Prob-based</span>
+                        <span className="text-[#8fa69a]">Probability based</span>
                       )}
                     </td>
                     <td className="py-3 px-3 text-right">

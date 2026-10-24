@@ -1,6 +1,6 @@
 {
   "name": "MATCHMIND",
-  "description": "Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession-efficiency projections, and calibrated multi-market analytics.",
+  "description": "Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession efficiency projections, and calibrated multi market analytics.",
   "permissions": [],
   "capabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

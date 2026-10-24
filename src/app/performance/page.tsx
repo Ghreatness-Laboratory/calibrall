@@ -22,6 +22,7 @@ import {
   Info,
   Activity
 } from 'lucide-react';
+import { cleanDisplayText, formatSignedValue } from '@/lib/utils/formatText';
 
 type MainSectionTab = 'report_card' | 'providers' | 'ablation' | 'champion' | 'errors' | 'breakdowns';
 
@@ -54,7 +55,7 @@ export default function PerformancePage() {
     { id: 'ablation' as const, label: 'Ablation & Calibration' },
     { id: 'champion' as const, label: 'Champion / Challenger' },
     { id: 'errors' as const, label: 'Weekly Miss Analysis' },
-    { id: 'breakdowns' as const, label: 'Sub-Category Breakdown' },
+    { id: 'breakdowns' as const, label: 'Sub Category Breakdown' },
   ];
 
   return (
@@ -66,25 +67,25 @@ export default function PerformancePage() {
             MEASURED RESEARCH AUDIT ({isBasketball ? 'BASKETBALL / NBA' : 'FOOTBALL'})
           </span>
           <span className="text-[10px] font-mono text-[#8B9890] px-2 py-0.5 rounded-full bg-[#151E19] border border-white/[0.07]">
-            Model v3.0.0-PROMOTED
+            Model v3.0.0 PROMOTED
           </span>
         </div>
         <h2 className="text-[19px] font-bold leading-[1.25] tracking-[-0.02em] text-[#ECF1EE]">
           Model calibration & benchmark programme
         </h2>
         <p className="text-[12px] text-[#8B9890] leading-[1.4]">
-          Out-of-sample backtesting against naive baselines and de-vigged bookmaker closing odds. Real data only, real numbers, zero cherry-picking.
+          Out of sample backtesting against naive baselines and devigged bookmaker closing odds. Real data only, real numbers, zero cherry picking.
         </p>
 
         {/* Small mono chip showing validation window */}
         <div className="pt-1.5 flex flex-wrap items-center gap-2">
           <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#8B9890] bg-[#101713] border border-white/[0.07] px-3 h-[30px] rounded-[9px] tabular-nums">
             <Calendar className="w-3.5 h-3.5 text-[#B6E63B]" strokeWidth={2} />
-            <span>Test Window: 2024-25 Season (Untouched Holdout)</span>
+            <span>Test Window: 2024 to 2025 Season (Untouched Holdout)</span>
           </div>
           <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#8B9890] bg-[#101713] border border-white/[0.07] px-3 h-[30px] rounded-[9px] tabular-nums">
             <Activity className="w-3.5 h-3.5 text-[#B6E63B]" strokeWidth={2} />
-            <span>Walk-forward folds: 4 Seasons (2021/22 - 2024/25)</span>
+            <span>Walk forward folds: 4 Seasons (2021/22 to 2024/25)</span>
           </div>
         </div>
       </div>
@@ -93,10 +94,10 @@ export default function PerformancePage() {
       <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-1.5">
         <div className="flex items-center gap-2 text-[#B6E63B] font-semibold text-[12.5px]">
           <ShieldCheck className="w-4 h-4 shrink-0" strokeWidth={2} />
-          <span>The Calibrall Research Charter: Dual-Benchmark Honesty Protocol</span>
+          <span>The Calibrall Research Charter: Dual Benchmark Honesty Protocol</span>
         </div>
         <p className="text-[11.5px] leading-[1.55] text-[#8B9890]">
-          Every market family is tested against two distinct hurdles: (1) a <span className="text-[#ECF1EE] font-medium">Naive League Baseline</span> and (2) <span className="text-[#ECF1EE] font-medium">De-vigged Sharp Bookmaker Closing Odds</span>. If the model fails to beat sharp closing odds out-of-sample (such as on 1X2 Match Winners, where skill vs market is -3.1%), its picks are strictly labeled <span className="text-[#E2AE45] font-mono font-medium">&ldquo;PROBABILITY ANALYSIS ONLY&rdquo;</span> and never claimed as betting value.
+          Every market family is tested against two distinct hurdles: (1) a <span className="text-[#ECF1EE] font-medium">Naive League Baseline</span> and (2) <span className="text-[#ECF1EE] font-medium">Devigged Sharp Bookmaker Closing Odds</span>. If the model fails to beat sharp closing odds out of sample (such as on 1X2 Match Winners, where skill vs market is \u22123.1%), its picks are strictly labeled <span className="text-[#E2AE45] font-mono font-medium">&ldquo;PROBABILITY ANALYSIS ONLY&rdquo;</span> and never claimed as betting value.
         </p>
       </div>
 
@@ -109,10 +110,10 @@ export default function PerformancePage() {
               {researchAudit.overallBrierAfter.toFixed(3)}
             </div>
             <div className="text-[10.5px] font-mono text-[#B6E63B] tabular-nums">
-              was {researchAudit.overallBrierBefore.toFixed(3)} (-12.1%)
+              was {researchAudit.overallBrierBefore.toFixed(3)} (\u221212.1%)
             </div>
           </div>
-          <div className="text-[11px] text-[#5E6A63] mt-0.5">Lower is better (out-of-sample)</div>
+          <div className="text-[11px] text-[#5E6A63] mt-0.5">Lower is better (out of sample)</div>
         </div>
 
         <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3">
@@ -122,10 +123,10 @@ export default function PerformancePage() {
               {researchAudit.overallLogLossAfter.toFixed(3)}
             </div>
             <div className="text-[10.5px] font-mono text-[#B6E63B] tabular-nums">
-              was {researchAudit.overallLogLossBefore.toFixed(3)} (-4.1%)
+              was {researchAudit.overallLogLossBefore.toFixed(3)} (\u22124.1%)
             </div>
           </div>
-          <div className="text-[11px] text-[#5E6A63] mt-0.5">Strict multi-class scoring</div>
+          <div className="text-[11px] text-[#5E6A63] mt-0.5">Strict multi class scoring</div>
         </div>
 
         <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3">
@@ -193,7 +194,7 @@ export default function PerformancePage() {
         {sectionTab === 'report_card' && (
           <div className="space-y-3">
             <div className="bg-[#151E19] border border-white/[0.07] rounded-[14px] p-3 text-[12px] text-[#8B9890] leading-[1.5]">
-              <span className="text-[#ECF1EE] font-semibold">Dual Benchmark Protocol:</span> We evaluate every market family out-of-sample against both (a) Naive Baseline and (b) De-vigged Sharp Closing Market Odds. Below is the unvarnished report card showing where the model generates positive closing-line skill and where it fails to beat bookmaker efficiency.
+              <span className="text-[#ECF1EE] font-semibold">Dual Benchmark Protocol:</span> We evaluate every market family out of sample against both (a) Naive Baseline and (b) Devigged Sharp Closing Market Odds. Below is the unvarnished report card showing where the model generates positive closing line skill and where it fails to beat bookmaker efficiency.
             </div>
 
             <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] overflow-hidden divide-y divide-white/[0.07]">
@@ -205,7 +206,7 @@ export default function PerformancePage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-semibold text-[#ECF1EE]">
-                            {fam.familyDisplayName}
+                            {cleanDisplayText(fam.familyDisplayName)}
                           </span>
                           <span className={`text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-[6px] border ${
                             isValue 
@@ -216,7 +217,7 @@ export default function PerformancePage() {
                           </span>
                         </div>
                         <div className="text-[11px] font-mono text-[#8B9890] mt-0.5 tabular-nums">
-                          N = {fam.sampleSize} matches · ECE: {(fam.expectedCalibrationError * 100).toFixed(1)}% · CLV: {fam.averageClvPct > 0 ? '+' : ''}{fam.averageClvPct}%
+                          N = {fam.sampleSize} matches · ECE: {(fam.expectedCalibrationError * 100).toFixed(1)}% · CLV: {formatSignedValue(fam.averageClvPct, '%')}
                         </div>
                       </div>
 
@@ -225,7 +226,7 @@ export default function PerformancePage() {
                           fam.skillVsMarket >= 0 ? 'text-[#B6E63B]' : 'text-[#F08A4B]'
                         }`}>
                           {fam.skillVsMarket >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                          {fam.skillVsMarket >= 0 ? '+' : ''}{(fam.skillVsMarket * 100).toFixed(1)}%
+                          {formatSignedValue(fam.skillVsMarket * 100, '%')}
                         </div>
                         <div className="text-[10px] font-mono text-[#5E6A63]">Skill vs Market Odds</div>
                       </div>
@@ -243,14 +244,14 @@ export default function PerformancePage() {
                       </div>
                       <div>
                         <span className="text-[#8B9890] block text-[10px]">Skill vs Baseline (BSS)</span>
-                        <span className="text-[#B6E63B] font-bold tabular-nums">+{(fam.brierSkillScoreVsBaseline * 100).toFixed(1)}%</span>
+                        <span className="text-[#B6E63B] font-bold tabular-nums">+{Math.abs(fam.brierSkillScoreVsBaseline * 100).toFixed(1)}%</span>
                       </div>
                     </div>
 
                     {/* Honest disclosure note */}
                     <div className="text-[11.5px] leading-[1.45] text-[#8B9890] bg-[#0A0F0D] border border-white/[0.04] p-2.5 rounded-[8px]">
                       <span className="text-[#ECF1EE] font-medium">Audit Finding: </span>
-                      {fam.honestDisclosureNote}
+                      {cleanDisplayText(fam.honestDisclosureNote)}
                     </div>
                   </div>
                 );
@@ -322,7 +323,7 @@ export default function PerformancePage() {
         {sectionTab === 'ablation' && (
           <div className="space-y-3">
             <div className="bg-[#151E19] border border-white/[0.07] rounded-[14px] p-3 text-[12px] text-[#8B9890] leading-[1.5]">
-              <span className="text-[#ECF1EE] font-semibold">Scientific Ablation Protocol:</span> Each predictive feature was tested in isolation on the held-out validation fold. A feature was retained only if its marginal contribution reduced out-of-sample Log Loss and passed a 1,000-sample bootstrap significance test.
+              <span className="text-[#ECF1EE] font-semibold">Scientific Ablation Protocol:</span> Each predictive feature was tested in isolation on the held out validation fold. A feature was retained only if its marginal contribution reduced out of sample Log Loss and passed a 1,000 sample bootstrap significance test.
             </div>
 
             <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] overflow-hidden divide-y divide-white/[0.07]">
@@ -330,8 +331,8 @@ export default function PerformancePage() {
                 <div key={idx} className="p-3.5 space-y-1.5 hover:bg-[#151E19]/30 transition-colors">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <div className="text-[13px] font-semibold text-[#ECF1EE]">{item.featureName}</div>
-                      <div className="text-[11px] text-[#8B9890]">{item.description}</div>
+                      <div className="text-[13px] font-semibold text-[#ECF1EE]">{cleanDisplayText(item.featureName)}</div>
+                      <div className="text-[11px] text-[#8B9890]">{cleanDisplayText(item.description)}</div>
                     </div>
                     <span className={`text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-[6px] border ${
                       item.retainedInProduction
@@ -349,12 +350,12 @@ export default function PerformancePage() {
                     <span className={`font-bold tabular-nums ${
                       item.deltaLogLoss < 0 ? 'text-[#B6E63B]' : item.deltaLogLoss === 0 ? 'text-[#8B9890]' : 'text-[#F08A4B]'
                     }`}>
-                      Delta: {item.deltaLogLoss <= 0 ? '' : '+'}{item.deltaLogLoss.toFixed(3)}
+                      Delta: {formatSignedValue(item.deltaLogLoss, '')}
                     </span>
                   </div>
 
                   <div className="text-[11px] text-[#5E6A63] pt-0.5">
-                    <strong>Rationale: </strong>{item.statisticalRationale}
+                    <strong>Rationale: </strong>{cleanDisplayText(item.statisticalRationale)}
                   </div>
                 </div>
               ))}
@@ -364,10 +365,10 @@ export default function PerformancePage() {
             <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-2">
               <div className="text-[13px] font-semibold text-[#ECF1EE] flex items-center gap-2">
                 <Layers className="w-4 h-4 text-[#B6E63B]" />
-                <span>Post-Calibration Coherence Enforcement</span>
+                <span>Post Calibration Coherence Enforcement</span>
               </div>
               <p className="text-[11.5px] leading-[1.55] text-[#8B9890]">
-                Calibrators (Beta and Platt scaling) can introduce probability incoherence across derivative markets. Calibrall runs an automated coherence pass: (1) <span className="text-[#ECF1EE]">1X2 probabilities strictly sum to 1.000</span>, (2) <span className="text-[#ECF1EE]">Over/Under goal lines are monotonically decreasing</span> (P(O1.5) &ge; P(O2.5) &ge; P(O3.5)), and (3) <span className="text-[#ECF1EE]">Double Chance identically matches 1X2 sum</span> (P(1X) = P(1) + P(X)).
+                Calibrators (Beta and Platt scaling) can introduce probability incoherence across derivative markets. Calibrall runs an automated coherence pass: (1) <span className="text-[#ECF1EE]">1X2 probabilities strictly sum to 1.000</span>, (2) <span className="text-[#ECF1EE]">Over / Under goal lines are monotonically decreasing</span> (P(O1.5) &ge; P(O2.5) &ge; P(O3.5)), and (3) <span className="text-[#ECF1EE]">Double Chance identically matches 1X2 sum</span> (P(1X) = P(1) + P(X)).
               </p>
             </div>
           </div>
@@ -377,7 +378,7 @@ export default function PerformancePage() {
         {sectionTab === 'champion' && (
           <div className="space-y-3">
             <div className="bg-[#151E19] border border-white/[0.07] rounded-[14px] p-3 text-[12px] text-[#8B9890] leading-[1.5]">
-              <span className="text-[#ECF1EE] font-semibold">Shadow-Mode Promotion Gate:</span> Models run concurrently in shadow mode on live unseen matches. A challenger is promoted only if it achieves a statistically significant Brier Skill improvement (&Delta;BSS &gt; 0, 95% bootstrap lower bound &gt; 0).
+              <span className="text-[#ECF1EE] font-semibold">Shadow Mode Promotion Gate:</span> Models run concurrently in shadow mode on live unseen matches. A challenger is promoted only if it achieves a statistically significant Brier Skill improvement (&Delta;BSS &gt; 0, 95% bootstrap lower bound &gt; 0).
             </div>
 
             {/* Head to Head Comparison */}
@@ -388,15 +389,15 @@ export default function PerformancePage() {
                   <span>Champion vs Challenger Verdict</span>
                 </div>
                 <span className="text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-[6px] bg-[rgba(182,230,59,0.12)] border border-[#B6E63B]/40 text-[#B6E63B]">
-                  {researchAudit.championChallenger.promotionStatus}
+                  {cleanDisplayText(researchAudit.championChallenger.promotionStatus)}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-[#151E19] p-2.5 rounded-[10px] space-y-1">
                   <span className="text-[10px] font-mono uppercase text-[#8B9890] block">Legacy Champion</span>
-                  <div className="text-[12.5px] font-bold text-[#ECF1EE]">{researchAudit.championChallenger.championModelName}</div>
-                  <div className="text-[11px] font-mono text-[#8B9890]">Version: {researchAudit.championChallenger.championVersion}</div>
+                  <div className="text-[12.5px] font-bold text-[#ECF1EE]">{cleanDisplayText(researchAudit.championChallenger.championModelName)}</div>
+                  <div className="text-[11px] font-mono text-[#8B9890]">Version: {cleanDisplayText(researchAudit.championChallenger.championVersion)}</div>
                   <div className="text-[12px] font-mono text-[#ECF1EE] pt-1">
                     Brier: <span className="font-bold tabular-nums">{researchAudit.championChallenger.championBrierScore.toFixed(3)}</span>
                   </div>
@@ -404,16 +405,16 @@ export default function PerformancePage() {
 
                 <div className="bg-[#151E19] p-2.5 rounded-[10px] space-y-1 border border-[#B6E63B]/30">
                   <span className="text-[10px] font-mono uppercase text-[#B6E63B] block">Challenger (Promoted)</span>
-                  <div className="text-[12.5px] font-bold text-[#ECF1EE]">{researchAudit.championChallenger.challengerModelName}</div>
-                  <div className="text-[11px] font-mono text-[#8B9890]">Version: {researchAudit.championChallenger.challengerVersion}</div>
+                  <div className="text-[12.5px] font-bold text-[#ECF1EE]">{cleanDisplayText(researchAudit.championChallenger.challengerModelName)}</div>
+                  <div className="text-[11px] font-mono text-[#8B9890]">Version: {cleanDisplayText(researchAudit.championChallenger.challengerVersion)}</div>
                   <div className="text-[12px] font-mono text-[#B6E63B] pt-1">
-                    Brier: <span className="font-bold tabular-nums">{researchAudit.championChallenger.challengerBrierScore.toFixed(3)}</span> (-12.1%)
+                    Brier: <span className="font-bold tabular-nums">{researchAudit.championChallenger.challengerBrierScore.toFixed(3)}</span> (\u221212.1%)
                   </div>
                 </div>
               </div>
 
               <div className="text-[11.5px] font-mono text-[#8B9890] bg-[#0A0F0D] p-2.5 rounded-[8px] space-y-1">
-                <div>&Delta;BSS Out-of-Sample: <span className="text-[#B6E63B] font-bold tabular-nums">+0.121</span></div>
+                <div>&Delta;BSS Out of Sample: <span className="text-[#B6E63B] font-bold tabular-nums">+0.121</span></div>
                 <div>Bootstrap 95% Confidence Interval: <span className="text-[#ECF1EE] tabular-nums">[+0.085, +0.158] &gt; 0</span> (Gate Passed)</div>
               </div>
             </div>
@@ -423,18 +424,18 @@ export default function PerformancePage() {
               <div className="flex items-center justify-between">
                 <div className="text-[13px] font-semibold text-[#ECF1EE] flex items-center gap-2">
                   <Activity className="w-4 h-4 text-[#B6E63B]" />
-                  <span>Real-Time Drift Monitoring & Rollback Engine</span>
+                  <span>Real Time Drift Monitoring & Rollback Engine</span>
                 </div>
                 <span className="text-[10px] font-mono text-[#B6E63B] bg-[rgba(182,230,59,0.12)] px-2 py-0.5 rounded-[6px]">
                   ALL TELEMETRY NOMINAL
                 </span>
               </div>
               <p className="text-[11.5px] text-[#8B9890] leading-[1.5]">
-                If feature distribution drift exceeds threshold (Z &gt; 2.0) or out-of-sample calibration error degrades (ECE &gt; 0.05), the system automatically rolls back traffic to the last validated static champion without manual intervention.
+                If feature distribution drift exceeds threshold (Z &gt; 2.0) or out of sample calibration error degrades (ECE &gt; 0.05), the system automatically rolls back traffic to the last validated static champion without manual intervention.
               </p>
               <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] font-mono">
                 <div className="bg-[#151E19] p-2 rounded-[8px]">
-                  <span className="text-[#8B9890] block text-[10px]">Input Drift Z-Score</span>
+                  <span className="text-[#8B9890] block text-[10px]">Input Drift Z Score</span>
                   <span className="text-[#B6E63B] font-bold tabular-nums">0.42 (Safe &lt; 2.0)</span>
                 </div>
                 <div className="bg-[#151E19] p-2 rounded-[8px]">
@@ -454,18 +455,18 @@ export default function PerformancePage() {
                 {experimentHistory.map((exp) => (
                   <div key={exp.experimentId} className="p-3 text-[11px] font-mono space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[#B6E63B] font-bold">{exp.experimentId} · {exp.version}</span>
+                      <span className="text-[#B6E63B] font-bold">{cleanDisplayText(exp.experimentId)} · {cleanDisplayText(exp.version)}</span>
                       <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${
                         exp.outcome === 'PROMOTED_TO_CHAMPION' ? 'bg-[#B6E63B]/20 text-[#B6E63B]' :
                         exp.outcome === 'EVALUATING_CHALLENGER' ? 'bg-[#E2AE45]/20 text-[#E2AE45]' :
                         'bg-[#F08A4B]/20 text-[#F08A4B]'
                       }`}>
-                        {exp.outcome.replace(/_/g, ' ')}
+                        {cleanDisplayText(exp.outcome)}
                       </span>
                     </div>
-                    <div className="text-[#ECF1EE] font-sans font-medium text-[12px]">{exp.modelName}</div>
+                    <div className="text-[#ECF1EE] font-sans font-medium text-[12px]">{cleanDisplayText(exp.modelName)}</div>
                     <div className="text-[#8B9890] text-[10.5px]">Log Loss: {exp.metrics.logLoss.toFixed(3)} · Brier: {exp.metrics.brierScore.toFixed(3)} · ECE: {(exp.metrics.calibrationErrorECE * 100).toFixed(1)}%</div>
-                    <div className="text-[#5E6A63] text-[10px] font-sans pt-0.5">{exp.notes}</div>
+                    <div className="text-[#5E6A63] text-[10px] font-sans pt-0.5">{cleanDisplayText(exp.notes)}</div>
                   </div>
                 ))}
               </div>
@@ -477,7 +478,7 @@ export default function PerformancePage() {
         {sectionTab === 'errors' && (
           <div className="space-y-3">
             <div className="bg-[#151E19] border border-white/[0.07] rounded-[14px] p-3 text-[12px] text-[#8B9890] leading-[1.5]">
-              <span className="text-[#ECF1EE] font-semibold">Weekly Error Cluster Review:</span> Prediction misses are never swept under the rug. Every week, outliers and model failures are categorized across four dimensions: bad input data, tactical shift, high-variance events, and model flaw. Code remediations are only deployed after out-of-sample validation.
+              <span className="text-[#ECF1EE] font-semibold">Weekly Error Cluster Review:</span> Prediction misses are never swept under the rug. Every week, outliers and model failures are categorized across four dimensions: bad input data, tactical shift, high variance events, and model flaw. Code remediations are only deployed after out of sample validation.
             </div>
 
             <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] overflow-hidden divide-y divide-white/[0.07]">
@@ -487,10 +488,10 @@ export default function PerformancePage() {
                     <div>
                       <div className="text-[13px] font-semibold text-[#ECF1EE] flex items-center gap-1.5">
                         <AlertTriangle className="w-3.5 h-3.5 text-[#E2AE45]" />
-                        {cluster.groupName}
+                        {cleanDisplayText(cluster.groupName)}
                       </div>
                       <div className="text-[11px] font-mono text-[#8B9890] mt-0.5">
-                        Cluster: {cluster.clusterId} · Dimension: {cluster.dimension}
+                        Cluster: {cleanDisplayText(cluster.clusterId)} · Dimension: {cleanDisplayText(cluster.dimension)}
                       </div>
                     </div>
                     <div className="text-right">
@@ -503,12 +504,12 @@ export default function PerformancePage() {
 
                   <div className="text-[11.5px] text-[#8B9890] leading-[1.45] bg-[#0A0F0D] p-2.5 rounded-[8px]">
                     <strong className="text-[#ECF1EE]">Root Cause Analysis: </strong>
-                    {cluster.rootCauseAnalysis}
+                    {cleanDisplayText(cluster.rootCauseAnalysis)}
                   </div>
 
                   <div className="text-[11.5px] text-[#B6E63B] leading-[1.45] bg-[#151E19] p-2.5 rounded-[8px]">
                     <strong className="text-[#ECF1EE]">Validated Code Remediation: </strong>
-                    {cluster.proposedRemediation}
+                    {cleanDisplayText(cluster.proposedRemediation)}
                   </div>
                 </div>
               ))}
@@ -516,11 +517,11 @@ export default function PerformancePage() {
           </div>
         )}
 
-        {/* SECTION 6: SUB-CATEGORY BREAKDOWN */}
+        {/* SECTION 6: SUB CATEGORY BREAKDOWN */}
         {sectionTab === 'breakdowns' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-[#ECF1EE]">Sub-Category Performance</span>
+              <span className="text-[13px] font-semibold text-[#ECF1EE]">Sub Category Performance</span>
               <span className="text-[11px] font-mono text-[#5E6A63] tabular-nums">
                 {report.settledPredictions} settled calls
               </span>
@@ -555,7 +556,7 @@ export default function PerformancePage() {
                   <div key={idx} className="p-3.5 flex items-center justify-between gap-3 hover:bg-[#151E19]/40 transition-colors">
                     <div className="min-w-0">
                       <div className="text-[13px] font-[600] text-[#ECF1EE] truncate">
-                        {cat.name}
+                        {cleanDisplayText(cat.name)}
                       </div>
                       <div className="text-[11px] font-mono text-[#8B9890] mt-0.5 tabular-nums">
                         n = {cat.sampleSize} · Brier: {cat.brierScore.toFixed(3)}
@@ -577,7 +578,7 @@ export default function PerformancePage() {
                   <div key={idx} className="p-3.5 flex items-center justify-between gap-3 hover:bg-[#151E19]/40 transition-colors">
                     <div className="min-w-0">
                       <div className="text-[13px] font-[600] text-[#ECF1EE] truncate">
-                        #{tag.tag} ({tag.label})
+                        {cleanDisplayText(tag.label)}
                       </div>
                       <div className="text-[11px] font-mono text-[#8B9890] mt-0.5 tabular-nums">
                         n = {tag.sampleSize} · Brier: {tag.brierScore.toFixed(3)}
@@ -599,10 +600,10 @@ export default function PerformancePage() {
                   <div key={idx} className="p-3.5 flex items-center justify-between gap-3 hover:bg-[#151E19]/40 transition-colors">
                     <div className="min-w-0">
                       <div className="text-[13px] font-[600] text-[#ECF1EE] truncate">
-                        {comp.competitionName}
+                        {cleanDisplayText(comp.competitionName)}
                       </div>
                       <div className="text-[11px] font-mono text-[#8B9890] mt-0.5 tabular-nums">
-                        {comp.competitionCode} · n = {comp.sampleSize} · Brier: {comp.brierScore.toFixed(3)}
+                        {cleanDisplayText(comp.competitionCode)} · n = {comp.sampleSize} · Brier: {comp.brierScore.toFixed(3)}
                       </div>
                     </div>
 
@@ -624,7 +625,7 @@ export default function PerformancePage() {
 
       {/* 6. Slim single-line statistical notice */}
       <div className="text-center pt-3 pb-1 text-[11px] font-mono text-[#5E6A63]">
-        Statistical estimate notice: Past calibration across walk-forward validation windows does not guarantee future market returns.
+        Statistical estimate notice: Past calibration across walk forward validation windows does not guarantee future market returns.
       </div>
     </div>
   );

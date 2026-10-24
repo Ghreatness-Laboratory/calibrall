@@ -23,6 +23,7 @@ import {
   formatOdds,
   getRiskTierBadge
 } from '@/lib/prediction/marketCatalog';
+import { cleanDisplayText } from '@/lib/utils/formatText';
 
 interface Props {
   predictions: MarketPrediction[];
@@ -169,10 +170,10 @@ export default function MarketComparisonTable({
           <div className="min-w-0 pr-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[13px] font-[500] text-[#e8efe9] leading-tight truncate">
-                {selectionName}
+                {cleanDisplayText(selectionName)}
               </span>
               <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider ${tierBadge.badgeClass}`}>
-                {tierBadge.label}
+                {cleanDisplayText(tierBadge.label)}
               </span>
               {isTop && (
                 <span className="text-[9px] text-[#b8e63a] border-[0.5px] border-[#b8e63a]/40 rounded-[3px] px-1.5 py-0.5 leading-none shrink-0 font-[500]">
@@ -186,11 +187,11 @@ export default function MarketComparisonTable({
               )}
             </div>
             <div className="text-[11px] text-[#8fa69a] mt-0.5 truncate leading-tight flex items-center gap-2">
-              <span>{categoryLabel}</span>
+              <span>{cleanDisplayText(categoryLabel)}</span>
               {pred.plainEnglishReason && (
                 <>
                   <span className="text-white/20">·</span>
-                  <span className="text-[#8fa69a]/80 truncate max-w-sm">{pred.plainEnglishReason}</span>
+                  <span className="text-[#8fa69a]/80 truncate max-w-sm">{cleanDisplayText(pred.plainEnglishReason)}</span>
                 </>
               )}
             </div>
@@ -204,7 +205,7 @@ export default function MarketComparisonTable({
             <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#8fa69a]">
               {pred.marketOdds && <span>@{oddsFormatted}</span>}
               {pred.expectedValue !== undefined && (
-                <span className={evFormatted.colorClass}>{evFormatted.text}</span>
+                <span className={evFormatted.colorClass}>{cleanDisplayText(evFormatted.text)}</span>
               )}
             </div>
           </div>
@@ -224,13 +225,13 @@ export default function MarketComparisonTable({
           <div className="px-3.5 pb-3.5 pt-1 bg-[#0c1c14]/50 border-t border-white/[0.04] text-[12px] space-y-2">
             <div className="text-[11px] text-[#c9d6ce] leading-relaxed">
               <span className="text-[#8fa69a] font-[500]">Settlement rule: </span>
-              {pred.settlementRule}
+              {cleanDisplayText(pred.settlementRule)}
             </div>
 
             {pred.plainEnglishReason && (
               <div className="p-2 rounded bg-[#0a1812] border border-white/[0.06] text-[11px] text-[#b8e63a]">
                 <span className="text-[#8fa69a] block font-mono text-[10px] uppercase">Model Rationale:</span>
-                {pred.plainEnglishReason}
+                {cleanDisplayText(pred.plainEnglishReason)}
               </div>
             )}
 
@@ -277,7 +278,7 @@ export default function MarketComparisonTable({
             <span>Market Intel & Candidate Lines ({predictions.length})</span>
           </h3>
           <p className="text-[11px] text-[#8fa69a] mt-0.5">
-            Dixon-Coles bivariate distributions & negative binomial models grouped by risk tier.
+            Dixon Coles bivariate distributions & negative binomial models grouped by risk tier.
           </p>
         </div>
 
@@ -344,7 +345,7 @@ export default function MarketComparisonTable({
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#e3b341]" />
                 <h4 className="text-[13px] font-[600] text-[#e3b341]">
-                  MODERATE TIERS (60% - 75% Probability)
+                  MODERATE TIERS (60% to 75% Probability)
                 </h4>
                 <span className="text-[10px] font-mono text-[#8fa69a] bg-white/[0.05] px-1.5 py-0.5 rounded">
                   {tierGroups.moderate.length} lines
@@ -366,7 +367,7 @@ export default function MarketComparisonTable({
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
                 <h4 className="text-[13px] font-[600] text-orange-400">
-                  RISKY VALUE PLAYS (45% - 60% Probability with Edge)
+                  RISKY VALUE PLAYS (45% to 60% Probability with Edge)
                 </h4>
                 <span className="text-[10px] font-mono text-[#8fa69a] bg-white/[0.05] px-1.5 py-0.5 rounded">
                   {tierGroups.risky.length} lines
@@ -447,7 +448,7 @@ export default function MarketComparisonTable({
                   onClick={() => setHandicapMode('european')}
                   className={`px-2 py-0.5 rounded font-[500] ${handicapMode === 'european' ? 'bg-[#b8e63a] text-[#0a1812]' : 'text-[#8fa69a]'}`}
                 >
-                  European (3-Way)
+                  European (3 Way)
                 </button>
               </div>
             </div>
@@ -458,7 +459,7 @@ export default function MarketComparisonTable({
                 <div className="p-2.5 rounded-[8px] bg-[#0f2219] border border-white/[0.06] space-y-1">
                   <div className="text-[10px] uppercase font-mono text-[#8fa69a]">Safest {homeTeamName} line</div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-[500] text-[#e8efe9]">{safestHomeHandicap.selection}</span>
+                    <span className="text-[13px] font-[500] text-[#e8efe9]">{cleanDisplayText(safestHomeHandicap.selection)}</span>
                     <span className="font-mono text-[#b8e63a] font-bold">{(safestHomeHandicap.modelProbability * 100).toFixed(0)}%</span>
                   </div>
                   {safestHomeHandicap.pushProbability !== undefined && (
@@ -471,7 +472,7 @@ export default function MarketComparisonTable({
                 <div className="p-2.5 rounded-[8px] bg-[#0f2219] border border-white/[0.06] space-y-1">
                   <div className="text-[10px] uppercase font-mono text-[#8fa69a]">Safest {awayTeamName} line</div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-[500] text-[#e8efe9]">{safestAwayHandicap.selection}</span>
+                    <span className="text-[13px] font-[500] text-[#e8efe9]">{cleanDisplayText(safestAwayHandicap.selection)}</span>
                     <span className="font-mono text-[#b8e63a] font-bold">{(safestAwayHandicap.modelProbability * 100).toFixed(0)}%</span>
                   </div>
                   {safestAwayHandicap.pushProbability !== undefined && (
@@ -496,7 +497,7 @@ export default function MarketComparisonTable({
                 <Gauge className="w-4 h-4 text-[#b8e63a]" />
                 <h4 className="text-[14px] font-[600] text-[#e8efe9]">Goal Bounds (Total & Team Goal Ranges)</h4>
               </div>
-              <span className="text-[11px] font-mono text-[#8fa69a]">Non-overlapping bands</span>
+              <span className="text-[11px] font-mono text-[#8fa69a]">Non overlapping bands</span>
             </div>
 
             {/* Highlights: Most likely band & Safest wide band */}
@@ -505,7 +506,7 @@ export default function MarketComparisonTable({
                 <div className="p-2.5 rounded-[8px] bg-[#0f2219] border border-white/[0.06] space-y-1">
                   <div className="text-[10px] uppercase font-mono text-[#8fa69a]">Most Likely Goal Band</div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-[500] text-[#e8efe9]">{mostLikelyGoalBand.selection}</span>
+                    <span className="text-[13px] font-[500] text-[#e8efe9]">{cleanDisplayText(mostLikelyGoalBand.selection)}</span>
                     <span className="font-mono text-[#b8e63a] font-bold">{(mostLikelyGoalBand.modelProbability * 100).toFixed(0)}%</span>
                   </div>
                   <div className="text-[10px] text-[#8fa69a]">Modal point of bivariate Poisson joint matrix</div>
@@ -516,7 +517,7 @@ export default function MarketComparisonTable({
                 <div className="p-2.5 rounded-[8px] bg-[#0f2219] border border-white/[0.06] space-y-1">
                   <div className="text-[10px] uppercase font-mono text-[#8fa69a]">Safest Wide Band Cushion</div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-[500] text-[#e8efe9]">{safestWideBand.selection}</span>
+                    <span className="text-[13px] font-[500] text-[#e8efe9]">{cleanDisplayText(safestWideBand.selection)}</span>
                     <span className="font-mono text-[#b8e63a] font-bold">{(safestWideBand.modelProbability * 100).toFixed(0)}%</span>
                   </div>
                   <div className="text-[10px] text-[#8fa69a]">Wide range covers bulk of simulated scorelines</div>
@@ -535,7 +536,7 @@ export default function MarketComparisonTable({
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-[#b8e63a]" />
-                <h4 className="text-[14px] font-[600] text-[#e8efe9]">Half-by-Half Breakdown & Highest Scoring Half</h4>
+                <h4 className="text-[14px] font-[600] text-[#e8efe9]">Half by Half Breakdown & Highest Scoring Half</h4>
               </div>
               <span className="text-[11px] font-mono text-[#8fa69a]">
                 {hasHalfData ? 'Empirically calibrated (100% sum)' : 'Insufficient split data'}
@@ -550,7 +551,7 @@ export default function MarketComparisonTable({
               <div className="p-4 rounded-[8px] bg-[#0f2219] border border-white/[0.06] text-center text-[12px] text-[#8fa69a] space-y-1">
                 <AlertTriangle className="w-4 h-4 text-amber-400 mx-auto" />
                 <p className="font-[500] text-[#e8efe9]">Insufficient Half Split Data</p>
-                <p>First-half and second-half goal records not available. Engine abstains to prevent fabricated projections.</p>
+                <p>First half and second half goal records not available. Engine abstains to prevent fabricated projections.</p>
               </div>
             )}
           </div>
@@ -574,7 +575,7 @@ export default function MarketComparisonTable({
                       : 'bg-[#0f2219] text-[#8fa69a] hover:text-[#e8efe9] border border-white/[0.08]'
                   }`}
                 >
-                  {cat === 'ALL' ? 'All' : cat.replace(/_/g, ' ')}
+                  {cat === 'ALL' ? 'All' : cleanDisplayText(cat)}
                 </button>
               ))}
             </div>
@@ -598,7 +599,7 @@ export default function MarketComparisonTable({
       {/* Mandatory Statistical Estimate Disclaimer (Requirement 15) */}
       <div className="p-3 bg-[#0a1812]/80 border-t border-white/[0.08] text-[11px] text-[#8fa69a] flex items-center gap-2">
         <Info className="w-3.5 h-3.5 text-[#8fa69a] shrink-0" />
-        <span>Statistical estimate only: model probabilities are derived from Dixon-Coles parameters and do not represent guaranteed outcomes.</span>
+        <span>Statistical estimate only: model probabilities are derived from Dixon Coles parameters and do not represent guaranteed outcomes.</span>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 // Strictly defines the 10 supported option types. Any market outside this catalogue stays disabled by configuration.
 
 import { SupportedOptionType, MarketPeriod, MarketCategory, MarketDefinition } from '@/types';
+import { cleanDisplayText } from '@/lib/utils/formatText';
 
 export interface OptionTypeMetadata {
   type: SupportedOptionType;
@@ -52,10 +53,10 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
   },
   draw: {
     type: 'draw',
-    title: 'Draw (Draw-Specific Threshold)',
+    title: 'Draw (Draw Specific Threshold)',
     category: 'match_result',
     period: 'REGULAR_TIME',
-    description: 'Level score at end of regular time. Enforces a strict draw-specific threshold due to high outcome variance and empirical difficulty in forecasting parity.',
+    description: 'Level score at end of regular time. Enforces a strict draw specific threshold due to high outcome variance and empirical difficulty in forecasting parity.',
     defaultSelections: ['Draw'],
     settlementRule: 'Regular time 90 minutes plus injury time. Settle as Won if scores are level. Extra time excluded.',
     dataRequirements: {
@@ -64,7 +65,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       maxUncertaintyScore: 0.14,
     },
     qualificationCriteria: {
-      minProbability: 0.30, // Draw-specific hurdle: requires >= 30% model probability (league average ~24-26%)
+      minProbability: 0.30, // Draw specific hurdle: requires >= 30% model probability (league average ~24-26%)
       drawSpecificThreshold: true,
       minEv: 0.06,
       minEdge: 0.04,
@@ -96,10 +97,10 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
     title: 'Over / Under Goals',
     category: 'total_goals',
     period: 'REGULAR_TIME',
-    description: 'Total combined goals scored in regular time across supported half-integer lines (0.5, 1.5, 2.5, 3.5, 4.5). Derived from Dixon-Coles bivariate scoreline matrix. Whole-number lines push if exact.',
+    description: 'Total combined goals scored in regular time across supported half integer lines (0.5, 1.5, 2.5, 3.5, 4.5). Derived from Dixon Coles bivariate scoreline matrix. Whole number lines push if exact.',
     defaultSelections: ['Over Line', 'Under Line'],
     supportedLines: [0.5, 1.5, 2.0, 2.5, 3.0, 3.5, 4.5],
-    settlementRule: 'Regular time 90 mins plus stoppage time. Extra time excluded. If whole-number line matches total match goals exactly, settlement is Push (stake refund).',
+    settlementRule: 'Regular time 90 mins plus stoppage time. Extra time excluded. If whole number line matches total match goals exactly, settlement is Push (stake refund).',
     dataRequirements: {
       minSampleSizeMatches: 10,
       minDataCoverageScore: 0.82,
@@ -118,7 +119,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
     category: 'btts',
     period: 'REGULAR_TIME',
     description: 'Whether both teams score at least one goal in regular time. Derived directly from the joint scoreline distribution (P(BTTS Yes) = sum of matrix where h >= 1 and a >= 1; P(No) = 1 - P(Yes)).',
-    defaultSelections: ['BTTS - Yes', 'BTTS - No'],
+    defaultSelections: ['BTTS Yes', 'BTTS No'],
     settlementRule: 'Regular time only. Yes requires home goals >= 1 AND away goals >= 1. No requires either home goals == 0 OR away goals == 0.',
     dataRequirements: {
       minSampleSizeMatches: 10,
@@ -668,9 +669,9 @@ export function formatSelectionName(name: string): string {
   }
 
   // Both teams to score
-  if (/^BTTS - Yes/i.test(cleaned) || /^BTTS Yes/i.test(cleaned)) {
+  if (/^BTTS [- ]?Yes/i.test(cleaned)) {
     cleaned = 'BTTS: yes';
-  } else if (/^BTTS - No/i.test(cleaned) || /^BTTS No/i.test(cleaned)) {
+  } else if (/^BTTS [- ]?No/i.test(cleaned)) {
     cleaned = 'BTTS: no';
   }
 
@@ -687,7 +688,7 @@ export function formatSelectionName(name: string): string {
     .replace(/1st Half Over ([0-9.]+) Goals/gi, '1st half over $1 goals')
     .replace(/1st Half Under ([0-9.]+) Goals/gi, '1st half under $1 goals');
 
-  return cleaned;
+  return cleanDisplayText(cleaned);
 }
 
 /**

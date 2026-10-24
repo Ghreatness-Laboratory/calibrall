@@ -31,7 +31,7 @@ export default function OfflineBanner() {
           Offline: data may be out of date
         </span>
         <span className="text-[11px] text-[#e3b341]/80 hidden sm:inline">
-          · Showing cached football intelligence snapshot ({cachedTime || 'saved session'}). Reconnect for real-time odds &amp; lines.
+          · Showing cached football intelligence snapshot ({cachedTime || 'saved session'}). Reconnect for real time odds &amp; lines.
         </span>
       </div>
 

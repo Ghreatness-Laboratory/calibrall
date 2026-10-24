@@ -14,6 +14,7 @@ import {
 import { getStoredUser } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
 import { MonitoringReport } from '@/lib/prediction/marketMonitor';
+import { cleanDisplayText } from '@/lib/utils/formatText';
 
 export default function AdminPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -24,10 +25,10 @@ export default function AdminPage() {
   const [missReport, setMissReport] = useState<any>(null);
 
   const [syncLogs, setSyncLogs] = useState([
-    { id: 'job_9841', provider: 'football-data.org', records: 48, status: 'Completed', time: '10 mins ago' },
-    { id: 'job_9840', provider: 'the-odds-api', records: 112, status: 'Completed', time: '25 mins ago' },
-    { id: 'job_9839', provider: 'dixon_coles_inference', records: 18, status: 'Completed', time: '30 mins ago' },
-    { id: 'job_9838', provider: 'prediction_settlement', records: 14, status: 'Completed', time: '1 hour ago' },
+    { id: 'job 9841', provider: 'Football Data org', records: 48, status: 'Completed', time: '10 mins ago' },
+    { id: 'job 9840', provider: 'The Odds API', records: 112, status: 'Completed', time: '25 mins ago' },
+    { id: 'job 9839', provider: 'Dixon Coles inference', records: 18, status: 'Completed', time: '30 mins ago' },
+    { id: 'job 9838', provider: 'Prediction settlement', records: 14, status: 'Completed', time: '1 hour ago' },
   ]);
 
   const fetchMonitoring = async () => {
@@ -67,8 +68,8 @@ export default function AdminPage() {
       const newJobs: typeof syncLogs = [];
       if (data.results?.footballData) {
         newJobs.push({
-          id: `job_${Math.floor(1000 + Math.random() * 9000)}`,
-          provider: 'football-data.org',
+          id: `job ${Math.floor(1000 + Math.random() * 9000)}`,
+          provider: 'Football Data org',
           records: data.results.footballData.records || 13,
           status: data.results.footballData.status,
           time: timeStr
@@ -76,8 +77,8 @@ export default function AdminPage() {
       }
       if (data.results?.theOddsApi) {
         newJobs.push({
-          id: `job_${Math.floor(1000 + Math.random() * 9000)}`,
-          provider: 'the-odds-api',
+          id: `job ${Math.floor(1000 + Math.random() * 9000)}`,
+          provider: 'The Odds API',
           records: data.results.theOddsApi.records || 30,
           status: data.results.theOddsApi.status,
           time: timeStr
@@ -85,16 +86,16 @@ export default function AdminPage() {
       }
       if (data.results?.sportmonks) {
         newJobs.push({
-          id: `job_${Math.floor(1000 + Math.random() * 9000)}`,
-          provider: 'sportmonks',
+          id: `job ${Math.floor(1000 + Math.random() * 9000)}`,
+          provider: 'Sportmonks',
           records: data.results.sportmonks.records || 25,
           status: data.results.sportmonks.status,
           time: timeStr
         });
       }
       newJobs.push({
-        id: `job_${Math.floor(1000 + Math.random() * 9000)}`,
-        provider: 'dixon_coles_inference',
+        id: `job ${Math.floor(1000 + Math.random() * 9000)}`,
+        provider: 'Dixon Coles inference',
         records: 18,
         status: 'Completed',
         time: timeStr
@@ -119,32 +120,32 @@ export default function AdminPage() {
 
   const modelRegistry = [
     {
-      name: 'Dixon-Coles Poisson goals engine',
+      name: 'Dixon Coles Poisson goals engine',
       version: 'v2.4.1',
       status: 'Production active',
       brierScore: 0.171,
-      lastTrained: '2026-10-18',
+      lastTrained: '18 Oct 2026',
     },
     {
       name: 'Negative binomial corner count model',
       version: 'v1.8.0',
       status: 'Production active',
       brierScore: 0.168,
-      lastTrained: '2026-10-15',
+      lastTrained: '15 Oct 2026',
     },
     {
       name: 'Disciplinary cards count model',
       version: 'v1.2.4',
       status: 'Production active',
       brierScore: 0.179,
-      lastTrained: '2026-10-12',
+      lastTrained: '12 Oct 2026',
     },
     {
       name: 'Experimental LightGBM goal regressor',
-      version: 'v0.9-canary',
+      version: 'v0.9 canary',
       status: 'Staging (validation failed)',
       brierScore: 0.214,
-      lastTrained: '2026-10-19',
+      lastTrained: '19 Oct 2026',
     }
   ];
 
@@ -176,11 +177,11 @@ export default function AdminPage() {
       {syncStatus === 'SUCCESS' && (
         <div className="p-3 bg-[#b8e63a]/15 border border-[#b8e63a]/30 rounded-[8px] text-[12px] font-mono text-[#b8e63a] flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
-          <span>Sync complete at {lastSync}. Fixtures and market lines refreshed.</span>
+          <span>Sync complete at {cleanDisplayText(lastSync)}. Fixtures and market lines refreshed.</span>
         </div>
       )}
 
-      {/* STEP 6: Market Family Concentration & Recommendation Telemetry */}
+      {/* Market Family Concentration & Recommendation Telemetry */}
       {monitoringReport && (
         <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
@@ -206,7 +207,7 @@ export default function AdminPage() {
               <div className="space-y-1">
                 <div className="font-[500]">Concentration Alert Triggered:</div>
                 {monitoringReport.alertMessages.map((msg, i) => (
-                  <div key={i} className="text-[11px] text-amber-200/90 font-mono">{msg}</div>
+                  <div key={i} className="text-[11px] text-amber-200/90 font-mono">{cleanDisplayText(msg)}</div>
                 ))}
               </div>
             </div>
@@ -233,7 +234,7 @@ export default function AdminPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between text-[11px] text-[#8fa69a]">
-                    <span className="truncate pr-1 font-[500] text-[#e8efe9]">{m.displayName}</span>
+                    <span className="truncate pr-1 font-[500] text-[#e8efe9]">{cleanDisplayText(m.displayName)}</span>
                     <span className="font-mono text-[#b8e63a]">{m.count}</span>
                   </div>
                   <div className="mt-2 flex items-baseline justify-between">
@@ -289,8 +290,8 @@ export default function AdminPage() {
                 const isUnpublished = unpublishedModels.includes(m.version);
                 return (
                   <tr key={m.version} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">{m.name}</td>
-                    <td className="py-2.5 px-3 font-mono text-[#8fa69a]">{m.version}</td>
+                    <td className="py-2.5 px-3 font-[500] text-[#e8efe9]">{cleanDisplayText(m.name)}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#8fa69a]">{cleanDisplayText(m.version)}</td>
                     <td className="py-2.5 px-3 text-[11px]">
                       {isUnpublished ? (
                         <span className="text-[#8fa69a] bg-white/[0.05] border border-white/10 px-1.5 py-0.5 rounded-[4px]">
@@ -307,9 +308,8 @@ export default function AdminPage() {
                       )}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#e8efe9] tabular-nums">{m.brierScore.toFixed(3)}</td>
-                    <td className="py-2.5 px-3 font-mono text-[#8fa69a]">{m.lastTrained}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#8fa69a]">{cleanDisplayText(m.lastTrained)}</td>
                     <td className="py-2.5 px-3 text-right">
-                      {/* Ghost button: 12px, 0.5px border, 6px radius, 6px 10px padding, muted text, red text on hover */}
                       <button
                         onClick={() => handleTogglePublish(m.version)}
                         type="button"
@@ -350,15 +350,15 @@ export default function AdminPage() {
                 <div key={cluster.clusterId} className="p-3 bg-[#0a1812]/70 rounded-[8px] border border-white/[0.06] space-y-1.5 text-[11.5px]">
                   <div className="flex items-center justify-between font-mono">
                     <span className="text-[#e3b341] font-[600]">
-                      Cluster: {cluster.dimensionKey} ({cluster.dimension.toUpperCase()})
+                      Cluster: {cleanDisplayText(cluster.dimensionKey)} ({cleanDisplayText(cluster.dimension).toUpperCase()})
                     </span>
                     <span className="text-rose-400">
                       Miss rate: {(cluster.missRate * 100).toFixed(1)}% (vs {(cluster.expectedMissRate * 100).toFixed(1)}% exp)
                     </span>
                   </div>
-                  <p className="text-[#c9d6ce]">{cluster.systematicIssueDescription}</p>
+                  <p className="text-[#c9d6ce]">{cleanDisplayText(cluster.systematicIssueDescription)}</p>
                   <div className="pt-1 border-t border-white/[0.04] flex items-center justify-between text-[11px]">
-                    <span className="text-[#b8e63a]">Proposed adjustment: {cluster.proposedAdjustment}</span>
+                    <span className="text-[#b8e63a]">Proposed adjustment: {cleanDisplayText(cluster.proposedAdjustment)}</span>
                     <span className="text-[#8fa69a] font-mono">N={cluster.totalSettled}</span>
                   </div>
                 </div>
@@ -371,7 +371,7 @@ export default function AdminPage() {
           </div>
 
           <div className="pt-1 text-[11px] font-mono text-[#8fa69a] flex items-center justify-between border-t border-white/[0.04]">
-            <span>{missReport.validationStatusNotice}</span>
+            <span>{cleanDisplayText(missReport.validationStatusNotice)}</span>
             <span suppressHydrationWarning>Generated weekly</span>
           </div>
         </div>
@@ -387,13 +387,13 @@ export default function AdminPage() {
           {syncLogs.map(log => (
             <div key={log.id} className="p-2.5 bg-[#0a1812]/50 rounded-[8px] border border-white/[0.04] flex items-center justify-between text-[11px] font-mono">
               <div className="flex items-center gap-2">
-                <span className="text-[#b8e63a]">{log.id}</span>
-                <span className="text-[#e8efe9]">{log.provider}</span>
+                <span className="text-[#b8e63a]">{cleanDisplayText(log.id)}</span>
+                <span className="text-[#e8efe9]">{cleanDisplayText(log.provider)}</span>
                 <span className="text-[#8fa69a]">({log.records} records)</span>
               </div>
               <div className="flex items-center gap-3 text-[#8fa69a]">
-                <span>{log.time}</span>
-                <span className="text-[#b8e63a]">✓ {log.status}</span>
+                <span>{cleanDisplayText(log.time)}</span>
+                <span className="text-[#b8e63a]">✓ {cleanDisplayText(log.status)}</span>
               </div>
             </div>
           ))}

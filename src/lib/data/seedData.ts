@@ -350,17 +350,17 @@ export const VERIFIED_PERFORMANCE_REPORT: PerformanceReport = {
   brierScore: 0.176, // Standard calibration quality benchmark
   logLoss: 0.512,
   averageYieldRoi: 0.074, // +7.4% realized out-of-sample yield
-  outOfSampleValidationWindow: '2024-08-15 to 2026-10-15 (Walk-Forward Rolling Origin)',
+  outOfSampleValidationWindow: '15 Aug 2024 to 15 Oct 2026 (Walk Forward Rolling Origin)',
   calibrationSlope: 0.984,
   calibrationBuckets: [
-    { binRange: '0.10 - 0.20', binCenter: 0.15, predictedProbMean: 0.154, observedFrequency: 0.160, sampleCount: 42 },
-    { binRange: '0.20 - 0.30', binCenter: 0.25, predictedProbMean: 0.252, observedFrequency: 0.244, sampleCount: 51 },
-    { binRange: '0.30 - 0.40', binCenter: 0.35, predictedProbMean: 0.348, observedFrequency: 0.355, sampleCount: 68 },
-    { binRange: '0.40 - 0.50', binCenter: 0.45, predictedProbMean: 0.451, observedFrequency: 0.439, sampleCount: 74 },
-    { binRange: '0.50 - 0.60', binCenter: 0.55, predictedProbMean: 0.553, observedFrequency: 0.561, sampleCount: 82 },
-    { binRange: '0.60 - 0.70', binCenter: 0.65, predictedProbMean: 0.648, observedFrequency: 0.640, sampleCount: 61 },
-    { binRange: '0.70 - 0.80', binCenter: 0.75, predictedProbMean: 0.749, observedFrequency: 0.756, sampleCount: 33 },
-    { binRange: '0.80 - 0.90', binCenter: 0.85, predictedProbMean: 0.842, observedFrequency: 0.833, sampleCount: 9 },
+    { binRange: '0.10 to 0.20', binCenter: 0.15, predictedProbMean: 0.154, observedFrequency: 0.160, sampleCount: 42 },
+    { binRange: '0.20 to 0.30', binCenter: 0.25, predictedProbMean: 0.252, observedFrequency: 0.244, sampleCount: 51 },
+    { binRange: '0.30 to 0.40', binCenter: 0.35, predictedProbMean: 0.348, observedFrequency: 0.355, sampleCount: 68 },
+    { binRange: '0.40 to 0.50', binCenter: 0.45, predictedProbMean: 0.451, observedFrequency: 0.439, sampleCount: 74 },
+    { binRange: '0.50 to 0.60', binCenter: 0.55, predictedProbMean: 0.553, observedFrequency: 0.561, sampleCount: 82 },
+    { binRange: '0.60 to 0.70', binCenter: 0.65, predictedProbMean: 0.648, observedFrequency: 0.640, sampleCount: 61 },
+    { binRange: '0.70 to 0.80', binCenter: 0.75, predictedProbMean: 0.749, observedFrequency: 0.756, sampleCount: 33 },
+    { binRange: '0.80 to 0.90', binCenter: 0.85, predictedProbMean: 0.842, observedFrequency: 0.833, sampleCount: 9 },
   ],
   byMarketCategory: [
     {
@@ -492,7 +492,7 @@ export const VERIFIED_PERFORMANCE_REPORT: PerformanceReport = {
     },
     {
       tag: 'lineup-unconfirmed',
-      label: 'Pre-Lineup Window (T > 60m)',
+      label: 'Pre Lineup Window (T > 60m)',
       sampleSize: 98,
       hitRate: 0.612,
       brierScore: 0.186,

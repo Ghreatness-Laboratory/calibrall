@@ -336,7 +336,7 @@ export default function MatchAnalysisPage() {
             <div className="p-2.5 bg-[#151E19] rounded-[10px] border border-white/[0.05]">
               <span className="text-[10.5px] text-[#8B9890] block">Expected goals (xG)</span>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[13.5px] font-semibold text-[#ECF1EE] font-mono tabular-nums">{stats.homeXg.toFixed(2)} - {stats.awayXg.toFixed(2)}</span>
+                <span className="text-[13.5px] font-semibold text-[#ECF1EE] font-mono tabular-nums">{stats.homeXg.toFixed(2)} to {stats.awayXg.toFixed(2)}</span>
                 <span className="text-[10px] text-[#5E6A63] font-mono ml-auto tabular-nums">({totalXg.toFixed(2)})</span>
               </div>
             </div>
@@ -398,7 +398,7 @@ export default function MatchAnalysisPage() {
               )}
             </div>
             <h3 className="text-[15px] font-bold text-[#ECF1EE]">
-              {formatSelectionName(topPick.selection)} — {(topPick.modelProbability * 100).toFixed(1)}% probability
+              {formatSelectionName(topPick.selection)} · {(topPick.modelProbability * 100).toFixed(1)}% probability
               {topPick.expectedValue !== undefined ? ` (${formatExpectedValue(topPick.expectedValue).text} EV)` : ''}
             </h3>
             {topPick.plainEnglishReason && (
@@ -422,7 +422,7 @@ export default function MatchAnalysisPage() {
 
         <div className="shrink-0 flex items-center">
           <span className="text-[10.5px] font-mono text-[#5E6A63]">
-            {isBasketball ? 'NBA Efficiency Model' : 'Dixon-Coles bivariate Poisson'}
+            {isBasketball ? 'NBA Efficiency Model' : 'Dixon Coles bivariate Poisson'}
           </span>
         </div>
       </div>

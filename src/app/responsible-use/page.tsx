@@ -22,7 +22,7 @@ export default function ResponsibleUsePage() {
       <section className="p-4 bg-[#0f2219] border-[0.5px] border-white/[0.08] rounded-[12px] space-y-3">
         <h2 className="text-[18px] font-[500] text-[#e8efe9] flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-[#e3b341]" />
-          <span>1. Core product identity & anti-wagering policy</span>
+          <span>1. Core product identity & anti wagering policy</span>
         </h2>
         <p className="text-[12px] text-[#8fa69a] leading-[1.65]">
           Calibrall is an advanced computational terminal for football statistical analysis, expected value discovery, and mathematical modeling.{' '}
@@ -40,7 +40,7 @@ export default function ResponsibleUsePage() {
           <span>2. Probabilistic disclaimer & uncertainty</span>
         </h2>
         <p className="text-[12px] text-[#8fa69a] leading-[1.65]">
-          High probability does not guarantee occurrence. A projected 75% probability means that in simulated or historical distributions under similar parameters, the outcome occurred roughly three times out of four—and failed one time out of four. Past calibration and backtested performance do not guarantee future returns.
+          High probability does not guarantee occurrence. A projected 75% probability means that in simulated or historical distributions under similar parameters, the outcome occurred roughly three times out of four and failed one time out of four. Past calibration and backtested performance do not guarantee future returns.
         </p>
         <p className="text-[12px] text-[#8fa69a] leading-[1.65]">
           Users must exercise independent critical judgment. Calibrall expressly disclaims any liability for financial decisions or wagering outcomes incurred by individuals utilizing this software.
@@ -51,10 +51,10 @@ export default function ResponsibleUsePage() {
       <section className="p-4 bg-[#0f2219] border-[0.5px] border-white/[0.08] rounded-[12px] space-y-3">
         <h2 className="text-[18px] font-[500] text-[#e8efe9]">3. Age restriction & responsible gambling resources</h2>
         <p className="text-[12px] text-[#8fa69a] leading-[1.65]">
-          This service is strictly intended for individuals aged 18 or older (or the applicable legal age of majority in your jurisdiction). If you or someone you know is experiencing gambling-related harm, we urge you to consult professional support:
+          This service is strictly intended for individuals aged 18 or older (or the applicable legal age of majority in your jurisdiction). If you or someone you know is experiencing gambling related harm, we urge you to consult professional support:
         </p>
         <ul className="list-disc pl-5 space-y-1 text-[#b8e63a] text-[12px] leading-[1.65]">
-          <li>National Council on Problem Gambling (US): 1-800-522-4700 / ncpgambling.org</li>
+          <li>National Council on Problem Gambling (US): 1 800 522 4700 / ncpgambling.org</li>
           <li>GamCare (UK): 0808 8020 133 / gamcare.org.uk</li>
           <li>Gambling Help Online (Australia): 1800 858 858 / gamblinghelponline.org.au</li>
         </ul>
@@ -67,7 +67,7 @@ export default function ResponsibleUsePage() {
           <span>4. Privacy, data minimization & security</span>
         </h2>
         <p className="text-[12px] text-[#8fa69a] leading-[1.65]">
-          We adhere to strict data minimization principles. We do not sell user data, track off-platform browsing, or store plaintext passwords. All user records in PostgreSQL are isolated through Row Level Security (RLS) policies. You retain the absolute right to export or delete your user account and saved fixtures at any time.
+          We adhere to strict data minimization principles. We do not sell user data, track off platform browsing, or store plaintext passwords. All user records in PostgreSQL are isolated through Row Level Security (RLS) policies. You retain the absolute right to export or delete your user account and saved fixtures at any time.
         </p>
       </section>
     </div>

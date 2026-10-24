@@ -707,8 +707,8 @@ export function generateNBAPredictions(fixture: Fixture): MarketPrediction[] {
       marketCategory: 'spread',
       marketName: 'Point Spread',
       selection: coverHome 
-        ? `${homeName} ${stats.sportsbookSpreadHome > 0 ? '+' : ''}${stats.sportsbookSpreadHome}`
-        : `${awayName} ${-stats.sportsbookSpreadHome > 0 ? '+' : ''}${-stats.sportsbookSpreadHome}`,
+        ? `${homeName} ${stats.sportsbookSpreadHome > 0 ? '+' : '\u2212'}${Math.abs(stats.sportsbookSpreadHome)}`
+        : `${awayName} ${-stats.sportsbookSpreadHome > 0 ? '+' : '\u2212'}${Math.abs(stats.sportsbookSpreadHome)}`,
       line: stats.sportsbookSpreadHome,
       period: 'FULL_TIME',
       settlementRule: 'Margin of victory adjusted by handicap line',
@@ -748,13 +748,13 @@ export const VERIFIED_NBA_PERFORMANCE_REPORT: PerformanceReport = {
   brierScore: 0.164, // Well-calibrated probabilistic score
   logLoss: 0.512,
   averageYieldRoi: 0.084, // +8.4% verified yield
-  outOfSampleValidationWindow: '2024-10-22 to present (NBA Regular Season)',
+  outOfSampleValidationWindow: '22 Oct 2024 to present (NBA Regular Season)',
   calibrationSlope: 0.985,
   calibrationBuckets: [
-    { binRange: '0.45 - 0.55', binCenter: 0.50, predictedProbMean: 0.505, observedFrequency: 0.512, sampleCount: 78 },
-    { binRange: '0.55 - 0.65', binCenter: 0.60, predictedProbMean: 0.602, observedFrequency: 0.614, sampleCount: 165 },
-    { binRange: '0.65 - 0.75', binCenter: 0.70, predictedProbMean: 0.698, observedFrequency: 0.708, sampleCount: 142 },
-    { binRange: '0.75 - 0.85', binCenter: 0.80, predictedProbMean: 0.794, observedFrequency: 0.791, sampleCount: 101 },
+    { binRange: '0.45 to 0.55', binCenter: 0.50, predictedProbMean: 0.505, observedFrequency: 0.512, sampleCount: 78 },
+    { binRange: '0.55 to 0.65', binCenter: 0.60, predictedProbMean: 0.602, observedFrequency: 0.614, sampleCount: 165 },
+    { binRange: '0.65 to 0.75', binCenter: 0.70, predictedProbMean: 0.698, observedFrequency: 0.708, sampleCount: 142 },
+    { binRange: '0.75 to 0.85', binCenter: 0.80, predictedProbMean: 0.794, observedFrequency: 0.791, sampleCount: 101 },
   ],
   byMarketCategory: [
     {
@@ -807,7 +807,7 @@ export const VERIFIED_NBA_PERFORMANCE_REPORT: PerformanceReport = {
     },
     {
       tag: 'fixture-congested',
-      label: 'Back-to-Back Schedule',
+      label: 'Back to Back Schedule',
       sampleSize: 94,
       hitRate: 0.638,
       brierScore: 0.171,

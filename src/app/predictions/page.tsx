@@ -21,6 +21,7 @@ import {
 import { checkDerby } from '@/lib/prediction/contextFactors';
 import { useSport } from '@/lib/context/SportContext';
 import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
+import { cleanDisplayText, formatSignedValue } from '@/lib/utils/formatText';
 
 type MarketGroupFilter = 'ALL' | 'goals' | 'corners' | 'cards' | 'handicap' | 'results' | 'halves' | 'goal_bounds' | 'moneyline' | 'spread' | 'total_points';
 
@@ -224,8 +225,8 @@ export default function PredictionsPage() {
   const riskTierPills: { id: string; label: string }[] = [
     { id: 'ALL', label: 'All Tiers' },
     { id: 'SAFE', label: 'Safe (75%+)' },
-    { id: 'MODERATE', label: 'Moderate (60-75%)' },
-    { id: 'RISKY', label: 'Risky (45-60%)' },
+    { id: 'MODERATE', label: 'Moderate (60 to 75%)' },
+    { id: 'RISKY', label: 'Risky (45 to 60%)' },
   ];
 
   // Helper for Tier Badge styles
@@ -266,7 +267,7 @@ export default function PredictionsPage() {
         <p className="text-[12px] text-[#8B9890] mt-0.5 truncate">
           {isBasketball
             ? 'NBA possessions, defensive ratings and expected value projections.'
-            : 'Multi-market evaluation across Goals, Results, Handicaps, Corners, and Cards.'}
+            : 'Multi market evaluation across Goals, Results, Handicaps, Corners, and Cards.'}
         </p>
       </div>
 
@@ -416,8 +417,8 @@ export default function PredictionsPage() {
             >
               <option value="ALL">All risk tiers</option>
               <option value="SAFE">SAFE (≥75%)</option>
-              <option value="MODERATE">MODERATE (60-75%)</option>
-              <option value="RISKY">RISKY (45-60%)</option>
+              <option value="MODERATE">MODERATE (60 to 75%)</option>
+              <option value="RISKY">RISKY (45 to 60%)</option>
             </select>
           </div>
         </div>
@@ -579,7 +580,7 @@ export default function PredictionsPage() {
                         </span>
                         {p.edge !== undefined && (
                           <span className={`text-[11px] font-mono tabular-nums ${p.edge >= 0 ? 'text-[#B6E63B]' : 'text-[#8B9890]'}`}>
-                            {p.edge >= 0 ? `+${(p.edge * 100).toFixed(1)}%` : `${(p.edge * 100).toFixed(1)}%`} edge
+                            {formatSignedValue(p.edge * 100, '%')} edge
                           </span>
                         )}
                       </div>

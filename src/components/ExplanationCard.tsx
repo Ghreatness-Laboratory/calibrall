@@ -2,14 +2,8 @@
 
 import React from 'react';
 import { MarketPrediction } from '@/types';
-import { 
-  ShieldCheck, 
-  AlertCircle, 
-  TrendingUp, 
-  HelpCircle, 
-  Check, 
-  X
-} from 'lucide-react';
+import { Check, ShieldCheck, AlertCircle, TrendingUp, X } from 'lucide-react';
+import { cleanDisplayText } from '@/lib/utils/formatText';
 
 interface Props {
   prediction: MarketPrediction | null;
@@ -19,10 +13,16 @@ interface Props {
 export default function ExplanationCard({ prediction, noRecommendationReason }: Props) {
   if (!prediction) {
     return (
-      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-6 text-center text-[#8B9890]">
-        <HelpCircle className="w-7 h-7 mx-auto mb-2 text-[#5E6A63]" />
-        <h4 className="text-[#ECF1EE] font-semibold text-[13px]">No market selected</h4>
-        <p className="text-[11.5px] mt-1 text-[#8B9890]">Select any row in the comparison table to audit evidence and model rationale.</p>
+      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-5 text-center">
+        <ShieldCheck className="w-6 h-6 text-[#5E6A63] mx-auto mb-1.5" strokeWidth={2} />
+        <h4 className="text-[13px] font-semibold text-[#ECF1EE]">
+          {noRecommendationReason ? 'No qualified recommendation' : 'Select a market line'}
+        </h4>
+        <p className="text-[11.5px] mt-1 text-[#8B9890]">
+          {noRecommendationReason 
+            ? cleanDisplayText(noRecommendationReason)
+            : 'Select any row in the comparison table to audit evidence and model rationale.'}
+        </p>
       </div>
     );
   }
@@ -30,10 +30,10 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
   const { explanation, substituteOption, fragilityScore, fragilityFlags, similarFixturesComparison, liveStateStatus } = prediction;
 
   const formatHeadline = () => {
-    if (explanation?.headline) return explanation.headline;
+    if (explanation?.headline) return cleanDisplayText(explanation.headline);
     const edgeText = prediction.edge ? ` (+${(prediction.edge * 100).toFixed(1)}% edge)` : '';
     const probText = ` (${(prediction.modelProbability * 100).toFixed(1)}% prob)`;
-    return `${prediction.qualificationStatus === 'QUALIFIED_VALUE' ? 'Strong value: ' : ''}${prediction.selection.toLowerCase()}${edgeText || probText}`;
+    return cleanDisplayText(`${prediction.qualificationStatus === 'QUALIFIED_VALUE' ? 'Strong value: ' : ''}${prediction.selection.toLowerCase()}${edgeText || probText}`);
   };
 
   return (
@@ -44,7 +44,7 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
           liveStateStatus.isSupersededByRedCard ? 'bg-red-950/70 border-b border-red-500/40 text-red-200' : 'bg-amber-950/60 border-b border-[#E2AE45]/30 text-[#E2AE45]'
         }`}>
           <AlertCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
-          <span>{liveStateStatus.statusNotice}</span>
+          <span>{cleanDisplayText(liveStateStatus.statusNotice)}</span>
         </div>
       )}
 
@@ -65,7 +65,7 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
                 Fragility: {(fragilityScore * 100).toFixed(0)}%
               </span>
             )}
-            <span className="text-[#5E6A63] font-mono text-[10px]">Dixon-Coles · Poisson</span>
+            <span className="text-[#5E6A63] font-mono text-[10px]">Dixon Coles · Poisson</span>
           </div>
         </div>
 
@@ -74,31 +74,31 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
         </h3>
 
         <p className="text-[12px] text-[#8B9890] leading-[1.55] mt-1">
-          {explanation?.summary || 'Modeled using calibrated Poisson joint matrices and empirical distribution regressions.'}
+          {cleanDisplayText(explanation?.summary || 'Modeled using calibrated Poisson joint matrices and empirical distribution regressions.')}
         </p>
       </div>
 
       <div className="p-3.5 space-y-3.5 text-[12px]">
-        {/* LOWER-VARIANCE SUBSTITUTE BOX (if Fragility Triggered or Substitute exists) */}
+        {/* LOWER VARIANCE SUBSTITUTE BOX (if Fragility Triggered or Substitute exists) */}
         {substituteOption && (
           <div className="bg-[#151E19] border border-[#B6E63B]/40 rounded-[11px] p-3 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono tracking-wider uppercase text-[#B6E63B] font-semibold flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5" strokeWidth={2} />
-                <span>Lower-Variance Substitute Option</span>
+                <span>Lower Variance Substitute Option</span>
               </span>
               <span className="px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-mono bg-[rgba(182,230,59,0.12)] text-[#B6E63B] border border-[#B6E63B]/30 font-semibold">
-                −{substituteOption.varianceReductionPct}% variance
+                &#8722;{substituteOption.varianceReductionPct}% variance
               </span>
             </div>
 
             <div className="flex items-center justify-between pt-0.5">
               <div>
                 <div className="text-[13px] font-[650] text-[#ECF1EE]">
-                  {substituteOption.selection}
+                  {cleanDisplayText(substituteOption.selection)}
                 </div>
                 <div className="text-[11px] text-[#8B9890] mt-0.5">
-                  {substituteOption.marketName}
+                  {cleanDisplayText(substituteOption.marketName)}
                 </div>
               </div>
 
@@ -116,7 +116,7 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
 
             <p className="text-[11.5px] text-[#ECF1EE]/90 bg-[#101713] p-2.5 rounded-[8px] border border-white/[0.05] leading-relaxed">
               <span className="text-[#B6E63B] font-medium">Reason for swap: </span>
-              {substituteOption.reasonForSwap}
+              {cleanDisplayText(substituteOption.reasonForSwap)}
             </p>
 
             {/* Margin breakdown if available */}
@@ -139,7 +139,7 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
           </h4>
           <ul className="space-y-1.5 pl-4 list-disc text-[#ECF1EE]/90 text-[12px] leading-[1.55]">
             {explanation?.keySupportingFactors?.map((factor, idx) => (
-              <li key={idx}>{factor}</li>
+              <li key={idx}>{cleanDisplayText(factor)}</li>
             ))}
           </ul>
         </div>
@@ -148,7 +148,7 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
         {similarFixturesComparison && similarFixturesComparison.similarMatches.length > 0 && (
           <div className="bg-[#151E19] border border-white/[0.07] rounded-[11px] p-3 space-y-2">
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-[#ECF1EE] font-medium">Similar-Fixture Precedents (K=5)</span>
+              <span className="text-[#ECF1EE] font-medium">Similar Fixture Precedents (K=5)</span>
               <span className="font-mono text-[#B6E63B] text-[10.5px] font-semibold tabular-nums">
                 Hit rate: {(similarFixturesComparison.marketHitRate * 100).toFixed(0)}%
               </span>
@@ -156,8 +156,8 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px] font-mono text-[#8B9890] tabular-nums">
               {similarFixturesComparison.similarMatches.slice(0, 4).map((m, idx) => (
                 <div key={idx} className="flex items-center justify-between bg-[#101713] px-2 py-1 rounded-[5px] border border-white/[0.04]">
-                  <span className="truncate max-w-[140px] text-[#ECF1EE]">{m.fixtureName}</span>
-                  <span className="text-[#B6E63B] font-semibold ml-1">{m.score}</span>
+                  <span className="truncate max-w-[140px] text-[#ECF1EE]">{cleanDisplayText(m.fixtureName)}</span>
+                  <span className="text-[#B6E63B] font-semibold ml-1">{cleanDisplayText(m.score)}</span>
                 </div>
               ))}
             </div>
@@ -179,7 +179,7 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
           </div>
           <ul className="space-y-1.5 pl-4 list-disc text-[#8B9890] text-[11.5px] leading-[1.55]">
             {explanation?.counterarguments?.map((item, idx) => (
-              <li key={idx}>{item}</li>
+              <li key={idx}>{cleanDisplayText(item)}</li>
             ))}
           </ul>
         </div>
@@ -189,10 +189,10 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
           <div>
             <h4 className="font-semibold text-[#ECF1EE] flex items-center gap-1.5 mb-1 text-[13px]">
               <TrendingUp className="w-3.5 h-3.5 text-[#B6E63B]" strokeWidth={2} />
-              <span>Cross-market priority rationale</span>
+              <span>Cross market priority rationale</span>
             </h4>
             <p className="text-[#8B9890] bg-[#151E19] p-2.5 rounded-[11px] border border-white/[0.07] text-[12px] leading-[1.55]">
-              {explanation.whyRankedAboveAlternatives}
+              {cleanDisplayText(explanation.whyRankedAboveAlternatives)}
             </p>
           </div>
         )}
@@ -205,9 +205,9 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
               {explanation.alternativeComparisons.map((alt, idx) => (
                 <div key={idx} className="bg-[#151E19] p-2 rounded-[8px] border border-white/[0.05] flex items-start justify-between text-[11px]">
                   <div>
-                    <span className="font-medium text-[#ECF1EE]">{alt.alternative}</span>
+                    <span className="font-medium text-[#ECF1EE]">{cleanDisplayText(alt.alternative)}</span>
                     <span className="text-[#8B9890] font-mono ml-2 tabular-nums">({(alt.modelProbability * 100).toFixed(1)}%)</span>
-                    <p className="text-[#8B9890] mt-0.5 leading-normal">{alt.reasonRejected}</p>
+                    <p className="text-[#8B9890] mt-0.5 leading-normal">{cleanDisplayText(alt.reasonRejected)}</p>
                   </div>
                   <X className="w-3.5 h-3.5 text-[#5E6A63] shrink-0 mt-0.5 ml-2" strokeWidth={2} />
                 </div>

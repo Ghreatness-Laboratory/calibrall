@@ -31,6 +31,7 @@ import {
   Info
 } from 'lucide-react';
 import { NBATeamStats } from '@/types';
+import { cleanDisplayText } from '@/lib/utils/formatText';
 
 interface TeamFieldState {
   teamAbbr: string;
@@ -54,7 +55,7 @@ export default function NBAScoreProjectionTool() {
 
   // Sportsbook optional lines
   const [sportsbookTotal, setSportsbookTotal] = useState<string>('224.5');
-  const [sportsbookSpreadTeamA, setSportsbookSpreadTeamA] = useState<string>('-5.5');
+  const [sportsbookSpreadTeamA, setSportsbookSpreadTeamA] = useState<string>('−5.5');
 
   const allTeams = useMemo(() => getAllNBATeamsList(), []);
 
@@ -69,7 +70,7 @@ export default function NBAScoreProjectionTool() {
     isDefEffManual: false,
     isPossManual: false,
     source: 'Official NBA Advanced Stats (ORtg/100, DRtg/100, PACE)',
-    lastUpdated: 'Season 2024-25 · Updated today',
+    lastUpdated: 'Season 2024 to 2025 · Updated today',
   });
 
   // Team B State - prefilled with Detroit Pistons test example
@@ -83,7 +84,7 @@ export default function NBAScoreProjectionTool() {
     isDefEffManual: false,
     isPossManual: false,
     source: 'Official NBA Advanced Stats (ORtg/100, DRtg/100, PACE)',
-    lastUpdated: 'Season 2024-25 · Updated today',
+    lastUpdated: 'Season 2024 to 2025 · Updated today',
   });
 
   // Fetch stats from server-side API route
@@ -136,7 +137,7 @@ export default function NBAScoreProjectionTool() {
       isPossManual: false,
       pulledStats: apiStats[abbr] || null,
       source: apiStats[abbr]?.source || 'Official NBA Advanced Stats (ORtg/100, DRtg/100, PACE)',
-      lastUpdated: `Season ${season} · ${apiStats[abbr]?.lastUpdated || 'Updated today'}`,
+      lastUpdated: cleanDisplayText(`Season ${season} · ${apiStats[abbr]?.lastUpdated || 'Updated today'}`),
     });
   };
 
@@ -161,7 +162,7 @@ export default function NBAScoreProjectionTool() {
       isPossManual: false,
       pulledStats: apiStats[abbr] || null,
       source: apiStats[abbr]?.source || 'Official NBA Advanced Stats (ORtg/100, DRtg/100, PACE)',
-      lastUpdated: `Season ${season} · ${apiStats[abbr]?.lastUpdated || 'Updated today'}`,
+      lastUpdated: cleanDisplayText(`Season ${season} · ${apiStats[abbr]?.lastUpdated || 'Updated today'}`),
     });
   };
 
@@ -255,7 +256,7 @@ export default function NBAScoreProjectionTool() {
             </span>
           </h2>
           <p className="text-[12px] text-[var(--text-2)] mt-0.5">
-            Offensive & Defensive efficiency ratings multiplied by pace possessions. Fully auditable step-by-step math.
+            Offensive & Defensive efficiency ratings multiplied by pace possessions. Fully auditable step by step math.
           </p>
         </div>
 
@@ -270,7 +271,7 @@ export default function NBAScoreProjectionTool() {
             >
               {NBA_SEASONS.map((s) => (
                 <option key={s} value={s} className="bg-[var(--bg)] text-[var(--text)]">
-                  {s}
+                  {cleanDisplayText(s)}
                 </option>
               ))}
             </select>
@@ -336,7 +337,7 @@ export default function NBAScoreProjectionTool() {
             >
               {allTeams.map((t) => (
                 <option key={t.abbreviation} value={t.abbreviation} className="bg-[var(--bg)] text-[var(--text)]">
-                  {t.name} ({t.abbreviation} - {t.conference})
+                  {t.name} ({t.abbreviation} · {t.conference})
                 </option>
               ))}
             </select>
@@ -470,7 +471,7 @@ export default function NBAScoreProjectionTool() {
             >
               {allTeams.map((t) => (
                 <option key={t.abbreviation} value={t.abbreviation} className="bg-[var(--bg)] text-[var(--text)]">
-                  {t.name} ({t.abbreviation} - {t.conference})
+                  {t.name} ({t.abbreviation} · {t.conference})
                 </option>
               ))}
             </select>
@@ -603,7 +604,7 @@ export default function NBAScoreProjectionTool() {
             <input
               type="number"
               step="0.5"
-              placeholder="e.g. -5.5"
+              placeholder="e.g. −5.5"
               value={sportsbookSpreadTeamA}
               onChange={(e) => setSportsbookSpreadTeamA(e.target.value)}
               className="w-16 bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 rounded-[6px] text-center text-[var(--text)] font-mono text-[11.5px]"
@@ -612,7 +613,7 @@ export default function NBAScoreProjectionTool() {
         </div>
       </div>
 
-      {/* RESULTS CARD: Step-by-Step Mathematical Breakdown */}
+      {/* RESULTS CARD: Step by Step Mathematical Breakdown */}
       {calculationResult && (
         <div className="bg-[var(--surface)] border border-[var(--border-strong)] rounded-[12px] p-4 space-y-4">
           {/* Top Banner: Final Projection & Winner */}
@@ -624,7 +625,7 @@ export default function NBAScoreProjectionTool() {
               </span>
               <div className="text-[20px] sm:text-[22px] font-semibold font-mono tabular-nums text-[var(--text)]">
                 {teamA.name}: <span className="text-[var(--accent)]">{calculationResult.aProjected.toFixed(2)}</span>
-                {'  '}—{'  '}
+                {'  '}·{'  '}
                 {teamB.name}: <span className="text-[var(--info)]">{calculationResult.bProjected.toFixed(2)}</span>
               </div>
             </div>
@@ -685,11 +686,11 @@ export default function NBAScoreProjectionTool() {
             </div>
           )}
 
-          {/* Step-by-Step Math Visualization */}
+          {/* Step by Step Math Visualization */}
           <div className="space-y-2.5 pt-1">
             <h3 className="text-[13px] font-[620] text-[var(--text)] flex items-center gap-1.5">
               <Calculator className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
-              <span>Exact Step-by-Step Mathematical Calculation</span>
+              <span>Exact Step by Step Mathematical Calculation</span>
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-[11.5px] font-mono">
@@ -703,12 +704,12 @@ export default function NBAScoreProjectionTool() {
                 </div>
                 <div className="text-[var(--text)] pt-1 space-y-1">
                   <div>
-                    <span className="text-[var(--text-3)]">A_off ({teamA.name.split(' ').pop()}): </span>
+                    <span className="text-[var(--text-3)]">A offense ({teamA.name.split(' ').pop()}): </span>
                     <span>{inputA.offensiveEfficiency.toFixed(3)} × {inputA.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--accent)] font-semibold">{calculationResult.aOff.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-3)]">B_off ({teamB.name.split(' ').pop()}): </span>
+                    <span className="text-[var(--text-3)]">B offense ({teamB.name.split(' ').pop()}): </span>
                     <span>{inputB.offensiveEfficiency.toFixed(3)} × {inputB.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--info)] font-semibold">{calculationResult.bOff.toFixed(2)}</span>
                   </div>
@@ -725,12 +726,12 @@ export default function NBAScoreProjectionTool() {
                 </div>
                 <div className="text-[var(--text)] pt-1 space-y-1">
                   <div>
-                    <span className="text-[var(--text-3)]">A_def (allows vs B): </span>
+                    <span className="text-[var(--text-3)]">A defense (allows vs B): </span>
                     <span>{inputA.defensiveEfficiency.toFixed(3)} × {inputB.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--accent)] font-semibold">{calculationResult.aDef.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-3)]">B_def (allows vs A): </span>
+                    <span className="text-[var(--text-3)]">B defense (allows vs A): </span>
                     <span>{inputB.defensiveEfficiency.toFixed(3)} × {inputA.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--info)] font-semibold">{calculationResult.bDef.toFixed(2)}</span>
                   </div>
@@ -747,12 +748,12 @@ export default function NBAScoreProjectionTool() {
                 </div>
                 <div className="text-[var(--text)] pt-1 space-y-1">
                   <div>
-                    <span className="text-[var(--text-3)]">A_projected: </span>
+                    <span className="text-[var(--text-3)]">A projected: </span>
                     <span>({calculationResult.aOff.toFixed(2)} + {calculationResult.bDef.toFixed(2)}) / 2 = </span>
                     <span className="text-[var(--accent)] font-semibold text-[13px]">{calculationResult.aProjected.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-3)]">B_projected: </span>
+                    <span className="text-[var(--text-3)]">B projected: </span>
                     <span>({calculationResult.bOff.toFixed(2)} + {calculationResult.aDef.toFixed(2)}) / 2 = </span>
                     <span className="text-[var(--info)] font-semibold text-[13px]">{calculationResult.bProjected.toFixed(2)}</span>
                   </div>
@@ -765,7 +766,7 @@ export default function NBAScoreProjectionTool() {
                   Step 4: Total, Margin & Winner
                 </div>
                 <div className="text-[var(--text-3)] text-[10.5px]">
-                  Formula: Projected Total = A_proj + B_proj; Margin = |A - B|
+                  Formula: Projected Total = A proj + B proj; Margin = |A \u2212 B|
                 </div>
                 <div className="text-[var(--text)] pt-1 space-y-1">
                   <div>
@@ -775,7 +776,7 @@ export default function NBAScoreProjectionTool() {
                   </div>
                   <div>
                     <span className="text-[var(--text-3)]">Spread Margin: </span>
-                    <span>|{calculationResult.aProjected.toFixed(2)} - {calculationResult.bProjected.toFixed(2)}| = </span>
+                    <span>|{calculationResult.aProjected.toFixed(2)} \u2212 {calculationResult.bProjected.toFixed(2)}| = </span>
                     <span className="text-[var(--text)] font-semibold">{calculationResult.margin.toFixed(2)} pts</span>
                   </div>
                 </div>

@@ -48,7 +48,7 @@ export default function ScorelineMatrix({
             Scoreline distribution matrix
           </h4>
           <p className="text-[12px] text-[#8fa69a] mt-0.5 leading-normal">
-            Bivariate Poisson joint probabilities, low-score adjusted (tau −0.13). Values in %.
+            Bivariate Poisson joint probabilities, low score adjusted (tau &#8722;0.13). Values in %.
           </p>
         </div>
 
@@ -136,7 +136,7 @@ export default function ScorelineMatrix({
                     className={`h-7 rounded-[3px] flex items-center justify-center select-none ${
                       isDiagonal ? 'ring-[0.5px] ring-white/20' : ''
                     } ${isDark ? 'text-[#0a1812] font-[600]' : 'text-[#e8efe9] font-[500]'}`}
-                    title={`${cleanHome} ${h} - ${a} ${cleanAway}: ${pct.toFixed(2)}%`}
+                    title={`${cleanHome} ${h} to ${a} ${cleanAway}: ${pct.toFixed(2)}%`}
                   >
                     {pct >= 0.5 ? pct.toFixed(1) : '<0.5'}
                   </div>
@@ -166,7 +166,7 @@ export default function ScorelineMatrix({
                     : 'border-white/10 text-[#e8efe9] bg-[#0c1c14]'
                 }`}
               >
-                {sc.home}-{sc.away} · {(sc.probability * 100).toFixed(1)}%
+                {sc.home} to {sc.away} · {(sc.probability * 100).toFixed(1)}%
               </span>
             );
           })}

@@ -6,6 +6,8 @@ import { Fixture } from '@/types';
 import { Clock } from 'lucide-react';
 import TeamCrest from '../TeamCrest';
 
+import { cleanDisplayText } from '@/lib/utils/formatText';
+
 interface NBAGameCardProps {
   fixture: Fixture;
 }
@@ -48,9 +50,9 @@ export default function NBAGameCard({ fixture }: NBAGameCardProps) {
           {/* Home Team Row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
-              <TeamCrest crestUrl={fixture.homeTeam.crestUrl} teamName={homeName} size={22} />
+              <TeamCrest crestUrl={fixture.homeTeam.crestUrl} teamName={cleanDisplayText(homeName)} size={22} />
               <span className="text-[13px] font-semibold text-[#ECF1EE] truncate">
-                {homeName}
+                {cleanDisplayText(homeName)}
               </span>
             </div>
 
@@ -75,9 +77,9 @@ export default function NBAGameCard({ fixture }: NBAGameCardProps) {
           {/* Away Team Row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
-              <TeamCrest crestUrl={fixture.awayTeam.crestUrl} teamName={awayName} size={22} />
+              <TeamCrest crestUrl={fixture.awayTeam.crestUrl} teamName={cleanDisplayText(awayName)} size={22} />
               <span className="text-[13px] font-semibold text-[#ECF1EE] truncate">
-                {awayName}
+                {cleanDisplayText(awayName)}
               </span>
             </div>
 
@@ -119,13 +121,13 @@ export default function NBAGameCard({ fixture }: NBAGameCardProps) {
               <div className="flex items-center gap-1.5 text-[11px]">
                 <span className="text-[#8B9890]">Winner lean:</span>
                 <span className="px-2 py-0.5 rounded-[5px] text-[10.5px] font-semibold bg-[rgba(182,230,59,0.12)] text-[#B6E63B] border border-[#B6E63B]/30">
-                  {stats.projectedWinner.split(' ').pop()}
+                  {cleanDisplayText(stats.projectedWinner.split(' ').pop() || '')}
                 </span>
               </div>
 
               {stats.totalLean && (
                 <span className="text-[10.5px] font-mono font-medium text-[#5aa9e6]">
-                  Lean: {stats.totalLean}
+                  Lean: {cleanDisplayText(stats.totalLean)}
                 </span>
               )}
             </div>
