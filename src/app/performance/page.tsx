@@ -23,13 +23,19 @@ import {
   Activity
 } from 'lucide-react';
 import { cleanDisplayText, formatSignedValue } from '@/lib/utils/formatText';
+import { 
+  OCTOBER_18_CASE_STUDY, 
+  OCTOBER_18_SUMMARY, 
+  OCTOBER_18_ANECDOTAL_DISCLAIMER 
+} from '@/lib/data/october18CaseStudy';
 
-type MainSectionTab = 'report_card' | 'providers' | 'ablation' | 'champion' | 'errors' | 'breakdowns';
+type MainSectionTab = 'report_card' | 'case_study' | 'providers' | 'ablation' | 'champion' | 'errors' | 'breakdowns';
 
 export default function PerformancePage() {
   const { sport, isSwitching } = useSport();
   const [sectionTab, setSectionTab] = useState<MainSectionTab>('report_card');
   const [breakdownSubTab, setBreakdownSubTab] = useState<'markets' | 'state_tags' | 'competitions'>('markets');
+  const [caseStudyFilter, setCaseStudyFilter] = useState<'ALL' | 'AGREED' | 'DISAGREED' | 'FALLBACK'>('ALL');
 
   const report = sport === 'basketball' ? VERIFIED_NBA_PERFORMANCE_REPORT : VERIFIED_PERFORMANCE_REPORT;
   const isBasketball = sport === 'basketball';
@@ -51,6 +57,7 @@ export default function PerformancePage() {
 
   const sectionTabs = [
     { id: 'report_card' as const, label: 'Benchmarks & Report Card' },
+    { id: 'case_study' as const, label: '18 Oct Case Study (17 Legs)' },
     { id: 'providers' as const, label: 'Data Foundation & Audit' },
     { id: 'ablation' as const, label: 'Ablation & Calibration' },
     { id: 'champion' as const, label: 'Champion / Challenger' },
@@ -230,6 +237,205 @@ export default function PerformancePage() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* SECTION: 18 OCT WALK FORWARD BACKTEST CASE STUDY */}
+        {sectionTab === 'case_study' && (
+          <div className="space-y-3">
+            {/* Anecdotal Sample Warning Banner */}
+            <div className="bg-[#151E19] border border-[#E2AE45]/40 rounded-[14px] p-3.5 space-y-2">
+              <div className="flex items-center gap-2 text-[#E2AE45] font-[600] text-[13px]">
+                <AlertTriangle className="w-4 h-4 shrink-0" strokeWidth={2} />
+                <span>Anecdotal sample notice · Zero parameter tuning</span>
+              </div>
+              <p className="text-[12px] leading-[1.55] text-[#8B9890]">
+                {OCTOBER_18_ANECDOTAL_DISCLAIMER}
+              </p>
+            </div>
+
+            {/* Case Study Summary KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+                <div className="text-[10.5px] text-[#8B9890]">Slip hit rate</div>
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
+                    17 / 17
+                  </div>
+                  <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
+                    100%
+                  </div>
+                </div>
+                <div className="text-[10px] text-[#5E6A63]">Regular time result</div>
+              </div>
+
+              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+                <div className="text-[10.5px] text-[#8B9890]">Model agreement</div>
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
+                    10 / 17
+                  </div>
+                  <div className="text-[10.5px] text-[#8B9890] tabular-nums font-mono">
+                    58.8%
+                  </div>
+                </div>
+                <div className="text-[10px] text-[#5E6A63]">7 legs rejected on EV</div>
+              </div>
+
+              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+                <div className="text-[10.5px] text-[#8B9890]">Agreed avg edge</div>
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
+                    +{(OCTOBER_18_SUMMARY.averageAgreedEdge * 100).toFixed(1)}%
+                  </div>
+                </div>
+                <div className="text-[10px] text-[#5E6A63]">10 positive EV legs</div>
+              </div>
+
+              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+                <div className="text-[10.5px] text-[#8B9890]">Prior fallbacks</div>
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[17px] font-[650] text-[#E2AE45] font-mono tabular-nums">
+                    4 legs
+                  </div>
+                </div>
+                <div className="text-[10px] text-[#5E6A63]">Bayesian shrinkage</div>
+              </div>
+            </div>
+
+            {/* Filter Chips */}
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+                {[
+                  { id: 'ALL' as const, label: 'All 17 legs' },
+                  { id: 'AGREED' as const, label: 'Model Agreed (10)' },
+                  { id: 'DISAGREED' as const, label: 'Model Disagreed (7)' },
+                  { id: 'FALLBACK' as const, label: 'Prior Fallbacks (4)' },
+                ].map((chip) => (
+                  <button
+                    key={chip.id}
+                    onClick={() => setCaseStudyFilter(chip.id)}
+                    type="button"
+                    className={`h-[28px] px-3 rounded-full text-[11px] font-medium transition-colors ${
+                      caseStudyFilter === chip.id
+                        ? 'bg-[rgba(182,230,59,0.12)] border border-[#B6E63B] text-[#B6E63B]'
+                        : 'bg-[#151E19] border border-white/[0.07] text-[#8B9890]'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] font-mono text-[#5E6A63] shrink-0">
+                18 Oct 2026 fixtures
+              </span>
+            </div>
+
+            {/* 17 Leg Cards List */}
+            <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] overflow-hidden divide-y divide-white/[0.07]">
+              {OCTOBER_18_CASE_STUDY
+                .filter(leg => {
+                  if (caseStudyFilter === 'AGREED') return leg.agreementStatus === 'AGREED';
+                  if (caseStudyFilter === 'DISAGREED') return leg.agreementStatus === 'DISAGREED';
+                  if (caseStudyFilter === 'FALLBACK') return leg.inputQuality !== 'VERIFIED';
+                  return true;
+                })
+                .map((leg, index) => {
+                  const isAgreed = leg.agreementStatus === 'AGREED';
+                  const isPositiveEdge = leg.edge >= 0;
+
+                  return (
+                    <div key={leg.id} className="p-3.5 space-y-2.5 hover:bg-[#151E19]/30 transition-colors">
+                      {/* Top Row: Fixture & Hit Badge */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-mono text-[#5E6A63]">
+                              #{String(index + 1).padStart(2, '0')}
+                            </span>
+                            <span className="text-[14px] font-[600] text-[#ECF1EE]">
+                              {cleanDisplayText(leg.fixture)}
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-[5px] bg-[#151E19] border border-white/[0.07] text-[#8B9890]">
+                              {cleanDisplayText(leg.competition)}
+                            </span>
+                          </div>
+                          <div className="text-[12.5px] text-[#ECF1EE] font-medium mt-1">
+                            Selection: <span className="text-[#B6E63B]">{cleanDisplayText(leg.selection)}</span> @ <span className="font-mono tabular-nums text-[#ECF1EE]">{leg.bookmakerOdds.toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-[6px] bg-[rgba(182,230,59,0.12)] border border-[#B6E63B]/40 text-[#B6E63B]">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>HIT</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Numeric Metrics Comparison Grid */}
+                      <div className="grid grid-cols-3 gap-2 bg-[#151E19] rounded-[10px] p-2 text-center text-[11px] font-mono">
+                        <div>
+                          <span className="text-[#8B9890] block text-[10px]">Model walk forward</span>
+                          <span className="text-[#ECF1EE] font-bold tabular-nums">
+                            {(leg.modelWalkForwardProbability * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[#8B9890] block text-[10px]">Bookmaker implied (1/odds)</span>
+                          <span className="text-[#ECF1EE] tabular-nums">
+                            {(leg.impliedProbability * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[#8B9890] block text-[10px]">Model edge</span>
+                          <span className={`font-bold tabular-nums ${isPositiveEdge ? 'text-[#B6E63B]' : 'text-[#E2AE45]'}`}>
+                            {formatSignedValue(leg.edge * 100, '%')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Model Stance & Input Fallback Badges */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-[5px] border ${
+                          isAgreed
+                            ? 'bg-[rgba(182,230,59,0.12)] border-[#B6E63B]/40 text-[#B6E63B]'
+                            : 'bg-[rgba(226,174,69,0.12)] border-[#E2AE45]/40 text-[#E2AE45]'
+                        }`}>
+                          {isAgreed ? 'MODEL AGREED (Positive edge)' : 'MODEL DISAGREED (Negative edge or gated)'}
+                        </span>
+
+                        {leg.inputQuality !== 'VERIFIED' && (
+                          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-[5px] bg-[#151E19] border border-[#E2AE45]/40 text-[#E2AE45] inline-flex items-center gap-1">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            <span>Prior fallback</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Input Fallback Warning Note if applicable */}
+                      {leg.inputFlagNote && (
+                        <div className="text-[11px] leading-[1.4] text-[#E2AE45] bg-[#E2AE45]/[0.08] border border-[#E2AE45]/20 p-2 rounded-[8px]">
+                          <span className="font-semibold text-[#ECF1EE]">Input telemetry notice: </span>
+                          {cleanDisplayText(leg.inputFlagNote)}
+                        </div>
+                      )}
+
+                      {/* Walk Forward Rationale */}
+                      <div className="text-[11.5px] leading-[1.45] text-[#8B9890] bg-[#0A0F0D] border border-white/[0.04] p-2.5 rounded-[8px]">
+                        <span className="text-[#ECF1EE] font-medium">Walk forward rationale: </span>
+                        {cleanDisplayText(leg.agreementRationale)}
+                      </div>
+
+                      {/* Regular Time Outcome */}
+                      <div className="text-[11px] font-mono text-[#5E6A63] flex items-center justify-between">
+                        <span>Verified regular time outcome: {cleanDisplayText(leg.actualResult)}</span>
+                        <span className="text-[#B6E63B]">Leg hit in regular time</span>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}
