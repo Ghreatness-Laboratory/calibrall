@@ -97,13 +97,15 @@ export function calculateFragilityScore(params: {
   const flags: string[] = [];
 
   // 1. Model Uncertainty & Data Coverage
-  if (context.uncertaintyScore > 0.12) {
-    score += (context.uncertaintyScore - 0.12) * 1.5;
-    flags.push(`Model parameter uncertainty elevated (${(context.uncertaintyScore * 100).toFixed(0)}%)`);
+  const uncertainty = context.uncertaintyScore ?? 0.15;
+  if (uncertainty > 0.12) {
+    score += (uncertainty - 0.12) * 1.5;
+    flags.push(`Model parameter uncertainty elevated (${(uncertainty * 100).toFixed(0)}%)`);
   }
-  if (context.dataCoverageScore < 0.85) {
+  const dataCoverage = context.dataCoverageScore ?? 0.80;
+  if (dataCoverage < 0.85) {
     score += 0.15;
-    flags.push(`Data coverage score below 85% (${(context.dataCoverageScore * 100).toFixed(0)}%)`);
+    flags.push(`Data coverage score below 85% (${(dataCoverage * 100).toFixed(0)}%)`);
   }
 
   // 2. State-Tag Risk Factors

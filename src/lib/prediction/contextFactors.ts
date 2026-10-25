@@ -419,7 +419,7 @@ export function evaluateContextFactors(params: {
   expectedCornersAway: number;
   expectedCards: number;
   sampleSizeMatches: number;
-  dataCoverageScore: number;
+  dataCoverageScore?: number | null;
   rawStateTags?: StateTag[];
   lineupConfirmed?: boolean;
 }): ContextEvaluationResult {
@@ -430,10 +430,11 @@ export function evaluateContextFactors(params: {
     expectedCornersAway,
     expectedCards,
     sampleSizeMatches,
-    dataCoverageScore,
+    dataCoverageScore: rawCoverageScore = 0.85,
     rawStateTags = [],
     lineupConfirmed = false,
   } = params;
+  const dataCoverageScore = rawCoverageScore ?? 0.85;
 
   const detectedDerby = checkDerby(params.homeTeamName, params.awayTeamName);
   const stateTags: StateTag[] = [...rawStateTags];

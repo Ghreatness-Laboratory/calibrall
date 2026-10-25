@@ -167,19 +167,21 @@ export interface FixtureContext {
   lineupConfirmed?: boolean;
   factors?: Record<FactorCode, ContextFactorMeasurement>;
   missingFactors?: MissingFactorFlag[];
-  verifiedOdds?: {
-    homeWin?: number;
-    draw?: number;
-    awayWin?: number;
-    over25Goals?: number;
-    under25Goals?: number;
-    bttsYes?: number;
-    bttsNo?: number;
-    over95Corners?: number;
-    under95Corners?: number;
-    over45Cards?: number;
-    under45Cards?: number;
-  };
+  verifiedOdds?: VerifiedMatchOdds;
+}
+
+export interface VerifiedMatchOdds {
+  homeWin?: number;
+  draw?: number;
+  awayWin?: number;
+  over25Goals?: number;
+  under25Goals?: number;
+  bttsYes?: number;
+  bttsNo?: number;
+  over95Corners?: number;
+  under95Corners?: number;
+  over45Cards?: number;
+  under45Cards?: number;
 }
 
 export interface Competition {

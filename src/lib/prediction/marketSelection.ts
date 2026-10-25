@@ -149,7 +149,7 @@ export function evaluateFixtureMarkets(
       expectedCornersAway: context.expectedCornersAway,
       expectedCards: context.expectedCards,
       sampleSizeMatches: context.sampleSizeMatches,
-      dataCoverageScore: context.dataCoverageScore,
+      dataCoverageScore: context.dataCoverageScore ?? 0.85,
       rawStateTags: context.stateTags,
       lineupConfirmed: context.lineupConfirmed,
     });
@@ -184,7 +184,7 @@ export function evaluateFixtureMarkets(
     expectedCornersAway: context.expectedCornersAway,
     expectedCards: context.expectedCards,
     sampleSizeMatches: context.sampleSizeMatches,
-    dataCoverageScore: context.dataCoverageScore,
+    dataCoverageScore: context.dataCoverageScore ?? 0.85,
     rawStateTags: context.stateTags,
     lineupConfirmed: context.lineupConfirmed,
   });
@@ -231,7 +231,7 @@ export function evaluateFixtureMarkets(
 
   const isDeadRubber = stateTags.includes('dead-rubber');
   const isDerby = stateTags.includes('derby');
-  const effectiveUncertainty = context.uncertaintyScore * compositeUncertaintyMultiplier * lineupImpact.uncertaintyExpansion;
+  const effectiveUncertainty = (context.uncertaintyScore ?? 0.15) * compositeUncertaintyMultiplier * lineupImpact.uncertaintyExpansion;
 
   // 3. Mathematical Models Execution
   // A. Joint Full-Match Goals Model (Dixon-Coles)
