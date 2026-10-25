@@ -552,7 +552,7 @@ export class FeatureLayerEngine {
     const missingXgShare = hasKeyAbsences ? 0.22 : 0.02;
     const missingXaShare = hasKeyAbsences ? 0.18 : 0.01;
     const missingDefensiveActionsShare = hasKeyAbsences ? 0.15 : 0.0;
-    const keyCbAbsent = hasKeyAbsences && !isHome;
+    const keyCbAbsent = false;
     const keyGkAbsent = false;
 
     return {

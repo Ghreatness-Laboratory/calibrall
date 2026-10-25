@@ -167,6 +167,7 @@ export function evaluateFixtureMarkets(
       fixtureProfile,
       attackingDefendingMatchup,
       situationalPatterns,
+      goalMarginDistribution: calculateGoalMarginDistribution(v25Result.scorelineMatrix.matrix, (context.homeAttackRating >= context.awayAttackRating)),
     };
   }
 
@@ -735,7 +736,24 @@ export function evaluateFixtureMarkets(
   // =========================================================================
   if (isOptionTypeEnabled('asian_handicap')) {
     const meta = SUPPORTED_OPTIONS_CATALOGUE.asian_handicap;
-    const ahLines = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5];
+    const goalDiff = effectiveHomeXg - effectiveAwayXg;
+    const competitiveLines: number[] = [];
+    if (goalDiff >= 1.35) {
+      competitiveLines.push(-1.5, -1.0);
+    } else if (goalDiff >= 0.75) {
+      competitiveLines.push(-1.0, -0.5);
+    } else if (goalDiff >= 0.25) {
+      competitiveLines.push(-0.5, 0.0);
+    } else if (goalDiff >= -0.25) {
+      competitiveLines.push(0.0);
+    } else if (goalDiff >= -0.75) {
+      competitiveLines.push(0.5, 0.0);
+    } else if (goalDiff >= -1.35) {
+      competitiveLines.push(1.0, 0.5);
+    } else {
+      competitiveLines.push(1.5, 1.0);
+    }
+    const ahLines = competitiveLines;
 
     // Home lines
     ahLines.forEach(l => {
@@ -1252,12 +1270,27 @@ export function evaluateFixtureMarkets(
     // Reject trivially safe lines (e.g. baseline base rate >= 0.85) unless model shows clear edge (>= +3.5%)
     const isTriviallySafeRejected = baseline.isTriviallySafe && edgeOverBaseline < 0.035;
 
-    // Generate realistic benchmark odds if not provided in verifiedOdds
-    const odds = c.odds || Number(Math.max(1.08, Math.min(25.0, (1 / (c.modelProbability * 1.045)))).toFixed(2));
-    const implied = calculateImpliedProbability(odds);
-    const ev = calculateExpectedValue(c.modelProbability, odds);
-    const edge = implied !== undefined ? (c.modelProbability - implied) : undefined;
-    const isProbabilityBasedAnalysis = c.odds === undefined;
+    // Real bookmaker odds only! Never fabricate synthetic odds.
+    const odds = c.odds;
+    const implied = odds ? calculateImpliedProbability(odds) : undefined;
+    const ev = odds ? calculateExpectedValue(c.modelProbability, odds) : null;
+    const edge = (odds && implied !== undefined) ? Number((c.modelProbability - implied).toFixed(4)) : undefined;
+    const isProbabilityBasedAnalysis = !odds;
+
+    // Sanity Tripwires:
+    // 1. Any EV above 15%
+    // 2. Any model probability differing from market implied probability by > 15 points
+    let sanityTripwire = false;
+    let tripwireReason: string | undefined = undefined;
+    if (odds && ev !== null && ev !== undefined) {
+      if (ev > 0.15) {
+        sanityTripwire = true;
+        tripwireReason = `Check data: EV (+${(ev * 100).toFixed(1)}%) exceeds 15% credibility limit.`;
+      } else if (implied !== undefined && Math.abs(c.modelProbability - implied) > 0.15) {
+        sanityTripwire = true;
+        tripwireReason = `Check data: Model probability (${(c.modelProbability * 100).toFixed(1)}%) differs from market implied (${(implied * 100).toFixed(1)}%) by >15 points.`;
+      }
+    }
 
     // Missing Data & Deficiency Rules:
     let dataDeficiencyReason: string | null = null;
@@ -1347,7 +1380,7 @@ export function evaluateFixtureMarkets(
     } else if (edgeOverBaseline >= 0.02 && c.modelProbability >= 0.45) {
       qualificationStatus = 'QUALIFIED_PROBABILITY';
       evidenceTier = 'Tier 2: Validated Model Lean';
-    } else if (ev !== undefined && ev >= 0.04) {
+    } else if (typeof ev === 'number' && ev >= 0.04) {
       qualificationStatus = 'QUALIFIED_VALUE';
       evidenceTier = 'Tier 3: Positive Market EV';
     }
@@ -1428,7 +1461,7 @@ export function evaluateFixtureMarkets(
       brierSkillScore: gating.bss,
       marketOdds: odds ? Number(odds.toFixed(2)) : undefined,
       impliedProbability: implied ? Number(implied.toFixed(4)) : undefined,
-      expectedValue: ev ? Number(ev.toFixed(4)) : undefined,
+      expectedValue: ev !== null && ev !== undefined ? Number(ev.toFixed(4)) : null,
       edge: edge ? Number(edge.toFixed(4)) : undefined,
       riskTier,
       confidenceScore,
@@ -1461,7 +1494,9 @@ export function evaluateFixtureMarkets(
       attackingDefendingMatchup,
       fixtureProfile,
       isGenericPick,
-      isSubstituteOnly: isSubOnly
+      isSubstituteOnly: isSubOnly,
+      sanityTripwire,
+      tripwireReason,
     };
   });
 
@@ -1490,11 +1525,14 @@ export function evaluateFixtureMarkets(
   candidatesByFamily.forEach((cands, fam) => {
     if (cands.length === 0) return;
 
-    // Reject candidates with hard data deficiency, trivially safe lines, substitute-only types, or generic picks
+    // Reject candidates with hard data deficiency, trivially safe lines, substitute-only types, generic picks, tripwires, or wide handicaps
     const eligible = cands.filter(c => {
       if (c.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY') return false;
+      if (c.sanityTripwire) return false;
       // Substitute-only families (e.g. Asian handicap, European handicap, DNB) cannot be primary family winners
       if (c.isSubstituteOnly) return false;
+      // Wide handicaps (|line| >= 1.5) cannot be primary family winners or top picks
+      if (c.optionType === 'asian_handicap' && Math.abs(c.handicapLine ?? 0) >= 1.5) return false;
       // Generic picks within 2.5% of base rate are dropped from top picks
       if (c.isGenericPick) return false;
       const baseRate = c.baselineProbability ?? 0.50;
@@ -1677,7 +1715,7 @@ function generateGroundedExplanation(params: {
   modelProbability: number;
   odds?: number;
   implied?: number;
-  ev?: number;
+  ev?: number | null;
   edge?: number;
   qualificationStatus: QualificationStatus;
   confidence: ModelConfidence;
@@ -1754,7 +1792,7 @@ function generateGroundedExplanation(params: {
     );
   }
 
-  if (odds && implied && ev !== undefined && edge !== undefined) {
+  if (odds && implied && ev !== undefined && ev !== null && edge !== undefined) {
     keySupportingFactors.push(
       `Market price at ${odds.toFixed(2)} decimal odds implies ${(implied * 100).toFixed(1)}%, yielding an estimated +${(edge * 100).toFixed(1)}% statistical edge (EV: +${(ev * 100).toFixed(1)}%).`
     );

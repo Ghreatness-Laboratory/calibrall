@@ -377,12 +377,17 @@ export default function PredictionsPage() {
                         )}
                       </span>
 
-                      {p.marketOdds ? (
+                      {p.sanityTripwire && (
+                        <span className="px-1.5 py-0.5 rounded-[4px] bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9.5px] font-mono font-semibold">
+                          Check data
+                        </span>
+                      )}
+                      {p.marketOdds && p.expectedValue !== null && p.expectedValue !== undefined ? (
                         <span className="bg-[#151E19] px-2 py-0.5 rounded-[6px] border border-white/[0.07] text-[10.5px] text-[#ECF1EE] tabular-nums">
-                          @{formatOdds(p.marketOdds)}
+                          {p.bookmakerName ? `${p.bookmakerName} ` : ''}@{formatOdds(p.marketOdds)}
                         </span>
                       ) : (
-                        <span className="text-[10.5px] text-[#5E6A63]">No line</span>
+                        <span className="text-[10px] text-[#8B9890]/80">Odds unavailable: probability analysis only</span>
                       )}
                     </div>
                   </div>
@@ -572,17 +577,22 @@ export default function PredictionsPage() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      {p.expectedValue !== undefined && (
-                        <span className="text-[10.5px] text-[#8B9890] tabular-nums">
-                          EV {cleanDisplayText(formatExpectedValue(p.expectedValue).text)}
+                      {p.sanityTripwire && (
+                        <span className="px-1.5 py-0.5 rounded-[4px] bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9.5px] font-mono font-semibold">
+                          Check data
                         </span>
                       )}
-                      {p.marketOdds ? (
-                        <span className="bg-[#151E19] px-2 py-0.5 rounded-[6px] border border-white/[0.07] text-[10.5px] text-[#ECF1EE] tabular-nums">
-                          @{formatOdds(p.marketOdds)}
-                        </span>
+                      {p.marketOdds && p.expectedValue !== null && p.expectedValue !== undefined ? (
+                        <>
+                          <span className="text-[10.5px] text-[#8B9890] tabular-nums">
+                            EV {cleanDisplayText(formatExpectedValue(p.expectedValue).text)}
+                          </span>
+                          <span className="bg-[#151E19] px-2 py-0.5 rounded-[6px] border border-white/[0.07] text-[10.5px] text-[#ECF1EE] tabular-nums">
+                            {p.bookmakerName ? `${p.bookmakerName} ` : ''}@{formatOdds(p.marketOdds)}
+                          </span>
+                        </>
                       ) : (
-                        <span className="text-[10.5px] text-[#5E6A63]">No line</span>
+                        <span className="text-[10px] text-[#8B9890]/80">Odds unavailable: probability analysis only</span>
                       )}
                     </div>
                   </div>

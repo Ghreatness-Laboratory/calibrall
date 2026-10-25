@@ -21,6 +21,7 @@ import { formatSelectionName } from '../marketCatalog';
 import { getMarketBaseline } from '../baselines';
 import { marketMonitor } from '../marketMonitor';
 import { getMarketFamily } from '../marketSelection';
+import { calculateFragilityScore } from '../fragilityAndSubstitutes';
 
 export interface V25EvaluatedFixtureResult {
   engineVersion: 'v2.5.0';
@@ -84,40 +85,43 @@ export class DixonColesV25Evaluator {
       );
 
       // REAL PER-PREDICTION DATA COMPLETENESS (Not a constant!)
-      let predCompleteness = 0.88;
-      if (context.lineupConfirmed) predCompleteness += 0.04;
-      if (context.sampleSizeMatches >= 18) predCompleteness += 0.03;
-      else if (context.sampleSizeMatches < 12) predCompleteness -= 0.06;
+      const baseCoverage = context.dataCoverageScore ?? 0.88;
+      let predCompleteness = baseCoverage * 0.94;
+      if (context.lineupConfirmed) predCompleteness += 0.035;
+      if (context.sampleSizeMatches >= 20) predCompleteness += 0.035;
+      else if (context.sampleSizeMatches < 14) predCompleteness -= 0.05;
 
-      if (cand.marketOdds !== undefined) predCompleteness += 0.04;
+      if (cand.marketOdds !== undefined) predCompleteness += 0.035;
       else predCompleteness -= 0.04;
 
       if (cand.marketCategory === 'total_corners' || cand.marketCategory === 'team_corners') {
-        predCompleteness -= 0.05;
+        predCompleteness -= 0.045;
       } else if (cand.marketCategory === 'bookings') {
-        predCompleteness -= 0.06;
+        predCompleteness -= 0.055;
       } else if (cand.marketCategory === 'handicap') {
-        predCompleteness -= 0.03;
+        predCompleteness -= 0.025;
       } else if (cand.marketCategory === 'match_result') {
         predCompleteness += 0.02;
       }
-      predCompleteness = Math.max(0.65, Math.min(0.98, Number(predCompleteness.toFixed(3))));
+      predCompleteness = Math.max(0.60, Math.min(0.98, Number(predCompleteness.toFixed(3))));
 
       // REAL PER-PREDICTION UNCERTAINTY SPREAD (Not a constant!)
-      let baseMarketSpread = 0.038;
+      const baseUncertainty = context.uncertaintyScore ?? 0.08;
+      let categoryMultiplier = 1.0;
       switch (cand.marketCategory) {
-        case 'double_chance': baseMarketSpread = 0.032; break;
-        case 'match_result': baseMarketSpread = 0.038; break;
-        case 'total_goals': baseMarketSpread = 0.041; break;
-        case 'btts': baseMarketSpread = 0.043; break;
-        case 'half_time': baseMarketSpread = 0.051; break;
-        case 'handicap': baseMarketSpread = 0.054; break;
-        case 'combos': baseMarketSpread = 0.056; break;
+        case 'double_chance': categoryMultiplier = 0.75; break;
+        case 'match_result': categoryMultiplier = 0.90; break;
+        case 'total_goals': categoryMultiplier = 0.95; break;
+        case 'btts': categoryMultiplier = 1.00; break;
+        case 'half_time': categoryMultiplier = 1.15; break;
+        case 'handicap': categoryMultiplier = 1.20; break;
+        case 'combos': categoryMultiplier = 1.25; break;
         case 'total_corners':
-        case 'team_corners': baseMarketSpread = 0.062; break;
-        case 'bookings': baseMarketSpread = 0.068; break;
-        default: baseMarketSpread = 0.045; break;
+        case 'team_corners': categoryMultiplier = 1.40; break;
+        case 'bookings': categoryMultiplier = 1.55; break;
+        default: categoryMultiplier = 1.05; break;
       }
+      const baseMarketSpread = (baseUncertainty * 0.32 * categoryMultiplier) + 0.012;
 
       const samplePenalty = Math.max(0, 16 - context.sampleSizeMatches) * 0.003;
       const weatherPenalty = features.weather.isMissing ? 0.008 : 0;
@@ -249,6 +253,35 @@ export class DixonColesV25Evaluator {
         riskEval
       );
 
+      const fragility = calculateFragilityScore({
+        prediction: {
+          id: `pred_v25_${context.fixtureId}_${cand.marketCode}`,
+          fixtureId: context.fixtureId,
+          marketCode: cand.marketCode,
+          optionType: cand.optionType,
+          marketCategory: cand.marketCategory,
+          marketName: cand.marketName,
+          selection: formatSelectionName(cand.selection),
+          period: cand.period,
+          settlementRule: cand.settlementRule,
+          modelProbability: calProb,
+          rankingScore: 0,
+          isTopPick: false,
+          settlementStatus: 'PENDING',
+          evidenceTier: '',
+          dataQualityScore: predCompleteness,
+          isProbabilityBasedAnalysis: !cand.marketOdds,
+          stateTags: context.stateTags || [],
+          lineupStatus: context.lineupConfirmed ? 'confirmed' : 'pre-lineup',
+          modelConfidence: 'MODERATE',
+          qualificationStatus: 'UNQUALIFIED_MARGINAL',
+          topFactorContributions: [],
+        },
+        context,
+        scorerDependence: features.homeAbsences.missingXgShare,
+        hasKeyAttackerAbsent: features.homeAbsences.missingXgShare > 0.15,
+      });
+
       const prediction: MarketPrediction = {
         id: `pred_v25_${context.fixtureId}_${cand.marketCode}`,
         fixtureId: context.fixtureId,
@@ -305,6 +338,8 @@ export class DixonColesV25Evaluator {
         isGenericPick,
         sanityTripwire,
         tripwireReason,
+        fragilityScore: fragility.fragilityScore,
+        fragilityFlags: whyData.riskFlags.concat(fragility.fragilityFlags),
       };
 
       processed.push(prediction);
