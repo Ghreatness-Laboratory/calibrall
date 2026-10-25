@@ -136,7 +136,7 @@ export default function DashboardPage() {
       selection: string;
       probability: number;
       odds?: number;
-      expectedValue?: number;
+      expectedValue?: number | null;
       edge?: number;
     }[] = [];
 

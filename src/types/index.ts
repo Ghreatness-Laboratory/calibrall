@@ -422,7 +422,7 @@ export interface SubstituteOption {
   edgeOverBaseline?: number;
   odds?: number;
   impliedProbability?: number;
-  expectedValue?: number;
+  expectedValue?: number | null;
   varianceReductionPct: number; // e.g. 35% lower variance
   fragilityScore: number;
   reasonForSwap: string;
