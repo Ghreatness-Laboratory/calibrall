@@ -317,11 +317,18 @@ export default function PredictionsPage() {
         </div>
       )}
 
-      {/* Bug 6: Single notice at the top when odds are not connected */}
-      <div className="p-2.5 rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-[#8B9890] text-[11.5px] flex items-center gap-2">
-        <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
-        <span>Odds not connected. Showing probability analysis only.</span>
-      </div>
+      {/* Odds connection status */}
+      {fixtures.some(f => Boolean(f.verifiedOdds)) ? (
+        <div className="p-2.5 rounded-[10px] bg-[#B6E63B]/[0.08] border border-[#B6E63B]/20 text-[#B6E63B] text-[11.5px] flex items-center gap-2 font-mono">
+          <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
+          <span>Real bookmaker odds active (DraftKings sportsbook lines). Unquoted lines show &quot;—&quot;.</span>
+        </div>
+      ) : (
+        <div className="p-2.5 rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-[#8B9890] text-[11.5px] flex items-center gap-2">
+          <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
+          <span>Odds not connected. Unquoted markets show &quot;—&quot;. Showing probability analysis only.</span>
+        </div>
+      )}
 
       {/* Bug 7: Filters Card placed FIRST so filters sit above the fold */}
       <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 space-y-2.5">
@@ -535,19 +542,23 @@ export default function PredictionsPage() {
                           />
                         </div>
 
-                        {/* Odds & EV row - Bug 6: EV & odds shown ONLY when real odds exist, NO repeated unavailable text */}
-                        {hasRealOdds && (
-                          <div className="flex items-center justify-end gap-1.5 text-[10.5px] pt-0.5">
-                            {p.expectedValue !== null && p.expectedValue !== undefined && (
-                              <span className="text-[#8B9890] tabular-nums">
-                                EV {cleanDisplayText(formatExpectedValue(p.expectedValue).text)}
+                        {/* Odds & EV row: Real odds snapshot when available, dash when unquoted */}
+                        <div className="flex items-center justify-end gap-1.5 text-[10.5px] pt-0.5">
+                          {hasRealOdds ? (
+                            <>
+                              {p.expectedValue !== null && p.expectedValue !== undefined && (
+                                <span className="text-[#8B9890] tabular-nums">
+                                  EV {cleanDisplayText(formatExpectedValue(p.expectedValue).text)}
+                                </span>
+                              )}
+                              <span className="bg-[#101713] px-2 py-0.5 rounded-[5px] border border-white/[0.07] text-[#ECF1EE] tabular-nums">
+                                {p.bookmakerName ? `${p.bookmakerName} ` : ''}@{formatOdds(p.marketOdds)}
                               </span>
-                            )}
-                            <span className="bg-[#101713] px-2 py-0.5 rounded-[5px] border border-white/[0.07] text-[#ECF1EE] tabular-nums">
-                              {p.bookmakerName ? `${p.bookmakerName} ` : ''}@{formatOdds(p.marketOdds)}
-                            </span>
-                          </div>
-                        )}
+                            </>
+                          ) : (
+                            <span className="text-[#5E6A63] tabular-nums">Odds: — · EV: —</span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

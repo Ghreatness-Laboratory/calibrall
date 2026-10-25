@@ -215,10 +215,12 @@ export default function FixtureCard({
                 </div>
 
                 <div className="text-[11px] text-[#8B9890] tabular-nums truncate text-right">
-                  {hasRealOdds && (
+                  {hasRealOdds ? (
                     <span>
                       {topPrediction?.bookmakerName ? `${topPrediction.bookmakerName} ` : ''}@{oddsFormatted} · {evFormatted} EV
                     </span>
+                  ) : (
+                    <span className="text-[#5E6A63]">Odds: — · EV: —</span>
                   )}
                 </div>
               </div>

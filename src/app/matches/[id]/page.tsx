@@ -486,7 +486,7 @@ export default function MatchAnalysisPage() {
                 </span>
               ) : (
                 <span className="text-[10.5px] text-[#8B9890] bg-[#151E19] px-2 py-0.5 rounded-full border border-white/[0.07] font-mono">
-                  Odds unavailable: probability analysis only
+                  Odds: — · EV: —
                 </span>
               )}
             </div>

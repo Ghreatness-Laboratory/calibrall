@@ -14,7 +14,8 @@ import {
   Info, 
   Search, 
   Calendar,
-  X
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 
@@ -30,7 +31,17 @@ export default function MatchesPage() {
   const [selectedFootballGroup, setSelectedFootballGroup] = useState<FootballMarketGroup>('ALL');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  const { fixtures, isLoading, lastUpdated, isDelayed, refetch } = useLiveFixtures(
+  const { 
+    fixtures, 
+    isLoading, 
+    liveDataAvailable, 
+    lastUpdated, 
+    isDelayed, 
+    error, 
+    failedProvider, 
+    quotaHeaders, 
+    refetch 
+  } = useLiveFixtures(
     isBasketball ? 'NBA' : selectedComp, 
     selectedStatus, 
     sport
@@ -200,6 +211,23 @@ export default function MatchesPage() {
         </button>
       </div>
 
+      {/* Provider failover warning banner if a provider failed but cached real data is being served */}
+      {failedProvider && (
+        <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11.5px] space-y-1.5">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              Provider feed <span className="font-semibold">{failedProvider}</span> unavailable or quota exhausted. Serving verified cached real fixtures (last updated {lastUpdated}).
+            </span>
+          </div>
+          {quotaHeaders && Object.keys(quotaHeaders).length > 0 && (
+            <div className="font-mono text-[10.5px] text-amber-200/80 pl-5">
+              Quota: {Object.entries(quotaHeaders).map(([k, v]) => `${k}=${v}`).join(', ')}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Notice if sync is delayed by more than 2 hours or snapshot older than 30 minutes */}
       {isDelayed && (
         <div className="p-2.5 rounded-[10px] bg-[#E2AE45]/10 border border-[#E2AE45]/30 text-[#E2AE45] text-[11.5px] flex items-center gap-2">
@@ -208,11 +236,18 @@ export default function MatchesPage() {
         </div>
       )}
 
-      {/* Bug 6: Single notice at the top when odds are not connected */}
-      <div className="p-2.5 rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-[#8B9890] text-[11.5px] flex items-center gap-2">
-        <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
-        <span>Odds not connected. Showing probability analysis only.</span>
-      </div>
+      {/* Verified odds vs unquoted snapshot status */}
+      {fixtures.some(f => Boolean(f.verifiedOdds)) ? (
+        <div className="p-2.5 rounded-[10px] bg-[#B6E63B]/[0.08] border border-[#B6E63B]/20 text-[#B6E63B] text-[11.5px] flex items-center gap-2 font-mono">
+          <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
+          <span>Real bookmaker odds active (DraftKings sportsbook lines). Unquoted lines show &quot;—&quot;.</span>
+        </div>
+      ) : (
+        <div className="p-2.5 rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-[#8B9890] text-[11.5px] flex items-center gap-2">
+          <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
+          <span>Odds not connected. Unquoted markets show &quot;—&quot;. Showing probability analysis only.</span>
+        </div>
+      )}
 
       {/* Slim info note: 11.5px text, 2px lime left border, small info icon */}
       <div className="border-l-2 border-[#B6E63B] bg-[#101713] rounded-r-[10px] px-3 py-2 flex items-center gap-2">
@@ -372,6 +407,35 @@ export default function MatchesPage() {
               noRecommendationReason={noRecommendationReason}
             />
           ))}
+        </div>
+      ) : (error || !liveDataAvailable) && fixtures.length === 0 ? (
+        /* Loud Error State (Requirement 4) */
+        <div className="border border-rose-500/30 bg-rose-500/10 rounded-[14px] p-6 text-center space-y-3">
+          <div className="w-[46px] h-[46px] rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div className="text-[16px] font-[700] text-[#ECF1EE]">
+            Fixtures unavailable, last updated {lastUpdated || 'recently'}
+          </div>
+          <p className="text-[12.5px] text-[#8B9890] max-w-sm mx-auto leading-relaxed">
+            Live football data provider failed or quota is exhausted. In accordance with zero-fake-data policy, no synthetic substitute data is generated.
+          </p>
+          {failedProvider && (
+            <div className="text-[12px] font-mono text-rose-300">
+              Failed Provider: <span className="font-semibold text-rose-200">{failedProvider}</span>
+            </div>
+          )}
+          {quotaHeaders && Object.keys(quotaHeaders).length > 0 && (
+            <div className="mt-2 p-2.5 rounded-[8px] bg-[#101713] border border-white/[0.08] text-left max-w-sm mx-auto text-[11px] font-mono text-[#8B9890] space-y-1">
+              <div className="text-[#ECF1EE] font-semibold text-[10.5px] uppercase">Quota Response Headers:</div>
+              {Object.entries(quotaHeaders).map(([key, val]) => (
+                <div key={key} className="flex justify-between">
+                  <span className="text-[#5E6A63]">{key}:</span>
+                  <span className="text-[#ECF1EE]">{val}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         /* Empty state: dashed border card with 46px icon tile, 15px title, 12.5px text, and Clear filters button */

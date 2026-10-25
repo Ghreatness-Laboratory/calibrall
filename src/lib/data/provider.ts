@@ -801,8 +801,10 @@ export class LiveFootballDataProvider implements FootballDataProvider {
   }
 }
 
+export const liveFootballDataProvider = new LiveFootballDataProvider();
+
 export function getFootballDataProvider(): LiveFootballDataProvider {
-  return new LiveFootballDataProvider();
+  return liveFootballDataProvider;
 }
 
 export async function getEvaluatedFixture(fixtureId: string) {

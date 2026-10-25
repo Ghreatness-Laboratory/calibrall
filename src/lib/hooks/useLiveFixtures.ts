@@ -10,6 +10,9 @@ export interface LiveFixturesHookResult {
   lastUpdated: string;
   isDelayed?: boolean;
   error?: string;
+  providerUsed?: string;
+  failedProvider?: string;
+  quotaHeaders?: Record<string, string>;
   refetch: () => Promise<void>;
 }
 
@@ -24,6 +27,9 @@ export function useLiveFixtures(
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [isDelayed, setIsDelayed] = useState<boolean>(false);
   const [error, setError] = useState<string | undefined>();
+  const [providerUsed, setProviderUsed] = useState<string | undefined>();
+  const [failedProvider, setFailedProvider] = useState<string | undefined>();
+  const [quotaHeaders, setQuotaHeaders] = useState<Record<string, string> | undefined>();
 
   const load = useCallback(async () => {
     try {
@@ -61,6 +67,9 @@ export function useLiveFixtures(
       setFixtures(list);
       setLiveDataAvailable(Boolean(json.liveDataAvailable && list.length > 0));
       setIsDelayed(Boolean(json.isDelayed));
+      setProviderUsed(json.providerUsed);
+      setFailedProvider(json.failedProvider);
+      setQuotaHeaders(json.quotaHeaders);
       if (json.lastUpdated) {
         setLastUpdated(json.lastUpdated);
       } else {
@@ -78,7 +87,7 @@ export function useLiveFixtures(
       const now = new Date();
       const stamp = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} UTC`;
       setLastUpdated(prev => prev || stamp);
-      setError(`Live data unavailable. Last updated ${stamp}`);
+      setError(`Fixtures unavailable, last updated ${stamp}`);
     } finally {
       setIsLoading(false);
     }
@@ -91,6 +100,6 @@ export function useLiveFixtures(
     return () => clearInterval(timer);
   }, [load]);
 
-  return { fixtures, isLoading, liveDataAvailable, lastUpdated, isDelayed, error, refetch: load };
+  return { fixtures, isLoading, liveDataAvailable, lastUpdated, isDelayed, error, providerUsed, failedProvider, quotaHeaders, refetch: load };
 }
 
