@@ -40,7 +40,7 @@ export default function MatchAnalysisPage() {
       try {
         setIsLoading(true);
         const isNba = id?.startsWith('nba_');
-        const res = await fetch(`/api/v1/fixtures?sport=${isNba ? 'basketball' : 'football'}`, { cache: 'no-store' });
+        const res = await fetch(`/api/v1/fixtures?sport=${isNba ? 'basketball' : 'football'}&id=${encodeURIComponent(id)}`, { cache: 'no-store' });
         if (!res.ok) {
           setFixture(null);
           return;

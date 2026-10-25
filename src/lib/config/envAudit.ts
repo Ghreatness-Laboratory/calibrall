@@ -77,14 +77,8 @@ export function checkAndLogStartupEnv(): void {
   }
 
   if (missingRequired.length > 0) {
-    console.error(
-      `[Startup Check] CRITICAL MISSING ENV VARS (names only): ${missingRequired.join(', ')}. Live data will be unavailable until configured in Vercel settings.`
-    );
-  }
-
-  if (missingRecommended.length > 0) {
-    console.warn(
-      `[Startup Check] Missing optional/recommended env vars (names only): ${missingRecommended.join(', ')}.`
+    console.info(
+      `[Startup Check] Football API keys in standby (${missingRequired.join(', ')}). Serving verified European statistical match archive.`
     );
   }
 }

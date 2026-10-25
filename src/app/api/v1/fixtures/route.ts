@@ -11,6 +11,7 @@ export async function GET(request: Request) {
   const sport = (searchParams.get('sport') as Sport) || 'football';
   const competitionCode = searchParams.get('competition') || undefined;
   const status = searchParams.get('status') || undefined;
+  const fixtureId = searchParams.get('id') || undefined;
 
   if (sport === 'basketball') {
     const nbaProvider = getNBADataProvider();
@@ -39,6 +40,13 @@ export async function GET(request: Request) {
   // Default: Football
   const provider = getFootballDataProvider();
   const result = await provider.getLiveFixtures({ competitionCode, status });
+
+  if (fixtureId) {
+    const single = await provider.getFixtureById(fixtureId);
+    if (single && !result.fixtures.some(f => f.id === fixtureId)) {
+      result.fixtures.unshift(single);
+    }
+  }
 
   return NextResponse.json(
     {
