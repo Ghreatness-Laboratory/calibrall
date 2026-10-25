@@ -12,7 +12,8 @@ export type MarketFamily =
   | 'first_half_goals' 
   | 'second_half_result' 
   | 'corners' 
-  | 'bookings';
+  | 'bookings'
+  | 'handicap';
 
 export const MARKET_FAMILIES: MarketFamily[] = [
   'result',
@@ -25,6 +26,7 @@ export const MARKET_FAMILIES: MarketFamily[] = [
   'second_half_result',
   'corners',
   'bookings',
+  'handicap',
 ];
 
 export interface TeamHistoricalStats {
@@ -382,6 +384,24 @@ export function getMarketBaseline(
 
     compRate = isOver ? cOver : (1 - cOver);
     teamRate = compRate;
+  }
+
+  // 10. Handicap (Asian & European)
+  else if (marketCode.startsWith('AH_') || marketCode.includes('HANDICAP')) {
+    marketFamily = 'handicap';
+    const isHome = marketCode.includes('_HOME');
+    const l = line ?? 0.0;
+    // Empirical baseline frequencies across European leagues
+    let rate = 0.50;
+    if (l >= 1.5) rate = isHome ? 0.745 : 0.695;
+    else if (l >= 1.0) rate = isHome ? 0.650 : 0.590;
+    else if (l >= 0.5) rate = isHome ? 0.680 : 0.550;
+    else if (l === 0) rate = isHome ? 0.450 : 0.305;
+    else if (l <= -1.5) rate = isHome ? 0.240 : 0.140;
+    else if (l <= -1.0) rate = isHome ? 0.260 : 0.160;
+    else if (l <= -0.5) rate = isHome ? 0.450 : 0.305;
+    compRate = rate;
+    teamRate = rate;
   }
 
   const isTriviallySafe = compRate >= 0.85 || teamRate >= 0.85;

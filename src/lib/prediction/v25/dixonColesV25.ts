@@ -523,12 +523,24 @@ export class DixonColesV25Engine {
     const z = this.logit(blendedProb);
     const calibratedProb = Number(this.sigmoid(plattParams.a * z + plattParams.b).toFixed(4));
 
-    // Uncertainty spread calculation:
-    // Base spread 2.5% to 4.0%
-    const baseSpread = 0.028 + (1 - (features?.dataCompletenessScore ?? 1.0)) * 0.045;
-    // Each risk flag widens uncertainty by +0.8%
+    // Category-sensitive base variance
+    let categoryBaseVariance = 0.035;
+    switch (marketCategory) {
+      case 'double_chance': categoryBaseVariance = 0.028; break;
+      case 'match_result': categoryBaseVariance = 0.035; break;
+      case 'total_goals': categoryBaseVariance = 0.038; break;
+      case 'btts': categoryBaseVariance = 0.040; break;
+      case 'handicap': categoryBaseVariance = 0.048; break;
+      case 'total_corners':
+      case 'team_corners': categoryBaseVariance = 0.055; break;
+      case 'bookings': categoryBaseVariance = 0.062; break;
+      default: categoryBaseVariance = 0.038; break;
+    }
+
+    const completeness = features?.dataCompletenessScore ?? 0.90;
+    const baseSpread = categoryBaseVariance + (1 - completeness) * 0.045;
     const riskExpansion = riskFlagsCount * 0.009;
-    const uncertaintySpread = Number(Math.min(0.12, baseSpread + riskExpansion).toFixed(4));
+    const uncertaintySpread = Number(Math.min(0.12, Math.max(0.024, baseSpread + riskExpansion)).toFixed(4));
 
     const ciLower90 = Number(Math.max(0.01, calibratedProb - uncertaintySpread * 1.645).toFixed(4));
     const ciUpper90 = Number(Math.min(0.99, calibratedProb + uncertaintySpread * 1.645).toFixed(4));

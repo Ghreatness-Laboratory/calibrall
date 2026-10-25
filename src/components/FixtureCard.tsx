@@ -67,29 +67,33 @@ export default function FixtureCard({
   const tierBadge = topPrediction ? getRiskTierBadge(topPrediction.confidenceTier || topPrediction.riskTier) : null;
   const dataCoverage = topPrediction?.dataCompletenessScore !== undefined 
     ? Math.round(topPrediction.dataCompletenessScore * 100) 
-    : 92;
+    : (topPrediction?.dataQualityScore !== undefined ? Math.round(topPrediction.dataQualityScore * 100) : null);
 
-  const evFormatted = topPrediction?.expectedValue !== undefined
+  const hasRealOdds = Boolean(topPrediction?.marketOdds && topPrediction.expectedValue !== null && topPrediction.expectedValue !== undefined);
+
+  const evFormatted = hasRealOdds && topPrediction?.expectedValue !== undefined && topPrediction?.expectedValue !== null
     ? cleanDisplayText(formatExpectedValue(topPrediction.expectedValue).text)
-    : '+41.7%';
+    : null;
 
   const oddsFormatted = topPrediction?.marketOdds 
     ? formatOdds(topPrediction.marketOdds) 
-    : '1.90';
+    : null;
 
   const probPercent = topPrediction
     ? (topPrediction.calibratedProbability !== undefined
         ? (topPrediction.calibratedProbability * 100).toFixed(1)
         : (topPrediction.modelProbability * 100).toFixed(1))
-    : '74.6';
+    : null;
 
   const uncertaintyText = topPrediction?.uncertaintySpread !== undefined
     ? ` ± ${(topPrediction.uncertaintySpread * 100).toFixed(1)}%`
-    : ' ± 3.2%';
+    : '';
 
-  const probProgress = topPrediction
-    ? Math.min(100, Math.max(0, (topPrediction.calibratedProbability ?? topPrediction.modelProbability) * 100))
-    : 74.6;
+  const probProgress = topPrediction && probPercent
+    ? Math.min(100, Math.max(0, parseFloat(probPercent)))
+    : 50;
+
+  const isDemo = fixture.isDemo || fixture.id.startsWith('seed_') || fixture.id.startsWith('pl_2324_') || fixture.id.startsWith('pl_2425_');
 
   return (
     <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 space-y-2.5 touch-press transition-transform duration-150">
@@ -99,6 +103,13 @@ export default function FixtureCard({
           <span className="truncate">{cleanDisplayText(fixture.competition.name)}</span>
           <span className="text-[#5E6A63]">·</span>
           <span className="tabular-nums shrink-0">MD {fixture.matchday}</span>
+          <span className={`px-1.5 py-0.5 rounded-[4px] font-mono text-[9px] font-semibold border ${
+            isDemo
+              ? 'bg-[#E2AE45]/[0.10] text-[#E2AE45] border-[#E2AE45]/30'
+              : 'bg-[#B6E63B]/[0.10] text-[#B6E63B] border-[#B6E63B]/30'
+          }`}>
+            {isDemo ? 'Demo data' : 'Live data'}
+          </span>
           {isFinished && (
             <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-[#B6E63B]/[0.12] text-[#B6E63B] font-mono text-[9.5px] font-semibold border border-[#B6E63B]/30">
               Match completed
@@ -202,31 +213,46 @@ export default function FixtureCard({
         <div className="mt-2.5">
           {topPrediction ? (
             <div className="bg-[#151E19] rounded-[11px] p-2.5 space-y-1.5">
-              {/* Row 1: "Top pick" caption, small amber chip, "92% data" dim text. Right: "@1.90 · +41.7% EV" */}
-              <div className="flex items-center justify-between text-[11px]">
-                <div className="flex items-center gap-1.5">
+              {/* Row 1: "Top pick" caption, small amber chip, data completeness. Right: Odds/EV or Odds unavailable */}
+              <div className="flex items-center justify-between text-[11px] gap-2">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <span className="text-[#8B9890]">Top pick</span>
                   <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#E2AE45]/[0.15] text-[#E2AE45] leading-tight">
                     {cleanDisplayText(tierBadge?.label || 'MEDIUM')}
                   </span>
-                  <span className="text-[#5E6A63] tabular-nums">
-                    {dataCoverage}% data
-                  </span>
+                  {dataCoverage !== null && (
+                    <span className="text-[#5E6A63] tabular-nums">
+                      {dataCoverage}% data
+                    </span>
+                  )}
+                  {topPrediction.sanityTripwire && (
+                    <span className="px-1.5 py-0.5 rounded-[4px] bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9.5px] font-mono font-semibold">
+                      Check data
+                    </span>
+                  )}
                 </div>
 
-                <div className="text-[11px] text-[#8B9890] tabular-nums">
-                  @{oddsFormatted} · {evFormatted} EV
+                <div className="text-[11px] text-[#8B9890] tabular-nums truncate text-right">
+                  {hasRealOdds ? (
+                    <span>
+                      {topPrediction?.bookmakerName ? `${topPrediction.bookmakerName} ` : ''}@{oddsFormatted} · {evFormatted} EV
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-[#8B9890]/80">Odds unavailable: probability analysis only</span>
+                  )}
                 </div>
               </div>
 
-              {/* Row 2: pick name 13.5 semibold left; "74.6% ± 3.2%" accent right */}
+              {/* Row 2: pick name 13.5 semibold left; prob % with real uncertainty accent right */}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[13.5px] font-[600] text-[#ECF1EE] truncate">
                   {cleanDisplayText(formatSelectionName(topPrediction.selection))}
                 </span>
-                <span className="text-[12.5px] font-[600] text-[#B6E63B] tabular-nums shrink-0">
-                  {probPercent}%{uncertaintyText}
-                </span>
+                {probPercent && (
+                  <span className="text-[12.5px] font-[600] text-[#B6E63B] tabular-nums shrink-0">
+                    {probPercent}%{uncertaintyText}
+                  </span>
+                )}
               </div>
 
               {/* Settlement Banner when match completed */}

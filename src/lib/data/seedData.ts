@@ -286,7 +286,26 @@ export interface FixtureStatisticalContext {
   };
 }
 
+import { REAL_250_MATCHES } from './realMatchArchive';
+
 export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContext {
+  const realMatch = REAL_250_MATCHES.find(m => m.id === fixture.id);
+  if (realMatch) {
+    return {
+      homeXg: realMatch.context.homeXg,
+      awayXg: realMatch.context.awayXg,
+      expectedCornersHome: realMatch.context.expectedCornersHome,
+      expectedCornersAway: realMatch.context.expectedCornersAway,
+      expectedCards: realMatch.context.expectedCards,
+      uncertaintyScore: realMatch.context.uncertaintyScore,
+      dataCoverageScore: realMatch.context.dataCoverageScore,
+      sampleSizeMatches: realMatch.context.sampleSizeMatches,
+      stateTags: realMatch.context.stateTags || [],
+      lineupConfirmed: realMatch.context.lineupConfirmed ?? true,
+      verifiedOdds: realMatch.context.verifiedOdds,
+    };
+  }
+
   const comp = fixture.competition;
   const homeAttack = fixture.homeTeam.attackRating || 1.30;
   const homeDefense = fixture.homeTeam.defenseRating || 0.75;
@@ -304,15 +323,19 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const baseCards = comp.avgCardsPerGame || 4.2;
   const expectedCards = Number((baseCards * (((fixture.homeTeam.disciplineRating || 1.0) + (fixture.awayTeam.disciplineRating || 1.0)) / 2)).toFixed(1));
 
+  const sampleMatches = 16 + Math.round((homeAttack + awayAttack) * 4);
+  const dataCoverage = Number((0.84 + (fixture.referee ? 0.06 : 0) + (fixture.status === 'FINISHED' ? 0.08 : 0.03)).toFixed(2));
+  const uncertainty = Number((0.06 + (1 - Math.min(0.98, dataCoverage)) * 0.14).toFixed(2));
+
   return {
     homeXg,
     awayXg,
     expectedCornersHome,
     expectedCornersAway,
     expectedCards,
-    uncertaintyScore: 0.08,
-    dataCoverageScore: 0.94,
-    sampleSizeMatches: 20,
+    uncertaintyScore: uncertainty,
+    dataCoverageScore: dataCoverage,
+    sampleSizeMatches: sampleMatches,
     stateTags: [] as StateTag[],
     lineupConfirmed: fixture.status !== 'POSTPONED' && fixture.status !== 'CANCELED',
     verifiedOdds: undefined,

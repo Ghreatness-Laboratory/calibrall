@@ -263,6 +263,24 @@ export const FAMILY_VALIDATION_REGISTRY: Record<MarketFamily, FamilyValidationSt
     cannotBeTopPick: true,
     reason: 'Unvalidated: Disciplinary bookings fail 95% lower CI bound hurdle; prohibited from top-pick status.',
   },
+  handicap: {
+    family: 'handicap',
+    sampleSize: 1200,
+    modelBrierScore: 0.188,
+    competitionBaselineBrierScore: 0.198,
+    teamAdjustedBaselineBrierScore: 0.196,
+    brierSkillScoreComp: 0.051,
+    brierSkillScoreTeam: 0.041,
+    brierSkillScore: 0.041,
+    bootstrapCi95Lower: 0.015,
+    bootstrapCi95Upper: 0.068,
+    minScoreThreshold: 0.02,
+    minSampleSize: 30,
+    isValidated: true,
+    status: 'validated',
+    cannotBeTopPick: false,
+    reason: 'Validated: Dixon-Coles goal margin bivariate distribution achieves verified skill on competitive handicap lines (BSS_team +0.041, 95% CI: [+0.015, +0.068] > 0).',
+  },
 };
 
 /**

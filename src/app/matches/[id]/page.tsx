@@ -472,15 +472,24 @@ export default function MatchAnalysisPage() {
                   </span>
                 );
               })()}
-              {topPick.marketOdds && (
+              {topPick.sanityTripwire && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                  Check data
+                </span>
+              )}
+              {topPick.marketOdds ? (
                 <span className="text-[11px] text-[#ECF1EE] bg-[#151E19] px-2 py-0.5 rounded-full border border-white/[0.07] tabular-nums font-mono">
-                  @{formatOdds(topPick.marketOdds)}
+                  {topPick.bookmakerName ? `${topPick.bookmakerName} ` : ''}@{formatOdds(topPick.marketOdds)}
+                </span>
+              ) : (
+                <span className="text-[10.5px] text-[#8B9890] bg-[#151E19] px-2 py-0.5 rounded-full border border-white/[0.07] font-mono">
+                  Odds unavailable: probability analysis only
                 </span>
               )}
             </div>
             <h3 className="text-[15px] font-semibold text-[#ECF1EE]">
-              {formatSelectionName(topPick.selection)} · {(topPick.modelProbability * 100).toFixed(1)}% probability
-              {topPick.expectedValue !== undefined ? ` (${formatExpectedValue(topPick.expectedValue).text} EV)` : ''}
+              {formatSelectionName(topPick.selection)} · {((topPick.calibratedProbability ?? topPick.modelProbability) * 100).toFixed(1)}% probability
+              {topPick.expectedValue !== undefined && topPick.expectedValue !== null ? ` (${formatExpectedValue(topPick.expectedValue).text} EV)` : ''}
             </h3>
             {topPick.plainEnglishReason && (
               <p className="text-[12px] text-[#8B9890] mt-1 max-w-2xl leading-normal">

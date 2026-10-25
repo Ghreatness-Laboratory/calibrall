@@ -23,9 +23,22 @@ export default function Navbar() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [isMonochrome, setIsMonochrome] = useState<boolean>(false);
   const [utcTime, setUtcTime] = useState<string>('20:50 UTC');
+  const [dataMode, setDataMode] = useState<'live' | 'demo'>('demo');
 
   useEffect(() => {
     setUser(getStoredUser());
+
+    // Check data provider status
+    fetch('/api/v1/health')
+      .then(r => r.json())
+      .then(data => {
+        if (data?.services?.provider?.isConfigured) {
+          setDataMode('live');
+        } else {
+          setDataMode('demo');
+        }
+      })
+      .catch(() => setDataMode('demo'));
 
     try {
       const updateTime = () => {
@@ -149,6 +162,20 @@ export default function Navbar() {
             >
               <Search className="w-3.5 h-3.5" strokeWidth={2} />
             </Link>
+
+            {/* Live data or Demo data badge */}
+            <div
+              className={`font-mono text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1.5 leading-none tracking-wide select-none ${
+                dataMode === 'live'
+                  ? 'border-[#B6E63B]/30 bg-[#B6E63B]/10 text-[#B6E63B]'
+                  : 'border-[#E2AE45]/30 bg-[#E2AE45]/10 text-[#E2AE45]'
+              }`}
+              title={dataMode === 'live' ? 'Connected to live odds and statistical feeds' : 'Offline demo archive with real historical European data'}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${dataMode === 'live' ? 'bg-[#B6E63B]' : 'bg-[#E2AE45]'}`} />
+              <span className="hidden xs:inline">{dataMode === 'live' ? 'Live data' : 'Demo data'}</span>
+              <span className="xs:hidden">{dataMode === 'live' ? 'Live' : 'Demo'}</span>
+            </div>
 
             {/* Small outlined mono PRO badge */}
             <Link

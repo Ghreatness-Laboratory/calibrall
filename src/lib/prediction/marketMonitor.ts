@@ -44,12 +44,14 @@ const FAMILY_DISPLAY_NAMES: Record<MarketFamily, string> = {
   second_half_result: '2nd Half Result',
   corners: 'Corners (Total & Team)',
   bookings: 'Disciplinary Bookings',
+  handicap: 'Handicap (Asian & European)',
 };
 
 class MarketMonitor {
   private logs: RecommendationLogEntry[] = [];
-  private readonly DEFAULT_ALERT_THRESHOLD = 0.40; // 40% maximum allowable concentration before diagnostic alert
+  private readonly DEFAULT_ALERT_THRESHOLD = 0.25; // 25% warning ceiling for slate/trailing concentration
   private readonly DEFAULT_WINDOW = 100;
+  private activeSlateAlerts: string[] = [];
 
   constructor() {
     this.seedInitialHistory();
@@ -64,6 +66,7 @@ class MarketMonitor {
       both_teams_to_score: 14,
       corners: 12,
       bookings: 8,
+      handicap: 6,
       highest_scoring_half: 4,
       first_half_goals: 3,
       second_half_result: 3,
@@ -142,6 +145,7 @@ class MarketMonitor {
       second_half_result: 0,
       corners: 0,
       bookings: 0,
+      handicap: 0,
     };
 
     const dailyBreakdown: Record<string, Record<MarketFamily, number>> = {};
@@ -162,12 +166,15 @@ class MarketMonitor {
           second_half_result: 0,
           corners: 0,
           bookings: 0,
+          handicap: 0,
         };
       }
-      dailyBreakdown[entry.dateStr][entry.marketFamily]++;
+      if (dailyBreakdown[entry.dateStr][entry.marketFamily] !== undefined) {
+        dailyBreakdown[entry.dateStr][entry.marketFamily]++;
+      }
     });
 
-    const alertMessages: string[] = [];
+    const alertMessages: string[] = [...this.activeSlateAlerts];
     const familyShares: FamilyShareMetric[] = MARKET_FAMILIES.map(fam => {
       const c = counts[fam] || 0;
       const sharePct = Number(((c / total) * 100).toFixed(1));
@@ -175,7 +182,7 @@ class MarketMonitor {
 
       if (exceeds) {
         alertMessages.push(
-          `Alert: Family "${FAMILY_DISPLAY_NAMES[fam]}" concentration at ${sharePct}% exceeds the trailing ${trailingN}-fixture warning ceiling of ${(alertThreshold * 100).toFixed(0)}%.`
+          `Alert: Family "${FAMILY_DISPLAY_NAMES[fam]}" concentration at ${sharePct}% exceeds the warning ceiling of ${(alertThreshold * 100).toFixed(0)}%.`
         );
       }
 
@@ -198,6 +205,85 @@ class MarketMonitor {
       dailyBreakdown,
       lastUpdated: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Evaluates an active slate of top picks to detect:
+   * 1. If more than 20% of picks share the exact same line and side.
+   * 2. If multiple picks share identical numbers (prob, uncertainty, completeness, odds).
+   * 3. If any family dominates the slate (>25%).
+   */
+  public checkSlateConcentrationAndIdenticalMetrics(
+    picks: {
+      selection?: string;
+      marketCode?: string;
+      marketFamily?: string;
+      modelProbability?: number;
+      calibratedProbability?: number;
+      uncertaintySpread?: number;
+      dataCompletenessScore?: number;
+      marketOdds?: number;
+    }[]
+  ): { hasAlert: boolean; alerts: string[] } {
+    const alerts: string[] = [];
+    if (!picks || picks.length < 3) {
+      this.activeSlateAlerts = [];
+      return { hasAlert: false, alerts: [] };
+    }
+
+    const n = picks.length;
+
+    // 1. Line and side concentration
+    const lineSideCounts: Record<string, number> = {};
+    const familyCounts: Record<string, number> = {};
+
+    picks.forEach(p => {
+      const sel = p.selection || p.marketCode || 'UNKNOWN';
+      lineSideCounts[sel] = (lineSideCounts[sel] || 0) + 1;
+
+      const fam = p.marketFamily || 'unknown';
+      familyCounts[fam] = (familyCounts[fam] || 0) + 1;
+    });
+
+    Object.entries(lineSideCounts).forEach(([sel, count]) => {
+      const share = count / n;
+      if (share > 0.20) {
+        alerts.push(
+          `Slate Concentration Violation: "${sel}" represents ${(share * 100).toFixed(1)}% of top picks (${count}/${n}), exceeding the 20% slate ceiling.`
+        );
+      }
+    });
+
+    Object.entries(familyCounts).forEach(([fam, count]) => {
+      const share = count / n;
+      if (share > 0.25) {
+        alerts.push(
+          `Slate Family Dominance Alert: Family "${fam}" represents ${(share * 100).toFixed(1)}% of slate (${count}/${n}), exceeding 25% ceiling.`
+        );
+      }
+    });
+
+    // 2. Identical metrics detection (prob, uncertainty, completeness, odds)
+    const metricFingerprints: Record<string, number> = {};
+    picks.forEach(p => {
+      const prob = (p.calibratedProbability ?? p.modelProbability ?? 0).toFixed(3);
+      const unc = (p.uncertaintySpread ?? 0).toFixed(3);
+      const data = (p.dataCompletenessScore ?? 0).toFixed(2);
+      const odds = p.marketOdds ? p.marketOdds.toFixed(2) : 'NONE';
+      const fp = `prob:${prob}|unc:${unc}|data:${data}|odds:${odds}`;
+      metricFingerprints[fp] = (metricFingerprints[fp] || 0) + 1;
+    });
+
+    Object.entries(metricFingerprints).forEach(([fp, count]) => {
+      if (count >= 3) {
+        alerts.push(
+          `Identical Numbers Alert: ${count} matches share identical statistical parameters (${fp.replace(/\|/g, ', ')}). Artificial constant detected.`
+        );
+      }
+    });
+
+    this.activeSlateAlerts = alerts;
+    return { hasAlert: alerts.length > 0, alerts };
   }
 }
 

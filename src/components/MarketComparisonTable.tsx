@@ -209,8 +209,17 @@ export default function MarketComparisonTable({
               {probPct.toFixed(1)}%
             </span>
             <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#8B9890]">
-              {pred.marketOdds && <span className="tabular-nums">@{oddsFormatted}</span>}
-              {pred.expectedValue !== undefined && (
+              {pred.sanityTripwire && (
+                <span className="px-1 py-0.2 rounded text-[9px] bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  Check data
+                </span>
+              )}
+              {pred.marketOdds ? (
+                <span className="tabular-nums">@{oddsFormatted}</span>
+              ) : (
+                <span className="text-[9px] text-[#5E6A63]">No odds</span>
+              )}
+              {pred.expectedValue !== undefined && pred.expectedValue !== null && (
                 <span className={`${evFormatted.colorClass} tabular-nums`}>{cleanDisplayText(evFormatted.text)}</span>
               )}
             </div>

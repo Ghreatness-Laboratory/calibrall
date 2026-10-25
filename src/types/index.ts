@@ -313,7 +313,7 @@ export interface MarketPrediction {
   modelProbability: number;
   marketOdds?: number;
   impliedProbability?: number;
-  expectedValue?: number; // (p * O) - 1
+  expectedValue?: number | null; // (p * O) - 1 or null if odds unavailable
   edge?: number; // p - implied
   riskTier?: RiskTier;
   confidenceScore?: number; // 0.0 - 1.0 (or percentage)
@@ -380,6 +380,10 @@ export interface MarketPrediction {
   abstainReason?: string;
   actualStatValue?: string | number;
   lineComparisonText?: string;
+  bookmakerName?: string;
+  oddsTimestamp?: string;
+  sanityTripwire?: boolean;
+  tripwireReason?: string;
 }
 
 export type FixtureProfile = 

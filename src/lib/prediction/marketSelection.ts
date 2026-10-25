@@ -112,7 +112,8 @@ interface RawCandidateConfig {
 
 export function getMarketFamily(optionType: SupportedOptionType, marketCode: string, marketCategory?: MarketCategory): MarketFamily {
   if (marketCode.startsWith('1X2_DRAW')) return 'draw';
-  if (optionType === 'win' || marketCode.startsWith('1X2_') || optionType === 'draw_no_bet' || optionType === 'asian_handicap' || optionType === 'european_handicap' || optionType === 'win_draw_combo') return 'result';
+  if (optionType === 'asian_handicap' || optionType === 'european_handicap' || marketCode.startsWith('AH_') || marketCategory === 'handicap') return 'handicap';
+  if (optionType === 'win' || marketCode.startsWith('1X2_') || optionType === 'draw_no_bet' || optionType === 'win_draw_combo') return 'result';
   if (optionType === 'draw') return 'draw';
   if (optionType === 'double_chance' || marketCode.startsWith('DC_')) return 'double_chance';
   if (optionType === 'both_teams_to_score' || marketCode.startsWith('BTTS_')) return 'both_teams_to_score';
