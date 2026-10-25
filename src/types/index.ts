@@ -158,9 +158,11 @@ export interface FixtureContext {
   expectedCornersHome: number;
   expectedCornersAway: number;
   expectedCards: number;
-  uncertaintyScore: number;
-  dataCoverageScore: number;
+  uncertaintyScore: number | null;
+  dataCoverageScore: number | null;
   sampleSizeMatches: number;
+  hasRealTeamStrength?: boolean;
+  insufficientData?: boolean;
   stateTags?: StateTag[];
   lineupConfirmed?: boolean;
   factors?: Record<FactorCode, ContextFactorMeasurement>;
@@ -201,11 +203,12 @@ export interface Team {
   crestUrl: string;
   venue?: string;
   competitionId?: string;
-  attackRating: number;
-  defenseRating: number;
-  cornerAttackRating: number;
-  disciplineRating: number;
+  attackRating?: number;
+  defenseRating?: number;
+  cornerAttackRating?: number;
+  disciplineRating?: number;
   recentForm?: ('W' | 'D' | 'L')[];
+  hasRealTeamStrength?: boolean;
 }
 
 export interface Fixture {
@@ -240,6 +243,9 @@ export interface Fixture {
   sport?: Sport;
   isDerby?: boolean;
   derbyName?: string;
+  insufficientData?: boolean;
+  hasRealTeamStrength?: boolean;
+  verifiedOdds?: VerifiedMatchOdds;
   hasCoachChange?: boolean;
   coachChangeNote?: string;
   h2hSummary?: string;

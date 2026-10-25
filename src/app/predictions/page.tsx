@@ -8,7 +8,8 @@ import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { MarketPrediction, Team } from '@/types';
 import { 
   SlidersHorizontal,
-  AlertCircle
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import { 
   formatOdds, 
@@ -19,7 +20,14 @@ import {
 import { checkDerby } from '@/lib/prediction/contextFactors';
 import { useSport } from '@/lib/context/SportContext';
 import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
-import { cleanDisplayText, formatSignedValue } from '@/lib/utils/formatText';
+import TeamCrest from '@/components/TeamCrest';
+import { 
+  cleanDisplayText, 
+  formatSignedValue, 
+  displayName, 
+  getTeamAbbreviation, 
+  formatMatchTime 
+} from '@/lib/utils/formatText';
 
 type MarketGroupFilter = 'ALL' | 'goals' | 'corners' | 'cards' | 'handicap' | 'results' | 'halves' | 'goal_bounds' | 'moneyline' | 'spread' | 'total_points';
 
@@ -33,13 +41,15 @@ export default function PredictionsPage() {
   const [onlyValuePicks, setOnlyValuePicks] = useState<boolean>(false);
   const [minProb, setMinProb] = useState<number>(0.50);
 
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated, isDelayed } = useLiveFixtures(
     isBasketball ? 'NBA' : selectedComp,
     'ALL',
     sport
   );
 
-  // Generate qualified and probability-based market candidates across all live fixtures
+  // Generate qualified and probability-based market candidates across upcoming fixtures
+  // Bug 7: Only list fixtures that haven't kicked off, remove any match that already started or finished.
+  // Bug 1: Never generate picks if team strength is missing (insufficientData).
   const allPredictions = useMemo(() => {
     const list: {
       fixtureId: string;
@@ -54,13 +64,20 @@ export default function PredictionsPage() {
       prediction: MarketPrediction;
     }[] = [];
 
+    const now = Date.now();
+
     fixtures.forEach(fixture => {
+      // Filter out finished or already started matches
+      if (fixture.status === 'FINISHED' || fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED') return;
+      const kickoffMs = new Date(fixture.kickoffTime).getTime();
+      if (!isNaN(kickoffMs) && kickoffMs <= now) return;
+
       if (isBasketball || fixture.sport === 'basketball') {
         const nbaPreds = generateNBAPredictions(fixture);
         nbaPreds.forEach(p => {
           list.push({
             fixtureId: fixture.id,
-            fixtureName: `${fixture.homeTeam.shortName || fixture.homeTeam.name} vs ${fixture.awayTeam.shortName || fixture.awayTeam.name}`,
+            fixtureName: `${displayName(fixture.homeTeam)} vs ${displayName(fixture.awayTeam)}`,
             homeTeam: fixture.homeTeam,
             awayTeam: fixture.awayTeam,
             compCode: 'NBA',
@@ -74,6 +91,11 @@ export default function PredictionsPage() {
       }
 
       const stats = getFixtureStatistics(fixture);
+      // Hard rule: if fixture has no real team strength, do not return a pick for it
+      if (fixture.insufficientData || stats.insufficientData) {
+        return;
+      }
+
       const derbyInfo = fixture.isDerby && fixture.derbyName 
         ? { name: fixture.derbyName }
         : checkDerby(fixture.homeTeam.name, fixture.awayTeam.name);
@@ -84,27 +106,29 @@ export default function PredictionsPage() {
         awayTeamName: fixture.awayTeam.name,
         competitionCode: fixture.competition.code,
         competitionName: fixture.competition.name,
-        homeAttackRating: fixture.homeTeam.attackRating,
-        homeDefenseRating: fixture.homeTeam.defenseRating,
-        awayAttackRating: fixture.awayTeam.attackRating,
-        awayDefenseRating: fixture.awayTeam.defenseRating,
+        homeAttackRating: fixture.homeTeam.attackRating ?? 1.0,
+        homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
+        awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
+        awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
         homeXg: stats.homeXg,
         awayXg: stats.awayXg,
         expectedCornersHome: stats.expectedCornersHome,
         expectedCornersAway: stats.expectedCornersAway,
         expectedCards: stats.expectedCards,
-        uncertaintyScore: stats.uncertaintyScore,
-        dataCoverageScore: stats.dataCoverageScore,
+        uncertaintyScore: stats.uncertaintyScore as any,
+        dataCoverageScore: stats.dataCoverageScore as any,
         sampleSizeMatches: stats.sampleSizeMatches,
         stateTags: stats.stateTags,
         lineupConfirmed: stats.lineupConfirmed,
         verifiedOdds: stats.verifiedOdds,
+        insufficientData: stats.insufficientData || fixture.insufficientData,
+        hasRealTeamStrength: stats.hasRealTeamStrength,
       });
 
       evalResult.predictions.forEach(p => {
         list.push({
           fixtureId: fixture.id,
-          fixtureName: `${fixture.homeTeam.shortName || fixture.homeTeam.name} vs ${fixture.awayTeam.shortName || fixture.awayTeam.name}`,
+          fixtureName: `${displayName(fixture.homeTeam)} vs ${displayName(fixture.awayTeam)}`,
           homeTeam: fixture.homeTeam,
           awayTeam: fixture.awayTeam,
           compCode: fixture.competition.code,
@@ -120,45 +144,14 @@ export default function PredictionsPage() {
     return list;
   }, [fixtures, isBasketball]);
 
-  // Daily High Confidence Picks: Top 5 High Confidence picks, max 2 per market type
-  const featuredConfidencePicks = useMemo(() => {
-    const candidates = allPredictions.filter(item => {
-      const p = item.prediction;
-      const isHigh = p.confidenceTier === 'HIGH' || p.riskTier === 'SAFE' || p.riskTier === 'HIGH';
-      const prob = p.calibratedProbability ?? p.modelProbability;
-      return isHigh && prob >= 0.60;
-    }).sort((a, b) => {
-      const confA = a.prediction.confidenceScore ?? 0.75;
-      const confB = b.prediction.confidenceScore ?? 0.75;
-      const probA = a.prediction.calibratedProbability ?? a.prediction.modelProbability;
-      const probB = b.prediction.calibratedProbability ?? b.prediction.modelProbability;
-      const scoreA = (probA * 10) + (confA * 5) + ((a.prediction.edge ?? 0) * 8);
-      const scoreB = (probB * 10) + (confB * 5) + ((b.prediction.edge ?? 0) * 8);
-      return scoreB - scoreA;
-    });
-
-    const selected: typeof candidates = [];
-    const marketCounts: Record<string, number> = {};
-
-    for (const cand of candidates) {
-      if (selected.length >= 5) break;
-
-      const groupKey = cand.prediction.marketCategory || cand.prediction.optionType;
-      const count = marketCounts[groupKey] || 0;
-      if (count < 2) {
-        selected.push(cand);
-        marketCounts[groupKey] = count + 1;
-      }
-    }
-
-    return selected;
-  }, [allPredictions]);
-
   // Market Group matching helper
   const matchesMarketGroup = (p: MarketPrediction, group: MarketGroupFilter): boolean => {
     if (group === 'ALL') return true;
     if (group === 'goals') {
       return p.optionType === 'over_under_goals' || p.optionType === 'first_half_goals' || p.marketCategory === 'total_goals' || p.marketCategory === 'team_goals' || p.marketCategory === 'btts';
+    }
+    if (group === 'results') {
+      return p.optionType === 'win' || p.optionType === 'draw' || p.optionType === 'double_chance' || p.optionType === 'draw_no_bet' || p.marketCategory === 'match_result' || p.marketCategory === 'double_chance' || p.marketCategory === 'draw_no_bet';
     }
     if (group === 'corners') {
       return p.optionType === 'corners' || p.optionType === 'corner_handicap' || p.marketCategory === 'total_corners' || p.marketCategory === 'team_corners';
@@ -167,13 +160,10 @@ export default function PredictionsPage() {
       return p.optionType === 'bookings' || p.optionType === 'team_bookings' || p.optionType === 'booking_points' || p.marketCategory === 'bookings';
     }
     if (group === 'handicap') {
-      return p.optionType === 'asian_handicap' || p.optionType === 'european_handicap' || p.optionType === 'corner_handicap' || p.marketCategory === 'handicap';
-    }
-    if (group === 'results') {
-      return p.optionType === 'win' || p.optionType === 'draw' || p.optionType === 'double_chance' || p.optionType === 'draw_no_bet' || p.optionType === 'win_draw_combo' || p.marketCategory === 'match_result' || p.marketCategory === 'double_chance' || p.marketCategory === 'draw_no_bet' || p.marketCategory === 'combos';
+      return p.optionType === 'asian_handicap' || p.marketCategory === 'handicap';
     }
     if (group === 'halves') {
-      return p.optionType === 'highest_scoring_half' || p.optionType === 'first_half_goals' || p.optionType === 'second_half_result' || p.marketCategory === 'half_time';
+      return p.optionType === 'first_half_goals' || p.optionType === 'second_half_result' || p.optionType === 'highest_scoring_half';
     }
     if (group === 'goal_bounds') {
       return p.optionType === 'goal_bounds' || p.optionType === 'team_goal_bounds' || p.marketCategory === 'goal_bounds';
@@ -190,12 +180,15 @@ export default function PredictionsPage() {
     return true;
   };
 
+  // Filtered raw predictions
   const filtered = useMemo(() => {
     return allPredictions.filter(item => {
       const p = item.prediction;
-      if (selectedComp !== 'ALL' && item.compCode !== selectedComp) return false;
+      if (selectedComp !== 'ALL' && item.compCode !== selectedComp) {
+        return false;
+      }
       if (selectedRiskTier !== 'ALL') {
-        const matchesTier = p.confidenceTier === selectedRiskTier || p.riskTier === selectedRiskTier ||
+        const matchesTier =
           (selectedRiskTier === 'HIGH' && (p.riskTier === 'SAFE' || p.confidenceTier === 'HIGH')) ||
           (selectedRiskTier === 'MEDIUM' && (p.riskTier === 'MODERATE' || p.confidenceTier === 'MEDIUM')) ||
           (selectedRiskTier === 'LOW' && (p.riskTier === 'RISKY' || p.riskTier === 'LONGSHOT' || p.confidenceTier === 'LOW'));
@@ -219,6 +212,47 @@ export default function PredictionsPage() {
     });
   }, [allPredictions, selectedComp, selectedRiskTier, selectedMarketGroup, onlyValuePicks, minProb]);
 
+  // Bug 7: Group options for one match into one card so overlapping selections are presented together
+  const groupedMatches = useMemo(() => {
+    const map = new Map<string, {
+      fixtureId: string;
+      fixtureName: string;
+      homeTeam: Team;
+      awayTeam: Team;
+      compCode: string;
+      compName: string;
+      kickoff: string;
+      isDerby?: boolean;
+      derbyName?: string;
+      picks: MarketPrediction[];
+    }>();
+
+    filtered.forEach(item => {
+      const existing = map.get(item.fixtureId);
+      if (existing) {
+        // Prevent duplicate same market code
+        if (!existing.picks.some(pk => pk.marketCode === item.prediction.marketCode)) {
+          existing.picks.push(item.prediction);
+        }
+      } else {
+        map.set(item.fixtureId, {
+          fixtureId: item.fixtureId,
+          fixtureName: item.fixtureName,
+          homeTeam: item.homeTeam,
+          awayTeam: item.awayTeam,
+          compCode: item.compCode,
+          compName: item.compName,
+          kickoff: item.kickoff,
+          isDerby: item.isDerby,
+          derbyName: item.derbyName,
+          picks: [item.prediction],
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [filtered]);
+
   const footballMarketFilters: { id: MarketGroupFilter; label: string }[] = [
     { id: 'ALL', label: 'All markets' },
     { id: 'goals', label: 'Goals' },
@@ -239,13 +273,6 @@ export default function PredictionsPage() {
 
   const activeMarketFilters = isBasketball ? basketballMarketFilters : footballMarketFilters;
 
-  const riskTierPills = [
-    { id: 'ALL', label: 'All Tiers' },
-    { id: 'HIGH', label: 'High Confidence' },
-    { id: 'MEDIUM', label: 'Medium Confidence' },
-    { id: 'LOW', label: 'Low Confidence' },
-  ];
-
   const getTierBadgeStyle = (tier?: string) => {
     if (tier === 'HIGH' || tier === 'SAFE') {
       return 'text-[#B6E63B] bg-[#B6E63B]/[0.12] border-[#B6E63B]/40';
@@ -254,13 +281,6 @@ export default function PredictionsPage() {
       return 'text-[#E2AE45] bg-[#E2AE45]/[0.12] border-[#E2AE45]/40';
     }
     return 'text-[#8B9890] bg-[#151E19] border border-white/[0.07]';
-  };
-
-  const getTeamCode = (team: Team): string => {
-    if (team.shortName && team.shortName.length <= 4) {
-      return team.shortName.slice(0, 3).toUpperCase();
-    }
-    return team.name.slice(0, 3).toUpperCase();
   };
 
   if (isSwitching) {
@@ -276,136 +296,41 @@ export default function PredictionsPage() {
 
   return (
     <div className="space-y-3.5 py-1">
-      {/* Title 23px with 12px muted subtitle */}
+      {/* Title with WAT timezone indicator and Last updated */}
       <div className="space-y-0.5">
         <h1 className="text-[23px] font-[700] leading-[1.2] text-[#ECF1EE] tracking-[-0.025em]">
           Market intelligence
         </h1>
         <p className="text-[12px] text-[#8B9890]">
           {isBasketball
-            ? 'NBA possessions, defensive ratings and expected value projections.'
-            : 'Multi market evaluation across goals, results, handicaps, corners, and cards.'}
+            ? 'NBA possessions, defensive ratings and expected value projections · All times WAT'
+            : 'Pre-kickoff probability models and statistical evaluations · All times WAT'}
+          {lastUpdated ? ` · Last updated ${lastUpdated}` : ''}
         </p>
       </div>
 
-      {/* Responsible use disclaimer - compact amber card */}
-      <div className="rounded-[14px] p-3 border border-[#E2AE45]/[0.28] bg-[#E2AE45]/[0.08] flex items-start gap-2.5">
-        <AlertCircle className="w-3.5 h-3.5 text-[#E2AE45] shrink-0 mt-0.5" strokeWidth={2} />
-        <div className="text-[11px] leading-[16px] text-[#ECF1EE]">
-          <strong className="font-semibold text-[#E2AE45]">Responsible use: </strong>
-          Probabilistic models and mathematical projections only. Sports outcomes contain intrinsic randomness; high modeled probability is never a guarantee. 18+ only.
-        </div>
-      </div>
-
-      {/* Daily High Confidence Picks Section */}
-      {featuredConfidencePicks.length > 0 && (
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-[15px] font-semibold text-[#EDF1F6]">
-              Daily high confidence picks
-            </h2>
-            <span className="text-[11px] text-[#8A95A5]">
-              Top selections across holdout models
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {featuredConfidencePicks.map((item, idx) => {
-              const p = item.prediction;
-              const homeCode = getTeamCode(item.homeTeam);
-              const awayCode = getTeamCode(item.awayTeam);
-              const displayTier = p.confidenceTier || (p.riskTier === 'SAFE' ? 'HIGH' : p.riskTier === 'MODERATE' ? 'MEDIUM' : 'LOW');
-              const tierBadgeClass = getTierBadgeStyle(displayTier);
-              const probVal = p.calibratedProbability ?? p.modelProbability;
-
-              return (
-                <Link
-                  key={idx}
-                  href={`/matches/${item.fixtureId}`}
-                  className="bg-[#101713] border border-white/[0.07] hover:border-[#B6E63B]/40 rounded-[14px] p-3 flex flex-col justify-between space-y-2 transition-transform duration-150 touch-press group"
-                >
-                  <div className="space-y-1.5">
-                    {/* Top row */}
-                    <div className="flex items-center justify-between gap-1 text-[11px] text-[#8B9890]">
-                      <span className="truncate">{item.compCode} · {getOptionTypeLabel(p.optionType)}</span>
-                      <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded-full border font-semibold tracking-wider shrink-0 ${tierBadgeClass}`}>
-                        {displayTier}
-                      </span>
-                    </div>
-
-                    {/* Team row */}
-                    <div className="flex items-center gap-1.5 text-[13px] font-[600] text-[#ECF1EE] min-w-0">
-                      <span className="px-1.5 py-0.5 rounded-[5px] bg-[#151E19] text-[#ECF1EE] text-[10px] font-bold border border-white/[0.07] shrink-0 font-mono">
-                        {homeCode}
-                      </span>
-                      <span className="truncate">{item.homeTeam.shortName || item.homeTeam.name}</span>
-                      <span className="text-[#5E6A63] text-[11px] font-normal shrink-0">vs</span>
-                      <span className="px-1.5 py-0.5 rounded-[5px] bg-[#151E19] text-[#ECF1EE] text-[10px] font-bold border border-white/[0.07] shrink-0 font-mono">
-                        {awayCode}
-                      </span>
-                      <span className="truncate">{item.awayTeam.shortName || item.awayTeam.name}</span>
-                    </div>
-
-                    {/* Pick line */}
-                    <div className="text-[13.5px] font-[600] text-[#ECF1EE] group-hover:text-[#B6E63B] transition-colors leading-tight">
-                      {formatSelectionName(p.selection)}
-                    </div>
-
-                    {p.plainEnglishReason && (
-                      <p className="text-[11.5px] leading-[1.5] text-[#8B9890] line-clamp-2">
-                        {cleanDisplayText(p.plainEnglishReason)}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Probability & Odds Footer */}
-                  <div className="space-y-1 pt-1">
-                    <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#B6E63B] rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, probVal * 100)}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11.5px] pt-0.5">
-                      <span className="text-[13.5px] font-[600] text-[#B6E63B] tabular-nums">
-                        {(probVal * 100).toFixed(0)}%
-                        {p.uncertaintySpread !== undefined && (
-                          <span className="text-[10.5px] text-[#8B9890] font-normal ml-1">
-                            ±{(p.uncertaintySpread * 100).toFixed(1)}%
-                          </span>
-                        )}
-                      </span>
-
-                      {p.sanityTripwire && (
-                        <span className="px-1.5 py-0.5 rounded-[4px] bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9.5px] font-mono font-semibold">
-                          Check data
-                        </span>
-                      )}
-                      {p.marketOdds && p.expectedValue !== null && p.expectedValue !== undefined ? (
-                        <span className="bg-[#151E19] px-2 py-0.5 rounded-[6px] border border-white/[0.07] text-[10.5px] text-[#ECF1EE] tabular-nums">
-                          {p.bookmakerName ? `${p.bookmakerName} ` : ''}@{formatOdds(p.marketOdds)}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-[#8B9890]/80">Odds unavailable: probability analysis only</span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+      {/* Bug 8: Notice if fixtures snapshot is delayed or older than 30 minutes */}
+      {isDelayed && (
+        <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11.5px] flex items-center gap-2">
+          <Info className="w-3.5 h-3.5 shrink-0" />
+          <span>Data may be out of date (snapshot is older than 30 minutes).</span>
         </div>
       )}
 
-      {/* Filters Card */}
+      {/* Bug 6: Single notice at the top when odds are not connected */}
+      <div className="p-2.5 rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-[#8B9890] text-[11.5px] flex items-center gap-2">
+        <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
+        <span>Odds not connected. Showing probability analysis only.</span>
+      </div>
+
+      {/* Bug 7: Filters Card placed FIRST so filters sit above the fold */}
       <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 space-y-2.5">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="w-3.5 h-3.5 text-[#B6E63B]" strokeWidth={2} />
           <h3 className="text-[13px] font-[600] text-[#ECF1EE]">Filters</h3>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label className="block text-[#8B9890] mb-1 text-[11px] font-normal">Competition</label>
             {isBasketball ? (
@@ -423,23 +348,23 @@ export default function PredictionsPage() {
               >
                 <option value="ALL">All competitions</option>
                 {COMPETITIONS.map(c => (
-                  <option key={c.code} value={c.code}>{c.name}</option>
+                  <option key={c.code} value={c.code}>{cleanDisplayText(c.name)}</option>
                 ))}
               </select>
             )}
           </div>
 
           <div>
-            <label className="block text-[#8B9890] mb-1 text-[11px] font-normal">Confidence tier</label>
+            <label className="block text-[#8B9890] mb-1 text-[11px] font-normal">Confidence</label>
             <select
               value={selectedRiskTier}
               onChange={(e) => setSelectedRiskTier(e.target.value)}
               className="w-full h-[38px] bg-[#151E19] border border-white/[0.07] px-3 rounded-[11px] text-[12.5px] text-[#ECF1EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B6E63B]/40"
             >
-              <option value="ALL">All confidence tiers</option>
-              <option value="HIGH">High confidence (≥60%)</option>
-              <option value="MEDIUM">Medium confidence</option>
-              <option value="LOW">Low confidence</option>
+              <option value="ALL">All</option>
+              <option value="HIGH">High (≥60%)</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
             </select>
           </div>
         </div>
@@ -497,120 +422,155 @@ export default function PredictionsPage() {
         </div>
       </div>
 
-      {/* Results header count */}
+      {/* Results header count: Bug 7: Show fixture count instead of raw pipeline line count */}
       <div className="flex items-center justify-between text-[12px] text-[#8A95A5] px-1 pt-1">
-        <span className="tabular-nums font-medium text-[#EDF1F6]">{filtered.length} scored lines</span>
-        <span className="text-[#5F6B7C]">Ranked by probability and edge</span>
+        <span className="tabular-nums font-medium text-[#EDF1F6]">
+          {groupedMatches.length} upcoming fixtures analyzed ({filtered.length} selections)
+        </span>
+        <span className="text-[#5F6B7C]">Ranked by model confidence</span>
       </div>
 
-      {/* Results Card Grid */}
-      {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filtered.map((item, idx) => {
-            const p = item.prediction;
-            const homeCode = getTeamCode(item.homeTeam);
-            const awayCode = getTeamCode(item.awayTeam);
-            const displayTier = p.confidenceTier || (p.riskTier === 'SAFE' ? 'HIGH' : p.riskTier === 'MODERATE' ? 'MEDIUM' : 'LOW');
-            const tierBadgeClass = getTierBadgeStyle(displayTier);
-            const probVal = p.calibratedProbability ?? p.modelProbability;
+      {/* Results Card Grid: Bug 7: Grouped by fixture so overlapping options sit inside one match card */}
+      {groupedMatches.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {groupedMatches.map(group => {
+            const homeName = displayName(group.homeTeam);
+            const awayName = displayName(group.awayTeam);
+            const homeAbbr = getTeamAbbreviation(group.homeTeam);
+            const awayAbbr = getTeamAbbreviation(group.awayTeam);
+            const hasMultiplePicks = group.picks.length > 1;
 
             return (
-              <Link
-                key={idx}
-                href={`/matches/${item.fixtureId}`}
-                className="bg-[#101713] border border-white/[0.07] hover:border-[#B6E63B]/40 rounded-[14px] p-3 flex flex-col justify-between space-y-2 transition-transform duration-150 touch-press group"
+              <div
+                key={group.fixtureId}
+                className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 flex flex-col justify-between space-y-2.5 transition-transform duration-150"
               >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-1 text-[11px] text-[#8A95A5]">
-                    <span className="truncate">{item.compCode} · {getOptionTypeLabel(p.optionType)}</span>
-                    <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full border font-semibold tracking-wider shrink-0 ${tierBadgeClass}`}>
-                      {displayTier}
+                {/* Matchup Header */}
+                <div className="border-b border-white/[0.06] pb-2 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-[#8B9890]">
+                    <span className="truncate">{cleanDisplayText(group.compName)}</span>
+                    <span className="tabular-nums shrink-0">
+                      {formatMatchTime(group.kickoff, 'Africa/Lagos')} WAT
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-[13px] font-[600] text-[#ECF1EE] min-w-0">
-                    <span className="px-1.5 py-0.5 rounded-[5px] bg-[#151E19] text-[#ECF1EE] text-[10px] font-bold border border-white/[0.07] shrink-0 font-mono">
-                      {homeCode}
-                    </span>
-                    <span className="truncate">{item.homeTeam.shortName || item.homeTeam.name}</span>
-                    <span className="text-[#5E6A63] text-[11px] font-normal shrink-0">vs</span>
-                    <span className="px-1.5 py-0.5 rounded-[5px] bg-[#151E19] text-[#ECF1EE] text-[10px] font-bold border border-white/[0.07] shrink-0 font-mono">
-                      {awayCode}
-                    </span>
-                    <span className="truncate">{item.awayTeam.shortName || item.awayTeam.name}</span>
+                  {/* Team matchup with crests and verified abbreviations */}
+                  <div className="flex items-center justify-between gap-2">
+                    <Link
+                      href={`/matches/${group.fixtureId}`}
+                      className="flex items-center gap-2 min-w-0 flex-1 hover:text-[#B6E63B] transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <TeamCrest crestUrl={group.homeTeam.crestUrl} teamName={homeName} size={20} />
+                        <span className="text-[13px] font-semibold text-[#ECF1EE] truncate">
+                          {homeName}
+                        </span>
+                        <span className="px-1 py-0.5 rounded-[4px] bg-[#151E19] text-[#8B9890] text-[9.5px] font-mono font-bold border border-white/[0.06]">
+                          {homeAbbr}
+                        </span>
+                      </div>
+                      <span className="text-[#5E6A63] text-[11px] shrink-0">vs</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <TeamCrest crestUrl={group.awayTeam.crestUrl} teamName={awayName} size={20} />
+                        <span className="text-[13px] font-semibold text-[#ECF1EE] truncate">
+                          {awayName}
+                        </span>
+                        <span className="px-1 py-0.5 rounded-[4px] bg-[#151E19] text-[#8B9890] text-[9.5px] font-mono font-bold border border-white/[0.06]">
+                          {awayAbbr}
+                        </span>
+                      </div>
+                    </Link>
                   </div>
 
-                  <div className="text-[13.5px] font-[600] text-[#ECF1EE] group-hover:text-[#B6E63B] transition-colors leading-tight">
-                    {formatSelectionName(p.selection)}
-                    {p.isTopPick && (
-                      <span className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#B6E63B]/[0.12] text-[#B6E63B] border border-[#B6E63B]/30 align-middle">
-                        Top pick
-                      </span>
-                    )}
-                  </div>
-
-                  {p.plainEnglishReason && (
-                    <p className="text-[11.5px] leading-[1.5] text-[#8B9890] line-clamp-2">
-                      {cleanDisplayText(p.plainEnglishReason)}
-                    </p>
+                  {/* Bug 7: Note when options from one match overlap */}
+                  {hasMultiplePicks && (
+                    <div className="text-[10.5px] text-[#E2AE45] flex items-center gap-1 pt-0.5">
+                      <span className="w-1 h-1 rounded-full bg-[#E2AE45]" />
+                      <span>Options from one match overlap.</span>
+                    </div>
                   )}
                 </div>
 
-                <div className="space-y-1 pt-1">
-                  <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#B6E63B] rounded-full transition-all duration-300"
-                      style={{ width: `${Math.min(100, probVal * 100)}%` }}
-                    />
-                  </div>
+                {/* Picks list for this fixture */}
+                <div className="space-y-2">
+                  {group.picks.map((p, pIdx) => {
+                    const displayTier = p.confidenceTier || (p.riskTier === 'SAFE' ? 'HIGH' : p.riskTier === 'MODERATE' ? 'MEDIUM' : 'LOW');
+                    const tierBadgeClass = getTierBadgeStyle(displayTier);
+                    const probVal = p.calibratedProbability ?? p.modelProbability;
+                    const hasRealOdds = Boolean(p.marketOdds && p.expectedValue !== null && p.expectedValue !== undefined);
 
-                  <div className="flex items-center justify-between text-[11.5px] pt-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13.5px] font-[600] text-[#B6E63B] tabular-nums">
-                        {(probVal * 100).toFixed(0)}%
-                      </span>
-                      {p.edge !== undefined && (
-                        <span className={`text-[11px] tabular-nums ${p.edge >= 0 ? 'text-[#B6E63B]' : 'text-[#8B9890]'}`}>
-                          {formatSignedValue(p.edge * 100, '%')} edge
-                        </span>
-                      )}
-                    </div>
+                    return (
+                      <div
+                        key={pIdx}
+                        className="bg-[#151E19] rounded-[10px] p-2.5 space-y-1.5 border border-white/[0.04]"
+                      >
+                        <div className="flex items-center justify-between text-[11px] gap-1">
+                          <span className="text-[#8B9890] text-[10.5px] truncate">
+                            {getOptionTypeLabel(p.optionType)}
+                          </span>
+                          <span className={`text-[9.5px] uppercase px-1.5 py-0.5 rounded-full border font-semibold tracking-wider shrink-0 ${tierBadgeClass}`}>
+                            {displayTier}
+                          </span>
+                        </div>
 
-                    <div className="flex items-center gap-1.5">
-                      {p.sanityTripwire && (
-                        <span className="px-1.5 py-0.5 rounded-[4px] bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9.5px] font-mono font-semibold">
-                          Check data
-                        </span>
-                      )}
-                      {p.marketOdds && p.expectedValue !== null && p.expectedValue !== undefined ? (
-                        <>
-                          <span className="text-[10.5px] text-[#8B9890] tabular-nums">
-                            EV {cleanDisplayText(formatExpectedValue(p.expectedValue).text)}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[13px] font-[600] text-[#ECF1EE] truncate">
+                            {cleanDisplayText(formatSelectionName(p.selection))}
                           </span>
-                          <span className="bg-[#151E19] px-2 py-0.5 rounded-[6px] border border-white/[0.07] text-[10.5px] text-[#ECF1EE] tabular-nums">
-                            {p.bookmakerName ? `${p.bookmakerName} ` : ''}@{formatOdds(p.marketOdds)}
+                          <span className="text-[12.5px] font-[600] text-[#B6E63B] tabular-nums shrink-0">
+                            {(probVal * 100).toFixed(0)}%
+                            {p.uncertaintySpread !== undefined && p.uncertaintySpread !== null && (
+                              <span className="text-[10px] text-[#8B9890] font-normal ml-1">
+                                ±{(p.uncertaintySpread * 100).toFixed(1)}%
+                              </span>
+                            )}
                           </span>
-                        </>
-                      ) : (
-                        <span className="text-[10px] text-[#8B9890]/80">Odds unavailable: probability analysis only</span>
-                      )}
-                    </div>
-                  </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#B6E63B] rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(100, probVal * 100)}%` }}
+                          />
+                        </div>
+
+                        {/* Odds & EV row - Bug 6: EV & odds shown ONLY when real odds exist, NO repeated unavailable text */}
+                        {hasRealOdds && (
+                          <div className="flex items-center justify-end gap-1.5 text-[10.5px] pt-0.5">
+                            {p.expectedValue !== null && p.expectedValue !== undefined && (
+                              <span className="text-[#8B9890] tabular-nums">
+                                EV {cleanDisplayText(formatExpectedValue(p.expectedValue).text)}
+                              </span>
+                            )}
+                            <span className="bg-[#101713] px-2 py-0.5 rounded-[5px] border border-white/[0.07] text-[#ECF1EE] tabular-nums">
+                              {p.bookmakerName ? `${p.bookmakerName} ` : ''}@{formatOdds(p.marketOdds)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>
       ) : (
-        <div className="p-8 text-center bg-[#101713] border border-white/[0.07] rounded-[14px] space-y-2">
-          <div suppressHydrationWarning className="text-[13px] font-[600] text-[#ECF1EE]">
-            {liveDataAvailable ? 'No predictions match your selected filters' : `Live data unavailable. Last updated ${lastUpdated}`}
-          </div>
-          <p className="max-w-sm mx-auto text-[12px] text-[#8B9890]">
-            Try adjusting the minimum probability threshold or selecting all market categories.
-          </p>
+        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-6 text-center space-y-1.5">
+          <p className="text-[13px] font-semibold text-[#ECF1EE]">No picks match current filters</p>
+          <p className="text-[11.5px] text-[#8B9890]">Try lowering the minimum probability or selecting another competition.</p>
         </div>
       )}
+
+      {/* Responsible use disclaimer at bottom */}
+      <div className="rounded-[14px] p-3 border border-[#E2AE45]/[0.28] bg-[#E2AE45]/[0.08] flex items-start gap-2.5 mt-2">
+        <AlertCircle className="w-3.5 h-3.5 text-[#E2AE45] shrink-0 mt-0.5" strokeWidth={2} />
+        <div className="text-[11px] leading-[16px] text-[#ECF1EE]">
+          <strong className="font-semibold text-[#E2AE45]">Responsible use: </strong>
+          Probabilistic models and mathematical projections only. Sports outcomes contain intrinsic randomness; high modeled probability is never a guarantee. 18+ only.
+        </div>
+      </div>
     </div>
   );
 }

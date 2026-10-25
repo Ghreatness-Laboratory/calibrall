@@ -26,6 +26,7 @@ import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
 import { evaluateLiveMatchState } from '@/lib/prediction/liveMatchState';
 import { extractMatchStats, settleMarketPrediction } from '@/lib/prediction/settlementEngine';
 import QuantitativeFactorsAuditPanel from '@/components/QuantitativeFactorsAuditPanel';
+import { displayName, formatMatchTime } from '@/lib/utils/formatText';
 
 export default function MatchAnalysisPage() {
   const params = useParams();
@@ -84,21 +85,23 @@ export default function MatchAnalysisPage() {
       awayTeamName: fixture.awayTeam.name,
       competitionCode: fixture.competition.code,
       competitionName: fixture.competition.name,
-      homeAttackRating: fixture.homeTeam.attackRating,
-      homeDefenseRating: fixture.homeTeam.defenseRating,
-      awayAttackRating: fixture.awayTeam.attackRating,
-      awayDefenseRating: fixture.awayTeam.defenseRating,
+      homeAttackRating: fixture.homeTeam.attackRating ?? 1.0,
+      homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
+      awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
+      awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
       homeXg: stats.homeXg,
       awayXg: stats.awayXg,
       expectedCornersHome: stats.expectedCornersHome,
       expectedCornersAway: stats.expectedCornersAway,
       expectedCards: stats.expectedCards,
-      uncertaintyScore: stats.uncertaintyScore,
-      dataCoverageScore: stats.dataCoverageScore,
+      uncertaintyScore: stats.uncertaintyScore as any,
+      dataCoverageScore: stats.dataCoverageScore as any,
       sampleSizeMatches: stats.sampleSizeMatches,
       stateTags: stats.stateTags,
       lineupConfirmed: stats.lineupConfirmed,
       verifiedOdds: stats.verifiedOdds,
+      insufficientData: stats.insufficientData || fixture.insufficientData,
+      hasRealTeamStrength: stats.hasRealTeamStrength,
     });
   }, [fixture, isBasketball, stats]);
 
@@ -183,8 +186,8 @@ export default function MatchAnalysisPage() {
   const kickoff = new Date(fixture.kickoffTime);
   const totalXg = stats ? stats.homeXg + stats.awayXg : 0;
   const totalCorners = stats ? stats.expectedCornersHome + stats.expectedCornersAway : 0;
-  const homeName = fixture.homeTeam.shortName || fixture.homeTeam.name;
-  const awayName = fixture.awayTeam.shortName || fixture.awayTeam.name;
+  const homeName = displayName(fixture.homeTeam);
+  const awayName = displayName(fixture.awayTeam);
 
   return (
     <div className="space-y-3.5 py-1">
@@ -234,13 +237,13 @@ export default function MatchAnalysisPage() {
             <span className="flex items-center gap-1" suppressHydrationWarning>
               <Calendar className="w-3.5 h-3.5" strokeWidth={1.8} />
               <span suppressHydrationWarning>
-                {kickoff.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                {kickoff.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Africa/Lagos' })}
               </span>
             </span>
             <span className="flex items-center gap-1" suppressHydrationWarning>
               <Clock className="w-3.5 h-3.5" strokeWidth={1.8} />
               <span suppressHydrationWarning>
-                {kickoff.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                {formatMatchTime(fixture.kickoffTime, 'Africa/Lagos')} WAT
               </span>
             </span>
           </div>
@@ -252,7 +255,7 @@ export default function MatchAnalysisPage() {
             {/* Home Team */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <TeamCrest crestUrl={fixture.homeTeam.crestUrl} teamName={fixture.homeTeam.name} size={28} />
+                <TeamCrest crestUrl={fixture.homeTeam.crestUrl} teamName={homeName} size={28} />
                 <span className="text-[15px] font-semibold text-[#ECF1EE] leading-tight truncate">
                   {homeName}
                 </span>
@@ -269,7 +272,7 @@ export default function MatchAnalysisPage() {
             {/* Away Team */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <TeamCrest crestUrl={fixture.awayTeam.crestUrl} teamName={fixture.awayTeam.name} size={28} />
+                <TeamCrest crestUrl={fixture.awayTeam.crestUrl} teamName={awayName} size={28} />
                 <span className="text-[15px] font-semibold text-[#ECF1EE] leading-tight truncate">
                   {awayName}
                 </span>
@@ -290,7 +293,7 @@ export default function MatchAnalysisPage() {
               {fixture.status === 'FINISHED' ? 'Match completed' : 'Upcoming match'}
             </span>
             <span className="text-[12px] text-[#ECF1EE] mt-0.5 tabular-nums" suppressHydrationWarning>
-              {fixture.status === 'FINISHED' ? 'Full time' : kickoff.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC'}
+              {fixture.status === 'FINISHED' ? 'Full time' : `${formatMatchTime(fixture.kickoffTime, 'Africa/Lagos')} WAT`}
             </span>
           </div>
         </div>
@@ -444,7 +447,7 @@ export default function MatchAnalysisPage() {
               <span className="text-[11px] text-[#8B9890] block">Model confidence</span>
               <div className="flex items-baseline gap-1 mt-0.5">
                 <span className="text-[14px] font-semibold text-[#B6E63B] tabular-nums font-mono">
-                  {((1 - stats.uncertaintyScore) * 100).toFixed(0)}%
+                  {stats.uncertaintyScore !== null ? `${((1 - stats.uncertaintyScore) * 100).toFixed(0)}%` : '—'}
                 </span>
                 <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
                   {stats.sampleSizeMatches} games

@@ -266,9 +266,11 @@ export interface FixtureStatisticalContext {
   expectedCornersHome: number;
   expectedCornersAway: number;
   expectedCards: number;
-  uncertaintyScore: number;
-  dataCoverageScore: number;
+  uncertaintyScore: number | null;
+  dataCoverageScore: number | null;
   sampleSizeMatches: number;
+  hasRealTeamStrength?: boolean;
+  insufficientData?: boolean;
   stateTags?: StateTag[];
   lineupConfirmed?: boolean;
   verifiedOdds?: {
@@ -287,6 +289,7 @@ export interface FixtureStatisticalContext {
 }
 
 import { REAL_250_MATCHES } from './realMatchArchive';
+import { lookupTeamStrength } from './teamDatabase';
 
 export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContext {
   const realMatch = REAL_250_MATCHES.find(m => m.id === fixture.id);
@@ -300,32 +303,71 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       uncertaintyScore: realMatch.context.uncertaintyScore,
       dataCoverageScore: realMatch.context.dataCoverageScore,
       sampleSizeMatches: realMatch.context.sampleSizeMatches,
+      hasRealTeamStrength: true,
+      insufficientData: false,
       stateTags: realMatch.context.stateTags || [],
       lineupConfirmed: realMatch.context.lineupConfirmed ?? true,
       verifiedOdds: realMatch.context.verifiedOdds,
     };
   }
 
+  // Look up genuine team strength parameters in team database
+  const homeLookup = lookupTeamStrength(fixture.homeTeam);
+  const awayLookup = lookupTeamStrength(fixture.awayTeam);
+
+  const homeStrength = homeLookup.found ? homeLookup.data : (fixture.homeTeam.hasRealTeamStrength ? fixture.homeTeam : null);
+  const awayStrength = awayLookup.found ? awayLookup.data : (fixture.awayTeam.hasRealTeamStrength ? fixture.awayTeam : null);
+
+  // HARD RULE (Bug 1): If a fixture has no real team-strength input, do not return a pick.
+  // Return status: "insufficient_data", null data coverage and uncertainty.
+  if (!homeStrength || !awayStrength) {
+    return {
+      homeXg: 0,
+      awayXg: 0,
+      expectedCornersHome: 0,
+      expectedCornersAway: 0,
+      expectedCards: 0,
+      uncertaintyScore: null,
+      dataCoverageScore: null,
+      sampleSizeMatches: 0,
+      hasRealTeamStrength: false,
+      insufficientData: true,
+      stateTags: [] as StateTag[],
+      lineupConfirmed: false,
+      verifiedOdds: undefined,
+    };
+  }
+
   const comp = fixture.competition;
-  const homeAttack = fixture.homeTeam.attackRating || 1.30;
-  const homeDefense = fixture.homeTeam.defenseRating || 0.75;
-  const awayAttack = fixture.awayTeam.attackRating || 1.20;
-  const awayDefense = fixture.awayTeam.defenseRating || 0.85;
+  const homeAttack = homeStrength.attackRating || 1.25;
+  const homeDefense = homeStrength.defenseRating || 0.95;
+  const awayAttack = awayStrength.attackRating || 1.15;
+  const awayDefense = awayStrength.defenseRating || 1.05;
 
   const baseGoals = (comp.avgGoalsPerGame || 2.80) / 2;
-  const homeXg = Number((homeAttack * awayDefense * baseGoals * 1.10).toFixed(2));
-  const awayXg = Number((awayAttack * homeDefense * baseGoals * 0.90).toFixed(2));
+  const homeXg = Number((homeAttack * awayDefense * baseGoals * 1.08).toFixed(2));
+  const awayXg = Number((awayAttack * homeDefense * baseGoals * 0.92).toFixed(2));
 
   const baseCorners = (comp.avgCornersPerGame || 10.0) / 2;
-  const expectedCornersHome = Number(((fixture.homeTeam.cornerAttackRating || 1.2) * baseCorners * 1.05).toFixed(1));
-  const expectedCornersAway = Number(((fixture.awayTeam.cornerAttackRating || 1.0) * baseCorners * 0.95).toFixed(1));
+  const expectedCornersHome = Number(((homeStrength.cornerAttackRating || 1.15) * baseCorners * 1.05).toFixed(1));
+  const expectedCornersAway = Number(((awayStrength.cornerAttackRating || 1.05) * baseCorners * 0.95).toFixed(1));
 
   const baseCards = comp.avgCardsPerGame || 4.2;
-  const expectedCards = Number((baseCards * (((fixture.homeTeam.disciplineRating || 1.0) + (fixture.awayTeam.disciplineRating || 1.0)) / 2)).toFixed(1));
+  const expectedCards = Number((baseCards * (((homeStrength.disciplineRating || 1.0) + (awayStrength.disciplineRating || 1.0)) / 2)).toFixed(1));
 
-  const sampleMatches = 16 + Math.round((homeAttack + awayAttack) * 4);
-  const dataCoverage = Number((0.84 + (fixture.referee ? 0.06 : 0) + (fixture.status === 'FINISHED' ? 0.08 : 0.03)).toFixed(2));
-  const uncertainty = Number((0.06 + (1 - Math.min(0.98, dataCoverage)) * 0.14).toFixed(2));
+  const sampleMatches = ((homeStrength as any).sampleMatches || 20) + ((awayStrength as any).sampleMatches || 20);
+  
+  // Computed (non-constant) data coverage score
+  const sampleCoverage = Math.min(0.78, (sampleMatches / 44) * 0.78);
+  const refereeBonus = fixture.referee ? 0.07 : 0.02;
+  const lineupBonus = fixture.status !== 'POSTPONED' && fixture.status !== 'CANCELED' ? 0.08 : 0.02;
+  const statusBonus = fixture.status === 'FINISHED' ? 0.05 : 0.01;
+  const oddsBonus = fixture.verifiedOdds ? 0.04 : 0.0;
+  const dataCoverage = Number(Math.min(0.96, Math.max(0.68, sampleCoverage + refereeBonus + lineupBonus + statusBonus + oddsBonus)).toFixed(2));
+
+  // Computed (non-constant) uncertainty score
+  const attackDiffSpread = Math.abs(homeAttack - awayAttack) * 0.025;
+  const uncertainty = Number(Math.max(0.042, Math.min(0.125, 0.045 + (1 - dataCoverage) * 0.12 + attackDiffSpread)).toFixed(3));
 
   return {
     homeXg,
@@ -335,10 +377,12 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     expectedCards,
     uncertaintyScore: uncertainty,
     dataCoverageScore: dataCoverage,
-    sampleSizeMatches: sampleMatches,
+    sampleSizeMatches: Math.round(sampleMatches / 2),
+    hasRealTeamStrength: true,
+    insufficientData: false,
     stateTags: [] as StateTag[],
     lineupConfirmed: fixture.status !== 'POSTPONED' && fixture.status !== 'CANCELED',
-    verifiedOdds: undefined,
+    verifiedOdds: fixture.verifiedOdds,
   };
 }
 

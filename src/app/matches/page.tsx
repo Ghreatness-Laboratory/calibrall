@@ -63,21 +63,23 @@ export default function MatchesPage() {
         awayTeamName: fixture.awayTeam.name,
         competitionCode: fixture.competition.code,
         competitionName: fixture.competition.name,
-        homeAttackRating: fixture.homeTeam.attackRating,
-        homeDefenseRating: fixture.homeTeam.defenseRating,
-        awayAttackRating: fixture.awayTeam.attackRating,
-        awayDefenseRating: fixture.awayTeam.defenseRating,
+        homeAttackRating: fixture.homeTeam.attackRating ?? 1.0,
+        homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
+        awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
+        awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
         homeXg: stats.homeXg,
         awayXg: stats.awayXg,
         expectedCornersHome: stats.expectedCornersHome,
         expectedCornersAway: stats.expectedCornersAway,
         expectedCards: stats.expectedCards,
-        uncertaintyScore: stats.uncertaintyScore,
-        dataCoverageScore: stats.dataCoverageScore,
+        uncertaintyScore: stats.uncertaintyScore as any,
+        dataCoverageScore: stats.dataCoverageScore as any,
         sampleSizeMatches: stats.sampleSizeMatches,
         stateTags: stats.stateTags,
         lineupConfirmed: stats.lineupConfirmed,
         verifiedOdds: stats.verifiedOdds,
+        insufficientData: stats.insufficientData || fixture.insufficientData,
+        hasRealTeamStrength: stats.hasRealTeamStrength,
       });
 
       return {
@@ -182,7 +184,7 @@ export default function MatchesPage() {
             Fixtures and markets
           </h2>
           <p className="text-[12px] text-[#8B9890] leading-tight">
-            {scheduledCount} · Active matchday pipelines {lastUpdated ? `· Last updated ${lastUpdated}` : ''}
+            {scheduledCount} · Active matchday pipelines · All kickoff times WAT {lastUpdated ? `· Last updated ${lastUpdated}` : ''}
           </p>
         </div>
 
@@ -198,13 +200,19 @@ export default function MatchesPage() {
         </button>
       </div>
 
-      {/* Notice if sync is delayed by more than 2 hours */}
+      {/* Notice if sync is delayed by more than 2 hours or snapshot older than 30 minutes */}
       {isDelayed && (
         <div className="p-2.5 rounded-[10px] bg-[#E2AE45]/10 border border-[#E2AE45]/30 text-[#E2AE45] text-[11.5px] flex items-center gap-2">
           <Info className="w-3.5 h-3.5 shrink-0" />
-          <span>Data delayed: Live fixture pipeline sync was delayed by more than 2 hours. Showing latest verified schedule.</span>
+          <span>Data may be out of date (snapshot is older than 30 minutes).</span>
         </div>
       )}
+
+      {/* Bug 6: Single notice at the top when odds are not connected */}
+      <div className="p-2.5 rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-[#8B9890] text-[11.5px] flex items-center gap-2">
+        <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
+        <span>Odds not connected. Showing probability analysis only.</span>
+      </div>
 
       {/* Slim info note: 11.5px text, 2px lime left border, small info icon */}
       <div className="border-l-2 border-[#B6E63B] bg-[#101713] rounded-r-[10px] px-3 py-2 flex items-center gap-2">

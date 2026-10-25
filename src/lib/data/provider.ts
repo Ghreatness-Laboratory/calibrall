@@ -6,6 +6,8 @@ import { computeRequestDateWindow } from '../utils/dateWindow';
 import { serverCache } from '../cache/serverCache';
 import { checkAndLogStartupEnv } from '../config/envAudit';
 import { REAL_250_MATCHES, RealHistoricalMatch } from './realMatchArchive';
+import { lookupTeamStrength } from './teamDatabase';
+import { displayName, getTeamAbbreviation } from '../utils/formatText';
 
 export interface ProviderHealth {
   providerName: string;
@@ -53,28 +55,35 @@ function parseFootballDataMatch(m: any): Fixture {
     isActive: true,
   };
 
+  const homeLookup = lookupTeamStrength(m.homeTeam);
+  const awayLookup = lookupTeamStrength(m.awayTeam);
+
   const homeTeam: Team = {
     id: `team_${m.homeTeam?.id || m.homeTeam?.name?.toLowerCase().replace(/\s+/g, '_')}`,
     name: m.homeTeam?.name || 'Home Team',
-    shortName: m.homeTeam?.shortName || m.homeTeam?.name || 'Home',
-    tla: m.homeTeam?.tla || 'HOM',
-    crestUrl: m.homeTeam?.crest || 'https://crests.football-data.org/65.png',
-    attackRating: 1.30,
-    defenseRating: 0.75,
-    cornerAttackRating: 1.25,
-    disciplineRating: 0.90,
+    shortName: homeLookup.found && homeLookup.data ? homeLookup.data.shortName : displayName(m.homeTeam),
+    tla: homeLookup.found && homeLookup.data ? homeLookup.data.tla : getTeamAbbreviation(m.homeTeam),
+    crestUrl: homeLookup.found && homeLookup.data?.crestUrl ? homeLookup.data.crestUrl : (m.homeTeam?.crest || 'https://crests.football-data.org/65.png'),
+    attackRating: homeLookup.found && homeLookup.data ? homeLookup.data.attackRating : undefined,
+    defenseRating: homeLookup.found && homeLookup.data ? homeLookup.data.defenseRating : undefined,
+    cornerAttackRating: homeLookup.found && homeLookup.data ? homeLookup.data.cornerAttackRating : undefined,
+    disciplineRating: homeLookup.found && homeLookup.data ? homeLookup.data.disciplineRating : undefined,
+    recentForm: homeLookup.found && homeLookup.data ? homeLookup.data.recentForm : undefined,
+    hasRealTeamStrength: homeLookup.found,
   };
 
   const awayTeam: Team = {
     id: `team_${m.awayTeam?.id || m.awayTeam?.name?.toLowerCase().replace(/\s+/g, '_')}`,
     name: m.awayTeam?.name || 'Away Team',
-    shortName: m.awayTeam?.shortName || m.awayTeam?.name || 'Away',
-    tla: m.awayTeam?.tla || 'AWY',
-    crestUrl: m.awayTeam?.crest || 'https://crests.football-data.org/57.png',
-    attackRating: 1.20,
-    defenseRating: 0.85,
-    cornerAttackRating: 1.15,
-    disciplineRating: 0.95,
+    shortName: awayLookup.found && awayLookup.data ? awayLookup.data.shortName : displayName(m.awayTeam),
+    tla: awayLookup.found && awayLookup.data ? awayLookup.data.tla : getTeamAbbreviation(m.awayTeam),
+    crestUrl: awayLookup.found && awayLookup.data?.crestUrl ? awayLookup.data.crestUrl : (m.awayTeam?.crest || 'https://crests.football-data.org/57.png'),
+    attackRating: awayLookup.found && awayLookup.data ? awayLookup.data.attackRating : undefined,
+    defenseRating: awayLookup.found && awayLookup.data ? awayLookup.data.defenseRating : undefined,
+    cornerAttackRating: awayLookup.found && awayLookup.data ? awayLookup.data.cornerAttackRating : undefined,
+    disciplineRating: awayLookup.found && awayLookup.data ? awayLookup.data.disciplineRating : undefined,
+    recentForm: awayLookup.found && awayLookup.data ? awayLookup.data.recentForm : undefined,
+    hasRealTeamStrength: awayLookup.found,
   };
 
   return {
@@ -115,28 +124,35 @@ function parseSportmonksMatch(m: any): Fixture {
     isActive: true,
   };
 
+  const homeLookup = lookupTeamStrength(home);
+  const awayLookup = lookupTeamStrength(away);
+
   const homeTeam: Team = {
     id: `team_${home.id || 'home'}`,
     name: home.name || 'Home Team',
-    shortName: home.short_code || home.name || 'Home',
-    tla: home.short_code || 'HOM',
-    crestUrl: home.image_path || 'https://crests.football-data.org/65.png',
-    attackRating: 1.25,
-    defenseRating: 0.80,
-    cornerAttackRating: 1.20,
-    disciplineRating: 0.90,
+    shortName: homeLookup.found && homeLookup.data ? homeLookup.data.shortName : displayName(home),
+    tla: homeLookup.found && homeLookup.data ? homeLookup.data.tla : getTeamAbbreviation(home),
+    crestUrl: homeLookup.found && homeLookup.data?.crestUrl ? homeLookup.data.crestUrl : (home.image_path || 'https://crests.football-data.org/65.png'),
+    attackRating: homeLookup.found && homeLookup.data ? homeLookup.data.attackRating : undefined,
+    defenseRating: homeLookup.found && homeLookup.data ? homeLookup.data.defenseRating : undefined,
+    cornerAttackRating: homeLookup.found && homeLookup.data ? homeLookup.data.cornerAttackRating : undefined,
+    disciplineRating: homeLookup.found && homeLookup.data ? homeLookup.data.disciplineRating : undefined,
+    recentForm: homeLookup.found && homeLookup.data ? homeLookup.data.recentForm : undefined,
+    hasRealTeamStrength: homeLookup.found,
   };
 
   const awayTeam: Team = {
     id: `team_${away.id || 'away'}`,
     name: away.name || 'Away Team',
-    shortName: away.short_code || away.name || 'Away',
-    tla: away.short_code || 'AWY',
-    crestUrl: away.image_path || 'https://crests.football-data.org/57.png',
-    attackRating: 1.15,
-    defenseRating: 0.85,
-    cornerAttackRating: 1.10,
-    disciplineRating: 0.95,
+    shortName: awayLookup.found && awayLookup.data ? awayLookup.data.shortName : displayName(away),
+    tla: awayLookup.found && awayLookup.data ? awayLookup.data.tla : getTeamAbbreviation(away),
+    crestUrl: awayLookup.found && awayLookup.data?.crestUrl ? awayLookup.data.crestUrl : (away.image_path || 'https://crests.football-data.org/57.png'),
+    attackRating: awayLookup.found && awayLookup.data ? awayLookup.data.attackRating : undefined,
+    defenseRating: awayLookup.found && awayLookup.data ? awayLookup.data.defenseRating : undefined,
+    cornerAttackRating: awayLookup.found && awayLookup.data ? awayLookup.data.cornerAttackRating : undefined,
+    disciplineRating: awayLookup.found && awayLookup.data ? awayLookup.data.disciplineRating : undefined,
+    recentForm: awayLookup.found && awayLookup.data ? awayLookup.data.recentForm : undefined,
+    hasRealTeamStrength: awayLookup.found,
   };
 
   return {
@@ -172,7 +188,40 @@ function parseHistoricalMatchToFixture(m: RealHistoricalMatch, index: number): F
     isActive: true,
   };
 
-  const crests = [65, 57, 64, 61, 58, 73, 86, 81, 78, 5, 3, 108, 109, 110];
+  const homeLookup = lookupTeamStrength(m.homeTeam);
+  const awayLookup = lookupTeamStrength(m.awayTeam);
+
+  const homeTeam: Team = {
+    id: `team_${m.homeTeam.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+    name: m.homeTeam,
+    shortName: homeLookup.found && homeLookup.data ? homeLookup.data.shortName : displayName(m.homeTeam),
+    tla: homeLookup.found && homeLookup.data ? homeLookup.data.tla : getTeamAbbreviation(m.homeTeam),
+    crestUrl: homeLookup.found && homeLookup.data?.crestUrl ? homeLookup.data.crestUrl : `https://crests.football-data.org/65.png`,
+    attackRating: homeLookup.found && homeLookup.data ? homeLookup.data.attackRating : m.context.homeAttackRating,
+    defenseRating: homeLookup.found && homeLookup.data ? homeLookup.data.defenseRating : m.context.homeDefenseRating,
+    cornerAttackRating: homeLookup.found && homeLookup.data ? homeLookup.data.cornerAttackRating : 1.25,
+    disciplineRating: homeLookup.found && homeLookup.data ? homeLookup.data.disciplineRating : 0.95,
+    recentForm: homeLookup.found && homeLookup.data ? homeLookup.data.recentForm : ['W', 'D', 'W', 'W', 'L'],
+    hasRealTeamStrength: true,
+  };
+
+  const awayTeam: Team = {
+    id: `team_${m.awayTeam.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+    name: m.awayTeam,
+    shortName: awayLookup.found && awayLookup.data ? awayLookup.data.shortName : displayName(m.awayTeam),
+    tla: awayLookup.found && awayLookup.data ? awayLookup.data.tla : getTeamAbbreviation(m.awayTeam),
+    crestUrl: awayLookup.found && awayLookup.data?.crestUrl ? awayLookup.data.crestUrl : `https://crests.football-data.org/57.png`,
+    attackRating: awayLookup.found && awayLookup.data ? awayLookup.data.attackRating : m.context.awayAttackRating,
+    defenseRating: awayLookup.found && awayLookup.data ? awayLookup.data.defenseRating : m.context.awayDefenseRating,
+    cornerAttackRating: awayLookup.found && awayLookup.data ? awayLookup.data.cornerAttackRating : 1.15,
+    disciplineRating: awayLookup.found && awayLookup.data ? awayLookup.data.disciplineRating : 0.95,
+    recentForm: awayLookup.found && awayLookup.data ? awayLookup.data.recentForm : ['D', 'W', 'L', 'W', 'D'],
+    hasRealTeamStrength: true,
+  };
+
+  // Stagger kickoffs around today
+  const baseTime = Date.now();
+  const kickoffMs = baseTime + (index === 0 ? -3600000 : index * 7200000);
 
   return {
     id: m.id,
@@ -180,35 +229,13 @@ function parseHistoricalMatchToFixture(m: RealHistoricalMatch, index: number): F
     competitionId: comp.id,
     competition: comp,
     seasonYear: '2024/2025',
-    homeTeam: {
-      id: `team_${m.homeTeam.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-      name: m.homeTeam,
-      shortName: m.homeTeam.replace(/ (FC|CF)$/, ''),
-      tla: m.homeTeam.substring(0, 3).toUpperCase(),
-      crestUrl: `https://crests.football-data.org/${crests[index % crests.length]}.png`,
-      attackRating: m.context.homeAttackRating,
-      defenseRating: m.context.homeDefenseRating,
-      cornerAttackRating: 1.25,
-      disciplineRating: 0.95,
-      recentForm: ['W', 'D', 'W', 'W', 'L'],
-    },
-    awayTeam: {
-      id: `team_${m.awayTeam.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-      name: m.awayTeam,
-      shortName: m.awayTeam.replace(/ (FC|CF)$/, ''),
-      tla: m.awayTeam.substring(0, 3).toUpperCase(),
-      crestUrl: `https://crests.football-data.org/${crests[(index + 3) % crests.length]}.png`,
-      attackRating: m.context.awayAttackRating,
-      defenseRating: m.context.awayDefenseRating,
-      cornerAttackRating: 1.15,
-      disciplineRating: 0.95,
-      recentForm: ['D', 'W', 'L', 'W', 'D'],
-    },
-    kickoffTime: new Date(Date.now() + (index - 2) * 86400000).toISOString(),
+    homeTeam,
+    awayTeam,
+    kickoffTime: new Date(kickoffMs).toISOString(),
     matchday: 28,
-    status: index < 2 ? 'FINISHED' : 'TIMED',
-    homeScore: index < 2 ? m.actual.homeGoals : null,
-    awayScore: index < 2 ? m.actual.awayGoals : null,
+    status: index === 0 ? 'FINISHED' : 'TIMED',
+    homeScore: index === 0 ? m.actual.homeGoals : null,
+    awayScore: index === 0 ? m.actual.awayGoals : null,
     venue: 'European Stadium',
     dataFreshness: new Date().toISOString(),
     isDemo: false,
@@ -433,21 +460,23 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       awayTeamName: fixture.awayTeam.name,
       competitionCode: fixture.competition.code,
       competitionName: fixture.competition.name,
-      homeAttackRating: fixture.homeTeam.attackRating,
-      homeDefenseRating: fixture.homeTeam.defenseRating,
-      awayAttackRating: fixture.awayTeam.attackRating,
-      awayDefenseRating: fixture.awayTeam.defenseRating,
+      homeAttackRating: fixture.homeTeam.attackRating ?? 1.0,
+      homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
+      awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
+      awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
       homeXg: stats.homeXg,
       awayXg: stats.awayXg,
       expectedCornersHome: stats.expectedCornersHome,
       expectedCornersAway: stats.expectedCornersAway,
       expectedCards: stats.expectedCards,
-      uncertaintyScore: stats.uncertaintyScore,
-      dataCoverageScore: stats.dataCoverageScore,
+      uncertaintyScore: stats.uncertaintyScore as any,
+      dataCoverageScore: stats.dataCoverageScore as any,
       sampleSizeMatches: stats.sampleSizeMatches,
       stateTags: stats.stateTags,
       lineupConfirmed: stats.lineupConfirmed,
       verifiedOdds: stats.verifiedOdds,
+      insufficientData: stats.insufficientData || fixture.insufficientData,
+      hasRealTeamStrength: stats.hasRealTeamStrength,
     };
   }
 

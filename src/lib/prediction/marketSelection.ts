@@ -40,6 +40,7 @@ import {
   isOptionTypeEnabled,
   isSubstituteOnly
 } from './marketCatalog';
+import { displayName } from '@/lib/utils/formatText';
 import { 
   getMarketBaseline, 
   MarketFamily, 
@@ -272,6 +273,9 @@ export function evaluateFixtureMarkets(
   // =========================================================================
   // 1. MATCH RESULT (1X2)
   // =========================================================================
+  const homeDisplay = displayName(context.homeTeamName);
+  const awayDisplay = displayName(context.awayTeamName);
+
   if (isOptionTypeEnabled('win')) {
     const meta = SUPPORTED_OPTIONS_CATALOGUE.win;
     rawCandidates.push({
@@ -279,13 +283,13 @@ export function evaluateFixtureMarkets(
       optionType: 'win',
       marketCategory: 'match_result',
       marketName: meta.title,
-      selection: `${context.homeTeamName} Win`,
+      selection: `${homeDisplay} win`,
       period: 'REGULAR_TIME',
       settlementRule: meta.settlementRule,
       modelProbability: goalDist.homeWin,
       odds: context.verifiedOdds?.homeWin,
       confidence: baseConfidence,
-      plainEnglishReason: `${context.homeTeamName} projects ${effectiveHomeXg.toFixed(2)} xG vs ${effectiveAwayXg.toFixed(2)} with ${(context.homeAttackRating / context.awayDefenseRating).toFixed(2)} attacking ratio.`,
+      plainEnglishReason: `${homeDisplay} projects ${effectiveHomeXg.toFixed(2)} xG vs ${effectiveAwayXg.toFixed(2)} with ${(context.homeAttackRating / context.awayDefenseRating).toFixed(2)} attacking ratio.`,
       dataPoints: [
         { metricName: 'Home xG', value: effectiveHomeXg.toFixed(2) },
         { metricName: 'Away xG', value: effectiveAwayXg.toFixed(2) },
@@ -297,13 +301,13 @@ export function evaluateFixtureMarkets(
       optionType: 'win',
       marketCategory: 'match_result',
       marketName: meta.title,
-      selection: `${context.awayTeamName} Win`,
+      selection: `${awayDisplay} win`,
       period: 'REGULAR_TIME',
       settlementRule: meta.settlementRule,
       modelProbability: goalDist.awayWin,
       odds: context.verifiedOdds?.awayWin,
       confidence: baseConfidence,
-      plainEnglishReason: `${context.awayTeamName} counter-attack index yields ${effectiveAwayXg.toFixed(2)} projected away goals.`,
+      plainEnglishReason: `${awayDisplay} counter-attack index yields ${effectiveAwayXg.toFixed(2)} projected away goals.`,
       dataPoints: [
         { metricName: 'Home xG', value: effectiveHomeXg.toFixed(2) },
         { metricName: 'Away xG', value: effectiveAwayXg.toFixed(2) }
@@ -343,12 +347,12 @@ export function evaluateFixtureMarkets(
       optionType: 'double_chance',
       marketCategory: 'double_chance',
       marketName: meta.title,
-      selection: `${context.homeTeamName} or Draw`,
+      selection: `${homeDisplay} or Draw`,
       period: 'REGULAR_TIME',
       settlementRule: meta.settlementRule,
       modelProbability: goalDist.doubleChance.homeOrDraw,
       confidence: baseConfidence,
-      plainEnglishReason: `${context.homeTeamName} unbeaten in high-percentage simulations; combined ${(goalDist.doubleChance.homeOrDraw * 100).toFixed(0)}% safety cover.`,
+      plainEnglishReason: `${homeDisplay} unbeaten in high-percentage simulations; combined ${(goalDist.doubleChance.homeOrDraw * 100).toFixed(0)}% safety cover.`,
       dataPoints: [
         { metricName: 'Derived 1X Probability', value: `${(goalDist.doubleChance.homeOrDraw * 100).toFixed(1)}%` },
         { metricName: 'Home Win + Draw', value: `${(goalDist.homeWin * 100).toFixed(1)}% + ${(goalDist.draw * 100).toFixed(1)}%` }
@@ -360,12 +364,12 @@ export function evaluateFixtureMarkets(
       optionType: 'double_chance',
       marketCategory: 'double_chance',
       marketName: meta.title,
-      selection: `Draw or ${context.awayTeamName}`,
+      selection: `Draw or ${awayDisplay}`,
       period: 'REGULAR_TIME',
       settlementRule: meta.settlementRule,
       modelProbability: goalDist.doubleChance.awayOrDraw,
       confidence: baseConfidence,
-      plainEnglishReason: `${context.awayTeamName} loss avoidance rate covers ${(goalDist.doubleChance.awayOrDraw * 100).toFixed(0)}% of joint outcomes.`,
+      plainEnglishReason: `${awayDisplay} loss avoidance rate covers ${(goalDist.doubleChance.awayOrDraw * 100).toFixed(0)}% of joint outcomes.`,
       dataPoints: [
         { metricName: 'Derived X2 Probability', value: `${(goalDist.doubleChance.awayOrDraw * 100).toFixed(1)}%` }
       ]
@@ -376,7 +380,7 @@ export function evaluateFixtureMarkets(
       optionType: 'double_chance',
       marketCategory: 'double_chance',
       marketName: meta.title,
-      selection: `${context.homeTeamName} or ${context.awayTeamName} (No Draw)`,
+      selection: `${homeDisplay} or ${awayDisplay} (No Draw)`,
       period: 'REGULAR_TIME',
       settlementRule: meta.settlementRule,
       modelProbability: goalDist.doubleChance.homeOrAway,

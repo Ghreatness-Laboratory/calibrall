@@ -26,6 +26,7 @@ import {
 import { getStoredSavedFixtures } from '@/lib/supabase/client';
 import { Team } from '@/types';
 import { formatExpectedValue, formatOdds, formatSelectionName } from '@/lib/prediction/marketCatalog';
+import { displayName } from '@/lib/utils/formatText';
 
 export default function DashboardPage() {
   const { sport, isSwitching } = useSport();
@@ -55,21 +56,23 @@ export default function DashboardPage() {
         awayTeamName: fixture.awayTeam.name,
         competitionCode: fixture.competition.code,
         competitionName: fixture.competition.name,
-        homeAttackRating: fixture.homeTeam.attackRating,
-        homeDefenseRating: fixture.homeTeam.defenseRating,
-        awayAttackRating: fixture.awayTeam.attackRating,
-        awayDefenseRating: fixture.awayTeam.defenseRating,
+        homeAttackRating: fixture.homeTeam.attackRating ?? 1.0,
+        homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
+        awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
+        awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
         homeXg: stats.homeXg,
         awayXg: stats.awayXg,
         expectedCornersHome: stats.expectedCornersHome,
         expectedCornersAway: stats.expectedCornersAway,
         expectedCards: stats.expectedCards,
-        uncertaintyScore: stats.uncertaintyScore,
-        dataCoverageScore: stats.dataCoverageScore,
+        uncertaintyScore: stats.uncertaintyScore as any,
+        dataCoverageScore: stats.dataCoverageScore as any,
         sampleSizeMatches: stats.sampleSizeMatches,
         stateTags: stats.stateTags,
         lineupConfirmed: stats.lineupConfirmed,
         verifiedOdds: stats.verifiedOdds,
+        insufficientData: stats.insufficientData || fixture.insufficientData,
+        hasRealTeamStrength: stats.hasRealTeamStrength,
       });
 
       return {
@@ -147,7 +150,7 @@ export default function DashboardPage() {
             fixtureId: fixture.id,
             homeTeam: fixture.homeTeam,
             awayTeam: fixture.awayTeam,
-            matchName: `${fixture.homeTeam.shortName || fixture.homeTeam.name} vs ${fixture.awayTeam.shortName || fixture.awayTeam.name}`,
+            matchName: `${displayName(fixture.homeTeam)} vs ${displayName(fixture.awayTeam)}`,
             compCode: fixture.competition.code,
             marketName: p.marketName,
             selection: p.selection,

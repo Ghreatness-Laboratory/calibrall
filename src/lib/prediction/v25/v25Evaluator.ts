@@ -16,7 +16,7 @@ import { FeatureLayerEngine, V25FixtureFeatures } from './featureLayer';
 import { DixonColesV25Engine, V25ScorelineMatrix } from './dixonColesV25';
 import { ConfidenceEngine, V25RiskFlagEvaluation } from './confidenceEngine';
 import { WhyPanelGenerator } from './whyPanel';
-import { cleanDisplayText } from '@/lib/utils/formatText';
+import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
 import { formatSelectionName } from '../marketCatalog';
 import { getMarketBaseline } from '../baselines';
 import { marketMonitor } from '../marketMonitor';
@@ -53,6 +53,23 @@ interface RawOptionCandidate {
 
 export class DixonColesV25Evaluator {
   public static evaluateFixture(context: FixtureContext): V25EvaluatedFixtureResult {
+    // 0. HARD RULE: If a fixture has no real team-strength input, do not return a pick for it.
+    // Return status: "insufficient_data" and show "Not enough data" in the UI.
+    if (context.insufficientData || context.hasRealTeamStrength === false) {
+      const features = FeatureLayerEngine.computeFixtureFeatures(context);
+      return {
+        engineVersion: 'v2.5.0',
+        fixtureId: context.fixtureId,
+        features,
+        scorelineMatrix: DixonColesV25Engine.generateScorelineMatrix(1.0, 1.0, features),
+        predictions: [],
+        topPick: null,
+        alternativePicks: [],
+        noRecommendationReason: 'Not enough data',
+        dataCompletenessScore: 0,
+      };
+    }
+
     // 1. Compute pre-kickoff features (Zero temporal leakage)
     const features = FeatureLayerEngine.computeFixtureFeatures(context);
 
@@ -356,6 +373,16 @@ export class DixonColesV25Evaluator {
       if (p.optionType === 'asian_handicap' && Math.abs(p.handicapLine ?? 0) >= 1.5) return false;
       if (p.qualificationStatus === 'NO_RECOMMENDATION' || p.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY') return false;
 
+      // Hard rule (Bug 1): A pick below roughly 52% or with an edge near zero must not be shown as "Top pick".
+      // Show "No strong lean" instead, and allow a different market to be the top pick for that fixture.
+      const pickProb = p.calibratedProbability ?? p.modelProbability;
+      if (pickProb < 0.52) return false;
+
+      const pickEdge = p.expectedValue !== null && p.expectedValue !== undefined
+        ? p.expectedValue
+        : (p.edgeOverBaseline ?? 0);
+      if (pickEdge <= 0.02) return false;
+
       if (hasAnyVerifiedOdds) {
         // When real bookmaker odds exist, top pick MUST have verified odds and positive EV!
         return Boolean(p.marketOdds && p.qualificationStatus === 'QUALIFIED_VALUE' && (p.expectedValue ?? 0) > 0.015);
@@ -393,9 +420,7 @@ export class DixonColesV25Evaluator {
         }
       }
     } else {
-      noRecommendationReason = cleanDisplayText(
-        "No recommended pick: pre match contextual factors, adverse risk flags, or market efficiency indicate insufficient statistical edge. Abstaining on this fixture."
-      );
+      noRecommendationReason = 'No strong lean';
     }
 
     // Sort all predictions by ranking score for consistent UI rendering
@@ -428,8 +453,8 @@ export class DixonColesV25Evaluator {
     const list: RawOptionCandidate[] = [];
     const odds = context.verifiedOdds || {};
 
-    const home = context.homeTeamName;
-    const away = context.awayTeamName;
+    const home = displayName(context.homeTeamName);
+    const away = displayName(context.awayTeamName);
 
     // 1. 1X2 Match Result
     list.push({
@@ -437,7 +462,7 @@ export class DixonColesV25Evaluator {
       optionType: 'win',
       marketCategory: 'match_result',
       marketName: 'Match Result',
-      selection: `${home} to win`,
+      selection: `${home} win`,
       period: 'REGULAR_TIME',
       settlementRule: 'Regular time 90 mins.',
       rawProb: matrix.homeWin,
@@ -459,7 +484,7 @@ export class DixonColesV25Evaluator {
       optionType: 'win',
       marketCategory: 'match_result',
       marketName: 'Match Result',
-      selection: `${away} to win`,
+      selection: `${away} win`,
       period: 'REGULAR_TIME',
       settlementRule: 'Regular time 90 mins.',
       rawProb: matrix.awayWin,

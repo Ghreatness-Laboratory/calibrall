@@ -272,3 +272,268 @@ export function formatCleanOdds(odds?: number | null): string {
 export function formatBinRange(min: number, max: number): string {
   return `Bin ${min.toFixed(2)} to ${max.toFixed(2)}`;
 }
+
+/**
+ * Known canonical short display names for European clubs (Bug 4)
+ */
+const CANONICAL_SHORT_NAMES: Record<string, string> = {
+  'fortuna sittard': 'Sittard',
+  'sittard': 'Sittard',
+  'internazionale milano': 'Inter',
+  'fc internazionale milano': 'Inter',
+  'internazionale': 'Inter',
+  'inter milano': 'Inter',
+  'inter': 'Inter',
+  'genoa cfc': 'Genoa',
+  'genoa': 'Genoa',
+  'as monaco': 'Monaco',
+  'as monaco fc': 'Monaco',
+  'monaco': 'Monaco',
+  'venezia fc': 'Venezia',
+  'venezia': 'Venezia',
+  'bayer 04 leverkusen': 'Leverkusen',
+  'bayer leverkusen': 'Leverkusen',
+  'leverkusen': 'Leverkusen',
+  'borussia monchengladbach': "M'gladbach",
+  'borussia mönchengladbach': "M'gladbach",
+  'monchengladbach': "M'gladbach",
+  "m'gladbach": "M'gladbach",
+  '1. fsv mainz 05': 'Mainz',
+  'fsv mainz 05': 'Mainz',
+  'mainz 05': 'Mainz',
+  'mainz': 'Mainz',
+  'sc paderborn 07': 'Paderborn',
+  'sc paderborn': 'Paderborn',
+  'paderborn 07': 'Paderborn',
+  'paderborn': 'Paderborn',
+  'sc freiburg': 'Freiburg',
+  'freiburg': 'Freiburg',
+  'fc bayern munchen': 'Bayern',
+  'fc bayern münchen': 'Bayern',
+  'bayern munchen': 'Bayern',
+  'bayern münchen': 'Bayern',
+  'bayern munich': 'Bayern',
+  'bayern': 'Bayern',
+  'ec bahia': 'Bahia',
+  'esporte clube bahia': 'Bahia',
+  'bahia': 'Bahia',
+  'sv elversberg': 'Elversberg',
+  'elversberg': 'Elversberg',
+  'crystal palace fc': 'Crystal Palace',
+  'crystal palace': 'Crystal Palace',
+  'newcastle united fc': 'Newcastle',
+  'newcastle united': 'Newcastle',
+  'newcastle': 'Newcastle',
+  'hull city': 'Hull',
+  'hull': 'Hull',
+  'brentford fc': 'Brentford',
+  'brentford': 'Brentford',
+  'nec nijmegen': 'NEC',
+  'n.e.c.': 'NEC',
+  'nec': 'NEC',
+  'fc groningen': 'Groningen',
+  'groningen': 'Groningen',
+  'sbv excelsior': 'Excelsior',
+  'excelsior': 'Excelsior',
+  'excelsior rotterdam': 'Excelsior',
+  'lille osc': 'Lille',
+  'lille': 'Lille',
+  'tsg 1899 hoffenheim': 'Hoffenheim',
+  'tsg hoffenheim': 'Hoffenheim',
+  'hoffenheim': 'Hoffenheim',
+  'santos fc': 'Santos',
+  'santos': 'Santos',
+  'psv eindhoven': 'PSV',
+  'psv': 'PSV',
+  'feyenoord rotterdam': 'Feyenoord',
+  'feyenoord': 'Feyenoord',
+  'afc ajax': 'Ajax',
+  'ajax': 'Ajax',
+  'manchester city': 'Man City',
+  'manchester city fc': 'Man City',
+  'man city': 'Man City',
+  'manchester united': 'Man United',
+  'manchester united fc': 'Man United',
+  'man united': 'Man United',
+  'arsenal fc': 'Arsenal',
+  'arsenal': 'Arsenal',
+  'chelsea fc': 'Chelsea',
+  'chelsea': 'Chelsea',
+  'liverpool fc': 'Liverpool',
+  'liverpool': 'Liverpool',
+  'tottenham hotspur': 'Tottenham',
+  'tottenham': 'Tottenham',
+  'real madrid cf': 'Real Madrid',
+  'real madrid': 'Real Madrid',
+  'fc barcelona': 'Barcelona',
+  'barcelona': 'Barcelona',
+  'atletico de madrid': 'Atlético',
+  'atlético de madrid': 'Atlético',
+  'atletico madrid': 'Atlético',
+  'juventus fc': 'Juventus',
+  'juventus': 'Juventus',
+  'ac milan': 'Milan',
+  'milan': 'Milan',
+  'paris saint-germain': 'PSG',
+  'paris saint germain': 'PSG',
+  'psg': 'PSG',
+  'borussia dortmund': 'Dortmund',
+  'dortmund': 'Dortmund',
+  'rb leipzig': 'RB Leipzig',
+  'vfb stuttgart': 'Stuttgart',
+  'eintracht frankfurt': 'Frankfurt',
+};
+
+/**
+ * Returns the clean, consistent short display name for any team (Bug 4).
+ * Always use this helper inside pick labels (`${displayName(team)} win`), cards, and tables.
+ * Never insert the raw team.name into a pick label.
+ */
+export function displayName(team: any): string {
+  if (!team) return '';
+  const raw = typeof team === 'string' ? team : (team.shortName || team.name || '');
+  if (!raw) return '';
+
+  const lower = raw.toLowerCase().trim();
+  if (CANONICAL_SHORT_NAMES[lower]) {
+    return CANONICAL_SHORT_NAMES[lower];
+  }
+
+  // Also check normalized without punctuation/accents
+  const norm = lower.replace(/[\.\-_']/g, ' ').replace(/\s+/g, ' ').trim();
+  if (CANONICAL_SHORT_NAMES[norm]) {
+    return CANONICAL_SHORT_NAMES[norm];
+  }
+
+  // Generic heuristic cleanup
+  let cleaned = raw
+    .replace(/^(1\.\s*FSV\s+|1\.\s*FC\s+|1\.\s*|FC\s+|CF\s+|SC\s+|SV\s+|AFC\s+|AS\s+|US\s+|EC\s+|SBV\s+|TSG\s+1899\s+|TSG\s+|AC\s+|SS\s+)/i, '')
+    .replace(/\s+(FC|CF|CFC|OSC|04|05|07|1899)$/i, '')
+    .trim();
+
+  return cleaned || raw;
+}
+
+/**
+ * Known TLAs / Abbreviations for European and international teams (Bug 3)
+ */
+const KNOWN_TEAM_TLAS: Record<string, string> = {
+  'leverkusen': 'B04',
+  'bayer 04 leverkusen': 'B04',
+  'bayer leverkusen': 'B04',
+  'm_gladbach': 'BMG',
+  "m'gladbach": 'BMG',
+  'borussia monchengladbach': 'BMG',
+  'borussia mönchengladbach': 'BMG',
+  'monchengladbach': 'BMG',
+  'mainz': 'M05',
+  '1. fsv mainz 05': 'M05',
+  'fsv mainz 05': 'M05',
+  'bahia': 'BAH',
+  'ec bahia': 'BAH',
+  'paderborn': 'SCP',
+  'sc paderborn 07': 'SCP',
+  'sc paderborn': 'SCP',
+  'freiburg': 'SCF',
+  'sc freiburg': 'SCF',
+  'bayern': 'FCB',
+  'fc bayern munchen': 'FCB',
+  'fc bayern münchen': 'FCB',
+  'bayern munich': 'FCB',
+  'elversberg': 'SVE',
+  'sv elversberg': 'SVE',
+  'sv 07 elversberg': 'SVE',
+  'sittard': 'SIT',
+  'fortuna sittard': 'SIT',
+  'excelsior': 'EXC',
+  'sbv excelsior': 'EXC',
+  'inter': 'INT',
+  'internazionale milano': 'INT',
+  'fc internazionale milano': 'INT',
+  'monaco': 'ASM',
+  'as monaco': 'ASM',
+  'lille': 'LIL',
+  'lille osc': 'LIL',
+  'crystal palace': 'CRY',
+  'crystal palace fc': 'CRY',
+  'newcastle': 'NEW',
+  'newcastle united fc': 'NEW',
+  'hull': 'HUL',
+  'hull city': 'HUL',
+  'brentford': 'BRE',
+  'brentford fc': 'BRE',
+  'genoa': 'GEN',
+  'genoa cfc': 'GEN',
+  'venezia': 'VEN',
+  'venezia fc': 'VEN',
+  'nec': 'NEC',
+  'nec nijmegen': 'NEC',
+  'groningen': 'GRO',
+  'fc groningen': 'GRO',
+  'santos': 'SAN',
+  'santos fc': 'SAN',
+  'psv': 'PSV',
+  'feyenoord': 'FEY',
+  'ajax': 'AJA',
+  'dortmund': 'BVB',
+  'leipzig': 'RBL',
+  'stuttgart': 'VFB',
+  'frankfurt': 'SGE',
+  'hoffenheim': 'TSG',
+  'tsg 1899 hoffenheim': 'TSG',
+};
+
+/**
+ * Resolves verified 3-letter team abbreviation (Bug 3).
+ * Prioritizes provider TLA if valid, then lookup table keyed by team name/id,
+ * then first 3 letters of short name after stripping noise prefixes.
+ */
+export function getTeamAbbreviation(team: any): string {
+  if (!team) return 'TBD';
+
+  // 1. Check known lookup dictionary first to guarantee verified accuracy
+  const rawName = (team.name || '').toLowerCase().trim();
+  const rawShort = (team.shortName || '').toLowerCase().trim();
+  const rawId = (team.id || '').replace(/^team_/, '').toLowerCase().trim();
+
+  if (KNOWN_TEAM_TLAS[rawId]) return KNOWN_TEAM_TLAS[rawId];
+  if (KNOWN_TEAM_TLAS[rawShort]) return KNOWN_TEAM_TLAS[rawShort];
+  if (KNOWN_TEAM_TLAS[rawName]) return KNOWN_TEAM_TLAS[rawName];
+
+  // 2. Use provider's TLA if stored and clean (3-4 alphanumeric characters, not generic HOM/AWY)
+  if (team.tla && typeof team.tla === 'string') {
+    const tla = team.tla.trim().toUpperCase();
+    if (tla.length >= 3 && tla.length <= 4 && tla !== 'HOM' && tla !== 'AWY' && !/^[0-9\.]/.test(tla)) {
+      return tla;
+    }
+  }
+
+  // 3. Fallback: Strip prefixes "1.", "FC", "SC", "SV", "AFC", "CF", "AS", "US", "EC" from short name
+  const stripped = displayName(team)
+    .replace(/^(1\.\s*FSV|1\.\s*FC|1\.\s*|FC|CF|SC|SV|AFC|AS|US|EC|SBV|TSG)\s+/i, '')
+    .trim();
+
+  const code = stripped.replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase();
+  return code.length >= 3 ? code : (stripped.slice(0, 3).toUpperCase() || 'TBD');
+}
+
+/**
+ * Formats match kickoff time to user's timezone (default: Africa/Lagos / WAT) (Bug 5).
+ * e.g. "13:30 UTC" -> "14:30"
+ */
+export function formatMatchTime(kickoffUtc: string, timeZone: string = 'Africa/Lagos'): string {
+  if (!kickoffUtc) return '--:--';
+  try {
+    const d = new Date(kickoffUtc);
+    if (isNaN(d.getTime())) return '--:--';
+    return new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: timeZone || 'Africa/Lagos',
+    }).format(d);
+  } catch {
+    return '--:--';
+  }
+}
+
