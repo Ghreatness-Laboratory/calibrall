@@ -215,7 +215,10 @@ export interface Team {
 
 export interface Fixture {
   id: string;
-  providerId?: string;
+  providerId: string;
+  providerName?: string;
+  fetchTime?: string;
+  source?: string;
   competitionId: string;
   competition: Competition;
   seasonYear: string;

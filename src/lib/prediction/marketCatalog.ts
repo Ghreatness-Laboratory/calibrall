@@ -697,7 +697,7 @@ export function formatSelectionName(name: string): string {
  */
 export function formatExpectedValue(ev?: number | null): { text: string; colorClass: string } {
   if (ev === undefined || ev === null || isNaN(ev)) {
-    return { text: 'n/a', colorClass: 'text-[#8fa69a]' };
+    return { text: '—', colorClass: 'text-[#8fa69a]' };
   }
   const pct = ev * 100;
   if (pct > 0.05) {
@@ -710,11 +710,11 @@ export function formatExpectedValue(ev?: number | null): { text: string; colorCl
 }
 
 /**
- * Format decimal odds, returning "n/a" if unavailable
+ * Format decimal odds, returning "—" if unavailable per Requirement 5
  */
 export function formatOdds(odds?: number | null): string {
-  if (odds === undefined || odds === null || isNaN(odds)) {
-    return 'n/a';
+  if (odds === undefined || odds === null || isNaN(odds) || odds <= 1.0) {
+    return '—';
   }
   return odds.toFixed(2);
 }

@@ -390,16 +390,18 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
 export const FIXTURE_STATISTICS: Record<string, FixtureStatisticalContext> = new Proxy({}, {
   get: (_target, _prop: string) => {
     return {
-      homeXg: 1.55,
-      awayXg: 1.25,
-      expectedCornersHome: 5.4,
-      expectedCornersAway: 4.6,
-      expectedCards: 4.2,
-      uncertaintyScore: 0.10,
-      dataCoverageScore: 0.92,
-      sampleSizeMatches: 20,
+      homeXg: 0,
+      awayXg: 0,
+      expectedCornersHome: 0,
+      expectedCornersAway: 0,
+      expectedCards: 0,
+      uncertaintyScore: null,
+      dataCoverageScore: null,
+      sampleSizeMatches: 0,
+      hasRealTeamStrength: false,
+      insufficientData: true,
       stateTags: [] as StateTag[],
-      lineupConfirmed: true,
+      lineupConfirmed: false,
       verifiedOdds: undefined,
     };
   }

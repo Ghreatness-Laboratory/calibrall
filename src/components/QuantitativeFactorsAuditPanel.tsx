@@ -439,51 +439,59 @@ export default function QuantitativeFactorsAuditPanel({
               <div className="text-right">
                 <span className="text-[10px] text-[#8B9890] block">Best Price Available</span>
                 <span className="text-[13px] font-mono text-[#B6E63B] font-bold">
-                  @{marketPricing.bestPrice.odds.toFixed(2)} ({marketPricing.bestPrice.bookmaker})
+                  {marketPricing.bestPrice.odds > 0 ? `@${marketPricing.bestPrice.odds.toFixed(2)} (${marketPricing.bestPrice.bookmaker})` : '—'}
                 </span>
               </div>
             </div>
 
             {/* Bookmaker Snapshot Table */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-              {marketPricing.snapshots.map((snap) => (
-                <div key={snap.bookmaker} className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                  <span className="text-[10px] text-[#8B9890] block truncate">{snap.bookmaker}</span>
-                  <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">@{snap.odds.toFixed(2)}</span>
-                  <span className="text-[9.5px] text-[#5E6A63] block font-mono">
-                    {snap.isStale ? 'Stale odds' : 'Live quote'}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {marketPricing.snapshots.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                {marketPricing.snapshots.map((snap) => (
+                  <div key={snap.bookmaker} className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
+                    <span className="text-[10px] text-[#8B9890] block truncate">{snap.bookmaker}</span>
+                    <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">@{snap.odds.toFixed(2)}</span>
+                    <span className="text-[9.5px] text-[#5E6A63] block font-mono">
+                      {snap.isStale ? 'Stale odds' : 'Live quote'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 bg-[#101713] rounded-[8px] border border-white/[0.05] text-[11px] text-[#8B9890] text-center">
+                No verified bookmaker odds snapshots recorded for this line. Odds: — · EV: —
+              </div>
+            )}
 
             {/* De vigged Math Breakdown */}
-            <div className="p-2.5 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-1.5 text-[11px]">
-              <div className="flex items-center justify-between">
-                <span className="text-[#8B9890]">De vigged Market Probability:</span>
-                <span className="font-mono text-[#ECF1EE] font-bold">
-                  {(marketPricing.deviggedMarketProbability * 100).toFixed(1)}% (Overround: {(marketPricing.overround * 100).toFixed(1)}%)
-                </span>
+            {marketPricing.snapshots.length > 0 && (
+              <div className="p-2.5 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-1.5 text-[11px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#8B9890]">De vigged Market Probability:</span>
+                  <span className="font-mono text-[#ECF1EE] font-bold">
+                    {(marketPricing.deviggedMarketProbability * 100).toFixed(1)}% (Overround: {(marketPricing.overround * 100).toFixed(1)}%)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#8B9890]">Calibrated Model Probability:</span>
+                  <span className="font-mono text-[#ECF1EE] font-bold">
+                    {(blendResult.rawModelProbability * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#8B9890]">Blended Model vs Market:</span>
+                  <span className="font-mono text-[#B6E63B] font-bold">
+                    {(blendResult.blendedProbability * 100).toFixed(1)}% (Model weight: {(blendResult.modelWeight * 100).toFixed(0)}%)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-t border-white/[0.05] pt-1">
+                  <span className="text-[#8B9890]">Expected Value (EV):</span>
+                  <span className={`font-mono font-bold ${blendResult.expectedValue >= 0 ? 'text-[#B6E63B]' : 'text-[#8B9890]'}`}>
+                    {(blendResult.expectedValue * 100).toFixed(1)}% EV (Edge: +{(blendResult.edge * 100).toFixed(1)}%)
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#8B9890]">Calibrated Model Probability:</span>
-                <span className="font-mono text-[#ECF1EE] font-bold">
-                  {(blendResult.rawModelProbability * 100).toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#8B9890]">Blended Model vs Market:</span>
-                <span className="font-mono text-[#B6E63B] font-bold">
-                  {(blendResult.blendedProbability * 100).toFixed(1)}% (Model weight: {(blendResult.modelWeight * 100).toFixed(0)}%)
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-t border-white/[0.05] pt-1">
-                <span className="text-[#8B9890]">Expected Value (EV):</span>
-                <span className={`font-mono font-bold ${blendResult.expectedValue >= 0 ? 'text-[#B6E63B]' : 'text-[#8B9890]'}`}>
-                  {(blendResult.expectedValue * 100).toFixed(1)}% EV (Edge: +{(blendResult.edge * 100).toFixed(1)}%)
-                </span>
-              </div>
-            </div>
+            )}
 
             {/* High Disagreement Warning if applicable */}
             {blendResult.isHighDisagreement && (

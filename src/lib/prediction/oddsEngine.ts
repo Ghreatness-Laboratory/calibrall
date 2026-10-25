@@ -101,26 +101,21 @@ export function analyzeOptionMarketPricing(
     };
   });
 
-  // Find best available price
-  let best = checkedSnapshots[0] || {
-    bookmaker: 'Sharp Consensus',
-    odds: 1.90,
-    timestamp: new Date().toISOString(),
-    isStale: false,
-  };
+  // Find best available price strictly from snapshots - NO FAKE FALLBACK
+  let best = checkedSnapshots[0] || null;
 
   for (const s of checkedSnapshots) {
-    if (s.odds > best.odds) {
+    if (!best || s.odds > best.odds) {
       best = s;
     }
   }
 
-  // Consensus average odds
+  // Consensus average odds - NO FAKE 1.90
   const consensusOdds = checkedSnapshots.length > 0
     ? checkedSnapshots.reduce((acc, s) => acc + s.odds, 0) / checkedSnapshots.length
-    : best.odds;
+    : 0;
 
-  const rawImplied = 1 / consensusOdds;
+  const rawImplied = consensusOdds > 1.0 ? 1 / consensusOdds : 0;
 
   // Compile other selections in this market for de-vigging
   const otherSelections = Object.keys(completeMarketOddsMap);
@@ -130,7 +125,7 @@ export function analyzeOptionMarketPricing(
     const snaps = completeMarketOddsMap[sel] || [];
     if (snaps.length > 0) {
       const avg = snaps.reduce((a, b) => a + b.odds, 0) / snaps.length;
-      representativeOdds.push(avg);
+      if (avg > 1.0) representativeOdds.push(avg);
     }
   });
 
@@ -144,16 +139,22 @@ export function analyzeOptionMarketPricing(
       deviggedProb = deviggedProbs[selIndex];
       overround = overroundPct / 100;
     }
-  } else {
-    // Standard 5% overround devig if solitary selection
+  } else if (rawImplied > 0) {
     deviggedProb = rawImplied / 1.05;
+  } else {
+    deviggedProb = 0;
   }
 
   return {
     marketCode,
     selection,
     snapshots: checkedSnapshots,
-    bestPrice: best,
+    bestPrice: best || {
+      bookmaker: 'None',
+      odds: 0,
+      timestamp: new Date().toISOString(),
+      isStale: true,
+    },
     consensusOdds: Number(consensusOdds.toFixed(3)),
     rawImpliedProbability: Number(rawImplied.toFixed(4)),
     deviggedMarketProbability: Number(deviggedProb.toFixed(4)),
@@ -226,29 +227,61 @@ export function blendModelWithMarket(
 
 /**
  * Convenience helper to generate multi-bookmaker pricing snapshots and de-vigged market probability
+/**
+ * Multi-bookmaker pricing analysis from verified snapshots.
+ * If no verified odds exist, returns empty snapshots with no fake odds.
  */
 export function generateMultiBookmakerPricing(
   marketCode: string,
   selection: string,
-  consensusOdds: number = 1.95
+  realOdds?: number | null,
+  realSnapshots?: BookmakerPriceSnapshot[]
 ): OptionMarketPricing {
-  const timestamp = new Date().toISOString();
-  const safeConsensus = consensusOdds > 1.05 ? consensusOdds : 1.95;
-  const oppOdds = safeConsensus > 1.05 ? Math.max(1.10, 1 / (1 - (1 / safeConsensus))) : 2.0;
+  if (realSnapshots && realSnapshots.length > 0) {
+    const map: Record<string, BookmakerPriceSnapshot[]> = {
+      [selection]: realSnapshots,
+    };
+    return analyzeOptionMarketPricing(marketCode, selection, map);
+  }
 
-  const map: Record<string, BookmakerPriceSnapshot[]> = {
-    [selection]: [
-      { bookmaker: 'Pinnacle', odds: Number((safeConsensus * 1.03).toFixed(2)), timestamp, isStale: false },
-      { bookmaker: 'Bet365', odds: Number(safeConsensus.toFixed(2)), timestamp, isStale: false },
-      { bookmaker: 'Betfair Exchange', odds: Number((safeConsensus * 1.04).toFixed(2)), timestamp, isStale: false },
-      { bookmaker: 'Unibet', odds: Number((safeConsensus * 0.98).toFixed(2)), timestamp, isStale: false },
-    ],
-    ['Opposite Selection']: [
-      { bookmaker: 'Pinnacle', odds: Number((oppOdds * 1.02).toFixed(2)), timestamp, isStale: false },
-      { bookmaker: 'Bet365', odds: Number(oppOdds.toFixed(2)), timestamp, isStale: false },
-    ],
+  if (realOdds && realOdds > 1.0) {
+    const timestamp = new Date().toISOString();
+    const map: Record<string, BookmakerPriceSnapshot[]> = {
+      [selection]: [
+        { bookmaker: 'Sharp Consensus', odds: Number(realOdds.toFixed(2)), timestamp, isStale: false }
+      ],
+    };
+    return analyzeOptionMarketPricing(marketCode, selection, map);
+  }
+
+  // Development demo mode ONLY under explicit flag
+  if (process.env.USE_DEMO_DATA === 'true') {
+    const timestamp = new Date().toISOString();
+    const safeConsensus = 1.95;
+    const map: Record<string, BookmakerPriceSnapshot[]> = {
+      [selection]: [
+        { bookmaker: 'Demo Pinnacle', odds: 2.01, timestamp, isStale: false },
+        { bookmaker: 'Demo Bet365', odds: 1.95, timestamp, isStale: false },
+      ],
+    };
+    return analyzeOptionMarketPricing(marketCode, selection, map);
+  }
+
+  // No real snapshot available - return empty pricing without fake prices
+  return {
+    marketCode,
+    selection,
+    snapshots: [],
+    bestPrice: {
+      bookmaker: 'None',
+      odds: 0,
+      timestamp: new Date().toISOString(),
+      isStale: true,
+    },
+    consensusOdds: 0,
+    rawImpliedProbability: 0,
+    deviggedMarketProbability: 0,
+    overround: 0,
   };
-
-  return analyzeOptionMarketPricing(marketCode, selection, map);
 }
 
