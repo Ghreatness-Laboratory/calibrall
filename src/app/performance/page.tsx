@@ -26,21 +26,24 @@ import { cleanDisplayText, formatSignedValue } from '@/lib/utils/formatText';
 import { 
   OCTOBER_18_CASE_STUDY, 
   OCTOBER_18_SUMMARY, 
-  OCTOBER_18_ANECDOTAL_DISCLAIMER 
+  OCTOBER_18_RETROSPECTIVE_DISCLAIMER 
 } from '@/lib/data/october18CaseStudy';
+import { forwardPickLedger } from '@/lib/prediction/forwardPickLedger';
 
-type MainSectionTab = 'report_card' | 'case_study' | 'providers' | 'ablation' | 'champion' | 'errors' | 'breakdowns';
+type MainSectionTab = 'forward_record' | 'case_study' | 'report_card' | 'providers' | 'ablation' | 'champion' | 'errors' | 'breakdowns';
 
 export default function PerformancePage() {
   const { sport, isSwitching } = useSport();
-  const [sectionTab, setSectionTab] = useState<MainSectionTab>('report_card');
+  const [sectionTab, setSectionTab] = useState<MainSectionTab>('forward_record');
   const [breakdownSubTab, setBreakdownSubTab] = useState<'markets' | 'state_tags' | 'competitions'>('markets');
   const [caseStudyFilter, setCaseStudyFilter] = useState<'ALL' | 'AGREED' | 'DISAGREED' | 'FALLBACK'>('ALL');
+  const [forwardFilter, setForwardFilter] = useState<'ALL' | 'GRADED' | 'PENDING' | 'WON' | 'LOST'>('ALL');
 
   const report = sport === 'basketball' ? VERIFIED_NBA_PERFORMANCE_REPORT : VERIFIED_PERFORMANCE_REPORT;
   const isBasketball = sport === 'basketball';
 
-  // Load verified scientific audit data
+  // Load verified forward record metrics (the only platform accuracy measure)
+  const forwardMetrics = forwardPickLedger.getForwardRecordMetrics();
   const researchAudit = ValidationAndBenchmarksEngine.runFullResearchAudit();
   const errorClusters = ModelRegistryService.getWeeklyMissAnalysis();
   const experimentHistory = ModelRegistryService.getExperimentRegistry();
@@ -56,8 +59,9 @@ export default function PerformancePage() {
   }
 
   const sectionTabs = [
-    { id: 'report_card' as const, label: 'Benchmarks & Report Card' },
-    { id: 'case_study' as const, label: '18 Oct Case Study (17 Legs)' },
+    { id: 'forward_record' as const, label: 'Forward Record & Ledger' },
+    { id: 'case_study' as const, label: 'Retrospective illustration, not a test' },
+    { id: 'report_card' as const, label: 'Benchmarks & Protocols' },
     { id: 'providers' as const, label: 'Data Foundation & Audit' },
     { id: 'ablation' as const, label: 'Ablation & Calibration' },
     { id: 'champion' as const, label: 'Champion / Challenger' },
@@ -70,10 +74,10 @@ export default function PerformancePage() {
       {/* 1. Header: 23px font-700 with 12px muted subtitle */}
       <div className="space-y-0.5">
         <h1 className="text-[23px] font-[700] leading-[1.2] text-[#ECF1EE] tracking-[-0.025em]">
-          Record & calibration
+          Forward record & calibration
         </h1>
         <p className="text-[12px] text-[#8B9890]">
-          Out of sample backtesting against naive baselines and closing odds. Real data only.
+          The forward record is the only accuracy measure of the platform. Every recommendation is stored prior to kickoff with an immutable timestamp and graded after full time.
         </p>
       </div>
 
@@ -81,59 +85,62 @@ export default function PerformancePage() {
       <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 space-y-1.5">
         <div className="flex items-center gap-2 text-[#B6E63B] font-[600] text-[13px]">
           <ShieldCheck className="w-4 h-4 shrink-0" strokeWidth={2} />
-          <span>Research charter & dual benchmark protocol</span>
+          <span>Immutable pre kickoff forward ledger protocol</span>
         </div>
         <p className="text-[12px] leading-[1.5] text-[#8B9890]">
-          Every market is tested against a naive baseline and devigged sharp bookmaker closing odds. Where the model does not beat sharp closing lines out of sample, picks are labeled probability analysis only.
+          Every recommendation is stored before match kickoff with a timestamp, model version, probability, market line, and bookmaker odds, and cannot be edited afterwards. Graded strictly after full time. Retrospective illustrations are excluded from all accuracy figures.
         </p>
       </div>
 
-      {/* Overall Scorecard Tiles */}
+      {/* Headline Scorecard Tiles: Exclusively derived from forward ledger */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-          <div className="text-[10.5px] text-[#8B9890]">Overall Brier score</div>
+          <div className="text-[10.5px] text-[#8B9890]">Forward Brier score</div>
           <div className="flex items-baseline gap-1.5">
             <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
-              {researchAudit.overallBrierAfter.toFixed(3)}
+              {forwardMetrics.brierScore.toFixed(3)}
             </div>
             <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
-              (\u221212.1%)
+              (v2.5.0)
             </div>
           </div>
-          <div className="text-[10px] text-[#5E6A63]">Out of sample</div>
+          <div className="text-[10px] text-[#5E6A63]">Forward record only</div>
         </div>
 
         <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-          <div className="text-[10.5px] text-[#8B9890]">Logarithmic loss</div>
+          <div className="text-[10.5px] text-[#8B9890]">Forward log loss</div>
           <div className="flex items-baseline gap-1.5">
             <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
-              {researchAudit.overallLogLossAfter.toFixed(3)}
+              {forwardMetrics.logLoss.toFixed(3)}
             </div>
             <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
               (\u22124.1%)
             </div>
           </div>
-          <div className="text-[10px] text-[#5E6A63]">Multi class scoring</div>
+          <div className="text-[10px] text-[#5E6A63]">Graded after full time</div>
         </div>
 
         <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
           <div className="text-[10.5px] text-[#8B9890]">Calibration ECE</div>
           <div className="flex items-baseline gap-1.5">
             <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
-              1.8%
+              {(forwardMetrics.calibrationEce * 100).toFixed(1)}%
             </div>
           </div>
           <div className="text-[10px] text-[#5E6A63]">Expected error</div>
         </div>
 
         <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-          <div className="text-[10.5px] text-[#8B9890]">Average CLV</div>
+          <div className="text-[10.5px] text-[#8B9890]">Forward hit rate</div>
           <div className="flex items-baseline gap-1.5">
             <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
-              +2.8%
+              {(forwardMetrics.hitRate * 100).toFixed(1)}%
+            </div>
+            <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
+              +{forwardMetrics.yieldRoi.toFixed(1)}% ROI
             </div>
           </div>
-          <div className="text-[10px] text-[#5E6A63]">Closing line value</div>
+          <div className="text-[10px] text-[#5E6A63]">Pre kickoff ledger</div>
         </div>
       </div>
 
@@ -241,63 +248,259 @@ export default function PerformancePage() {
           </div>
         )}
 
-        {/* SECTION: 18 OCT WALK FORWARD BACKTEST CASE STUDY */}
-        {sectionTab === 'case_study' && (
+        {/* SECTION: VERIFIED FORWARD RECORD & PRE-KICKOFF LEDGER */}
+        {sectionTab === 'forward_record' && (
           <div className="space-y-3">
-            {/* Anecdotal Sample Warning Banner */}
-            <div className="bg-[#151E19] border border-[#E2AE45]/40 rounded-[14px] p-3.5 space-y-2">
-              <div className="flex items-center gap-2 text-[#E2AE45] font-[600] text-[13px]">
-                <AlertTriangle className="w-4 h-4 shrink-0" strokeWidth={2} />
-                <span>Anecdotal sample notice · Zero parameter tuning</span>
+            {/* Ledger Policy Charter */}
+            <div className="bg-[#151E19] border border-[#B6E63B]/40 rounded-[14px] p-3.5 space-y-2">
+              <div className="flex items-center gap-2 text-[#B6E63B] font-[600] text-[13px]">
+                <ShieldCheck className="w-4 h-4 shrink-0" strokeWidth={2} />
+                <span>Pre kickoff ledger protocol · The platform only accuracy measure</span>
               </div>
               <p className="text-[12px] leading-[1.55] text-[#8B9890]">
-                {OCTOBER_18_ANECDOTAL_DISCLAIMER}
+                Every recommendation from model deployment onwards is logged prior to kickoff with an immutable timestamp, model version, probability, market line, and bookmaker odds. Entries are sealed with a cryptographic hash and cannot be altered or backfilled. Grading occurs strictly after full time against official match results.
               </p>
             </div>
 
-            {/* Case Study Summary KPI Cards */}
+            {/* Forward Ledger KPI Summary Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-                <div className="text-[10.5px] text-[#8B9890]">Slip hit rate</div>
-                <div className="flex items-baseline gap-1.5">
-                  <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
-                    17 / 17
-                  </div>
-                  <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
-                    100%
-                  </div>
-                </div>
-                <div className="text-[10px] text-[#5E6A63]">Regular time result</div>
-              </div>
-
-              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-                <div className="text-[10.5px] text-[#8B9890]">Model agreement</div>
+                <div className="text-[10.5px] text-[#8B9890]">Total forward calls</div>
                 <div className="flex items-baseline gap-1.5">
                   <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
-                    10 / 17
+                    {forwardMetrics.totalSettled + forwardMetrics.totalPending}
                   </div>
                   <div className="text-[10.5px] text-[#8B9890] tabular-nums font-mono">
-                    58.8%
+                    picks
                   </div>
                 </div>
-                <div className="text-[10px] text-[#5E6A63]">7 legs rejected on EV</div>
+                <div className="text-[10px] text-[#5E6A63]">{forwardMetrics.totalPending} pending kickoff</div>
               </div>
 
               <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-                <div className="text-[10.5px] text-[#8B9890]">Agreed avg edge</div>
+                <div className="text-[10.5px] text-[#8B9890]">Graded full time</div>
                 <div className="flex items-baseline gap-1.5">
                   <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
-                    +{(OCTOBER_18_SUMMARY.averageAgreedEdge * 100).toFixed(1)}%
+                    {forwardMetrics.totalSettled}
+                  </div>
+                  <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
+                    settled
                   </div>
                 </div>
-                <div className="text-[10px] text-[#5E6A63]">10 positive EV legs</div>
+                <div className="text-[10px] text-[#5E6A63]">{forwardMetrics.wonCount} won · {forwardMetrics.lostCount} lost</div>
+              </div>
+
+              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+                <div className="text-[10.5px] text-[#8B9890]">Forward hit rate</div>
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
+                    {(forwardMetrics.hitRate * 100).toFixed(1)}%
+                  </div>
+                </div>
+                <div className="text-[10px] text-[#5E6A63]">+{forwardMetrics.yieldRoi.toFixed(1)}% unit yield</div>
+              </div>
+
+              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+                <div className="text-[10.5px] text-[#8B9890]">Forward Brier score</div>
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
+                    {forwardMetrics.brierScore.toFixed(3)}
+                  </div>
+                </div>
+                <div className="text-[10px] text-[#5E6A63]">Log loss {forwardMetrics.logLoss.toFixed(3)}</div>
+              </div>
+            </div>
+
+            {/* Forward Filter Chips */}
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+                {[
+                  { id: 'ALL' as const, label: `All picks (${forwardMetrics.totalSettled + forwardMetrics.totalPending})` },
+                  { id: 'GRADED' as const, label: `Graded full time (${forwardMetrics.totalSettled})` },
+                  { id: 'PENDING' as const, label: `Pending kickoff (${forwardMetrics.totalPending})` },
+                  { id: 'WON' as const, label: `Won (${forwardMetrics.wonCount})` },
+                  { id: 'LOST' as const, label: `Lost (${forwardMetrics.lostCount})` },
+                ].map((chip) => (
+                  <button
+                    key={chip.id}
+                    onClick={() => setForwardFilter(chip.id)}
+                    type="button"
+                    className={`h-[28px] px-3 rounded-full text-[11px] font-medium transition-colors ${
+                      forwardFilter === chip.id
+                        ? 'bg-[rgba(182,230,59,0.12)] border border-[#B6E63B] text-[#B6E63B]'
+                        : 'bg-[#151E19] border border-white/[0.07] text-[#8B9890]'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] font-mono text-[#5E6A63] shrink-0">
+                Immutable ledger
+              </span>
+            </div>
+
+            {/* Forward Ledger Items */}
+            <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] overflow-hidden divide-y divide-white/[0.07]">
+              {forwardPickLedger.getAllRecords()
+                .filter(pick => {
+                  if (forwardFilter === 'GRADED') return pick.gradingStatus === 'GRADED';
+                  if (forwardFilter === 'PENDING') return pick.gradingStatus === 'PENDING';
+                  if (forwardFilter === 'WON') return pick.settlementStatus === 'WON';
+                  if (forwardFilter === 'LOST') return pick.settlementStatus === 'LOST';
+                  return true;
+                })
+                .map((pick, idx) => {
+                  const isPending = pick.gradingStatus === 'PENDING';
+                  const isWon = pick.settlementStatus === 'WON';
+
+                  return (
+                    <div key={pick.id} className="p-3.5 space-y-2.5 hover:bg-[#151E19]/30 transition-colors">
+                      {/* Top Row: Fixture, League, Timestamps & Status */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-mono text-[#5E6A63]">
+                              #{String(idx + 1).padStart(2, '0')}
+                            </span>
+                            <span className="text-[14px] font-[600] text-[#ECF1EE]">
+                              {cleanDisplayText(pick.fixtureName)}
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-[5px] bg-[#151E19] border border-white/[0.07] text-[#8B9890]">
+                              {cleanDisplayText(pick.competition)}
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-[5px] bg-[#151E19] border border-[#B6E63B]/30 text-[#B6E63B]">
+                              {pick.modelVersion}
+                            </span>
+                          </div>
+
+                          <div className="text-[12.5px] text-[#ECF1EE] font-medium mt-1">
+                            Selection: <span className="text-[#B6E63B]">{cleanDisplayText(pick.selection)}</span> @ <span className="font-mono tabular-nums text-[#ECF1EE]">{pick.odds.toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          {isPending ? (
+                            <span className="inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-[6px] bg-[#151E19] border border-white/[0.1] text-[#8B9890]">
+                              <span>PENDING KICKOFF</span>
+                            </span>
+                          ) : isWon ? (
+                            <span className="inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-[6px] bg-[rgba(182,230,59,0.12)] border border-[#B6E63B]/40 text-[#B6E63B]">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>WON (Full time)</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-[6px] bg-[rgba(226,174,69,0.12)] border border-[#E2AE45]/40 text-[#E2AE45]">
+                              <span>LOST (Full time)</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Numeric Metrics Grid */}
+                      <div className="grid grid-cols-3 gap-2 bg-[#151E19] rounded-[10px] p-2 text-center text-[11px] font-mono">
+                        <div>
+                          <span className="text-[#8B9890] block text-[10px]">Model probability</span>
+                          <span className="text-[#ECF1EE] font-bold tabular-nums">
+                            {(pick.probability * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[#8B9890] block text-[10px]">Bookmaker implied</span>
+                          <span className="text-[#ECF1EE] tabular-nums">
+                            {(pick.impliedProbability * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[#8B9890] block text-[10px]">Statistical edge</span>
+                          <span className="text-[#B6E63B] font-bold tabular-nums">
+                            {formatSignedValue(pick.edge * 100, '%')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Verified Outcome & Ledger Seal */}
+                      <div className="text-[11px] font-mono text-[#8B9890] flex items-center justify-between flex-wrap gap-2 pt-0.5">
+                        <div className="space-x-2">
+                          <span>Recorded {new Date(pick.recordedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} UTC (Pre kickoff)</span>
+                          {pick.actualScore && (
+                            <span className="text-[#ECF1EE]">· Score: {cleanDisplayText(pick.actualScore)}</span>
+                          )}
+                        </div>
+                        <div className="text-[#5E6A63] text-[10px]">
+                          Cryptographic seal: {pick.recordHash} (Immutable)
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* SECTION: RETROSPECTIVE ILLUSTRATION (NOT A TEST) */}
+        {sectionTab === 'case_study' && (
+          <div className="space-y-3">
+            {/* Retrospective Reconstruction Notice */}
+            <div className="bg-[#151E19] border border-white/[0.07] rounded-[14px] p-3.5 space-y-2">
+              <div className="flex items-center gap-2 text-[#ECF1EE] font-[600] text-[13px]">
+                <Info className="w-4 h-4 shrink-0 text-[#B6E63B]" strokeWidth={2} />
+                <span>Retrospective illustration, not a test</span>
+              </div>
+              <p className="text-[12px] leading-[1.55] text-[#8B9890]">
+                {OCTOBER_18_RETROSPECTIVE_DISCLAIMER}
+              </p>
+            </div>
+
+            {/* Overview Tiles (Non-headline, purely illustrative) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+                <div className="text-[10.5px] text-[#8B9890]">Illustrative sample</div>
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
+                    17
+                  </div>
+                  <div className="text-[10.5px] text-[#8B9890] tabular-nums font-mono">
+                    fixtures
+                  </div>
+                </div>
+                <div className="text-[10px] text-[#5E6A63]">18 Oct retrospective</div>
+              </div>
+
+              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+                <div className="text-[10.5px] text-[#8B9890]">Probability higher</div>
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
+                    10
+                  </div>
+                  <div className="text-[10.5px] text-[#8B9890] tabular-nums font-mono">
+                    legs
+                  </div>
+                </div>
+                <div className="text-[10px] text-[#5E6A63]">Model prob {'>'} implied</div>
+              </div>
+
+              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
+                <div className="text-[10.5px] text-[#8B9890]">Probability lower</div>
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
+                    7
+                  </div>
+                  <div className="text-[10.5px] text-[#8B9890] tabular-nums font-mono">
+                    legs
+                  </div>
+                </div>
+                <div className="text-[10px] text-[#5E6A63]">Model prob {'<'} implied</div>
               </div>
 
               <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
                 <div className="text-[10.5px] text-[#8B9890]">Prior fallbacks</div>
                 <div className="flex items-baseline gap-1.5">
                   <div className="text-[17px] font-[650] text-[#E2AE45] font-mono tabular-nums">
-                    4 legs
+                    4
+                  </div>
+                  <div className="text-[10.5px] text-[#8B9890] tabular-nums font-mono">
+                    legs
                   </div>
                 </div>
                 <div className="text-[10px] text-[#5E6A63]">Bayesian shrinkage</div>
@@ -309,9 +512,9 @@ export default function PerformancePage() {
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
                 {[
                   { id: 'ALL' as const, label: 'All 17 legs' },
-                  { id: 'AGREED' as const, label: 'Model Agreed (10)' },
-                  { id: 'DISAGREED' as const, label: 'Model Disagreed (7)' },
-                  { id: 'FALLBACK' as const, label: 'Prior Fallbacks (4)' },
+                  { id: 'AGREED' as const, label: 'Model probability higher (10)' },
+                  { id: 'DISAGREED' as const, label: 'Model probability lower (7)' },
+                  { id: 'FALLBACK' as const, label: 'Prior fallbacks (4)' },
                 ].map((chip) => (
                   <button
                     key={chip.id}
@@ -328,7 +531,7 @@ export default function PerformancePage() {
                 ))}
               </div>
               <span className="text-[11px] font-mono text-[#5E6A63] shrink-0">
-                18 Oct 2026 fixtures
+                Excluded from accuracy figures
               </span>
             </div>
 
@@ -342,12 +545,12 @@ export default function PerformancePage() {
                   return true;
                 })
                 .map((leg, index) => {
-                  const isAgreed = leg.agreementStatus === 'AGREED';
-                  const isPositiveEdge = leg.edge >= 0;
+                  const isHigher = leg.agreementStatus === 'AGREED';
+                  const isPositiveDelta = leg.edge >= 0;
 
                   return (
                     <div key={leg.id} className="p-3.5 space-y-2.5 hover:bg-[#151E19]/30 transition-colors">
-                      {/* Top Row: Fixture & Hit Badge */}
+                      {/* Top Row: Fixture & Result Badge */}
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -367,9 +570,8 @@ export default function PerformancePage() {
                         </div>
 
                         <div className="text-right shrink-0">
-                          <span className="inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-[6px] bg-[rgba(182,230,59,0.12)] border border-[#B6E63B]/40 text-[#B6E63B]">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>HIT</span>
+                          <span className="inline-flex items-center gap-1 text-[10.5px] font-mono font-medium px-2 py-0.5 rounded-[6px] bg-[#151E19] border border-white/[0.08] text-[#8B9890]">
+                            <span>Regular time hit</span>
                           </span>
                         </div>
                       </div>
@@ -377,33 +579,29 @@ export default function PerformancePage() {
                       {/* Numeric Metrics Comparison Grid */}
                       <div className="grid grid-cols-3 gap-2 bg-[#151E19] rounded-[10px] p-2 text-center text-[11px] font-mono">
                         <div>
-                          <span className="text-[#8B9890] block text-[10px]">Model walk forward</span>
+                          <span className="text-[#8B9890] block text-[10px]">Reconstructed prob</span>
                           <span className="text-[#ECF1EE] font-bold tabular-nums">
-                            {(leg.modelWalkForwardProbability * 100).toFixed(1)}%
+                            {(leg.modelReconstructedProbability * 100).toFixed(1)}%
                           </span>
                         </div>
                         <div>
-                          <span className="text-[#8B9890] block text-[10px]">Bookmaker implied (1/odds)</span>
+                          <span className="text-[#8B9890] block text-[10px]">Bookmaker implied</span>
                           <span className="text-[#ECF1EE] tabular-nums">
                             {(leg.impliedProbability * 100).toFixed(1)}%
                           </span>
                         </div>
                         <div>
-                          <span className="text-[#8B9890] block text-[10px]">Model edge</span>
-                          <span className={`font-bold tabular-nums ${isPositiveEdge ? 'text-[#B6E63B]' : 'text-[#E2AE45]'}`}>
+                          <span className="text-[#8B9890] block text-[10px]">Probability delta</span>
+                          <span className={`font-bold tabular-nums ${isPositiveDelta ? 'text-[#B6E63B]' : 'text-[#8B9890]'}`}>
                             {formatSignedValue(leg.edge * 100, '%')}
                           </span>
                         </div>
                       </div>
 
-                      {/* Model Stance & Input Fallback Badges */}
+                      {/* Comparison & Input Fallback Badges */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-[5px] border ${
-                          isAgreed
-                            ? 'bg-[rgba(182,230,59,0.12)] border-[#B6E63B]/40 text-[#B6E63B]'
-                            : 'bg-[rgba(226,174,69,0.12)] border-[#E2AE45]/40 text-[#E2AE45]'
-                        }`}>
-                          {isAgreed ? 'MODEL AGREED (Positive edge)' : 'MODEL DISAGREED (Negative edge or gated)'}
+                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-[5px] bg-[#151E19] border border-white/[0.08] text-[#8B9890]">
+                          {isHigher ? 'Model probability higher than implied odds' : 'Model probability lower than implied odds'}
                         </span>
 
                         {leg.inputQuality !== 'VERIFIED' && (
@@ -422,16 +620,16 @@ export default function PerformancePage() {
                         </div>
                       )}
 
-                      {/* Walk Forward Rationale */}
+                      {/* Retrospective Reconstruction Rationale */}
                       <div className="text-[11.5px] leading-[1.45] text-[#8B9890] bg-[#0A0F0D] border border-white/[0.04] p-2.5 rounded-[8px]">
-                        <span className="text-[#ECF1EE] font-medium">Walk forward rationale: </span>
+                        <span className="text-[#ECF1EE] font-medium">Reconstruction note: </span>
                         {cleanDisplayText(leg.agreementRationale)}
                       </div>
 
                       {/* Regular Time Outcome */}
                       <div className="text-[11px] font-mono text-[#5E6A63] flex items-center justify-between">
-                        <span>Verified regular time outcome: {cleanDisplayText(leg.actualResult)}</span>
-                        <span className="text-[#B6E63B]">Leg hit in regular time</span>
+                        <span>Regular time result: {cleanDisplayText(leg.actualResult)}</span>
+                        <span>Retrospective illustration</span>
                       </div>
                     </div>
                   );
