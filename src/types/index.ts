@@ -74,6 +74,7 @@ export type ModelConfidence = 'VERY_HIGH' | 'HIGH' | 'MODERATE' | 'LOW';
 export type QualificationStatus = 
   | 'QUALIFIED_VALUE' 
   | 'QUALIFIED_PROBABILITY' 
+  | 'PROBABILITY_ANALYSIS_ONLY'
   | 'UNQUALIFIED_MARGINAL' 
   | 'UNQUALIFIED_HIGH_UNCERTAINTY' 
   | 'NO_RECOMMENDATION';
@@ -396,6 +397,9 @@ export interface MarketPrediction {
   oddsTimestamp?: string;
   sanityTripwire?: boolean;
   tripwireReason?: string;
+  skillVsDeviggedMarket?: number | null;
+  deviggedMarketProb?: number;
+  equivalentCanonicalKey?: string;
 }
 
 export type FixtureProfile = 

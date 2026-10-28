@@ -4,6 +4,11 @@
 
 export interface October18Leg {
   id: string;
+  date: string;
+  homeTeam: string;
+  awayTeam: string;
+  score: string;
+  htScore: string;
   fixture: string;
   competition: string;
   selection: string;
@@ -23,6 +28,11 @@ export interface October18Leg {
 export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   {
     id: 'oct18_01_osa_rac',
+    date: '2026-10-18',
+    homeTeam: 'CA Osasuna',
+    awayTeam: 'Racing Santander',
+    score: '2–0',
+    htScore: '1–0',
     fixture: 'Osasuna vs Racing Santander',
     competition: 'La Liga / Copa Tier',
     selection: 'Osasuna win',
@@ -32,7 +42,7 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
     modelReconstructedProbability: 0.638,
     edge: -0.0469,
     agreementStatus: 'DISAGREED',
-    agreementRationale: 'The 1.46 price implied 68.5% win probability. The reconstructed model estimated 63.8%, yielding a delta of \u22124.7%. The model projected a lower probability than the implied market odds.',
+    agreementRationale: 'The 1.46 price implied 68.5% win probability. The reconstructed model estimated 63.8%, yielding a delta of −4.7%. The model projected a lower probability than the implied market odds.',
     inputQuality: 'PRIOR_FALLBACK',
     inputFlagNote: 'Racing Santander top tier sample was unmeasured. Fell back to Segunda Division prior with Bayesian shrinkage.',
     actualResult: '2 to 0 Osasuna win',
@@ -40,6 +50,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_02_bou_sun',
+    date: '2026-10-18',
+    homeTeam: 'AFC Bournemouth',
+    awayTeam: 'Sunderland AFC',
+    score: '2–0',
+    htScore: '1–0',
     fixture: 'Bournemouth vs Sunderland',
     competition: 'Premier League',
     selection: '1st half goals 0 to 1',
@@ -57,6 +72,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_03_for_ars',
+    date: '2026-10-18',
+    homeTeam: 'Nottingham Forest',
+    awayTeam: 'Arsenal FC',
+    score: '0–1',
+    htScore: '0–0',
     fixture: 'Nottingham Forest vs Arsenal',
     competition: 'Premier League',
     selection: '1st half goals 0 to 1',
@@ -73,6 +93,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_04_pfc_ren',
+    date: '2026-10-18',
+    homeTeam: 'Paris FC',
+    awayTeam: 'Stade Rennais FC',
+    score: '4–3',
+    htScore: '2–1',
     fixture: 'Paris FC vs Rennes',
     competition: 'Ligue 1',
     selection: 'Paris FC over 1.5 bookings',
@@ -90,6 +115,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_05_leh_aux',
+    date: '2026-10-18',
+    homeTeam: 'Le Havre AC',
+    awayTeam: 'AJ Auxerre',
+    score: '1–3',
+    htScore: '0–2',
     fixture: 'Le Havre vs Auxerre',
     competition: 'Ligue 1',
     selection: 'Double chance: Home or away (no draw)',
@@ -106,6 +136,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_06_juv_laz',
+    date: '2026-10-18',
+    homeTeam: 'Juventus FC',
+    awayTeam: 'SS Lazio',
+    score: '0–3',
+    htScore: '0–1',
     fixture: 'Juventus vs Lazio',
     competition: 'Serie A',
     selection: '1st half goals 0 to 1',
@@ -122,6 +157,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_07_fio_com',
+    date: '2026-10-18',
+    homeTeam: 'ACF Fiorentina',
+    awayTeam: 'Como 1907',
+    score: '1–3',
+    htScore: '1–1',
     fixture: 'Fiorentina vs Como',
     competition: 'Serie A',
     selection: 'Double chance: Como or draw',
@@ -139,6 +179,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_08_mil_ata',
+    date: '2026-10-18',
+    homeTeam: 'AC Milan',
+    awayTeam: 'Atalanta BC',
+    score: '3–2',
+    htScore: '2–1',
     fixture: 'AC Milan vs Atalanta',
     competition: 'Serie A',
     selection: 'Both teams to score (Yes)',
@@ -155,6 +200,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_09_ang_mar',
+    date: '2026-10-18',
+    homeTeam: 'Angers SCO',
+    awayTeam: 'Olympique de Marseille',
+    score: '2–5',
+    htScore: '1–2',
     fixture: 'Angers vs Marseille',
     competition: 'Ligue 1',
     selection: 'Highest scoring half: 2nd half',
@@ -171,6 +221,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_10_rma_sev',
+    date: '2026-10-18',
+    homeTeam: 'Real Madrid',
+    awayTeam: 'Sevilla FC',
+    score: '4–1',
+    htScore: '2–0',
     fixture: 'Real Madrid vs Sevilla',
     competition: 'La Liga',
     selection: 'Real Madrid win',
@@ -187,6 +242,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_11_lyo_nic',
+    date: '2026-10-18',
+    homeTeam: 'Olympique Lyonnais',
+    awayTeam: 'OGC Nice',
+    score: '2–1',
+    htScore: '1–0',
     fixture: 'Lyon vs Nice',
     competition: 'Ligue 1',
     selection: 'Double chance: Home or away (no draw)',
@@ -203,6 +263,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_12_mal_rso',
+    date: '2026-10-18',
+    homeTeam: 'Málaga CF',
+    awayTeam: 'Real Sociedad',
+    score: '2–5',
+    htScore: '1–3',
     fixture: 'Malaga vs Real Sociedad',
     competition: 'Copa / Spanish Tier',
     selection: 'Double chance: Real Sociedad or draw',
@@ -220,6 +285,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_13_cel_ala',
+    date: '2026-10-18',
+    homeTeam: 'RC Celta de Vigo',
+    awayTeam: 'Deportivo Alavés',
+    score: '2–1',
+    htScore: '0–0',
     fixture: 'Celta vs Alaves',
     competition: 'La Liga',
     selection: '1st half goals 0 to 1',
@@ -236,6 +306,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_14_bri_cry',
+    date: '2026-10-18',
+    homeTeam: 'Brighton & Hove Albion',
+    awayTeam: 'Crystal Palace FC',
+    score: '5–0',
+    htScore: '2–0',
     fixture: 'Brighton vs Crystal Palace',
     competition: 'Premier League',
     selection: 'Brighton win',
@@ -253,6 +328,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_15_lee_mun',
+    date: '2026-10-18',
+    homeTeam: 'Leeds United',
+    awayTeam: 'Manchester United',
+    score: '1–1',
+    htScore: '0–0',
     fixture: 'Leeds vs Manchester United',
     competition: 'Premier League',
     selection: 'Manchester United over 0.5 team goals',
@@ -270,6 +350,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_16_lev_fre',
+    date: '2026-10-18',
+    homeTeam: 'Bayer 04 Leverkusen',
+    awayTeam: 'SC Freiburg',
+    score: '2–1',
+    htScore: '1–1',
     fixture: 'Bayer Leverkusen vs SC Freiburg',
     competition: 'Bundesliga',
     selection: 'Total goals over 2.5',
@@ -286,6 +371,11 @@ export const OCTOBER_18_CASE_STUDY: October18Leg[] = [
   },
   {
     id: 'oct18_17_bmg_tsg',
+    date: '2026-10-18',
+    homeTeam: 'Borussia Mönchengladbach',
+    awayTeam: 'TSG 1899 Hoffenheim',
+    score: '1–2',
+    htScore: '1–1',
     fixture: 'Borussia Mönchengladbach vs TSG Hoffenheim',
     competition: 'Bundesliga',
     selection: 'Total goals over 2.5',

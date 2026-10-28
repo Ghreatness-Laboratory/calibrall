@@ -210,12 +210,18 @@ export default function PerformancePage() {
                       </div>
 
                       <div className="text-right shrink-0">
-                        <div className={`text-[14px] font-bold font-mono tabular-nums flex items-center justify-end gap-1 ${
-                          fam.skillVsMarket >= 0 ? 'text-[#B6E63B]' : 'text-[#F08A4B]'
-                        }`}>
-                          {fam.skillVsMarket >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                          {formatSignedValue(fam.skillVsMarket * 100, '%')}
-                        </div>
+                        {fam.skillVsMarket !== null && fam.skillVsMarket !== undefined && !isNaN(fam.skillVsMarket) && (fam.marketClosingBrierScore ?? 0) > 0 ? (
+                          <div className={`text-[14px] font-bold font-mono tabular-nums flex items-center justify-end gap-1 ${
+                            fam.skillVsMarket >= 0 ? 'text-[#B6E63B]' : 'text-[#F08A4B]'
+                          }`}>
+                            {fam.skillVsMarket >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                            {formatSignedValue(fam.skillVsMarket * 100, '%')}
+                          </div>
+                        ) : (
+                          <div className="text-[14px] font-bold font-mono text-[#8B9890] flex items-center justify-end">
+                            n/a
+                          </div>
+                        )}
                         <div className="text-[10px] font-mono text-[#5E6A63]">Skill vs Market Odds</div>
                       </div>
                     </div>

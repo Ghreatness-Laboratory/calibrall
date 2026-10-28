@@ -19,7 +19,7 @@ import { WhyPanelGenerator } from './whyPanel';
 import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
 import { formatSelectionName } from '../marketCatalog';
 import { getMarketBaseline } from '../baselines';
-import { marketMonitor } from '../marketMonitor';
+import { marketMonitor, getEquivalentCanonicalKey } from '../marketMonitor';
 import { getMarketFamily } from '../marketSelection';
 import { calculateFragilityScore } from '../fragilityAndSubstitutes';
 
@@ -65,11 +65,7 @@ export class DixonColesV25Evaluator {
         predictions: [],
         topPick: null,
         alternativePicks: [],
-        noRecommendationReason: context.noRecommendationReason || (
-          context.homeTeamName && context.hasRealTeamStrength === false
-            ? `Needs matches for ${context.homeTeamName}: has 0`
-            : 'Not enough data'
-        ),
+        noRecommendationReason: context.noRecommendationReason || 'Not enough data',
         dataCompletenessScore: 0,
       };
     }
@@ -155,6 +151,7 @@ export class DixonColesV25Evaluator {
 
       // Platt calibration and market devigging
       let deviggedMarketProb: number | undefined = undefined;
+      let skillVsDeviggedMarket: number | null | undefined = undefined;
       let calProb = cand.rawProb;
 
       if (cand.marketOdds && cand.marketOdds > 1.0) {
@@ -168,6 +165,7 @@ export class DixonColesV25Evaluator {
           riskEval.downgradesCount
         );
         calProb = calibration.calibratedProb;
+        skillVsDeviggedMarket = Number((calProb - deviggedMarketProb).toFixed(4));
       } else {
         const calibration = DixonColesV25Engine.calibratePrediction(
           cand.rawProb,
@@ -177,6 +175,7 @@ export class DixonColesV25Evaluator {
           riskEval.downgradesCount
         );
         calProb = calibration.calibratedProb;
+        skillVsDeviggedMarket = null;
       }
 
       // Expected Value and Sanity Tripwire (NO FAKE ODDS OR EV)
@@ -229,8 +228,15 @@ export class DixonColesV25Evaluator {
 
       // Qualification & Abstain status
       let qualStatus: QualificationStatus = 'UNQUALIFIED_MARGINAL';
+      // GATING RULE: A market where odds exist and the model's skill vs the de-vigged market is <= 0 cannot be a recommendation!
+      const hasNonPositiveSkillVsMarket = Boolean(
+        cand.marketOdds && cand.marketOdds > 1.0 && deviggedMarketProb !== undefined && (skillVsDeviggedMarket ?? 0) <= 0
+      );
+
       if (sanityTripwire) {
         qualStatus = 'UNQUALIFIED_MARGINAL';
+      } else if (hasNonPositiveSkillVsMarket) {
+        qualStatus = 'PROBABILITY_ANALYSIS_ONLY';
       } else if (!confAssessment.isHandicapQualified) {
         qualStatus = 'NO_RECOMMENDATION';
       } else if (cand.marketOdds && (edge ?? 0) >= 0.025 && (ev ?? 0) > 0.015 && calProb >= 0.28) {
@@ -243,7 +249,9 @@ export class DixonColesV25Evaluator {
 
       // Ranking score: strictly edge & EV driven
       let rankingScore = 0;
-      if (cand.marketOdds && !sanityTripwire) {
+      if (hasNonPositiveSkillVsMarket) {
+        rankingScore = 0; // Gated out: cannot be a recommendation
+      } else if (cand.marketOdds && !sanityTripwire) {
         const edgeVal = Math.max(0, edge ?? 0);
         if (edgeVal >= 0.015) {
           rankingScore = Number((edgeVal * 60 * confAssessment.confidenceScore + (ev ?? 0) * 20).toFixed(3));
@@ -361,6 +369,9 @@ export class DixonColesV25Evaluator {
         tripwireReason,
         fragilityScore: fragility.fragilityScore,
         fragilityFlags: whyData.riskFlags.concat(fragility.fragilityFlags),
+        skillVsDeviggedMarket,
+        deviggedMarketProb,
+        equivalentCanonicalKey: getEquivalentCanonicalKey(cand.marketCode, cand.selection),
       };
 
       processed.push(prediction);
@@ -375,7 +386,10 @@ export class DixonColesV25Evaluator {
       if (p.isGenericPick) return false;
       // Wide handicaps (|line| >= 1.5) cannot be top pick!
       if (p.optionType === 'asian_handicap' && Math.abs(p.handicapLine ?? 0) >= 1.5) return false;
-      if (p.qualificationStatus === 'NO_RECOMMENDATION' || p.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY') return false;
+      if (p.qualificationStatus === 'NO_RECOMMENDATION' || p.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY' || p.qualificationStatus === 'PROBABILITY_ANALYSIS_ONLY') return false;
+
+      // GATING RULE: A market where odds exist and the model's skill vs the de-vigged market is <= 0 cannot be a recommendation!
+      if (p.marketOdds && p.skillVsDeviggedMarket !== undefined && p.skillVsDeviggedMarket !== null && p.skillVsDeviggedMarket <= 0) return false;
 
       // Hard rule (Bug 1): A pick below roughly 52% or with an edge near zero must not be shown as "Top pick".
       // Show "No strong lean" instead, and allow a different market to be the top pick for that fixture.
@@ -414,13 +428,17 @@ export class DixonColesV25Evaluator {
         topPick.selection
       );
 
-      // Up to 2 alternatives from distinct market categories
+      // Up to 2 alternatives from distinct market categories AND distinct equivalent bet keys (merging equivalent lines)
       const pickedCategories = new Set<string>([topPick.marketCategory]);
+      const pickedEquivKeys = new Set<string>([getEquivalentCanonicalKey(topPick.marketCode, topPick.selection)]);
+
       for (let i = 1; i < eligibleTopPicks.length && alternativePicks.length < 2; i++) {
         const alt = eligibleTopPicks[i];
-        if (!pickedCategories.has(alt.marketCategory)) {
+        const altEquivKey = getEquivalentCanonicalKey(alt.marketCode, alt.selection);
+        if (!pickedCategories.has(alt.marketCategory) && !pickedEquivKeys.has(altEquivKey)) {
           alternativePicks.push(alt);
           pickedCategories.add(alt.marketCategory);
+          pickedEquivKeys.add(altEquivKey);
         }
       }
     } else {

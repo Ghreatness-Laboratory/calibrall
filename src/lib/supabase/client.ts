@@ -21,6 +21,19 @@ export const isSupabaseConfigured = Boolean(
   !supabaseUrl.includes('your-project-id')
 );
 
+export function assertPersistenceConfigured(): void {
+  if (process.env.NODE_ENV === 'production' && !isSupabaseConfigured) {
+    throw new Error(
+      'PERSISTENCE ERROR: Supabase is not configured in production environment. In-memory demo fallback is strictly disabled in production.'
+    );
+  }
+}
+
+// In production, log loud error if Supabase is not configured
+if (process.env.NODE_ENV === 'production' && !isSupabaseConfigured) {
+  console.error('[CRITICAL PERSISTENCE ERROR] Supabase database credentials missing in production! In-memory fallback is disabled.');
+}
+
 // Real client when credentials exist
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {

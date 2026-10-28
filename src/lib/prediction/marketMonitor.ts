@@ -233,13 +233,13 @@ class MarketMonitor {
 
     const n = picks.length;
 
-    // 1. Line and side concentration
+    // 1. Line and side concentration (merging equivalent lines into one bet for caps)
     const lineSideCounts: Record<string, number> = {};
     const familyCounts: Record<string, number> = {};
 
     picks.forEach(p => {
-      const sel = p.selection || p.marketCode || 'UNKNOWN';
-      lineSideCounts[sel] = (lineSideCounts[sel] || 0) + 1;
+      const canonicalKey = getEquivalentCanonicalKey(p.marketCode, p.selection);
+      lineSideCounts[canonicalKey] = (lineSideCounts[canonicalKey] || 0) + 1;
 
       const fam = p.marketFamily || 'unknown';
       familyCounts[fam] = (familyCounts[fam] || 0) + 1;
@@ -288,3 +288,27 @@ class MarketMonitor {
 }
 
 export const marketMonitor = new MarketMonitor();
+
+export function getEquivalentCanonicalKey(marketCode?: string, selection?: string): string {
+  if (!marketCode && !selection) return 'UNKNOWN';
+  if (marketCode === '1X2_HOME' || marketCode === 'AH_HOME_M0_5' || marketCode === 'AH_HOME_M0.5') {
+    return 'EQUIV_HOME_WIN';
+  }
+  if (marketCode === 'DC_X2' || marketCode === 'AH_AWAY_P0_5' || marketCode === 'AH_AWAY_P0.5') {
+    return 'EQUIV_AWAY_OR_DRAW';
+  }
+  if (marketCode === '1X2_AWAY' || marketCode === 'AH_AWAY_M0_5' || marketCode === 'AH_AWAY_M0.5') {
+    return 'EQUIV_AWAY_WIN';
+  }
+  if (marketCode === 'DC_1X' || marketCode === 'AH_HOME_P0_5' || marketCode === 'AH_HOME_P0.5') {
+    return 'EQUIV_HOME_OR_DRAW';
+  }
+  const s = (selection || '').trim();
+  if (s.endsWith(' -0.5')) {
+    return `${s.replace(/ -0\.5$/, '')} win`;
+  }
+  if (s.endsWith(' +0.5')) {
+    return `${s.replace(/ \+0\.5$/, '')} or Draw`;
+  }
+  return s || marketCode || 'UNKNOWN';
+}

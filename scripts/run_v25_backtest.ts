@@ -142,9 +142,15 @@ export function runV25WalkForwardBacktest(): V25BacktestReport {
     });
   });
 
-  const overallBrierV25 = qualifiedCount > 0 ? Number((qualifiedBrierErr25 / qualifiedCount).toFixed(4)) : 0.1516;
-  const overallBrierV24 = 0.1760; // v2.4 baseline stated in benchmark specification
-  const overallBrierImprovement = Number((((overallBrierV24 - overallBrierV25) / overallBrierV24) * 100).toFixed(1));
+  const overallBrierV25 = qualifiedCount > 0 
+    ? Number((qualifiedBrierErr25 / qualifiedCount).toFixed(4)) 
+    : Number((totalBrierSquaredErrV25 / Math.max(1, totalPredictions)).toFixed(4));
+  const overallBrierV24 = qualifiedCount > 0
+    ? Number((qualifiedBrierErr24 / qualifiedCount).toFixed(4))
+    : Number((totalBrierSquaredErrV24 / Math.max(1, totalPredictions)).toFixed(4));
+  const overallBrierImprovement = overallBrierV24 > 0
+    ? Number((((overallBrierV24 - overallBrierV25) / overallBrierV24) * 100).toFixed(1))
+    : 0;
 
   const overallLogLossV25 = Number((totalLogLossV25 / totalPredictions).toFixed(4));
   const overallLogLossV24 = Number((totalLogLossV24 / totalPredictions).toFixed(4));
