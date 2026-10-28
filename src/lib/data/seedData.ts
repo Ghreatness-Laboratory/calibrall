@@ -286,6 +286,7 @@ export interface FixtureStatisticalContext {
     over45Cards?: number;
     under45Cards?: number;
   };
+  noRecommendationReason?: string;
 }
 
 import { REAL_250_MATCHES } from './realMatchArchive';
@@ -318,9 +319,21 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const homeStrength = homeLookup.found ? homeLookup.data : (fixture.homeTeam.hasRealTeamStrength ? fixture.homeTeam : null);
   const awayStrength = awayLookup.found ? awayLookup.data : (fixture.awayTeam.hasRealTeamStrength ? fixture.awayTeam : null);
 
-  // HARD RULE (Bug 1): If a fixture has no real team-strength input, do not return a pick.
+  const missingTeams: string[] = [];
+  if (!homeStrength || (homeStrength as any).sampleMatches === 0) {
+    missingTeams.push(`${fixture.homeTeam.name || 'Home Team'}: has 0`);
+  }
+  if (!awayStrength || (awayStrength as any).sampleMatches === 0) {
+    missingTeams.push(`${fixture.awayTeam.name || 'Away Team'}: has 0`);
+  }
+
+  const reason = missingTeams.length > 0
+    ? `Needs matches for ${missingTeams.join(', ')}`
+    : 'Not enough data';
+
+  // HARD RULE: If a fixture has no real team-strength input, do not return a pick.
   // Return status: "insufficient_data", null data coverage and uncertainty.
-  if (!homeStrength || !awayStrength) {
+  if (!homeStrength || !awayStrength || (homeStrength as any).sampleMatches === 0 || (awayStrength as any).sampleMatches === 0) {
     return {
       homeXg: 0,
       awayXg: 0,
@@ -335,6 +348,7 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       stateTags: [] as StateTag[],
       lineupConfirmed: false,
       verifiedOdds: undefined,
+      noRecommendationReason: reason,
     };
   }
 

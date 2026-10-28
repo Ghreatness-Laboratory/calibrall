@@ -168,6 +168,7 @@ export interface FixtureContext {
   factors?: Record<FactorCode, ContextFactorMeasurement>;
   missingFactors?: MissingFactorFlag[];
   verifiedOdds?: VerifiedMatchOdds;
+  noRecommendationReason?: string;
 }
 
 export interface VerifiedMatchOdds {

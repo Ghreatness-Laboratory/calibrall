@@ -65,7 +65,11 @@ export class DixonColesV25Evaluator {
         predictions: [],
         topPick: null,
         alternativePicks: [],
-        noRecommendationReason: 'Not enough data',
+        noRecommendationReason: context.noRecommendationReason || (
+          context.homeTeamName && context.hasRealTeamStrength === false
+            ? `Needs matches for ${context.homeTeamName}: has 0`
+            : 'Not enough data'
+        ),
         dataCompletenessScore: 0,
       };
     }

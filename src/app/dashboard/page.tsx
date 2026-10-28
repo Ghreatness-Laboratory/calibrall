@@ -73,13 +73,14 @@ export default function DashboardPage() {
         verifiedOdds: stats.verifiedOdds,
         insufficientData: stats.insufficientData || fixture.insufficientData,
         hasRealTeamStrength: stats.hasRealTeamStrength,
+        noRecommendationReason: stats.noRecommendationReason,
       });
 
       return {
         fixture,
         predictions: evalResult.predictions,
         topPick: evalResult.topPick,
-        noRecommendationReason: evalResult.noRecommendationReason,
+        noRecommendationReason: evalResult.noRecommendationReason || stats.noRecommendationReason,
       };
     });
   }, [fixtures, isBasketball]);

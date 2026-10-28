@@ -102,6 +102,7 @@ export default function MatchAnalysisPage() {
       verifiedOdds: stats.verifiedOdds,
       insufficientData: stats.insufficientData || fixture.insufficientData,
       hasRealTeamStrength: stats.hasRealTeamStrength,
+      noRecommendationReason: stats.noRecommendationReason,
     });
   }, [fixture, isBasketball, stats]);
 

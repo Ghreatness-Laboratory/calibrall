@@ -269,7 +269,17 @@ export default function FixtureCard({
           ) : (
             <div className="bg-[#151E19] rounded-[11px] p-2.5 flex items-center justify-between text-[11.5px] text-[#8B9890]">
               <span className="truncate">
-                {cleanDisplayText(noRecommendationReason || (fixture.insufficientData ? 'Not enough data' : 'No strong lean'))}
+                {cleanDisplayText(
+                  noRecommendationReason && noRecommendationReason !== 'Not enough data'
+                    ? noRecommendationReason
+                    : (fixture.insufficientData
+                        ? (fixture.homeTeam.hasRealTeamStrength === false && fixture.awayTeam.hasRealTeamStrength === false
+                            ? `Needs matches for ${homeName}: has 0, ${awayName}: has 0`
+                            : (fixture.homeTeam.hasRealTeamStrength === false
+                                ? `Needs matches for ${homeName}: has 0`
+                                : `Needs matches for ${awayName}: has 0`))
+                        : 'No strong lean')
+                )}
               </span>
             </div>
           )}
