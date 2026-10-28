@@ -1035,19 +1035,25 @@ export function normalizeTeamLookupKey(raw: string): string {
  * Returns found = false if team is truly missing from inputs (enforces Rule 2).
  */
 export function lookupTeamStrength(
-  teamIdentifier: { id?: string; name?: string; shortName?: string; tla?: string } | string
+  teamIdentifier: { id?: string | number; name?: string; shortName?: string; tla?: string } | string
 ): { found: boolean; data: TeamStrengthRecord | null } {
   if (!teamIdentifier) {
     return { found: false, data: null };
   }
 
-  const rawName = typeof teamIdentifier === 'string' ? teamIdentifier : (teamIdentifier.name || teamIdentifier.shortName || '');
-  const rawId = typeof teamIdentifier === 'object' ? (teamIdentifier.id || '') : '';
-  const rawTla = typeof teamIdentifier === 'object' ? (teamIdentifier.tla || '') : '';
+  const rawName = typeof teamIdentifier === 'string'
+    ? teamIdentifier
+    : String(teamIdentifier.name || teamIdentifier.shortName || '');
+  const rawId = typeof teamIdentifier === 'object' && teamIdentifier.id !== undefined && teamIdentifier.id !== null
+    ? String(teamIdentifier.id)
+    : '';
+  const rawTla = typeof teamIdentifier === 'object' && teamIdentifier.tla !== undefined && teamIdentifier.tla !== null
+    ? String(teamIdentifier.tla)
+    : '';
 
   // 1. Direct ID match
   const cleanId = rawId.replace(/^team_/, '').toLowerCase();
-  if (TEAM_STRENGTH_DATABASE[cleanId]) {
+  if (cleanId && TEAM_STRENGTH_DATABASE[cleanId]) {
     return { found: true, data: TEAM_STRENGTH_DATABASE[cleanId] };
   }
 

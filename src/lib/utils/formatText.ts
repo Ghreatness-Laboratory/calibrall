@@ -492,9 +492,9 @@ export function getTeamAbbreviation(team: any): string {
   if (!team) return 'TBD';
 
   // 1. Check known lookup dictionary first to guarantee verified accuracy
-  const rawName = (team.name || '').toLowerCase().trim();
-  const rawShort = (team.shortName || '').toLowerCase().trim();
-  const rawId = (team.id || '').replace(/^team_/, '').toLowerCase().trim();
+  const rawName = String(team.name || '').toLowerCase().trim();
+  const rawShort = String(team.shortName || '').toLowerCase().trim();
+  const rawId = String(team.id || '').replace(/^team_/, '').toLowerCase().trim();
 
   if (KNOWN_TEAM_TLAS[rawId]) return KNOWN_TEAM_TLAS[rawId];
   if (KNOWN_TEAM_TLAS[rawShort]) return KNOWN_TEAM_TLAS[rawShort];
