@@ -259,3 +259,147 @@ export function validateFixtureIntegrity(
     violations,
   };
 }
+
+export interface LeagueMembershipViolation {
+  matchId: string;
+  providerId: string;
+  season: string;
+  competitionCode: string;
+  homeTeam: string;
+  awayTeam: string;
+  kickoffTime: string;
+  reason: string;
+}
+
+export interface LeagueMembershipAuditReport {
+  isValid: boolean;
+  totalMatchesAudited: number;
+  seasonsAudited: string[];
+  competitionsAudited: string[];
+  violationsCount: number;
+  violations: LeagueMembershipViolation[];
+}
+
+/**
+ * Validates league membership per season:
+ * In domestic leagues (PL, ELC, E2, PD, BL1, SA, FL1, DED, BSA), a club cannot have
+ * league matches against clubs from a different division in the same season, nor can
+ * a club participate in conflicting domestic leagues in the same season.
+ */
+export function validateLeagueMembershipPerSeason(
+  matches: Array<{
+    id: string;
+    provider_id: string;
+    competition_code: string;
+    season: string;
+    home_team_id: string;
+    away_team_id: string;
+    home_team_name: string;
+    away_team_name: string;
+    kickoff_time: string;
+  }>
+): LeagueMembershipAuditReport {
+  const violations: LeagueMembershipViolation[] = [];
+  const seasonsSet = new Set<string>();
+  const compSet = new Set<string>();
+
+  // 1. Map of each team's registered domestic league per season
+  // Key: `${teamId}:${season}` -> competition_code
+  const teamDomesticLeagueBySeason = new Map<string, { comp: string; matchId: string }>();
+
+  // Domestic league codes to strictly audit
+  const domesticLeagues = new Set(['PL', 'ELC', 'E2', 'PD', 'BL1', 'SA', 'FL1', 'DED', 'BSA']);
+
+  for (const m of matches) {
+    const comp = m.competition_code.toUpperCase().trim();
+    const season = m.season.trim();
+    seasonsSet.add(season);
+    compSet.add(comp);
+
+    if (!domesticLeagues.has(comp)) continue;
+
+    // Check home and away team club lookup
+    const homeLookup = lookupTeamStrength(m.home_team_name);
+    const awayLookup = lookupTeamStrength(m.away_team_name);
+    const homeId = homeLookup.data?.id || m.home_team_id;
+    const awayId = awayLookup.data?.id || m.away_team_id;
+
+    // A. Check against known registered clubs in other conflicting domestic leagues
+    // E.g., if comp is ELC, neither team can belong to Serie A (SA), Bundesliga (BL1), La Liga (PD), or Ligue 1 (FL1)
+    const conflictingForeignLeagues = ['SA', 'PD', 'BL1', 'FL1', 'DED', 'BSA'];
+    for (const foreignCode of conflictingForeignLeagues) {
+      if (comp !== foreignCode) {
+        const foreignClubs = new Set(COMPETITION_CLUBS[foreignCode] || []);
+        if (foreignClubs.has(homeId)) {
+          violations.push({
+            matchId: m.id,
+            providerId: m.provider_id,
+            season,
+            competitionCode: comp,
+            homeTeam: m.home_team_name,
+            awayTeam: m.away_team_name,
+            kickoffTime: m.kickoff_time,
+            reason: `Cross-division violation: Home team "${m.home_team_name}" (${homeId}) belongs to ${foreignCode}, cannot play domestic league match in ${comp}`,
+          });
+        }
+        if (foreignClubs.has(awayId)) {
+          violations.push({
+            matchId: m.id,
+            providerId: m.provider_id,
+            season,
+            competitionCode: comp,
+            homeTeam: m.home_team_name,
+            awayTeam: m.away_team_name,
+            kickoffTime: m.kickoff_time,
+            reason: `Cross-division violation: Away team "${m.away_team_name}" (${awayId}) belongs to ${foreignCode}, cannot play domestic league match in ${comp}`,
+          });
+        }
+      }
+    }
+
+    // B. Check intra-country dual membership in the same season
+    // A team cannot play in both Premier League and Championship in the exact same season
+    const homeKey = `${homeId}:${season}`;
+    const prevHomeComp = teamDomesticLeagueBySeason.get(homeKey);
+    if (prevHomeComp && prevHomeComp.comp !== comp) {
+      violations.push({
+        matchId: m.id,
+        providerId: m.provider_id,
+        season,
+        competitionCode: comp,
+        homeTeam: m.home_team_name,
+        awayTeam: m.away_team_name,
+        kickoffTime: m.kickoff_time,
+        reason: `Dual domestic league violation: "${m.home_team_name}" already recorded in league ${prevHomeComp.comp} for season ${season} (match ${prevHomeComp.matchId})`,
+      });
+    } else if (!prevHomeComp) {
+      teamDomesticLeagueBySeason.set(homeKey, { comp, matchId: m.id });
+    }
+
+    const awayKey = `${awayId}:${season}`;
+    const prevAwayComp = teamDomesticLeagueBySeason.get(awayKey);
+    if (prevAwayComp && prevAwayComp.comp !== comp) {
+      violations.push({
+        matchId: m.id,
+        providerId: m.provider_id,
+        season,
+        competitionCode: comp,
+        homeTeam: m.home_team_name,
+        awayTeam: m.away_team_name,
+        kickoffTime: m.kickoff_time,
+        reason: `Dual domestic league violation: "${m.away_team_name}" already recorded in league ${prevAwayComp.comp} for season ${season} (match ${prevAwayComp.matchId})`,
+      });
+    } else if (!prevAwayComp) {
+      teamDomesticLeagueBySeason.set(awayKey, { comp, matchId: m.id });
+    }
+  }
+
+  return {
+    isValid: violations.length === 0,
+    totalMatchesAudited: matches.length,
+    seasonsAudited: Array.from(seasonsSet).sort(),
+    competitionsAudited: Array.from(compSet).sort(),
+    violationsCount: violations.length,
+    violations,
+  };
+}

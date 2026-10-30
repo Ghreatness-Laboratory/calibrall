@@ -304,6 +304,7 @@ export interface FixtureStatisticalContext {
 import { REAL_250_MATCHES } from './realMatchArchive';
 import { lookupTeamStrength } from './teamDatabase';
 import { displayName } from '../utils/formatText';
+import { matchesStore } from './matchesStore';
 
 export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContext {
   const realMatch = REAL_250_MATCHES.find(m => m.id === fixture.id);
@@ -368,11 +369,61 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     };
   }
 
+  // STALE DATA GUARD:
+  // If a team's most recent stored match is more than 21 days old in season,
+  // abstain and show "Data out of date: last match N days ago"
+  const homeLastMatch = matchesStore.getTeamDaysSinceLastMatch(fixture.homeTeam.id || fixture.homeTeam.name, fixture.kickoffTime);
+  const awayLastMatch = matchesStore.getTeamDaysSinceLastMatch(fixture.awayTeam.id || fixture.awayTeam.name, fixture.kickoffTime);
+
+  if (homeLastMatch.days !== null && homeLastMatch.days > 21) {
+    return {
+      homeXg: 0,
+      awayXg: 0,
+      expectedCornersHome: 0,
+      expectedCornersAway: 0,
+      expectedCards: 0,
+      uncertaintyScore: null,
+      dataCoverageScore: null,
+      sampleSizeMatches: homeMatches,
+      hasRealTeamStrength: true,
+      insufficientData: true,
+      stateTags: ['low-sample'] as StateTag[],
+      lineupConfirmed: false,
+      verifiedOdds: fixture.verifiedOdds,
+      noRecommendationReason: `Data out of date: last match ${homeLastMatch.days} days ago`,
+    };
+  }
+
+  if (awayLastMatch.days !== null && awayLastMatch.days > 21) {
+    return {
+      homeXg: 0,
+      awayXg: 0,
+      expectedCornersHome: 0,
+      expectedCornersAway: 0,
+      expectedCards: 0,
+      uncertaintyScore: null,
+      dataCoverageScore: null,
+      sampleSizeMatches: awayMatches,
+      hasRealTeamStrength: true,
+      insufficientData: true,
+      stateTags: ['low-sample'] as StateTag[],
+      lineupConfirmed: false,
+      verifiedOdds: fixture.verifiedOdds,
+      noRecommendationReason: `Data out of date: last match ${awayLastMatch.days} days ago`,
+    };
+  }
+
+  // Ratings rule: When fewer than 10 recent matches, use the league prior (1.00)
+  // with a wide uncertainty (±35%).
+  const isHomeLowSample = homeMatches < 10;
+  const isAwayLowSample = awayMatches < 10;
+  const isLowSample = isHomeLowSample || isAwayLowSample;
+
   const comp = fixture.competition;
-  const homeAttack = homeStrength.attackRating || 1.25;
-  const homeDefense = homeStrength.defenseRating || 0.95;
-  const awayAttack = awayStrength.attackRating || 1.15;
-  const awayDefense = awayStrength.defenseRating || 1.05;
+  const homeAttack = isHomeLowSample ? 1.00 : (homeStrength.attackRating || 1.00);
+  const homeDefense = isHomeLowSample ? 1.00 : (homeStrength.defenseRating || 1.00);
+  const awayAttack = isAwayLowSample ? 1.00 : (awayStrength.attackRating || 1.00);
+  const awayDefense = isAwayLowSample ? 1.00 : (awayStrength.defenseRating || 1.00);
 
   const baseGoals = (comp.avgGoalsPerGame || 2.80) / 2;
   const homeXg = Number((homeAttack * awayDefense * baseGoals * 1.08).toFixed(2));
@@ -395,9 +446,15 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const oddsBonus = fixture.verifiedOdds ? 0.04 : 0.0;
   const dataCoverage = Number(Math.min(0.96, Math.max(0.68, sampleCoverage + refereeBonus + lineupBonus + statusBonus + oddsBonus)).toFixed(2));
 
-  // Computed (non-constant) uncertainty score
+  // Computed uncertainty score: wide uncertainty (0.35) when fewer than 10 recent matches
   const attackDiffSpread = Math.abs(homeAttack - awayAttack) * 0.025;
-  const uncertainty = Number(Math.max(0.042, Math.min(0.125, 0.045 + (1 - dataCoverage) * 0.12 + attackDiffSpread)).toFixed(3));
+  const standardUncertainty = Number(Math.max(0.042, Math.min(0.125, 0.045 + (1 - dataCoverage) * 0.12 + attackDiffSpread)).toFixed(3));
+  const uncertainty = isLowSample ? 0.350 : standardUncertainty;
+
+  const stateTags: StateTag[] = [];
+  if (isLowSample) {
+    stateTags.push('low-sample');
+  }
 
   return {
     homeXg,
@@ -410,7 +467,7 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     sampleSizeMatches: Math.round(sampleMatches / 2),
     hasRealTeamStrength: true,
     insufficientData: false,
-    stateTags: [] as StateTag[],
+    stateTags,
     lineupConfirmed: fixture.status !== 'POSTPONED' && fixture.status !== 'CANCELED',
     verifiedOdds: fixture.verifiedOdds,
   };

@@ -43,6 +43,8 @@ export interface TeamHistoryAndForm {
   storedMatchCount: number;
   daysSinceLastMatch: number | null;
   lastMatchDate: string | null;
+  isStale?: boolean;
+  staleReason?: string;
   last5: {
     matches: FormMatchRecord[];
     formString: string;
@@ -57,6 +59,11 @@ export interface TeamHistoryAndForm {
   awaySplit: SplitMetrics;
   timeDecayedAttackRating: number;
   timeDecayedDefenseRating: number;
+  isRatingClamped?: boolean;
+  clampedReason?: string;
+  isUsingLeaguePrior?: boolean;
+  uncertaintyScore?: number;
+  uncertaintyLevel?: 'WIDE' | 'STANDARD';
 }
 
 export interface StoredMatch {
@@ -493,20 +500,38 @@ class MatchesStore {
 
     // Filter to finished matches with scores, respecting asOfDate if provided
     const finished = candidateMatches.filter(m => {
-      const isFinished = m.status === 'FINISHED' || m.home_score !== null;
-      if (!isFinished) return false;
+      // Must have valid numerical finished scores (never assume 0-0 for unplayed matches)
+      if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
+      const isFinished = m.status === 'FINISHED' || m.status === 'IN_PLAY';
+      if (!isFinished && m.home_score === null) return false;
       if (asOfDate && m.kickoff_time > asOfDate) return false;
       return true;
     }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
 
-    // Map to FormMatchRecord
+    // Map to FormMatchRecord: Compute W/D/L strictly from score (0-0 is D).
+    // Ensure the same match shows consistent opposite results for both clubs.
     const formMatches: FormMatchRecord[] = finished.map(m => {
-      const isHome = m.home_team_id === canonicalId || normalizeTeamLookupKey(m.home_team_name) === teamNorm;
-      const teamScore = isHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
-      const opponentScore = isHome ? (m.away_score ?? 0) : (m.home_score ?? 0);
+      const homeNorm = normalizeTeamLookupKey(m.home_team_name);
+      const awayNorm = normalizeTeamLookupKey(m.away_team_name);
+      const isTeamHome = m.home_team_id === canonicalId || homeNorm === teamNorm;
+      const isTeamAway = m.away_team_id === canonicalId || awayNorm === teamNorm;
+      const isHome = isTeamHome && !isTeamAway ? true : isTeamHome;
+
+      const teamScore = isHome ? m.home_score! : m.away_score!;
+      const opponentScore = isHome ? m.away_score! : m.home_score!;
       const opponentName = isHome ? m.away_team_name : m.home_team_name;
       const opponentId = isHome ? m.away_team_id : m.home_team_id;
-      const result: 'W' | 'D' | 'L' = teamScore > opponentScore ? 'W' : teamScore === opponentScore ? 'D' : 'L';
+
+      // Compute W/D/L strictly from score
+      let result: 'W' | 'D' | 'L';
+      if (teamScore > opponentScore) {
+        result = 'W';
+      } else if (teamScore === opponentScore) {
+        result = 'D'; // a 0-0 is strictly a D
+      } else {
+        result = 'L';
+      }
+
       return {
         id: m.id,
         provider_id: m.provider_id,
@@ -561,6 +586,7 @@ class MatchesStore {
       };
     };
 
+    // Last 5 sorted strictly by date descending
     const last5Matches = formMatches.slice(0, 5);
     const last10Matches = formMatches.slice(0, 10);
     const homeMatches = formMatches.filter(m => m.isHome);
@@ -581,22 +607,48 @@ class MatchesStore {
     const homeSplit = computeMetrics(homeMatches);
     const awaySplit = computeMetrics(awayMatches);
 
-    // Days since last match
+    // Days since last match & Stale Data Guard:
+    // If a team's most recent stored match is more than 21 days old in season, flag as stale
     let daysSinceLastMatch: number | null = null;
     let lastMatchDate: string | null = null;
+    let isStale = false;
+    let staleReason: string | undefined = undefined;
+
     if (formMatches.length > 0) {
       lastMatchDate = formMatches[0].date;
       const refTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
       const matchTime = new Date(lastMatchDate).getTime();
       daysSinceLastMatch = Math.max(0, Math.round((refTime - matchTime) / (1000 * 60 * 60 * 24)));
+      if (daysSinceLastMatch > 21) {
+        isStale = true;
+        staleReason = `Data out of date: last match ${daysSinceLastMatch} days ago`;
+      }
+    } else {
+      isStale = true;
+      staleReason = 'Data out of date: no recent matches stored in database';
     }
 
-    // Time-decayed attack and defence strengths (exponential half-life decay ~ 138 days)
+    // Ratings & Uncertainty:
+    // Rule: Remove hard clamps (0.60 and 0.65) or report when a rating is clamped,
+    // and use the league prior with a wide uncertainty when there are fewer than 10 recent matches.
     const baseGoalsPerMatch = 1.35;
-    let timeDecayedAttackRating = lookup?.data?.attackRating ?? 1.10;
-    let timeDecayedDefenseRating = lookup?.data?.defenseRating ?? 1.05;
+    let timeDecayedAttackRating: number;
+    let timeDecayedDefenseRating: number;
+    let isRatingClamped = false;
+    let clampedReason: string | undefined = undefined;
+    let isUsingLeaguePrior = false;
+    let uncertaintyScore = 0.12;
+    let uncertaintyLevel: 'WIDE' | 'STANDARD' = 'STANDARD';
 
-    if (formMatches.length > 0) {
+    if (formMatches.length < 10) {
+      // Fewer than 10 recent matches: Use league prior (1.00) with wide uncertainty
+      isUsingLeaguePrior = true;
+      uncertaintyScore = 0.35; // Wide uncertainty (±35%)
+      uncertaintyLevel = 'WIDE';
+      timeDecayedAttackRating = 1.00;
+      timeDecayedDefenseRating = 1.00;
+    } else {
+      // 10 or more recent matches: Exponential decay weights (~138-day half life)
       let weightSum = 0;
       let weightedGoalsScored = 0;
       let weightedGoalsConceded = 0;
@@ -614,9 +666,27 @@ class MatchesStore {
       if (weightSum > 0) {
         const avgScored = weightedGoalsScored / weightSum;
         const avgConceded = weightedGoalsConceded / weightSum;
-        timeDecayedAttackRating = Number(Math.max(0.65, Math.min(1.85, avgScored / baseGoalsPerMatch)).toFixed(2));
-        timeDecayedDefenseRating = Number(Math.max(0.60, Math.min(1.75, avgConceded / baseGoalsPerMatch)).toFixed(2));
+        const rawAttack = avgScored / baseGoalsPerMatch;
+        const rawDefense = avgConceded / baseGoalsPerMatch;
+
+        // Hard clamps (0.60 and 0.65) removed: values like 0.45 or 0.52 are retained naturally.
+        // Report if clamped to outer physical sanity limits [0.20, 2.50]
+        let finalAttack = rawAttack;
+        let finalDefense = rawDefense;
+        if (rawAttack < 0.20 || rawAttack > 2.50 || rawDefense < 0.20 || rawDefense > 2.50) {
+          isRatingClamped = true;
+          clampedReason = `Rating clamped to statistical boundary [0.20, 2.50] (raw Attack: ${rawAttack.toFixed(2)}, raw Defense: ${rawDefense.toFixed(2)})`;
+          finalAttack = Math.max(0.20, Math.min(2.50, rawAttack));
+          finalDefense = Math.max(0.20, Math.min(2.50, rawDefense));
+        }
+        timeDecayedAttackRating = Number(finalAttack.toFixed(2));
+        timeDecayedDefenseRating = Number(finalDefense.toFixed(2));
+      } else {
+        timeDecayedAttackRating = 1.00;
+        timeDecayedDefenseRating = 1.00;
       }
+      uncertaintyScore = 0.12;
+      uncertaintyLevel = 'STANDARD';
     }
 
     return {
@@ -625,13 +695,49 @@ class MatchesStore {
       storedMatchCount: formMatches.length,
       daysSinceLastMatch,
       lastMatchDate,
+      isStale,
+      staleReason,
       last5,
       last10,
       homeSplit,
       awaySplit,
       timeDecayedAttackRating,
       timeDecayedDefenseRating,
+      isRatingClamped,
+      clampedReason,
+      isUsingLeaguePrior,
+      uncertaintyScore,
+      uncertaintyLevel,
     };
+  }
+
+  /**
+   * Helper to retrieve days since last stored match for a team.
+   * Used by the stale data guard.
+   */
+  getTeamDaysSinceLastMatch(teamIdOrName: string | { id?: string; name?: string }, asOfDate?: string): { days: number | null; lastMatchDate: string | null } {
+    const rawInput = typeof teamIdOrName === 'string' ? teamIdOrName : (teamIdOrName?.id || teamIdOrName?.name || '');
+    const lookup = lookupTeamStrength(rawInput);
+    const canonicalId = lookup?.data?.id || (typeof teamIdOrName === 'object' && teamIdOrName?.id ? teamIdOrName.id : rawInput);
+    const teamName = lookup?.data?.name || (typeof teamIdOrName === 'object' && teamIdOrName?.name ? teamIdOrName.name : displayName(rawInput));
+    const teamNorm = normalizeTeamLookupKey(teamName);
+
+    const matches = Array.from(this.inMemoryMatches.values()).filter(m => {
+      if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
+      if (asOfDate && m.kickoff_time > asOfDate) return false;
+      const homeNorm = normalizeTeamLookupKey(m.home_team_name);
+      const awayNorm = normalizeTeamLookupKey(m.away_team_name);
+      return m.home_team_id === canonicalId || m.away_team_id === canonicalId || homeNorm === teamNorm || awayNorm === teamNorm;
+    }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
+
+    if (matches.length === 0) {
+      return { days: null, lastMatchDate: null };
+    }
+
+    const lastMatchDate = matches[0].kickoff_time;
+    const refTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
+    const days = Math.max(0, Math.round((refTime - new Date(lastMatchDate).getTime()) / (1000 * 60 * 60 * 24)));
+    return { days, lastMatchDate };
   }
 
   /**

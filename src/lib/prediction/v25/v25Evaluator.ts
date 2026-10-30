@@ -53,9 +53,9 @@ interface RawOptionCandidate {
 
 export class DixonColesV25Evaluator {
   public static evaluateFixture(context: FixtureContext): V25EvaluatedFixtureResult {
-    // 0. HARD RULE: If a fixture has no real team-strength input, do not return a pick for it.
-    // Return status: "insufficient_data" and show "Not enough data" in the UI.
-    if (context.insufficientData || context.hasRealTeamStrength === false) {
+    // 0. HARD RULE: If a fixture has no real team-strength input or data is stale (> 21 days),
+    // do not return a pick for it.
+    if (context.insufficientData || context.hasRealTeamStrength === false || context.noRecommendationReason?.startsWith('Data out of date')) {
       const features = FeatureLayerEngine.computeFixtureFeatures(context);
       return {
         engineVersion: 'v2.5.0',

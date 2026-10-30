@@ -135,6 +135,26 @@ export function evaluateFixtureMarkets(
   maxRankedOptions: number = 8,
   allowedOptionTypes?: SupportedOptionType[]
 ): EvaluatedFixtureResult {
+  // Stale data guard & missing team strength hard guard
+  if (context.insufficientData || context.hasRealTeamStrength === false || context.noRecommendationReason?.startsWith('Data out of date')) {
+    return {
+      predictions: [],
+      rankedOptions: [],
+      topPick: null,
+      noRecommendationReason: context.noRecommendationReason || 'Not enough data',
+      contextEvaluation: {
+        stateTags: context.stateTags || [],
+        lineupStatus: 'confirmed',
+        activeFactors: [],
+        missingFactors: [],
+        compositeUncertaintyMultiplier: 1.0,
+        dataQualityScore: 0,
+        factorContributionsByMarket: {},
+        correlationWarnings: [],
+      },
+    };
+  }
+
   // ROUTE TO DIXON COLES v2.5 WHEN FEATURE FLAG IS ACTIVE
   if (isDixonColesV25Active()) {
     const v25Result = DixonColesV25Evaluator.evaluateFixture(context);
