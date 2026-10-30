@@ -18,6 +18,7 @@ import { REAL_250_MATCHES, RealHistoricalMatch } from './realMatchArchive';
 import { lookupTeamStrength } from './teamDatabase';
 import { displayName, getTeamAbbreviation } from '../utils/formatText';
 import { validateFixtureIntegrity } from './fixtureIntegrity';
+import { supabase, isSupabaseConfigured, assertPersistenceConfigured } from '@/lib/supabase/client';
 
 export interface ProviderHealth {
   providerName: string;
@@ -363,6 +364,73 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
   };
 }
 
+function mapDbMatchToFixture(m: any, fetchTime: string): Fixture {
+  const homeLookup = lookupTeamStrength(m.home_team_id) || lookupTeamStrength(m.home_team_name);
+  const awayLookup = lookupTeamStrength(m.away_team_id) || lookupTeamStrength(m.away_team_name);
+
+  const comp = COMPETITIONS.find(c => c.code === m.competition_code) || {
+    id: `comp_${(m.competition_code || 'league').toLowerCase()}`,
+    code: m.competition_code || 'SA',
+    name: m.competition_code || 'League',
+    country: 'Europe',
+    emblemUrl: `https://crests.football-data.org/${m.competition_code || 'SA'}.png`,
+    tier: 1,
+    avgGoalsPerGame: 2.75,
+    avgCornersPerGame: 9.8,
+    avgCardsPerGame: 4.0,
+    isActive: true,
+  };
+
+  const homeTeam: Team = {
+    id: m.home_team_id,
+    name: m.home_team_name,
+    shortName: homeLookup?.data?.shortName || displayName(m.home_team_name),
+    tla: homeLookup?.data?.tla || m.home_team_name.slice(0, 3).toUpperCase(),
+    crestUrl: homeLookup?.data?.crestUrl || `https://crests.football-data.org/${m.competition_code}.png`,
+    attackRating: homeLookup?.data?.attackRating,
+    defenseRating: homeLookup?.data?.defenseRating,
+    cornerAttackRating: homeLookup?.data?.cornerAttackRating,
+    disciplineRating: homeLookup?.data?.disciplineRating,
+    recentForm: homeLookup?.data?.recentForm,
+    hasRealTeamStrength: homeLookup?.found ?? false,
+  };
+
+  const awayTeam: Team = {
+    id: m.away_team_id,
+    name: m.away_team_name,
+    shortName: awayLookup?.data?.shortName || displayName(m.away_team_name),
+    tla: awayLookup?.data?.tla || m.away_team_name.slice(0, 3).toUpperCase(),
+    crestUrl: awayLookup?.data?.crestUrl || `https://crests.football-data.org/${m.competition_code}.png`,
+    attackRating: awayLookup?.data?.attackRating,
+    defenseRating: awayLookup?.data?.defenseRating,
+    cornerAttackRating: awayLookup?.data?.cornerAttackRating,
+    disciplineRating: awayLookup?.data?.disciplineRating,
+    recentForm: awayLookup?.data?.recentForm,
+    hasRealTeamStrength: awayLookup?.found ?? false,
+  };
+
+  return {
+    id: m.id || `fix_${m.provider_id}`,
+    providerId: m.provider_id,
+    providerName: 'Supabase PostgreSQL',
+    fetchTime,
+    source: m.source || 'supabase:matches',
+    competitionId: comp.id,
+    competition: comp,
+    seasonYear: m.season || '2024/2025',
+    homeTeam,
+    awayTeam,
+    kickoffTime: m.kickoff_time,
+    matchday: m.matchday || 1,
+    status: (m.status as MatchStatus) || 'FINISHED',
+    homeScore: m.home_score,
+    awayScore: m.away_score,
+    homeHalfTimeScore: m.home_half_time_score,
+    awayHalfTimeScore: m.away_half_time_score,
+    dataFreshness: m.updated_at || fetchTime,
+  };
+}
+
 export class LiveFootballDataProvider implements FootballDataProvider {
   private lastGoodCachedFixtures: Fixture[] = [];
   private lastGoodSyncTime: string = '';
@@ -430,6 +498,40 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         providerUsed: filtered[0]?.providerName || 'ServerCache (TTL active)',
         dateRange: { dateFrom, dateTo },
       };
+    }
+
+    // In Production: The app must read matches only from Supabase
+    if (isSupabaseConfigured && supabase) {
+      try {
+        let query = supabase
+          .from('matches')
+          .select('*')
+          .gte('kickoff_time', `${dateFrom}T00:00:00Z`)
+          .lte('kickoff_time', `${dateTo}T23:59:59Z`);
+
+        if (params?.competitionCode && params.competitionCode !== 'ALL') {
+          query = query.eq('competition_code', params.competitionCode.toUpperCase());
+        }
+        if (params?.status && params.status !== 'ALL') {
+          query = query.eq('status', params.status);
+        }
+        const { data: dbMatches, error: dbErr } = await query;
+        if (!dbErr && dbMatches && dbMatches.length > 0) {
+          const mapped = dbMatches.map((m: any) => mapDbMatchToFixture(m, fetchTime));
+          const integrityReport = validateFixtureIntegrity(mapped, { dateFrom, dateTo });
+          if (integrityReport.validFixtures.length > 0) {
+            return {
+              fixtures: integrityReport.validFixtures,
+              liveDataAvailable: true,
+              lastUpdated: lastUpdatedFormatted,
+              providerUsed: 'Supabase PostgreSQL (Production matches table)',
+              dateRange: { dateFrom, dateTo },
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('[FootballDataProvider] Error reading matches from Supabase:', err);
+      }
     }
 
     // Array to collect live fixtures from providers

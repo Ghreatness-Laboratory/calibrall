@@ -7,7 +7,7 @@
 // 5. Look up crest by team id and verify/align with provider crest URL.
 
 import { Fixture } from '@/types';
-import { lookupTeamStrength, normalizeTeamLookupKey } from './teamDatabase';
+import { lookupTeamStrength, normalizeTeamLookupKey, COMPETITION_CLUBS } from './teamDatabase';
 
 export interface IntegrityValidationReport {
   isValid: boolean;
@@ -74,9 +74,20 @@ export function validateFixtureIntegrity(
       continue;
     }
 
-    // Rule 4: Team crest validation (look up team by ID and compare against provider crest URL)
+    // Rule 4: Team crest validation (verify every crest against canonical team id)
     const homeTeamLookup = lookupTeamStrength(f.homeTeam);
     const awayTeamLookup = lookupTeamStrength(f.awayTeam);
+
+    if (homeTeamLookup.found && homeTeamLookup.data?.crestUrl) {
+      if (f.homeTeam.crestUrl !== homeTeamLookup.data.crestUrl) {
+        f.homeTeam.crestUrl = homeTeamLookup.data.crestUrl;
+      }
+    }
+    if (awayTeamLookup.found && awayTeamLookup.data?.crestUrl) {
+      if (f.awayTeam.crestUrl !== awayTeamLookup.data.crestUrl) {
+        f.awayTeam.crestUrl = awayTeamLookup.data.crestUrl;
+      }
+    }
 
     // Guard against known corrupted crest URLs
     // NEC must NEVER have Feyenoord crest (675.png)
@@ -105,6 +116,31 @@ export function validateFixtureIntegrity(
       console.error(msg);
       violations.push(msg);
       f.awayTeam.crestUrl = awayTeamLookup.data?.crestUrl || 'https://crests.football-data.org/1073.png';
+    }
+
+    // Rule 5: League Membership Integrity Check
+    // Both teams in a domestic league fixture must belong to that competition's club list.
+    const compCode = f.competition.code.toUpperCase();
+    const authorizedClubs = COMPETITION_CLUBS[compCode];
+    if (authorizedClubs && authorizedClubs.length > 0) {
+      const homeId = homeTeamLookup.data?.id || f.homeTeam.id;
+      const awayId = awayTeamLookup.data?.id || f.awayTeam.id;
+      const homeComp = homeTeamLookup.data?.competitionCode || 'Unknown';
+      const awayComp = awayTeamLookup.data?.competitionCode || 'Unknown';
+
+      const homeBelongs = authorizedClubs.includes(homeId);
+      const awayBelongs = authorizedClubs.includes(awayId);
+
+      if (!homeBelongs || !awayBelongs) {
+        const msg = `[Integrity Check FAILED] Cross-competition league mismatch: ${f.homeTeam.name} (${homeComp}) vs ${f.awayTeam.name} (${awayComp}) in competition ${compCode} (${f.competition.name}). Fixture rejected.`;
+        console.error(msg);
+        violations.push(msg);
+        rejectedFixtures.push({
+          fixtureId: f.id,
+          reason: `Cross-competition mismatch: ${f.homeTeam.name} belongs to ${homeComp}, ${f.awayTeam.name} belongs to ${awayComp} (Competition: ${compCode})`,
+        });
+        continue;
+      }
     }
 
     validFixtures.push(f);

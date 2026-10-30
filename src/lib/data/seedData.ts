@@ -291,6 +291,7 @@ export interface FixtureStatisticalContext {
 
 import { REAL_250_MATCHES } from './realMatchArchive';
 import { lookupTeamStrength } from './teamDatabase';
+import { displayName } from '../utils/formatText';
 
 export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContext {
   const realMatch = REAL_250_MATCHES.find(m => m.id === fixture.id);
@@ -319,17 +320,20 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const homeStrength = homeLookup.found ? homeLookup.data : (fixture.homeTeam.hasRealTeamStrength ? fixture.homeTeam : null);
   const awayStrength = awayLookup.found ? awayLookup.data : (fixture.awayTeam.hasRealTeamStrength ? fixture.awayTeam : null);
 
-  const missingTeams: string[] = [];
-  if (!homeStrength || (homeStrength as any).sampleMatches === 0) {
-    missingTeams.push(`${fixture.homeTeam.name || 'Home Team'}: has 0`);
-  }
-  if (!awayStrength || (awayStrength as any).sampleMatches === 0) {
-    missingTeams.push(`${fixture.awayTeam.name || 'Away Team'}: has 0`);
-  }
+  const homeMatches = (homeStrength as any)?.sampleMatches ?? 0;
+  const awayMatches = (awayStrength as any)?.sampleMatches ?? 0;
 
-  const reason = missingTeams.length > 0
-    ? `Needs matches for ${missingTeams.join(', ')}`
-    : 'Not enough data';
+  const homeNeeds = !homeStrength || homeMatches === 0;
+  const awayNeeds = !awayStrength || awayMatches === 0;
+
+  let reason = 'Not enough data';
+  if (homeNeeds && awayNeeds) {
+    reason = `Needs history: ${displayName(fixture.homeTeam)} (${homeMatches} matches), ${displayName(fixture.awayTeam)} (${awayMatches})`;
+  } else if (homeNeeds) {
+    reason = `Needs history: ${displayName(fixture.homeTeam)} (${homeMatches} matches)`;
+  } else if (awayNeeds) {
+    reason = `Needs history: ${displayName(fixture.awayTeam)} (${awayMatches} matches)`;
+  }
 
   // HARD RULE: If a fixture has no real team-strength input, do not return a pick.
   // Return status: "insufficient_data", null data coverage and uncertainty.

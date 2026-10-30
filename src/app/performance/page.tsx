@@ -29,6 +29,7 @@ import {
   OCTOBER_18_RETROSPECTIVE_DISCLAIMER 
 } from '@/lib/data/october18CaseStudy';
 import { forwardPickLedger } from '@/lib/prediction/forwardPickLedger';
+import DataStatusDiagnostics from '@/components/DataStatusDiagnostics';
 
 type MainSectionTab = 'forward_record' | 'case_study' | 'report_card' | 'providers' | 'ablation' | 'champion' | 'errors' | 'breakdowns';
 
@@ -647,6 +648,9 @@ export default function PerformancePage() {
         {/* SECTION 2: DATA FOUNDATION & PROVIDER AUDIT */}
         {sectionTab === 'providers' && (
           <div className="space-y-3">
+            {/* Live Data Status & Historical Diagnostics */}
+            <DataStatusDiagnostics />
+
             <div className="bg-[#151E19] border border-white/[0.07] rounded-[14px] p-3 text-[12px] text-[#8B9890] leading-[1.5]">
               <span className="text-[#ECF1EE] font-semibold">Strict Data Governance:</span> We use only real data from licensed APIs. No gaps are filled with synthetic numbers. The table below details what each provider supplies, what is missing, and the transparent fallback policy.
             </div>
