@@ -665,6 +665,21 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     sampleMatches: 22,
     aliases: ['aston villa fc', 'aston villa', 'villa', 'avl'],
   },
+  nottingham_forest: {
+    id: 'team_nottinghamforest',
+    name: 'Nottingham Forest FC',
+    shortName: "Nott'm Forest",
+    tla: 'NFO',
+    crestUrl: 'https://crests.football-data.org/351.png',
+    competitionCode: 'PL',
+    attackRating: 1.10,
+    defenseRating: 1.12,
+    cornerAttackRating: 1.05,
+    disciplineRating: 1.14,
+    recentForm: ['W', 'D', 'L', 'W', 'W'],
+    sampleMatches: 22,
+    aliases: ['nottingham forest fc', 'nottingham forest', "nott'm forest", 'nottm forest', 'forest', 'nfo', 'team_nottinghamforest', 'team_nottingham_forest'],
+  },
 
   // ==========================================
   // SERIE A (ITALY)

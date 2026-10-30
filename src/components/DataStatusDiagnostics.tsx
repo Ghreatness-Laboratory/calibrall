@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, CheckCircle2, RefreshCw, Calendar, ShieldCheck } from 'lucide-react';
+import { Database, AlertTriangle, CheckCircle2, RefreshCw, Key, Terminal, Copy, Check } from 'lucide-react';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 
 interface LeagueSeasonStat {
@@ -26,26 +26,66 @@ interface DataStatusData {
   latestDate: string | null;
   matchesPerLeagueAndSeason: LeagueSeasonStat[];
   teamsWithFewerThan10Matches: UnderSampledTeam[];
+  unmatchedNamesCount?: number;
+  unmatchedNames?: string[];
+  persistenceMode?: string;
 }
 
 export default function DataStatusDiagnostics() {
   const [data, setData] = useState<DataStatusData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [adminSecretInput, setAdminSecretInput] = useState<string>('');
+  const [isSecretSaved, setIsSecretSaved] = useState<boolean>(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  const fetchDataStatus = async () => {
+  // Call list including 2526 and 2627 for all leagues, BSA 2025 and 2026, dropping 1920
+  const exampleCalls = [
+    { league: 'PL', season: '2627', desc: 'Premier League 2026-27 (Current In-Play)' },
+    { league: 'PL', season: '2526', desc: 'Premier League 2025-26' },
+    { league: 'PD', season: '2627', desc: 'La Liga 2026-27 (Current In-Play)' },
+    { league: 'PD', season: '2526', desc: 'La Liga 2025-26' },
+    { league: 'BL1', season: '2627', desc: 'Bundesliga 2026-27 (Current In-Play)' },
+    { league: 'BL1', season: '2526', desc: 'Bundesliga 2025-26' },
+    { league: 'SA', season: '2627', desc: 'Serie A 2026-27 (Current In-Play)' },
+    { league: 'SA', season: '2526', desc: 'Serie A 2025-26' },
+    { league: 'FL1', season: '2627', desc: 'Ligue 1 2026-27 (Current In-Play)' },
+    { league: 'FL1', season: '2526', desc: 'Ligue 1 2025-26' },
+    { league: 'DED', season: '2627', desc: 'Eredivisie 2026-27 (Current In-Play)' },
+    { league: 'DED', season: '2526', desc: 'Eredivisie 2025-26' },
+    { league: 'BSA', season: '2026', desc: 'Brazil Série A 2026' },
+    { league: 'BSA', season: '2025', desc: 'Brazil Série A 2025' },
+    { league: 'BSA', season: '2024', desc: 'Brazil Série A 2024' },
+  ];
+
+  const fetchDataStatus = async (secretOverride?: string) => {
     setLoading(true);
     setError(null);
+    const secret = secretOverride !== undefined ? secretOverride : adminSecretInput;
+
     try {
-      const res = await fetch('/api/admin/data-status?secret=calibrall_secret_2026', {
-        headers: {
-          'admin_secret': 'calibrall_secret_2026',
-        },
+      const headers: Record<string, string> = {};
+      if (secret) {
+        headers['x-admin-secret'] = secret;
+      }
+
+      const res = await fetch('/api/admin/data-status', {
+        headers,
         cache: 'no-store',
       });
+
+      if (res.status === 503) {
+        throw new Error('ADMIN_SECRET environment variable is not configured on the server (503 Service Unavailable). Configure it in Vercel/environment to activate status inspection.');
+      }
+
+      if (res.status === 401) {
+        throw new Error('Unauthorized (401). Provide a valid ADMIN_SECRET (>= 32 chars) via the input below or x-admin-secret header.');
+      }
+
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       }
+
       const json = await res.json();
       if (json.success) {
         setData(json);
@@ -60,8 +100,31 @@ export default function DataStatusDiagnostics() {
   };
 
   useEffect(() => {
-    fetchDataStatus();
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('calibrall_admin_secret') : null;
+    if (saved) {
+      setAdminSecretInput(saved);
+      setIsSecretSaved(true);
+      fetchDataStatus(saved);
+    } else {
+      fetchDataStatus('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleSaveSecret = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('calibrall_admin_secret', adminSecretInput.trim());
+      setIsSecretSaved(true);
+    }
+    fetchDataStatus(adminSecretInput.trim());
+  };
+
+  const handleCopyCommand = (cmd: string, index: number) => {
+    navigator.clipboard.writeText(cmd);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
 
   return (
     <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
@@ -73,11 +136,11 @@ export default function DataStatusDiagnostics() {
             <span>Database Status & Historical Sample Coverage</span>
           </div>
           <p className="text-[11.5px] text-[#8B9890] mt-0.5">
-            Diagnostic verification from Supabase matches table and multi-season ingestion pipeline.
+            Diagnostic verification joining the teams table and multi-season ingestion pipeline.
           </p>
         </div>
         <button
-          onClick={fetchDataStatus}
+          onClick={() => fetchDataStatus()}
           disabled={loading}
           type="button"
           className="p-1.5 rounded-[8px] bg-[#151E19] border border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE] transition-colors disabled:opacity-50"
@@ -87,6 +150,25 @@ export default function DataStatusDiagnostics() {
         </button>
       </div>
 
+      {/* Admin Secret Bar */}
+      <form onSubmit={handleSaveSecret} className="flex items-center gap-2 bg-[#151E19] p-2 rounded-[10px] border border-white/[0.07]">
+        <Key className="w-4 h-4 text-[#B6E63B] shrink-0" />
+        <input
+          type="password"
+          placeholder="Enter x-admin-secret (>= 32 chars)..."
+          value={adminSecretInput}
+          onChange={(e) => setAdminSecretInput(e.target.value)}
+          className="bg-transparent text-[11.5px] font-mono text-[#ECF1EE] placeholder-[#5E6A63] flex-1 outline-none min-w-0"
+        />
+        <button
+          type="submit"
+          disabled={loading || adminSecretInput.length < 5}
+          className="px-2.5 py-1 rounded-[6px] bg-[#B6E63B] text-[#0A0F0D] text-[11px] font-semibold hover:bg-[#c8ee47] disabled:opacity-50 shrink-0"
+        >
+          {loading ? 'Checking...' : isSecretSaved ? 'Update Key' : 'Authorize'}
+        </button>
+      </form>
+
       {loading && !data && (
         <div className="py-6 text-center text-[12px] text-[#8B9890] flex items-center justify-center gap-2">
           <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#B6E63B]" />
@@ -94,9 +176,9 @@ export default function DataStatusDiagnostics() {
         </div>
       )}
 
-      {error && !data && (
+      {error && (
         <div className="p-3 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] text-[12px] text-[#E2AE45]">
-          <span className="font-semibold text-[#ECF1EE]">Status query notice: </span>
+          <span className="font-semibold text-[#ECF1EE]">Admin Status: </span>
           {error}
         </div>
       )}
@@ -104,7 +186,7 @@ export default function DataStatusDiagnostics() {
       {data && (
         <div className="space-y-3">
           {/* Headline summary pills */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="bg-[#151E19] rounded-[10px] p-2.5 border border-white/[0.07]">
               <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-[#8B9890] block">
                 Total Matches
@@ -118,7 +200,7 @@ export default function DataStatusDiagnostics() {
               <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-[#8B9890] block">
                 Earliest Date
               </span>
-              <span className="text-[12.5px] font-mono text-[#ECF1EE] truncate block mt-0.5">
+              <span className="text-[12px] font-mono text-[#ECF1EE] truncate block mt-0.5">
                 {data.earliestDate ? cleanDisplayText(data.earliestDate.substring(0, 10)) : 'N/A'}
               </span>
             </div>
@@ -127,11 +209,40 @@ export default function DataStatusDiagnostics() {
               <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-[#8B9890] block">
                 Latest Date
               </span>
-              <span className="text-[12.5px] font-mono text-[#ECF1EE] truncate block mt-0.5">
+              <span className="text-[12px] font-mono text-[#ECF1EE] truncate block mt-0.5">
                 {data.latestDate ? cleanDisplayText(data.latestDate.substring(0, 10)) : 'N/A'}
               </span>
             </div>
+
+            <div className="bg-[#151E19] rounded-[10px] p-2.5 border border-white/[0.07]">
+              <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-[#8B9890] block">
+                Unmatched Names
+              </span>
+              <span className="text-[17px] font-bold font-mono text-[#ECF1EE] tabular-nums">
+                {data.unmatchedNamesCount ?? 0}
+              </span>
+            </div>
           </div>
+
+          {/* Unmatched Names Box if any */}
+          {data.unmatchedNames && data.unmatchedNames.length > 0 && (
+            <div className="p-3 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] space-y-1.5">
+              <span className="text-[11.5px] font-semibold text-[#E2AE45] flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Unmatched Team Names ({data.unmatchedNames.length})</span>
+              </span>
+              <p className="text-[11px] text-[#8B9890]">
+                The following raw CSV names had no match in team_aliases and were skipped (never auto-slugified):
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {data.unmatchedNames.map((name, i) => (
+                  <span key={i} className="text-[10.5px] font-mono px-2 py-0.5 rounded bg-black/40 border border-[#E2AE45]/40 text-[#ECF1EE]">
+                    {name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Matches Per League & Season Table */}
           {data.matchesPerLeagueAndSeason.length > 0 && (
@@ -165,12 +276,12 @@ export default function DataStatusDiagnostics() {
             </div>
           )}
 
-          {/* Under-Sampled Teams (< 10 matches) */}
+          {/* Under-Sampled Teams (< 10 matches) by joining teams table */}
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-between">
               <span className="text-[11.5px] font-semibold text-[#ECF1EE] flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 text-[#E2AE45]" />
-                <span>Under-Sampled Clubs (&lt; 10 matches)</span>
+                <span>Under-Sampled Clubs (&lt; 10 matches) Joined from Teams Table</span>
               </span>
               <span className="text-[10px] font-mono text-[#E2AE45]">
                 {data.teamsWithFewerThan10Matches.length} clubs flagged
@@ -180,12 +291,12 @@ export default function DataStatusDiagnostics() {
             {data.teamsWithFewerThan10Matches.length === 0 ? (
               <div className="p-2.5 rounded-[10px] bg-[#151E19] border border-white/[0.07] text-[11.5px] text-[#B6E63B] flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>All registered clubs have verified sample coverage (&ge; 10 matches).</span>
+                <span>All registered clubs in teams table have verified sample coverage (&ge; 10 matches).</span>
               </div>
             ) : (
               <div className="border border-[#E2AE45]/20 bg-[#151E19] rounded-[10px] p-2.5 space-y-2">
                 <p className="text-[11px] text-[#8B9890] leading-tight">
-                  Clubs with insufficient history fail minimum sample size validation and will produce: <code className="text-[#ECF1EE] bg-black/40 px-1 py-0.5 rounded">Needs history: Club (0 matches)</code>.
+                  Clubs with insufficient history in the joined teams table require historical match backfill:
                 </p>
                 <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pt-1">
                   {data.teamsWithFewerThan10Matches.map((t) => (
@@ -204,6 +315,41 @@ export default function DataStatusDiagnostics() {
           </div>
         </div>
       )}
+
+      {/* Call List Section */}
+      <div className="space-y-2 pt-2 border-t border-white/[0.07]">
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] font-semibold text-[#ECF1EE] flex items-center gap-1.5">
+            <Terminal className="w-3.5 h-3.5 text-[#B6E63B]" />
+            <span>Authorized Backfill Call List (Seasons 2526, 2627, BSA 2025/2026, 1920 Dropped)</span>
+          </span>
+          <span className="text-[10px] font-mono text-[#5E6A63]">Header: x-admin-secret</span>
+        </div>
+
+        <div className="space-y-1.5 max-h-52 overflow-y-auto">
+          {exampleCalls.map((c, idx) => {
+            const curlCmd = `curl -X POST "https://calibrall.vercel.app/api/admin/backfill?league=${c.league}&season=${c.season}" -H "x-admin-secret: $ADMIN_SECRET"`;
+            const isCopied = copiedIndex === idx;
+
+            return (
+              <div key={idx} className="p-2 bg-[#151E19] rounded-[8px] border border-white/[0.05] flex items-center justify-between gap-2 text-[11px] font-mono">
+                <div className="min-w-0">
+                  <div className="text-[#ECF1EE] font-semibold">{c.desc}</div>
+                  <div className="text-[#8B9890] truncate text-[10px] mt-0.5">{curlCmd}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopyCommand(curlCmd, idx)}
+                  className="p-1 rounded bg-black/40 hover:bg-black/60 text-[#8B9890] hover:text-[#ECF1EE] shrink-0"
+                  title="Copy curl command"
+                >
+                  {isCopied ? <Check className="w-3.5 h-3.5 text-[#B6E63B]" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

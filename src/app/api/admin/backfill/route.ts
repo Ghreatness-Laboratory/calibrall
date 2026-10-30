@@ -1,74 +1,135 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parse } from 'csv-parse/sync';
 import { matchesStore, StoredMatch, StoredOddsSnapshot } from '@/lib/data/matchesStore';
 import { lookupTeamStrength } from '@/lib/data/teamDatabase';
 import { displayName } from '@/lib/utils/formatText';
+import { verifyAdminSecretHeader } from '@/lib/auth/adminAuth';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const DIVISION_MAP: Record<string, string> = {
-  PL: 'E0',
-  PD: 'SP1',
-  BL1: 'D1',
-  SA: 'I1',
-  FL1: 'F1',
-  DED: 'N1',
-};
+import {
+  DIVISION_MAP,
+  SUPPORTED_EUROPEAN_SEASONS,
+  SUPPORTED_BRAZIL_SEASONS,
+  generateBackfillCallList,
+  sanitizeRawTeamForId,
+  parseLondonCsvDateTime,
+} from '@/lib/data/backfillCatalog';
 
-function parseDateToISO(dateStr: string, timeStr?: string): string {
-  if (!dateStr) return new Date().toISOString();
-  const parts = dateStr.trim().split('/');
-  if (parts.length !== 3) return new Date().toISOString();
+/**
+ * Cache for Supabase database aliases to minimize round-trips during backfill.
+ */
+let dbAliasesCache: Map<string, string> | null = null;
+let dbAliasesCacheTime = 0;
 
-  let [d, m, y] = parts;
-  if (y.length === 2) {
-    y = parseInt(y, 10) > 50 ? `19${y}` : `20${y}`;
+async function getDatabaseAliases(): Promise<Map<string, string>> {
+  const now = Date.now();
+  if (dbAliasesCache && now - dbAliasesCacheTime < 60000) {
+    return dbAliasesCache;
   }
-  const day = d.padStart(2, '0');
-  const month = m.padStart(2, '0');
-  const time = timeStr && timeStr.includes(':') ? `${timeStr.trim()}:00Z` : '15:00:00Z';
 
-  return `${y}-${month}-${day}T${time}`;
-}
-
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"' || char === "'") {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += char;
+  const map = new Map<string, string>();
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase.from('team_aliases').select('team_id, alias');
+      if (!error && data) {
+        for (const row of data) {
+          if (row.alias && row.team_id) {
+            map.set(row.alias.trim().toLowerCase(), row.team_id);
+          }
+        }
+      }
+    } catch {
+      // ignore
     }
   }
-  result.push(current.trim());
-  return result;
+
+  dbAliasesCache = map;
+  dbAliasesCacheTime = now;
+  return map;
+}
+
+/**
+ * Resolves CSV team name strictly through team_aliases table and TEAM_STRENGTH_DATABASE.
+ * Never auto-creates a team from a slugified name.
+ */
+async function resolveTeamName(
+  rawName: string,
+  unmatchedSet: Set<string>
+): Promise<{ id: string; name: string; shortName: string } | null> {
+  if (!rawName || !rawName.trim()) return null;
+  const cleanRaw = rawName.trim();
+  const lowerRaw = cleanRaw.toLowerCase();
+
+  // 1. Check database team_aliases table
+  const dbAliases = await getDatabaseAliases();
+  const aliasedTeamId = dbAliases.get(lowerRaw);
+  if (aliasedTeamId) {
+    const lookup = lookupTeamStrength(aliasedTeamId);
+    if (lookup.found && lookup.data) {
+      return {
+        id: lookup.data.id,
+        name: lookup.data.name,
+        shortName: lookup.data.shortName,
+      };
+    }
+    return {
+      id: aliasedTeamId,
+      name: cleanRaw,
+      shortName: cleanRaw,
+    };
+  }
+
+  // 2. Check canonical TEAM_STRENGTH_DATABASE and its aliases
+  const lookup = lookupTeamStrength(cleanRaw);
+  if (lookup.found && lookup.data) {
+    return {
+      id: lookup.data.id,
+      name: lookup.data.name,
+      shortName: lookup.data.shortName,
+    };
+  }
+
+  // 3. Unmatched: NEVER auto-create from slugified name
+  unmatchedSet.add(cleanRaw);
+  matchesStore.recordUnmatchedName(cleanRaw);
+  return null;
+}
+
+export async function GET(req: NextRequest) {
+  // Authenticate with ADMIN_SECRET via x-admin-secret header only
+  const auth = verifyAdminSecretHeader(req);
+  if (!auth.authorized) {
+    return auth.response!;
+  }
+
+  const host = req.headers.get('host') || 'calibrall.vercel.app';
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  const baseUrl = `${protocol}://${host}`;
+  const callList = generateBackfillCallList(baseUrl);
+
+  return NextResponse.json({
+    service: 'Calibrall Admin Backfill Pipeline',
+    status: 'ACTIVE',
+    authentication: 'Header x-admin-secret required (min 32 characters, constant-time evaluated)',
+    supportedLeagues: Object.keys(DIVISION_MAP).concat(['BSA']),
+    supportedEuropeanSeasons: SUPPORTED_EUROPEAN_SEASONS,
+    supportedBrazilSeasons: SUPPORTED_BRAZIL_SEASONS,
+    droppedSeasons: ['1920', '2019'],
+    callListTotal: callList.length,
+    callList,
+    idempotencyRule: 'provider_id format: fdco:{div}:{season}:{yyyymmdd}:{homeRaw}:{awayRaw}',
+    unmatchedNames: matchesStore.getUnmatchedNames(),
+  });
 }
 
 export async function POST(req: NextRequest) {
-  // 1. Authenticate with ADMIN_SECRET header
-  const adminSecret =
-    req.headers.get('admin_secret') ||
-    req.headers.get('x-admin-secret') ||
-    req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-
-  const validSecret =
-    process.env.ADMIN_SECRET?.trim() ||
-    process.env.CRON_SECRET?.trim() ||
-    process.env.REVALIDATE_SECRET?.trim() ||
-    'calibrall_secret_2026';
-
-  if (!adminSecret || adminSecret !== validSecret) {
-    return NextResponse.json(
-      { error: 'Unauthorized: Invalid or missing ADMIN_SECRET header.' },
-      { status: 401 }
-    );
+  // 1. Authenticate exclusively via x-admin-secret header with timing-safe comparison
+  const auth = verifyAdminSecretHeader(req);
+  if (!auth.authorized) {
+    return auth.response!;
   }
 
   // 2. Extract parameters
@@ -76,12 +137,25 @@ export async function POST(req: NextRequest) {
   const league = (url.searchParams.get('league') || 'SA').toUpperCase().trim();
   const season = (url.searchParams.get('season') || '2425').trim();
 
+  // Validate that season is not dropped season 1920
+  if (season === '1920' || season === '2019') {
+    return NextResponse.json(
+      {
+        error: 'Invalid season: Season 1920 has been deprecated and dropped from Calibrall pipelines. Please use 2021 through 2627.',
+        supportedEuropeanSeasons: SUPPORTED_EUROPEAN_SEASONS,
+        supportedBrazilSeasons: SUPPORTED_BRAZIL_SEASONS,
+      },
+      { status: 400 }
+    );
+  }
+
   const matches: StoredMatch[] = [];
   const oddsSnapshots: StoredOddsSnapshot[] = [];
+  const unmatchedNames = new Set<string>();
   let sourceUsed = 'football-data.co.uk';
 
   try {
-    // 3. Option A: Brazil Série A extra-league CSV file
+    // 3. Option A: Brazil Série A CSV
     if (league === 'BSA') {
       const csvRes = await fetch('https://football-data.co.uk/new/BRA.csv', {
         headers: { 'User-Agent': 'Calibrall/1.0' },
@@ -92,74 +166,85 @@ export async function POST(req: NextRequest) {
         throw new Error(`Failed to fetch Brazil CSV from football-data.co.uk: HTTP ${csvRes.status}`);
       }
 
-      const csvText = await csvRes.text();
-      const lines = csvText.split('\n').filter(l => l.trim().length > 0);
-      if (lines.length <= 1) {
+      const csvRawText = await csvRes.text();
+      // Strip any byte-order mark (BOM)
+      const cleanCsvText = csvRawText.replace(/^\uFEFF/, '');
+
+      // Parse with csv-parse library: quote is strictly '"'
+      const records: Record<string, string>[] = parse(cleanCsvText, {
+        columns: true,
+        skip_empty_lines: true,
+        bom: true,
+        quote: '"',
+        trim: true,
+        relax_column_count: true,
+      });
+
+      if (records.length === 0) {
         throw new Error('Empty Brazil CSV response');
       }
 
-      const header = parseCSVLine(lines[0]);
-      const idxSeason = header.indexOf('Season');
-      const idxDate = header.indexOf('Date');
-      const idxTime = header.indexOf('Time');
-      const idxHome = header.indexOf('Home');
-      const idxAway = header.indexOf('Away');
-      const idxHG = header.indexOf('HG');
-      const idxAG = header.indexOf('AG');
-      const idxRes = header.indexOf('Res');
-      const idxAvgH = header.indexOf('AvgCH') !== -1 ? header.indexOf('AvgCH') : header.indexOf('PSCH');
-      const idxAvgD = header.indexOf('AvgCD') !== -1 ? header.indexOf('AvgCD') : header.indexOf('PSCD');
-      const idxAvgA = header.indexOf('AvgCA') !== -1 ? header.indexOf('AvgCA') : header.indexOf('PSCA');
-
-      // Match target season: e.g. "2024" if season="2425" or "2024"
+      // Map requested season to Brazil season year: e.g. "2024", "2025", "2026"
       const targetSeasonYear = season.length === 4 && season.startsWith('20')
         ? season
+        : season === '2627' ? '2026'
+        : season === '2526' ? '2025'
         : season === '2425' ? '2024'
         : season === '2324' ? '2023'
         : season === '2223' ? '2022'
         : season === '2122' ? '2021'
         : season === '2021' ? '2020'
-        : season === '1920' ? '2019'
-        : '2024';
+        : season;
 
-      for (let i = 1; i < lines.length; i++) {
-        const cols = parseCSVLine(lines[i]);
-        if (cols.length < 8) continue;
-        const rowSeason = cols[idxSeason]?.trim();
+      for (const row of records) {
+        const rowSeason = row['Season']?.trim();
         if (rowSeason !== targetSeasonYear) continue;
 
-        const rawHome = cols[idxHome]?.trim();
-        const rawAway = cols[idxAway]?.trim();
+        const rawHome = row['Home']?.trim();
+        const rawAway = row['Away']?.trim();
         if (!rawHome || !rawAway) continue;
 
-        const homeLookup = lookupTeamStrength(rawHome);
-        const awayLookup = lookupTeamStrength(rawAway);
+        const rawDate = row['Date']?.trim();
+        const rawTime = row['Time']?.trim() || null;
 
-        const homeTeamId = homeLookup?.data?.id || `team_${rawHome.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-        const awayTeamId = awayLookup?.data?.id || `team_${rawAway.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-        const homeTeamName = homeLookup?.data?.name || rawHome;
-        const awayTeamName = awayLookup?.data?.name || rawAway;
+        // Date validation: skip row if date is invalid (never default to now)
+        const isoKickoff = parseLondonCsvDateTime(rawDate, rawTime);
+        if (!isoKickoff) {
+          continue; // Skip invalid date row
+        }
 
-        const rawDate = cols[idxDate];
-        const rawTime = idxTime !== -1 ? cols[idxTime] : '16:00';
-        const isoKickoff = parseDateToISO(rawDate, rawTime);
+        // Team identity: resolve through aliases, never auto-create from slugified name
+        const homeResolved = await resolveTeamName(rawHome, unmatchedNames);
+        const awayResolved = await resolveTeamName(rawAway, unmatchedNames);
 
-        const hg = parseInt(cols[idxHG], 10);
-        const ag = parseInt(cols[idxAG], 10);
+        if (!homeResolved || !awayResolved) {
+          // One or both teams unmatched: do not insert row with invented foreign keys
+          continue;
+        }
+
+        const hg = parseInt(row['HG'], 10);
+        const ag = parseInt(row['AG'], 10);
         const isFinished = !isNaN(hg) && !isNaN(ag);
 
         const cleanDateStr = rawDate.replace(/\//g, '');
-        const providerId = `fdco_bra_${targetSeasonYear}_${cleanDateStr}_${homeTeamId}_${awayTeamId}`;
+        // provider_id format independent of team IDs for idempotent re-runs:
+        // fdco:{div}:{season}:{yyyymmdd}:{homeRaw}:{awayRaw}
+        const providerId = `fdco:bra:${targetSeasonYear}:${cleanDateStr}:${sanitizeRawTeamForId(rawHome)}:${sanitizeRawTeamForId(rawAway)}`;
+
+        // Matchday: take from provider if present, or null. Never compute from row index!
+        const matchdayRaw = row['Round'] || row['Matchday'] || row['MW'] || null;
+        const matchday = matchdayRaw ? parseInt(matchdayRaw, 10) : null;
 
         matches.push({
           id: providerId,
           provider_id: providerId,
           competition_code: 'BSA',
           season: season,
-          home_team_id: homeTeamId,
-          away_team_id: awayTeamId,
-          home_team_name: homeTeamName,
-          away_team_name: awayTeamName,
+          matchday: !isNaN(matchday as number) ? matchday : null,
+          home_team_id: homeResolved.id,
+          away_team_id: awayResolved.id,
+          home_team_name: homeResolved.name,
+          away_team_name: awayResolved.name,
           kickoff_time: isoKickoff,
           status: isFinished ? 'FINISHED' : 'SCHEDULED',
           home_score: isFinished ? hg : null,
@@ -167,46 +252,54 @@ export async function POST(req: NextRequest) {
           source: 'football-data.co.uk:brazil',
         });
 
-        // Parse odds if present
-        if (idxAvgH !== -1 && idxAvgD !== -1 && idxAvgA !== -1) {
-          const oddH = parseFloat(cols[idxAvgH]);
-          const oddD = parseFloat(cols[idxAvgD]);
-          const oddA = parseFloat(cols[idxAvgA]);
-          if (!isNaN(oddH) && oddH >= 1.01) {
-            oddsSnapshots.push({
-              match_id: providerId,
-              bookmaker: 'MarketAvg',
-              market_code: '1X2_HOME',
-              selection: `${homeLookup?.data?.shortName || displayName(homeTeamName)} Win`,
-              decimal_odds: oddH,
-              source: 'football-data.co.uk:brazil',
-            });
-          }
-          if (!isNaN(oddD) && oddD >= 1.01) {
-            oddsSnapshots.push({
-              match_id: providerId,
-              bookmaker: 'MarketAvg',
-              market_code: '1X2_DRAW',
-              selection: 'Draw',
-              decimal_odds: oddD,
-              source: 'football-data.co.uk:brazil',
-            });
-          }
-          if (!isNaN(oddA) && oddA >= 1.01) {
-            oddsSnapshots.push({
-              match_id: providerId,
-              bookmaker: 'MarketAvg',
-              market_code: '1X2_AWAY',
-              selection: `${awayLookup?.data?.shortName || displayName(awayTeamName)} Win`,
-              decimal_odds: oddA,
-              source: 'football-data.co.uk:brazil',
-            });
-          }
+        // Odds snapshots
+        const oddH = parseFloat(row['AvgCH'] || row['AvgH'] || row['PSCH'] || row['PH']);
+        const oddD = parseFloat(row['AvgCD'] || row['AvgD'] || row['PSCD'] || row['PD']);
+        const oddA = parseFloat(row['AvgCA'] || row['AvgA'] || row['PSCA'] || row['PA']);
+
+        if (!isNaN(oddH) && oddH >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: '1X2_HOME',
+            selection: `${homeResolved.shortName} Win`,
+            decimal_odds: oddH,
+            source: 'football-data.co.uk:brazil',
+          });
+        }
+        if (!isNaN(oddD) && oddD >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: '1X2_DRAW',
+            selection: 'Draw',
+            decimal_odds: oddD,
+            source: 'football-data.co.uk:brazil',
+          });
+        }
+        if (!isNaN(oddA) && oddA >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: '1X2_AWAY',
+            selection: `${awayResolved.shortName} Win`,
+            decimal_odds: oddA,
+            source: 'football-data.co.uk:brazil',
+          });
         }
       }
     } else {
       // 4. Option B: European Leagues CSV (PL, PD, BL1, SA, FL1, DED)
-      const divCode = DIVISION_MAP[league] || 'I1';
+      const divCode = DIVISION_MAP[league];
+      if (!divCode) {
+        return NextResponse.json(
+          {
+            error: `Unsupported league code '${league}'. Supported leagues: ${Object.keys(DIVISION_MAP).join(', ')}, BSA`,
+          },
+          { status: 400 }
+        );
+      }
+
       const csvUrl = `https://football-data.co.uk/mmz4281/${season}/${divCode}.csv`;
 
       const csvRes = await fetch(csvUrl, {
@@ -218,165 +311,161 @@ export async function POST(req: NextRequest) {
         throw new Error(`Failed to fetch ${league} CSV for season ${season} from ${csvUrl}: HTTP ${csvRes.status}`);
       }
 
-      const csvText = await csvRes.text();
-      const lines = csvText.split('\n').filter(l => l.trim().length > 0);
-      if (lines.length <= 1) {
+      const csvRawText = await csvRes.text();
+      // Strip any byte-order mark (BOM)
+      const cleanCsvText = csvRawText.replace(/^\uFEFF/, '');
+
+      // Parse with csv-parse library: quote is strictly '"'
+      // Apostrophes in names like M'gladbach and Nott'm Forest are parsed cleanly
+      const records: Record<string, string>[] = parse(cleanCsvText, {
+        columns: true,
+        skip_empty_lines: true,
+        bom: true,
+        quote: '"',
+        trim: true,
+        relax_column_count: true,
+      });
+
+      if (records.length === 0) {
         throw new Error(`Empty CSV file returned for ${league} ${season}`);
       }
 
-      const header = parseCSVLine(lines[0]);
-      const idxDate = header.indexOf('Date');
-      const idxTime = header.indexOf('Time');
-      const idxHome = header.indexOf('HomeTeam');
-      const idxAway = header.indexOf('AwayTeam');
-      const idxFTHG = header.indexOf('FTHG');
-      const idxFTAG = header.indexOf('FTAG');
-      const idxHTHG = header.indexOf('HTHG');
-      const idxHTAG = header.indexOf('HTAG');
-      const idxHC = header.indexOf('HC');
-      const idxAC = header.indexOf('AC');
-      const idxHY = header.indexOf('HY');
-      const idxAY = header.indexOf('AY');
-      const idxHR = header.indexOf('HR');
-      const idxAR = header.indexOf('AR');
-      const idxHS = header.indexOf('HS');
-      const idxAS = header.indexOf('AS');
-      const idxHST = header.indexOf('HST');
-      const idxAST = header.indexOf('AST');
-
-      // Odds columns
-      const idxB365H = header.indexOf('B365H');
-      const idxB365D = header.indexOf('B365D');
-      const idxB365A = header.indexOf('B365A');
-      const idxAvgO25 = header.indexOf('Avg>2.5') !== -1 ? header.indexOf('Avg>2.5') : header.indexOf('B365>2.5');
-      const idxAvgU25 = header.indexOf('Avg<2.5') !== -1 ? header.indexOf('Avg<2.5') : header.indexOf('B365<2.5');
-
-      for (let i = 1; i < lines.length; i++) {
-        const cols = parseCSVLine(lines[i]);
-        if (cols.length < 6) continue;
-
-        const rawHome = cols[idxHome]?.trim();
-        const rawAway = cols[idxAway]?.trim();
+      for (const row of records) {
+        const rawHome = row['HomeTeam']?.trim();
+        const rawAway = row['AwayTeam']?.trim();
         if (!rawHome || !rawAway) continue;
 
-        const homeLookup = lookupTeamStrength(rawHome);
-        const awayLookup = lookupTeamStrength(rawAway);
+        const rawDate = row['Date']?.trim();
+        const rawTime = row['Time']?.trim() || null;
 
-        const homeTeamId = homeLookup?.data?.id || `team_${rawHome.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-        const awayTeamId = awayLookup?.data?.id || `team_${rawAway.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-        const homeTeamName = homeLookup?.data?.name || rawHome;
-        const awayTeamName = awayLookup?.data?.name || rawAway;
+        // Date validation: skip row if date is invalid (never default to now)
+        const isoKickoff = parseLondonCsvDateTime(rawDate, rawTime);
+        if (!isoKickoff) {
+          continue; // Skip invalid date row
+        }
 
-        const rawDate = cols[idxDate];
-        const rawTime = idxTime !== -1 ? cols[idxTime] : '15:00';
-        const isoKickoff = parseDateToISO(rawDate, rawTime);
+        // Team identity: resolve through aliases, never auto-create from slugified name
+        const homeResolved = await resolveTeamName(rawHome, unmatchedNames);
+        const awayResolved = await resolveTeamName(rawAway, unmatchedNames);
 
-        const fthg = parseInt(cols[idxFTHG], 10);
-        const ftag = parseInt(cols[idxFTAG], 10);
+        if (!homeResolved || !awayResolved) {
+          // Skip match if either team has no resolved foreign key
+          continue;
+        }
+
+        const fthg = parseInt(row['FTHG'], 10);
+        const ftag = parseInt(row['FTAG'], 10);
         const isFinished = !isNaN(fthg) && !isNaN(ftag);
 
         const cleanDateStr = rawDate.replace(/\//g, '');
-        const providerId = `fdco_${league.toLowerCase()}_${season}_${cleanDateStr}_${homeTeamId}_${awayTeamId}`;
+        // provider_id format independent of team IDs for idempotent re-runs:
+        // fdco:{div}:{season}:{yyyymmdd}:{homeRaw}:{awayRaw}
+        const providerId = `fdco:${divCode.toLowerCase()}:${season}:${cleanDateStr}:${sanitizeRawTeamForId(rawHome)}:${sanitizeRawTeamForId(rawAway)}`;
+
+        // Matchday: take from provider if present, or null. Never compute from row index!
+        const matchdayRaw = row['Round'] || row['Matchday'] || row['MW'] || null;
+        const matchday = matchdayRaw ? parseInt(matchdayRaw, 10) : null;
 
         matches.push({
           id: providerId,
           provider_id: providerId,
           competition_code: league,
           season: season,
-          matchday: Math.floor(i / 10) + 1,
-          home_team_id: homeTeamId,
-          away_team_id: awayTeamId,
-          home_team_name: homeTeamName,
-          away_team_name: awayTeamName,
+          matchday: !isNaN(matchday as number) ? matchday : null,
+          home_team_id: homeResolved.id,
+          away_team_id: awayResolved.id,
+          home_team_name: homeResolved.name,
+          away_team_name: awayResolved.name,
           kickoff_time: isoKickoff,
           status: isFinished ? 'FINISHED' : 'SCHEDULED',
           home_score: isFinished ? fthg : null,
           away_score: isFinished ? ftag : null,
-          home_half_time_score: idxHTHG !== -1 && !isNaN(parseInt(cols[idxHTHG], 10)) ? parseInt(cols[idxHTHG], 10) : null,
-          away_half_time_score: idxHTAG !== -1 && !isNaN(parseInt(cols[idxHTAG], 10)) ? parseInt(cols[idxHTAG], 10) : null,
-          home_corners: idxHC !== -1 && !isNaN(parseInt(cols[idxHC], 10)) ? parseInt(cols[idxHC], 10) : null,
-          away_corners: idxAC !== -1 && !isNaN(parseInt(cols[idxAC], 10)) ? parseInt(cols[idxAC], 10) : null,
-          home_yellow_cards: idxHY !== -1 && !isNaN(parseInt(cols[idxHY], 10)) ? parseInt(cols[idxHY], 10) : null,
-          away_yellow_cards: idxAY !== -1 && !isNaN(parseInt(cols[idxAY], 10)) ? parseInt(cols[idxAY], 10) : null,
-          home_red_cards: idxHR !== -1 && !isNaN(parseInt(cols[idxHR], 10)) ? parseInt(cols[idxHR], 10) : null,
-          away_red_cards: idxAR !== -1 && !isNaN(parseInt(cols[idxAR], 10)) ? parseInt(cols[idxAR], 10) : null,
-          home_shots: idxHS !== -1 && !isNaN(parseInt(cols[idxHS], 10)) ? parseInt(cols[idxHS], 10) : null,
-          away_shots: idxAS !== -1 && !isNaN(parseInt(cols[idxAS], 10)) ? parseInt(cols[idxAS], 10) : null,
-          home_shots_on_target: idxHST !== -1 && !isNaN(parseInt(cols[idxHST], 10)) ? parseInt(cols[idxHST], 10) : null,
-          away_shots_on_target: idxAST !== -1 && !isNaN(parseInt(cols[idxAST], 10)) ? parseInt(cols[idxAST], 10) : null,
+          home_half_time_score: row['HTHG'] !== undefined && !isNaN(parseInt(row['HTHG'], 10)) ? parseInt(row['HTHG'], 10) : null,
+          away_half_time_score: row['HTAG'] !== undefined && !isNaN(parseInt(row['HTAG'], 10)) ? parseInt(row['HTAG'], 10) : null,
+          home_corners: row['HC'] !== undefined && !isNaN(parseInt(row['HC'], 10)) ? parseInt(row['HC'], 10) : null,
+          away_corners: row['AC'] !== undefined && !isNaN(parseInt(row['AC'], 10)) ? parseInt(row['AC'], 10) : null,
+          home_yellow_cards: row['HY'] !== undefined && !isNaN(parseInt(row['HY'], 10)) ? parseInt(row['HY'], 10) : null,
+          away_yellow_cards: row['AY'] !== undefined && !isNaN(parseInt(row['AY'], 10)) ? parseInt(row['AY'], 10) : null,
+          home_red_cards: row['HR'] !== undefined && !isNaN(parseInt(row['HR'], 10)) ? parseInt(row['HR'], 10) : null,
+          away_red_cards: row['AR'] !== undefined && !isNaN(parseInt(row['AR'], 10)) ? parseInt(row['AR'], 10) : null,
+          home_shots: row['HS'] !== undefined && !isNaN(parseInt(row['HS'], 10)) ? parseInt(row['HS'], 10) : null,
+          away_shots: row['AS'] !== undefined && !isNaN(parseInt(row['AS'], 10)) ? parseInt(row['AS'], 10) : null,
+          home_shots_on_target: row['HST'] !== undefined && !isNaN(parseInt(row['HST'], 10)) ? parseInt(row['HST'], 10) : null,
+          away_shots_on_target: row['AST'] !== undefined && !isNaN(parseInt(row['AST'], 10)) ? parseInt(row['AST'], 10) : null,
           source: `football-data.co.uk:${divCode}`,
         });
 
         // Odds snapshots
-        if (idxB365H !== -1 && idxB365D !== -1 && idxB365A !== -1) {
-          const hOdds = parseFloat(cols[idxB365H]);
-          const dOdds = parseFloat(cols[idxB365D]);
-          const aOdds = parseFloat(cols[idxB365A]);
-          if (!isNaN(hOdds) && hOdds >= 1.01) {
-            oddsSnapshots.push({
-              match_id: providerId,
-              bookmaker: 'Bet365',
-              market_code: '1X2_HOME',
-              selection: `${homeLookup?.data?.shortName || displayName(homeTeamName)} Win`,
-              decimal_odds: hOdds,
-              source: `football-data.co.uk:${season}`,
-            });
-          }
-          if (!isNaN(dOdds) && dOdds >= 1.01) {
-            oddsSnapshots.push({
-              match_id: providerId,
-              bookmaker: 'Bet365',
-              market_code: '1X2_DRAW',
-              selection: 'Draw',
-              decimal_odds: dOdds,
-              source: `football-data.co.uk:${season}`,
-            });
-          }
-          if (!isNaN(aOdds) && aOdds >= 1.01) {
-            oddsSnapshots.push({
-              match_id: providerId,
-              bookmaker: 'Bet365',
-              market_code: '1X2_AWAY',
-              selection: `${awayLookup?.data?.shortName || displayName(awayTeamName)} Win`,
-              decimal_odds: aOdds,
-              source: `football-data.co.uk:${season}`,
-            });
-          }
+        const hOdds = parseFloat(row['B365H'] || row['AvgH'] || row['PSH']);
+        const dOdds = parseFloat(row['B365D'] || row['AvgD'] || row['PSD']);
+        const aOdds = parseFloat(row['B365A'] || row['AvgA'] || row['PSA']);
+
+        if (!isNaN(hOdds) && hOdds >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: row['B365H'] ? 'Bet365' : 'MarketAvg',
+            market_code: '1X2_HOME',
+            selection: `${homeResolved.shortName} Win`,
+            decimal_odds: hOdds,
+            source: `football-data.co.uk:${season}`,
+          });
+        }
+        if (!isNaN(dOdds) && dOdds >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: row['B365D'] ? 'Bet365' : 'MarketAvg',
+            market_code: '1X2_DRAW',
+            selection: 'Draw',
+            decimal_odds: dOdds,
+            source: `football-data.co.uk:${season}`,
+          });
+        }
+        if (!isNaN(aOdds) && aOdds >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: row['B365A'] ? 'Bet365' : 'MarketAvg',
+            market_code: '1X2_AWAY',
+            selection: `${awayResolved.shortName} Win`,
+            decimal_odds: aOdds,
+            source: `football-data.co.uk:${season}`,
+          });
         }
 
-        if (idxAvgO25 !== -1 && idxAvgU25 !== -1) {
-          const o25Odds = parseFloat(cols[idxAvgO25]);
-          const u25Odds = parseFloat(cols[idxAvgU25]);
-          if (!isNaN(o25Odds) && o25Odds >= 1.01) {
-            oddsSnapshots.push({
-              match_id: providerId,
-              bookmaker: 'MarketAvg',
-              market_code: 'TOTAL_GOALS_O25',
-              selection: 'Over 2.5 Goals',
-              decimal_odds: o25Odds,
-              source: `football-data.co.uk:${season}`,
-            });
-          }
-          if (!isNaN(u25Odds) && u25Odds >= 1.01) {
-            oddsSnapshots.push({
-              match_id: providerId,
-              bookmaker: 'MarketAvg',
-              market_code: 'TOTAL_GOALS_U25',
-              selection: 'Under 2.5 Goals',
-              decimal_odds: u25Odds,
-              source: `football-data.co.uk:${season}`,
-            });
-          }
+        const o25Odds = parseFloat(row['Avg>2.5'] || row['B365>2.5'] || row['P>2.5']);
+        const u25Odds = parseFloat(row['Avg<2.5'] || row['B365<2.5'] || row['P<2.5']);
+        if (!isNaN(o25Odds) && o25Odds >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: 'TOTAL_GOALS_O25',
+            selection: 'Over 2.5 Goals',
+            decimal_odds: o25Odds,
+            source: `football-data.co.uk:${season}`,
+          });
+        }
+        if (!isNaN(u25Odds) && u25Odds >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: 'TOTAL_GOALS_U25',
+            selection: 'Under 2.5 Goals',
+            decimal_odds: u25Odds,
+            source: `football-data.co.uk:${season}`,
+          });
         }
       }
     }
 
     // 5. Upsert matches and odds into Store / Supabase
+    // Creates the teams rows first so foreign keys cannot fail
+    // In production, confirms writes to Supabase and fails loudly if unconfigured or on error
     const upsertResult = await matchesStore.upsertMatches(matches, oddsSnapshots);
 
     const sortedDates = matches.map(m => m.kickoff_time).sort();
     const earliestDate = sortedDates[0] || null;
     const latestDate = sortedDates[sortedDates.length - 1] || null;
+
+    const unmatchedList = Array.from(unmatchedNames).sort();
 
     return NextResponse.json({
       success: true,
@@ -388,7 +477,11 @@ export async function POST(req: NextRequest) {
       earliestDate,
       latestDate,
       oddsSnapshotsCount: oddsSnapshots.length,
+      unmatchedNamesCount: unmatchedList.length,
+      unmatchedNames: unmatchedList,
       errors: upsertResult.errors,
+      environment: process.env.NODE_ENV || 'development',
+      persistenceTarget: (isSupabaseConfigured && supabase) ? 'Supabase (Production Database)' : 'In-Memory Store (Sandbox Output)',
     });
   } catch (error: any) {
     console.error(`[AdminBackfill] Error backfilling ${league} ${season}:`, error);

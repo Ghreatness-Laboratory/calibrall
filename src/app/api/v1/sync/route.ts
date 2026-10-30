@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import { getNBADataProvider } from '@/lib/data/nbaProvider';
 import { computeNBADateWindow } from '@/lib/utils/dateWindow';
+import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -10,17 +11,26 @@ async function handleSync(request: Request) {
   const url = new URL(request.url);
   const sportParam = url.searchParams.get('sport')?.toLowerCase() || 'all';
   
-  // Secret protection: check x-sync-secret, Authorization Bearer, or ?secret=
+  // Secret protection: check x-sync-secret or Authorization Bearer header (no query string)
   const secretHeader = request.headers.get('x-sync-secret') || 
-    request.headers.get('authorization')?.replace('Bearer ', '');
-  const urlSecret = url.searchParams.get('secret');
-  const configuredSecret = process.env.CRON_SECRET?.trim() || process.env.REVALIDATE_SECRET?.trim();
+    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  const configuredSecret = process.env.CRON_SECRET?.trim();
 
-  if (configuredSecret && secretHeader !== configuredSecret && urlSecret !== configuredSecret) {
-    return NextResponse.json(
-      { error: 'Unauthorized: Invalid sync secret.' },
-      { status: 401 }
-    );
+  if (configuredSecret) {
+    if (!secretHeader) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Missing sync secret.' },
+        { status: 401 }
+      );
+    }
+    const bufProvided = Buffer.from(secretHeader, 'utf8');
+    const bufConfigured = Buffer.from(configuredSecret, 'utf8');
+    if (bufProvided.length !== bufConfigured.length || !crypto.timingSafeEqual(bufProvided, bufConfigured)) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Invalid sync secret.' },
+        { status: 401 }
+      );
+    }
   }
 
   const results: Record<string, any> = {};

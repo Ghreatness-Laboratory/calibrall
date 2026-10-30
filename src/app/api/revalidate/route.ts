@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { serverCache } from '@/lib/cache/serverCache';
+import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,17 +14,32 @@ export async function POST(req: NextRequest) {
 
   const configuredSecret = process.env.REVALIDATE_SECRET?.trim() || process.env.AUTH_SECRET?.trim();
   if (!configuredSecret) {
-    console.error(
-      '[Revalidate] REVALIDATE_SECRET environment variable is not configured in Vercel settings! Using fallback secret.'
+    return NextResponse.json(
+      {
+        error: 'Service Unavailable',
+        message: 'REVALIDATE_SECRET environment variable is not configured.',
+      },
+      { status: 503 }
     );
   }
-  const validSecret = configuredSecret || 'calibrall_revalidate_secret';
 
-  if (!providedSecret || providedSecret !== validSecret) {
+  if (!providedSecret) {
     return NextResponse.json(
       { 
         error: 'Unauthorized', 
-        message: 'Missing or invalid revalidation secret in x-revalidate-secret header or Authorization Bearer token.' 
+        message: 'Missing revalidation secret in x-revalidate-secret header or Authorization Bearer token.' 
+      },
+      { status: 401 }
+    );
+  }
+
+  const bufProvided = Buffer.from(providedSecret, 'utf8');
+  const bufConfigured = Buffer.from(configuredSecret, 'utf8');
+  if (bufProvided.length !== bufConfigured.length || !crypto.timingSafeEqual(bufProvided, bufConfigured)) {
+    return NextResponse.json(
+      { 
+        error: 'Unauthorized', 
+        message: 'Invalid revalidation secret in x-revalidate-secret header or Authorization Bearer token.' 
       },
       { status: 401 }
     );

@@ -1,11 +1,12 @@
 // CALIBRALL: Historical Match Storage, Supabase Integration & Data Status Service
 // Strictly enforces:
-// 1. Production reads matches ONLY from Supabase
-// 2. In-memory local fallback store for seamless development and testing
-// 3. Exact data status reporting for leagues, seasons, date boundaries, and under-sampled teams (<10 matches)
+// 1. Production writes strictly to Supabase and fails loudly if unconfigured or on error
+// 2. Teams rows are always created/upserted first so foreign keys home_team_id and away_team_id can never fail
+// 3. In-memory local fallback store for seamless development and testing (clearly labeled as sandbox)
+// 4. Exact data status reporting for leagues, seasons, date boundaries, joined teams, and unmatched names
 
-import { supabase, isSupabaseConfigured, assertPersistenceConfigured } from '@/lib/supabase/client';
-import { TEAM_STRENGTH_DATABASE, lookupTeamStrength, TeamStrengthRecord } from './teamDatabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { TEAM_STRENGTH_DATABASE, lookupTeamStrength } from './teamDatabase';
 import { displayName } from '@/lib/utils/formatText';
 
 export interface StoredMatch {
@@ -13,7 +14,7 @@ export interface StoredMatch {
   provider_id: string;
   competition_code: string;
   season: string;
-  matchday?: number;
+  matchday?: number | null;
   home_team_id: string;
   away_team_id: string;
   home_team_name: string;
@@ -68,6 +69,9 @@ export interface DataStatusReport {
     competitionCode: string;
     matchCount: number;
   }[];
+  unmatchedNamesCount: number;
+  unmatchedNames: string[];
+  persistenceMode: 'SUPABASE_PRODUCTION' | 'IN_MEMORY_SANDBOX';
 }
 
 // In-Memory store across the runtime session (shared on globalThis)
@@ -92,6 +96,13 @@ const getGlobalTeamCounts = (): Map<string, number> => {
   return (globalThis as any).__calibrall_team_counts;
 };
 
+const getGlobalUnmatchedNames = (): Set<string> => {
+  if (!(globalThis as any).__calibrall_unmatched_names) {
+    (globalThis as any).__calibrall_unmatched_names = new Set<string>();
+  }
+  return (globalThis as any).__calibrall_unmatched_names;
+};
+
 class MatchesStore {
   private get inMemoryMatches(): Map<string, StoredMatch> {
     return getGlobalMatches();
@@ -101,6 +112,9 @@ class MatchesStore {
   }
   private get teamMatchCounts(): Map<string, number> {
     return getGlobalTeamCounts();
+  }
+  private get unmatchedNamesSet(): Set<string> {
+    return getGlobalUnmatchedNames();
   }
 
   constructor() {
@@ -117,9 +131,23 @@ class MatchesStore {
     }
   }
 
+  recordUnmatchedName(name: string) {
+    if (name && typeof name === 'string' && name.trim()) {
+      this.unmatchedNamesSet.add(name.trim());
+    }
+  }
+
+  getUnmatchedNames(): string[] {
+    return Array.from(this.unmatchedNamesSet).sort();
+  }
+
+  clearUnmatchedNames() {
+    this.unmatchedNamesSet.clear();
+  }
+
   /**
    * Upsert matches and optional odds snapshots.
-   * If Supabase is configured, persists to Supabase tables.
+   * If in production, strictly confirms writes to Supabase and fails loudly if unconfigured or on error.
    */
   async upsertMatches(
     matches: StoredMatch[],
@@ -129,7 +157,16 @@ class MatchesStore {
     let inserted = 0;
     const errors: string[] = [];
 
-    // 1. Update in-memory store
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production';
+
+    // 1. Strict production check: Fail loudly if Supabase is unconfigured in production
+    if (isProduction && (!isSupabaseConfigured || !supabase)) {
+      throw new Error(
+        '[MatchesStore] Fatal: Supabase persistence is strictly required in production environment, but Supabase credentials (NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/NEXT_PUBLIC_SUPABASE_ANON_KEY) are not configured.'
+      );
+    }
+
+    // 2. Update in-memory sandbox store
     for (const m of matches) {
       this.inMemoryMatches.set(m.provider_id, m);
       inserted++;
@@ -145,69 +182,126 @@ class MatchesStore {
 
     this.rebuildTeamCounts();
 
-    // 2. Persist to Supabase if configured
+    // 3. Persist to Supabase when configured
     if (isSupabaseConfigured && supabase) {
       try {
-        // Upsert teams first to satisfy foreign key constraints
-        const teamMap = new Map<string, { id: string; name: string; short_name: string; competition_code: string; crest_url: string; tla?: string }>();
+        // Step 3a: Create the teams rows first so foreign keys home_team_id and away_team_id can NEVER fail
+        const teamMap = new Map<string, {
+          id: string;
+          name: string;
+          short_name: string;
+          competition_code: string;
+          crest_url: string;
+          tla?: string;
+          attack_rating?: number;
+          defense_rating?: number;
+          corner_attack_rating?: number;
+          discipline_rating?: number;
+          sample_matches?: number;
+        }>();
+
         for (const m of matches) {
           const homeLookup = lookupTeamStrength(m.home_team_id) || lookupTeamStrength(m.home_team_name);
           const awayLookup = lookupTeamStrength(m.away_team_id) || lookupTeamStrength(m.away_team_name);
 
-          teamMap.set(m.home_team_id, {
-            id: m.home_team_id,
-            name: m.home_team_name,
-            short_name: homeLookup?.data?.shortName || displayName(m.home_team_name),
-            competition_code: m.competition_code,
-            crest_url: homeLookup?.data?.crestUrl || `https://crests.football-data.org/${m.competition_code}.png`,
-            tla: homeLookup?.data?.tla,
-          });
+          if (homeLookup?.data) {
+            teamMap.set(homeLookup.data.id, {
+              id: homeLookup.data.id,
+              name: homeLookup.data.name,
+              short_name: homeLookup.data.shortName || displayName(m.home_team_name),
+              competition_code: homeLookup.data.competitionCode || m.competition_code,
+              crest_url: homeLookup.data.crestUrl || `https://crests.football-data.org/${m.competition_code}.png`,
+              tla: homeLookup.data.tla,
+              attack_rating: homeLookup.data.attackRating,
+              defense_rating: homeLookup.data.defenseRating,
+              corner_attack_rating: homeLookup.data.cornerAttackRating,
+              discipline_rating: homeLookup.data.disciplineRating,
+              sample_matches: homeLookup.data.sampleMatches,
+            });
+          } else {
+            teamMap.set(m.home_team_id, {
+              id: m.home_team_id,
+              name: m.home_team_name,
+              short_name: displayName(m.home_team_name),
+              competition_code: m.competition_code,
+              crest_url: `https://crests.football-data.org/${m.competition_code}.png`,
+            });
+          }
 
-          teamMap.set(m.away_team_id, {
-            id: m.away_team_id,
-            name: m.away_team_name,
-            short_name: awayLookup?.data?.shortName || displayName(m.away_team_name),
-            competition_code: m.competition_code,
-            crest_url: awayLookup?.data?.crestUrl || `https://crests.football-data.org/${m.competition_code}.png`,
-            tla: awayLookup?.data?.tla,
-          });
+          if (awayLookup?.data) {
+            teamMap.set(awayLookup.data.id, {
+              id: awayLookup.data.id,
+              name: awayLookup.data.name,
+              short_name: awayLookup.data.shortName || displayName(m.away_team_name),
+              competition_code: awayLookup.data.competitionCode || m.competition_code,
+              crest_url: awayLookup.data.crestUrl || `https://crests.football-data.org/${m.competition_code}.png`,
+              tla: awayLookup.data.tla,
+              attack_rating: awayLookup.data.attackRating,
+              defense_rating: awayLookup.data.defenseRating,
+              corner_attack_rating: awayLookup.data.cornerAttackRating,
+              discipline_rating: awayLookup.data.disciplineRating,
+              sample_matches: awayLookup.data.sampleMatches,
+            });
+          } else {
+            teamMap.set(m.away_team_id, {
+              id: m.away_team_id,
+              name: m.away_team_name,
+              short_name: displayName(m.away_team_name),
+              competition_code: m.competition_code,
+              crest_url: `https://crests.football-data.org/${m.competition_code}.png`,
+            });
+          }
         }
 
         const teamsToInsert = Array.from(teamMap.values());
         if (teamsToInsert.length > 0) {
           const { error: teamErr } = await supabase.from('teams').upsert(teamsToInsert, { onConflict: 'id' });
           if (teamErr) {
-            console.warn('[MatchesStore] Supabase teams upsert warning:', teamErr.message);
+            console.error('[MatchesStore] Supabase teams upsert error:', teamErr.message);
+            if (isProduction) {
+              throw new Error(`[MatchesStore] Fatal: Teams upsert to Supabase failed: ${teamErr.message}`);
+            }
+            errors.push(`Teams upsert error: ${teamErr.message}`);
           }
         }
 
-        // Upsert matches in chunks of 100
+        // Step 3b: Upsert matches in chunks of 100
         const chunkSize = 100;
         for (let i = 0; i < matches.length; i += chunkSize) {
           const chunk = matches.slice(i, i + chunkSize);
           const { error: matchErr } = await supabase.from('matches').upsert(chunk, { onConflict: 'provider_id' });
           if (matchErr) {
             console.error('[MatchesStore] Supabase matches chunk upsert error:', matchErr.message);
+            if (isProduction) {
+              throw new Error(`[MatchesStore] Fatal: Matches upsert to Supabase failed: ${matchErr.message}`);
+            }
             errors.push(matchErr.message);
           }
         }
 
-        // Upsert odds snapshots if provided
+        // Step 3c: Upsert odds snapshots if provided
         if (oddsSnapshots && oddsSnapshots.length > 0) {
           for (let i = 0; i < oddsSnapshots.length; i += chunkSize) {
             const chunk = oddsSnapshots.slice(i, i + chunkSize);
             const { error: oddsErr } = await supabase.from('odds_snapshots').insert(chunk);
             if (oddsErr) {
-              console.warn('[MatchesStore] Supabase odds snapshot insert error:', oddsErr.message);
+              console.warn('[MatchesStore] Supabase odds snapshot insert warning:', oddsErr.message);
+              if (isProduction) {
+                throw new Error(`[MatchesStore] Fatal: Odds snapshots insert to Supabase failed: ${oddsErr.message}`);
+              }
+              errors.push(oddsErr.message);
             }
           }
         }
       } catch (err: any) {
         console.error('[MatchesStore] Supabase persistence error:', err?.message || err);
+        if (isProduction) {
+          throw err instanceof Error ? err : new Error(`[MatchesStore] Fatal: Supabase persistence failed: ${err}`);
+        }
         errors.push(err?.message || 'Supabase persistence error');
       }
-    } else if (process.env.NODE_ENV === 'production') {
-      console.warn('[MatchesStore] Production warning: Supabase credentials unconfigured, using in-memory store.');
+    } else if (!isProduction) {
+      console.log(`[MatchesStore Sandbox Output] Processed ${matches.length} matches and ${oddsSnapshots?.length || 0} odds snapshots into in-memory sandbox store.`);
     }
 
     return { fetched, inserted, errors: errors.length > 0 ? errors : undefined };
@@ -215,7 +309,7 @@ class MatchesStore {
 
   /**
    * Get matches for a competition and optional season.
-   * In production, reads from Supabase if configured.
+   * Reads from Supabase if configured, falling back to in-memory store in sandbox mode.
    */
   async getMatches(competitionCode?: string, season?: string): Promise<StoredMatch[]> {
     if (isSupabaseConfigured && supabase) {
@@ -258,7 +352,7 @@ class MatchesStore {
     const memCount = this.teamMatchCounts.get(canonicalId) || 0;
     if (memCount > 0) return memCount;
 
-    // In Supabase
+    // Check Supabase if configured
     if (isSupabaseConfigured && supabase) {
       try {
         const { count, error } = await supabase
@@ -284,33 +378,64 @@ class MatchesStore {
 
   /**
    * Diagnostic Data Status Report
-   * Returns matches per league and season, earliest and latest date,
-   * and teams with fewer than 10 matches.
+   * Returns:
+   * - Joined teams table check: every team with fewer than 10 matches
+   * - Per league and season counts
+   * - Total matches, earliest and latest date
+   * - Unmatched names list and count
    */
   async getDataStatus(): Promise<DataStatusReport> {
     let allMatches: StoredMatch[] = [];
+    let registeredTeams: { id: string; name: string; shortName: string; competitionCode: string; sampleMatches: number }[] = [];
 
+    // 1. Fetch matches from Supabase if configured
     if (isSupabaseConfigured && supabase) {
       try {
-        const { data, error } = await supabase
+        const { data: matchData, error: matchErr } = await supabase
           .from('matches')
           .select('id, provider_id, competition_code, season, kickoff_time, home_team_id, away_team_id, status, home_score')
           .order('kickoff_time', { ascending: true });
-        if (!error && data) {
-          allMatches = data as StoredMatch[];
+        if (!matchErr && matchData) {
+          allMatches = matchData as StoredMatch[];
+        }
+
+        // Join teams table
+        const { data: teamData, error: teamErr } = await supabase
+          .from('teams')
+          .select('id, name, short_name, competition_code, sample_matches');
+        if (!teamErr && teamData && teamData.length > 0) {
+          registeredTeams = teamData.map(t => ({
+            id: t.id,
+            name: t.name,
+            shortName: t.short_name,
+            competitionCode: t.competition_code,
+            sampleMatches: t.sample_matches ?? 0,
+          }));
         }
       } catch (err) {
-        console.warn('[MatchesStore] Could not read all matches from Supabase:', err);
+        console.warn('[MatchesStore] Could not read all data from Supabase:', err);
       }
     }
 
+    // In-memory fallback when Supabase has no records
     if (allMatches.length === 0) {
       allMatches = Array.from(this.inMemoryMatches.values());
     }
 
-    // Aggregate by league and season
+    // If teams table was not populated in Supabase, load all canonical teams from database
+    if (registeredTeams.length === 0) {
+      registeredTeams = Object.values(TEAM_STRENGTH_DATABASE).map(t => ({
+        id: t.id,
+        name: t.name,
+        shortName: t.shortName,
+        competitionCode: t.competitionCode,
+        sampleMatches: t.sampleMatches,
+      }));
+    }
+
+    // 2. Aggregate matches by league and season, and build team counts
     const leagueSeasonMap = new Map<string, { league: string; season: string; count: number; earliestDate: string; latestDate: string }>();
-    const teamCounts = new Map<string, number>();
+    const teamFinishedCounts = new Map<string, number>();
 
     let earliestDate: string | null = null;
     let latestDate: string | null = null;
@@ -337,13 +462,13 @@ class MatchesStore {
 
       // Accumulate finished team matches
       if (m.status === 'FINISHED' || m.home_score !== null) {
-        teamCounts.set(m.home_team_id, (teamCounts.get(m.home_team_id) || 0) + 1);
-        teamCounts.set(m.away_team_id, (teamCounts.get(m.away_team_id) || 0) + 1);
+        teamFinishedCounts.set(m.home_team_id, (teamFinishedCounts.get(m.home_team_id) || 0) + 1);
+        teamFinishedCounts.set(m.away_team_id, (teamFinishedCounts.get(m.away_team_id) || 0) + 1);
       }
     }
 
-    // Identify teams with fewer than 10 matches across all active teams in database
-    const underSampledTeams: {
+    // 3. Identify every team with fewer than 10 matches by joining the teams table
+    const teamsWithFewerThan10Matches: {
       teamId: string;
       name: string;
       shortName: string;
@@ -351,11 +476,10 @@ class MatchesStore {
       matchCount: number;
     }[] = [];
 
-    // Check all teams in knowledge base
-    for (const team of Object.values(TEAM_STRENGTH_DATABASE)) {
-      const matchCount = teamCounts.get(team.id) ?? team.sampleMatches;
+    for (const team of registeredTeams) {
+      const matchCount = teamFinishedCounts.get(team.id) ?? team.sampleMatches;
       if (matchCount < 10) {
-        underSampledTeams.push({
+        teamsWithFewerThan10Matches.push({
           teamId: team.id,
           name: team.name,
           shortName: team.shortName,
@@ -365,12 +489,21 @@ class MatchesStore {
       }
     }
 
+    const unmatched = this.getUnmatchedNames();
+
     return {
       totalMatches: allMatches.length,
       earliestDate,
       latestDate,
-      matchesPerLeagueAndSeason: Array.from(leagueSeasonMap.values()).sort((a, b) => a.league.localeCompare(b.league) || b.season.localeCompare(a.season)),
-      teamsWithFewerThan10Matches: underSampledTeams.sort((a, b) => a.matchCount - b.matchCount || a.name.localeCompare(b.name)),
+      matchesPerLeagueAndSeason: Array.from(leagueSeasonMap.values()).sort(
+        (a, b) => a.league.localeCompare(b.league) || b.season.localeCompare(a.season)
+      ),
+      teamsWithFewerThan10Matches: teamsWithFewerThan10Matches.sort(
+        (a, b) => a.matchCount - b.matchCount || a.name.localeCompare(b.name)
+      ),
+      unmatchedNamesCount: unmatched.length,
+      unmatchedNames: unmatched,
+      persistenceMode: (isSupabaseConfigured && supabase) ? 'SUPABASE_PRODUCTION' : 'IN_MEMORY_SANDBOX',
     };
   }
 }
