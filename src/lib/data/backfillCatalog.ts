@@ -147,3 +147,51 @@ export function parseLondonCsvDateTime(dateStr: string, timeStr?: string | null)
   const actualUtcMs = Date.UTC(y, m - 1, d, hours - offsetHours, minutes, 0);
   return new Date(actualUtcMs).toISOString();
 }
+
+/**
+ * Brazil Serie A matches from football-data.co.uk (BRA.csv):
+ * Kickoff times are frequently missing or inconsistently collated.
+ * Official timezone is America/Sao_Paulo (UTC-3), but Calibrall stores Brazil matches
+ * strictly date-only (YYYY-MM-DD with null time) to avoid inventing kickoff hours.
+ */
+export function parseBrazilCsvDate(dateStr: string): string | null {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const cleanDate = dateStr.trim();
+  const parts = cleanDate.split('/');
+  if (parts.length !== 3) return null;
+
+  let [dStr, mStr, yStr] = parts;
+  const d = parseInt(dStr, 10);
+  const m = parseInt(mStr, 10);
+  let y = parseInt(yStr, 10);
+  if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+  if (d < 1 || d > 31 || m < 1 || m > 12) return null;
+
+  if (yStr.length === 2) {
+    y = y > 50 ? 1900 + y : 2000 + y;
+  }
+  const day = String(d).padStart(2, '0');
+  const month = String(m).padStart(2, '0');
+  const year = String(y);
+
+  // Strictly date-only format: YYYY-MM-DD
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Creates canonical team identity from the CSV itself:
+ * One canonical team per league and CSV name.
+ * Attack/defense ratings, discipline, and sample_matches are left NULL until computed.
+ * crest_url is left NULL (no made-up URLs).
+ */
+export function getCanonicalTeamForCsv(league: string, rawCsvName: string) {
+  const cleanName = rawCsvName.trim();
+  const sanitized = sanitizeRawTeamForId(cleanName);
+  const canonicalId = `team_${league.toLowerCase()}_${sanitized}`;
+  return {
+    id: canonicalId,
+    name: cleanName,
+    shortName: cleanName,
+    competitionCode: league,
+  };
+}

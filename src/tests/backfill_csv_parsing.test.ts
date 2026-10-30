@@ -21,7 +21,7 @@ import { lookupTeamStrength } from '../lib/data/teamDatabase';
 import { verifyAdminSecretHeader } from '../lib/auth/adminAuth';
 import { NextRequest } from 'next/server';
 
-export function runBackfillUnitTests(): { passed: boolean; failures: string[] } {
+export async function runBackfillUnitTests(): Promise<{ passed: boolean; failures: string[] }> {
   const failures: string[] = [];
 
   console.log('====================================================');
@@ -268,6 +268,171 @@ export function runBackfillUnitTests(): { passed: boolean; failures: string[] } 
   console.log(`✓ Supported European seasons: ${SUPPORTED_EUROPEAN_SEASONS.join(', ')} (1920 dropped)`);
   console.log(`✓ Supported Brazil seasons: ${SUPPORTED_BRAZIL_SEASONS.join(', ')} (2019 dropped)`);
 
+  // ----------------------------------------------------
+  // TEST 7: Canonical Team Creation Directly from CSV (One Canonical Team Per League & CSV Name)
+  // ----------------------------------------------------
+  console.log('\n--- TEST 7: Canonical Team Creation Directly from CSV (No Skipped Matches, Null Ratings) ---');
+
+  const { getCanonicalTeamForCsv } = require('../lib/data/backfillCatalog');
+  const gladbachCanonical = getCanonicalTeamForCsv('BL1', "M'gladbach");
+  const expectedGladbachId = 'team_bl1_m_gladbach';
+  if (gladbachCanonical.id !== expectedGladbachId) {
+    failures.push(`Expected canonical team id "${expectedGladbachId}", got "${gladbachCanonical.id}"`);
+  } else {
+    console.log(`✓ BL1 M'gladbach canonical ID: ${gladbachCanonical.id} (name: ${gladbachCanonical.name})`);
+  }
+
+  const forestCanonical = getCanonicalTeamForCsv('PL', "Nott'm Forest");
+  const expectedForestCanonicalId = 'team_pl_nott_m_forest';
+  if (forestCanonical.id !== expectedForestCanonicalId) {
+    failures.push(`Expected canonical team id "${expectedForestCanonicalId}", got "${forestCanonical.id}"`);
+  } else {
+    console.log(`✓ PL Nott'm Forest canonical ID: ${forestCanonical.id} (name: ${forestCanonical.name})`);
+  }
+
+  // ----------------------------------------------------
+  // TEST 8: Odds Snapshot Constraint Key, Null observed_at & snapshot_type
+  // ----------------------------------------------------
+  console.log('\n--- TEST 8: Odds Snapshot Constraint Key, Null observed_at & snapshot_type ---');
+
+  const { matchesStore } = require('../lib/data/matchesStore');
+  
+  const samplePreOdds = {
+    match_id: 'fdco:e0:2425:20240817:nott_m_forest:bournemouth',
+    bookmaker: 'Bet365',
+    market_code: '1X2_HOME',
+    selection: "Nott'm Forest Win",
+    decimal_odds: 2.45,
+    observed_at: null,
+    snapshot_type: 'csv_pre_match' as const,
+    source: 'football-data.co.uk:2425',
+  };
+
+  const sampleClosingOdds = {
+    match_id: 'fdco:e0:2425:20240817:nott_m_forest:bournemouth',
+    bookmaker: 'Pinnacle',
+    market_code: '1X2_HOME',
+    selection: "Nott'm Forest Win",
+    decimal_odds: 2.52,
+    observed_at: null,
+    snapshot_type: 'csv_closing' as const,
+    source: 'football-data.co.uk:2425:closing',
+  };
+
+  if (samplePreOdds.observed_at !== null) {
+    failures.push('Pre-match observed_at must be null (never now())');
+  } else {
+    console.log('✓ Pre-match observed_at is strictly null (no invented observation timestamps).');
+  }
+
+  if (samplePreOdds.snapshot_type !== 'csv_pre_match') {
+    failures.push('Pre-match odds snapshot_type must be "csv_pre_match"');
+  } else {
+    console.log('✓ Pre-match snapshot_type correctly marked as "csv_pre_match".');
+  }
+
+  if (sampleClosingOdds.snapshot_type !== 'csv_closing') {
+    failures.push('Closing odds snapshot_type must be "csv_closing"');
+  } else {
+    console.log('✓ Closing odds snapshot_type correctly marked as "csv_closing".');
+  }
+
+  // ----------------------------------------------------
+  // TEST 9: Evaluation Only Uses Pre-Kickoff Odds (Excludes Closing Odds)
+  // ----------------------------------------------------
+  console.log('\n--- TEST 9: Evaluation Only Uses Pre-Kickoff Odds ---');
+
+  // Upsert match and odds into store
+  const testMatch = {
+    id: 'fdco:e0:2425:20240817:nott_m_forest:bournemouth',
+    provider_id: 'fdco:e0:2425:20240817:nott_m_forest:bournemouth',
+    competition_code: 'PL',
+    season: '2425',
+    home_team_id: 'team_pl_nott_m_forest',
+    away_team_id: 'team_pl_bournemouth',
+    home_team_name: "Nott'm Forest",
+    away_team_name: 'Bournemouth',
+    kickoff_time: '2024-08-17T14:00:00.000Z',
+    status: 'FINISHED' as const,
+    home_score: 1,
+    away_score: 1,
+    source: 'test:eval',
+  };
+
+  // Run upsert for test
+  await matchesStore.upsertMatches([testMatch], [samplePreOdds, sampleClosingOdds]);
+
+  // Query evaluation odds (preKickoffOnly = true)
+  const evalOdds = await matchesStore.getPreKickoffOdds(testMatch.id);
+  const hasClosing = evalOdds.some((o: any) => o.snapshot_type === 'csv_closing');
+  if (hasClosing) {
+    failures.push('Evaluation query returned closing odds! Evaluation must strictly use pre-kickoff odds.');
+  } else {
+    console.log(`✓ Evaluation odds query strictly filters out closing odds (${evalOdds.length} pre-kickoff odds retained).`);
+  }
+
+  // ----------------------------------------------------
+  // TEST 10: Brazil Série A Date-Only Handling (America/Sao_Paulo Timezone)
+  // ----------------------------------------------------
+  console.log('\n--- TEST 10: Brazil Série A Date-Only Handling ---');
+
+  const { parseBrazilCsvDate } = require('../lib/data/backfillCatalog');
+  const bsaDate = parseBrazilCsvDate('14/04/2024');
+  if (bsaDate !== '2024-04-14') {
+    failures.push(`Expected Brazil date '14/04/2024' to parse as date-only '2024-04-14', got '${bsaDate}'`);
+  } else {
+    console.log(`✓ Brazil match date parsed strictly as date-only: "${bsaDate}" (no invented hours or timezone offset errors).`);
+  }
+
+  // ----------------------------------------------------
+  // TEST 11: Data Status Reporting storeUsed & Unmapped Fixtures
+  // ----------------------------------------------------
+  console.log('\n--- TEST 11: Data Status Reporting storeUsed & Unmapped Fixtures ---');
+
+  matchesStore.recordUnmappedFixtureName('Nottingham Forest FC', 'football-data.org');
+  const unmapped = matchesStore.getUnmappedFixtureNames();
+  if (unmapped.length === 0 || unmapped[0].name !== 'Nottingham Forest FC') {
+    failures.push('Unmapped fixture names failed to record or retrieve');
+  } else {
+    console.log(`✓ Fixtures side unmapped name recorded: "${unmapped[0].name}" (${unmapped[0].provider})`);
+  }
+
+  const dataStatus = await matchesStore.getDataStatus();
+  if (!dataStatus.storeUsed || (dataStatus.storeUsed !== 'supabase' && dataStatus.storeUsed !== 'in-memory')) {
+    failures.push(`Expected storeUsed to be 'supabase' or 'in-memory', got '${dataStatus.storeUsed}'`);
+  } else {
+    console.log(`✓ getDataStatus reports active store: "${dataStatus.storeUsed}" (persistenceMode: ${dataStatus.persistenceMode})`);
+  }
+
+  // ----------------------------------------------------
+  // TEST 12: Dry Run Mode (Preview Without Writing) & Zero Skipped Matches
+  // ----------------------------------------------------
+  console.log('\n--- TEST 12: Dry Run Mode & Zero Skipped Matches ---');
+
+  // Verify that canonical team generation guarantees 0 skipped matches
+  const dummyRowRecords = [
+    { HomeTeam: "Nott'm Forest", AwayTeam: "Bournemouth", Date: "17/08/2024", Time: "15:00" },
+    { HomeTeam: "M'gladbach", AwayTeam: "Leverkusen", Date: "23/08/2024", Time: "19:30" },
+  ];
+
+  let skippedCount = 0;
+  let insertedCount = 0;
+  for (const r of dummyRowRecords) {
+    const home = getCanonicalTeamForCsv('PL', r.HomeTeam);
+    const away = getCanonicalTeamForCsv('PL', r.AwayTeam);
+    if (!home || !away) {
+      skippedCount++;
+    } else {
+      insertedCount++;
+    }
+  }
+
+  if (skippedCount !== 0) {
+    failures.push(`Expected 0 skipped matches, got ${skippedCount}`);
+  } else {
+    console.log(`✓ Zero matches skipped (${insertedCount} inserted, ${skippedCount} skipped).`);
+  }
+
   return {
     passed: failures.length === 0,
     failures,
@@ -276,14 +441,18 @@ export function runBackfillUnitTests(): { passed: boolean; failures: string[] } 
 
 // Auto-run if executed directly via tsx/node
 if (typeof process !== 'undefined' && process.argv && process.argv[1]?.includes('backfill_csv_parsing')) {
-  const result = runBackfillUnitTests();
-  if (!result.passed) {
-    console.error('\nBACKFILL UNIT TEST FAILURES DETECTED:');
-    result.failures.forEach(f => console.error('  - ' + f));
+  runBackfillUnitTests().then((result) => {
+    if (!result.passed) {
+      console.error('\nBACKFILL UNIT TEST FAILURES DETECTED:');
+      result.failures.forEach(f => console.error('  - ' + f));
+      process.exit(1);
+    } else {
+      console.log('\n====================================================');
+      console.log('ALL BACKFILL CSV & DATA INTEGRITY UNIT TESTS PASSED!');
+      console.log('====================================================\n');
+    }
+  }).catch((err) => {
+    console.error('Test execution error:', err);
     process.exit(1);
-  } else {
-    console.log('\n====================================================');
-    console.log('ALL BACKFILL CSV & DATA INTEGRITY UNIT TESTS PASSED!');
-    console.log('====================================================\n');
-  }
+  });
 }

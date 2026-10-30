@@ -28,6 +28,9 @@ interface DataStatusData {
   teamsWithFewerThan10Matches: UnderSampledTeam[];
   unmatchedNamesCount?: number;
   unmatchedNames?: string[];
+  unmappedFixtureNamesCount?: number;
+  unmappedFixtureNames?: { name: string; provider: string }[];
+  storeUsed?: 'supabase' | 'in-memory';
   persistenceMode?: string;
 }
 
@@ -185,6 +188,18 @@ export default function DataStatusDiagnostics() {
 
       {data && (
         <div className="space-y-3">
+          {/* Active Store Indicator */}
+          <div className="flex items-center justify-between px-3 py-1.5 rounded-[8px] bg-[#151E19] border border-white/[0.07] text-[11px] font-mono">
+            <span className="text-[#8B9890]">Active Store Source:</span>
+            <span className={`font-semibold px-2 py-0.5 rounded ${
+              data.storeUsed === 'supabase'
+                ? 'bg-[#B6E63B]/10 text-[#B6E63B] border border-[#B6E63B]/30'
+                : 'bg-[#E2AE45]/10 text-[#E2AE45] border border-[#E2AE45]/30'
+            }`}>
+              {data.storeUsed === 'supabase' ? 'Supabase Production Database' : 'In-Memory Sandbox Store'}
+            </span>
+          </div>
+
           {/* Headline summary pills */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="bg-[#151E19] rounded-[10px] p-2.5 border border-white/[0.07]">

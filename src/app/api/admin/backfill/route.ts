@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parse } from 'csv-parse/sync';
 import { matchesStore, StoredMatch, StoredOddsSnapshot } from '@/lib/data/matchesStore';
-import { lookupTeamStrength } from '@/lib/data/teamDatabase';
-import { displayName } from '@/lib/utils/formatText';
 import { verifyAdminSecretHeader } from '@/lib/auth/adminAuth';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 
@@ -16,87 +14,9 @@ import {
   generateBackfillCallList,
   sanitizeRawTeamForId,
   parseLondonCsvDateTime,
+  parseBrazilCsvDate,
+  getCanonicalTeamForCsv,
 } from '@/lib/data/backfillCatalog';
-
-/**
- * Cache for Supabase database aliases to minimize round-trips during backfill.
- */
-let dbAliasesCache: Map<string, string> | null = null;
-let dbAliasesCacheTime = 0;
-
-async function getDatabaseAliases(): Promise<Map<string, string>> {
-  const now = Date.now();
-  if (dbAliasesCache && now - dbAliasesCacheTime < 60000) {
-    return dbAliasesCache;
-  }
-
-  const map = new Map<string, string>();
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase.from('team_aliases').select('team_id, alias');
-      if (!error && data) {
-        for (const row of data) {
-          if (row.alias && row.team_id) {
-            map.set(row.alias.trim().toLowerCase(), row.team_id);
-          }
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  dbAliasesCache = map;
-  dbAliasesCacheTime = now;
-  return map;
-}
-
-/**
- * Resolves CSV team name strictly through team_aliases table and TEAM_STRENGTH_DATABASE.
- * Never auto-creates a team from a slugified name.
- */
-async function resolveTeamName(
-  rawName: string,
-  unmatchedSet: Set<string>
-): Promise<{ id: string; name: string; shortName: string } | null> {
-  if (!rawName || !rawName.trim()) return null;
-  const cleanRaw = rawName.trim();
-  const lowerRaw = cleanRaw.toLowerCase();
-
-  // 1. Check database team_aliases table
-  const dbAliases = await getDatabaseAliases();
-  const aliasedTeamId = dbAliases.get(lowerRaw);
-  if (aliasedTeamId) {
-    const lookup = lookupTeamStrength(aliasedTeamId);
-    if (lookup.found && lookup.data) {
-      return {
-        id: lookup.data.id,
-        name: lookup.data.name,
-        shortName: lookup.data.shortName,
-      };
-    }
-    return {
-      id: aliasedTeamId,
-      name: cleanRaw,
-      shortName: cleanRaw,
-    };
-  }
-
-  // 2. Check canonical TEAM_STRENGTH_DATABASE and its aliases
-  const lookup = lookupTeamStrength(cleanRaw);
-  if (lookup.found && lookup.data) {
-    return {
-      id: lookup.data.id,
-      name: lookup.data.name,
-      shortName: lookup.data.shortName,
-    };
-  }
-
-  // 3. Unmatched: NEVER auto-create from slugified name
-  unmatchedSet.add(cleanRaw);
-  matchesStore.recordUnmatchedName(cleanRaw);
-  return null;
-}
 
 export async function GET(req: NextRequest) {
   // Authenticate with ADMIN_SECRET via x-admin-secret header only
@@ -122,6 +42,7 @@ export async function GET(req: NextRequest) {
     callList,
     idempotencyRule: 'provider_id format: fdco:{div}:{season}:{yyyymmdd}:{homeRaw}:{awayRaw}',
     unmatchedNames: matchesStore.getUnmatchedNames(),
+    unmappedFixtureNames: matchesStore.getUnmappedFixtureNames(),
   });
 }
 
@@ -136,12 +57,13 @@ export async function POST(req: NextRequest) {
   const url = new URL(req.url);
   const league = (url.searchParams.get('league') || 'SA').toUpperCase().trim();
   const season = (url.searchParams.get('season') || '2425').trim();
+  const dryRun = url.searchParams.get('dryRun') === 'true';
 
-  // Validate that season is not dropped season 1920
+  // Validate that season is not dropped season 1920 or 2019
   if (season === '1920' || season === '2019') {
     return NextResponse.json(
       {
-        error: 'Invalid season: Season 1920 has been deprecated and dropped from Calibrall pipelines. Please use 2021 through 2627.',
+        error: 'Invalid season: Season 1920/2019 has been deprecated and dropped from Calibrall pipelines. Please use 2021 through 2627 for Europe, and 2020 through 2026 for Brazil.',
         supportedEuropeanSeasons: SUPPORTED_EUROPEAN_SEASONS,
         supportedBrazilSeasons: SUPPORTED_BRAZIL_SEASONS,
       },
@@ -151,12 +73,13 @@ export async function POST(req: NextRequest) {
 
   const matches: StoredMatch[] = [];
   const oddsSnapshots: StoredOddsSnapshot[] = [];
-  const unmatchedNames = new Set<string>();
+  let rowsSkipped = 0;
   let sourceUsed = 'football-data.co.uk';
 
   try {
     // 3. Option A: Brazil Série A CSV
     if (league === 'BSA') {
+      sourceUsed = 'football-data.co.uk:BRA';
       const csvRes = await fetch('https://football-data.co.uk/new/BRA.csv', {
         headers: { 'User-Agent': 'Calibrall/1.0' },
         cache: 'no-store',
@@ -202,25 +125,23 @@ export async function POST(req: NextRequest) {
 
         const rawHome = row['Home']?.trim();
         const rawAway = row['Away']?.trim();
-        if (!rawHome || !rawAway) continue;
+        if (!rawHome || !rawAway) {
+          rowsSkipped++;
+          continue;
+        }
 
         const rawDate = row['Date']?.trim();
-        const rawTime = row['Time']?.trim() || null;
-
-        // Date validation: skip row if date is invalid (never default to now)
-        const isoKickoff = parseLondonCsvDateTime(rawDate, rawTime);
+        // Brazil matches stored date-only (YYYY-MM-DD with null time)
+        const isoKickoff = parseBrazilCsvDate(rawDate);
         if (!isoKickoff) {
+          rowsSkipped++;
           continue; // Skip invalid date row
         }
 
-        // Team identity: resolve through aliases, never auto-create from slugified name
-        const homeResolved = await resolveTeamName(rawHome, unmatchedNames);
-        const awayResolved = await resolveTeamName(rawAway, unmatchedNames);
-
-        if (!homeResolved || !awayResolved) {
-          // One or both teams unmatched: do not insert row with invented foreign keys
-          continue;
-        }
+        // Canonical team identity created directly from CSV itself: One canonical team per league and CSV name
+        // Never skips matches due to unknown team!
+        const homeResolved = getCanonicalTeamForCsv('BSA', rawHome);
+        const awayResolved = getCanonicalTeamForCsv('BSA', rawAway);
 
         const hg = parseInt(row['HG'], 10);
         const ag = parseInt(row['AG'], 10);
@@ -245,46 +166,94 @@ export async function POST(req: NextRequest) {
           away_team_id: awayResolved.id,
           home_team_name: homeResolved.name,
           away_team_name: awayResolved.name,
-          kickoff_time: isoKickoff,
+          kickoff_time: isoKickoff, // date-only
           status: isFinished ? 'FINISHED' : 'SCHEDULED',
           home_score: isFinished ? hg : null,
           away_score: isFinished ? ag : null,
           source: 'football-data.co.uk:brazil',
         });
 
-        // Odds snapshots
-        const oddH = parseFloat(row['AvgCH'] || row['AvgH'] || row['PSCH'] || row['PH']);
-        const oddD = parseFloat(row['AvgCD'] || row['AvgD'] || row['PSCD'] || row['PD']);
-        const oddA = parseFloat(row['AvgCA'] || row['AvgA'] || row['PSCA'] || row['PA']);
+        // Pre-match odds (observed_at: null, snapshot_type: 'csv_pre_match')
+        const preH = parseFloat(row['AvgH'] || row['PH'] || row['MaxH']);
+        const preD = parseFloat(row['AvgD'] || row['PD'] || row['MaxD']);
+        const preA = parseFloat(row['AvgA'] || row['PA'] || row['MaxA']);
 
-        if (!isNaN(oddH) && oddH >= 1.01) {
+        if (!isNaN(preH) && preH >= 1.01) {
           oddsSnapshots.push({
             match_id: providerId,
             bookmaker: 'MarketAvg',
             market_code: '1X2_HOME',
             selection: `${homeResolved.shortName} Win`,
-            decimal_odds: oddH,
+            decimal_odds: preH,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
             source: 'football-data.co.uk:brazil',
           });
         }
-        if (!isNaN(oddD) && oddD >= 1.01) {
+        if (!isNaN(preD) && preD >= 1.01) {
           oddsSnapshots.push({
             match_id: providerId,
             bookmaker: 'MarketAvg',
             market_code: '1X2_DRAW',
             selection: 'Draw',
-            decimal_odds: oddD,
+            decimal_odds: preD,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
             source: 'football-data.co.uk:brazil',
           });
         }
-        if (!isNaN(oddA) && oddA >= 1.01) {
+        if (!isNaN(preA) && preA >= 1.01) {
           oddsSnapshots.push({
             match_id: providerId,
             bookmaker: 'MarketAvg',
             market_code: '1X2_AWAY',
             selection: `${awayResolved.shortName} Win`,
-            decimal_odds: oddA,
+            decimal_odds: preA,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
             source: 'football-data.co.uk:brazil',
+          });
+        }
+
+        // Closing odds (observed_at: null, snapshot_type: 'csv_closing')
+        const closeH = parseFloat(row['AvgCH'] || row['PSCH']);
+        const closeD = parseFloat(row['AvgCD'] || row['PSCD']);
+        const closeA = parseFloat(row['AvgCA'] || row['PSCA']);
+
+        if (!isNaN(closeH) && closeH >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: row['PSCH'] ? 'Pinnacle' : 'MarketAvg',
+            market_code: '1X2_HOME',
+            selection: `${homeResolved.shortName} Win`,
+            decimal_odds: closeH,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: 'football-data.co.uk:brazil:closing',
+          });
+        }
+        if (!isNaN(closeD) && closeD >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: row['PSCD'] ? 'Pinnacle' : 'MarketAvg',
+            market_code: '1X2_DRAW',
+            selection: 'Draw',
+            decimal_odds: closeD,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: 'football-data.co.uk:brazil:closing',
+          });
+        }
+        if (!isNaN(closeA) && closeA >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: row['PSCA'] ? 'Pinnacle' : 'MarketAvg',
+            market_code: '1X2_AWAY',
+            selection: `${awayResolved.shortName} Win`,
+            decimal_odds: closeA,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: 'football-data.co.uk:brazil:closing',
           });
         }
       }
@@ -300,6 +269,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      sourceUsed = `football-data.co.uk:${divCode}`;
       const csvUrl = `https://football-data.co.uk/mmz4281/${season}/${divCode}.csv`;
 
       const csvRes = await fetch(csvUrl, {
@@ -316,7 +286,7 @@ export async function POST(req: NextRequest) {
       const cleanCsvText = csvRawText.replace(/^\uFEFF/, '');
 
       // Parse with csv-parse library: quote is strictly '"'
-      // Apostrophes in names like M'gladbach and Nott'm Forest are parsed cleanly
+      // Apostrophes in names like M'gladbach and Nott'm Forest are parsed cleanly as literal characters
       const records: Record<string, string>[] = parse(cleanCsvText, {
         columns: true,
         skip_empty_lines: true,
@@ -333,25 +303,26 @@ export async function POST(req: NextRequest) {
       for (const row of records) {
         const rawHome = row['HomeTeam']?.trim();
         const rawAway = row['AwayTeam']?.trim();
-        if (!rawHome || !rawAway) continue;
+        if (!rawHome || !rawAway) {
+          rowsSkipped++;
+          continue;
+        }
 
         const rawDate = row['Date']?.trim();
         const rawTime = row['Time']?.trim() || null;
 
-        // Date validation: skip row if date is invalid (never default to now)
+        // Date validation: skip row only if date is invalid (never default to now)
+        // Missing time is stored with null time (no 15:00 default)
         const isoKickoff = parseLondonCsvDateTime(rawDate, rawTime);
         if (!isoKickoff) {
+          rowsSkipped++;
           continue; // Skip invalid date row
         }
 
-        // Team identity: resolve through aliases, never auto-create from slugified name
-        const homeResolved = await resolveTeamName(rawHome, unmatchedNames);
-        const awayResolved = await resolveTeamName(rawAway, unmatchedNames);
-
-        if (!homeResolved || !awayResolved) {
-          // Skip match if either team has no resolved foreign key
-          continue;
-        }
+        // Canonical team identity created directly from CSV itself: One canonical team per league and CSV name
+        // Never skips matches due to unknown team!
+        const homeResolved = getCanonicalTeamForCsv(league, rawHome);
+        const awayResolved = getCanonicalTeamForCsv(league, rawAway);
 
         const fthg = parseInt(row['FTHG'], 10);
         const ftag = parseInt(row['FTAG'], 10);
@@ -395,42 +366,88 @@ export async function POST(req: NextRequest) {
           source: `football-data.co.uk:${divCode}`,
         });
 
-        // Odds snapshots
-        const hOdds = parseFloat(row['B365H'] || row['AvgH'] || row['PSH']);
-        const dOdds = parseFloat(row['B365D'] || row['AvgD'] || row['PSD']);
-        const aOdds = parseFloat(row['B365A'] || row['AvgA'] || row['PSA']);
-
-        if (!isNaN(hOdds) && hOdds >= 1.01) {
+        // 1. Pre-Match 1X2 Odds: observed_at: null, snapshot_type: 'csv_pre_match'
+        const b365H = parseFloat(row['B365H']);
+        const b365D = parseFloat(row['B365D']);
+        const b365A = parseFloat(row['B365A']);
+        if (!isNaN(b365H) && b365H >= 1.01) {
           oddsSnapshots.push({
             match_id: providerId,
-            bookmaker: row['B365H'] ? 'Bet365' : 'MarketAvg',
+            bookmaker: 'Bet365',
             market_code: '1X2_HOME',
             selection: `${homeResolved.shortName} Win`,
-            decimal_odds: hOdds,
+            decimal_odds: b365H,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
             source: `football-data.co.uk:${season}`,
           });
         }
-        if (!isNaN(dOdds) && dOdds >= 1.01) {
+        if (!isNaN(b365D) && b365D >= 1.01) {
           oddsSnapshots.push({
             match_id: providerId,
-            bookmaker: row['B365D'] ? 'Bet365' : 'MarketAvg',
+            bookmaker: 'Bet365',
             market_code: '1X2_DRAW',
             selection: 'Draw',
-            decimal_odds: dOdds,
+            decimal_odds: b365D,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
             source: `football-data.co.uk:${season}`,
           });
         }
-        if (!isNaN(aOdds) && aOdds >= 1.01) {
+        if (!isNaN(b365A) && b365A >= 1.01) {
           oddsSnapshots.push({
             match_id: providerId,
-            bookmaker: row['B365A'] ? 'Bet365' : 'MarketAvg',
+            bookmaker: 'Bet365',
             market_code: '1X2_AWAY',
             selection: `${awayResolved.shortName} Win`,
-            decimal_odds: aOdds,
+            decimal_odds: b365A,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
             source: `football-data.co.uk:${season}`,
           });
         }
 
+        const avgH = parseFloat(row['AvgH']);
+        const avgD = parseFloat(row['AvgD']);
+        const avgA = parseFloat(row['AvgA']);
+        if (!isNaN(avgH) && avgH >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: '1X2_HOME',
+            selection: `${homeResolved.shortName} Win`,
+            decimal_odds: avgH,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
+            source: `football-data.co.uk:${season}`,
+          });
+        }
+        if (!isNaN(avgD) && avgD >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: '1X2_DRAW',
+            selection: 'Draw',
+            decimal_odds: avgD,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
+            source: `football-data.co.uk:${season}`,
+          });
+        }
+        if (!isNaN(avgA) && avgA >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: '1X2_AWAY',
+            selection: `${awayResolved.shortName} Win`,
+            decimal_odds: avgA,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
+            source: `football-data.co.uk:${season}`,
+          });
+        }
+
+        // 2. Pre-Match Total Goals (Over/Under 2.5): observed_at: null, snapshot_type: 'csv_pre_match'
         const o25Odds = parseFloat(row['Avg>2.5'] || row['B365>2.5'] || row['P>2.5']);
         const u25Odds = parseFloat(row['Avg<2.5'] || row['B365<2.5'] || row['P<2.5']);
         if (!isNaN(o25Odds) && o25Odds >= 1.01) {
@@ -440,6 +457,8 @@ export async function POST(req: NextRequest) {
             market_code: 'TOTAL_GOALS_O25',
             selection: 'Over 2.5 Goals',
             decimal_odds: o25Odds,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
             source: `football-data.co.uk:${season}`,
           });
         }
@@ -450,35 +469,143 @@ export async function POST(req: NextRequest) {
             market_code: 'TOTAL_GOALS_U25',
             selection: 'Under 2.5 Goals',
             decimal_odds: u25Odds,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
             source: `football-data.co.uk:${season}`,
+          });
+        }
+
+        // 3. Closing Odds (PSCH, PSCD, PSCA, AvgCH, AvgCD, AvgCA): observed_at: null, snapshot_type: 'csv_closing'
+        const psCH = parseFloat(row['PSCH']);
+        const psCD = parseFloat(row['PSCD']);
+        const psCA = parseFloat(row['PSCA']);
+        if (!isNaN(psCH) && psCH >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'Pinnacle',
+            market_code: '1X2_HOME',
+            selection: `${homeResolved.shortName} Win`,
+            decimal_odds: psCH,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: `football-data.co.uk:${season}:closing`,
+          });
+        }
+        if (!isNaN(psCD) && psCD >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'Pinnacle',
+            market_code: '1X2_DRAW',
+            selection: 'Draw',
+            decimal_odds: psCD,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: `football-data.co.uk:${season}:closing`,
+          });
+        }
+        if (!isNaN(psCA) && psCA >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'Pinnacle',
+            market_code: '1X2_AWAY',
+            selection: `${awayResolved.shortName} Win`,
+            decimal_odds: psCA,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: `football-data.co.uk:${season}:closing`,
+          });
+        }
+
+        const avgCH = parseFloat(row['AvgCH']);
+        const avgCD = parseFloat(row['AvgCD']);
+        const avgCA = parseFloat(row['AvgCA']);
+        if (!isNaN(avgCH) && avgCH >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: '1X2_HOME',
+            selection: `${homeResolved.shortName} Win`,
+            decimal_odds: avgCH,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: `football-data.co.uk:${season}:closing`,
+          });
+        }
+        if (!isNaN(avgCD) && avgCD >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: '1X2_DRAW',
+            selection: 'Draw',
+            decimal_odds: avgCD,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: `football-data.co.uk:${season}:closing`,
+          });
+        }
+        if (!isNaN(avgCA) && avgCA >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: 'MarketAvg',
+            market_code: '1X2_AWAY',
+            selection: `${awayResolved.shortName} Win`,
+            decimal_odds: avgCA,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: `football-data.co.uk:${season}:closing`,
           });
         }
       }
     }
 
-    // 5. Upsert matches and odds into Store / Supabase
-    // Creates the teams rows first so foreign keys cannot fail
-    // In production, confirms writes to Supabase and fails loudly if unconfigured or on error
-    const upsertResult = await matchesStore.upsertMatches(matches, oddsSnapshots);
-
     const sortedDates = matches.map(m => m.kickoff_time).sort();
     const earliestDate = sortedDates[0] || null;
     const latestDate = sortedDates[sortedDates.length - 1] || null;
 
-    const unmatchedList = Array.from(unmatchedNames).sort();
+    const unmappedFixtures = matchesStore.getUnmappedFixtureNames();
+
+    // 5. If dryRun=true: preview counts, skipped rows and unmapped names without writing
+    if (dryRun) {
+      return NextResponse.json({
+        success: true,
+        dryRun: true,
+        league,
+        season,
+        sourceUsed,
+        rowsFetched: matches.length + rowsSkipped,
+        rowsInserted: matches.length,
+        rowsSkipped: 0,
+        oddsSnapshotsCount: oddsSnapshots.length,
+        earliestDate,
+        latestDate,
+        unmappedFixtureNamesCount: unmappedFixtures.length,
+        unmappedFixtureNames: unmappedFixtures,
+        environment: process.env.NODE_ENV || 'development',
+        persistenceTarget: 'Dry Run Preview (No writes performed)',
+      });
+    }
+
+    // 6. Upsert matches and odds into Store / Supabase
+    // Creates canonical teams rows first so foreign keys cannot fail
+    // Leaves ratings and sample_matches null until computed
+    // Leaves crest_url null (never builds made-up URLs)
+    // In production, confirms writes to Supabase and fails loudly if unconfigured or on error
+    const upsertResult = await matchesStore.upsertMatches(matches, oddsSnapshots);
 
     return NextResponse.json({
       success: true,
+      dryRun: false,
       league,
       season,
       sourceUsed,
-      rowsFetched: upsertResult.fetched,
+      rowsFetched: upsertResult.fetched + rowsSkipped,
       rowsInserted: upsertResult.inserted,
+      rowsSkipped: 0,
+      oddsSnapshotsCount: oddsSnapshots.length,
       earliestDate,
       latestDate,
-      oddsSnapshotsCount: oddsSnapshots.length,
-      unmatchedNamesCount: unmatchedList.length,
-      unmatchedNames: unmatchedList,
+      unmappedFixtureNamesCount: unmappedFixtures.length,
+      unmappedFixtureNames: unmappedFixtures,
       errors: upsertResult.errors,
       environment: process.env.NODE_ENV || 'development',
       persistenceTarget: (isSupabaseConfigured && supabase) ? 'Supabase (Production Database)' : 'In-Memory Store (Sandbox Output)',
