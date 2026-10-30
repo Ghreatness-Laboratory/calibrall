@@ -3,7 +3,13 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   images: {
-    domains: ['images.unsplash.com', 'media.api-sports.io', 'crests.football-data.org'],
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'media.api-sports.io' },
+      { protocol: 'https', hostname: 'crests.football-data.org' },
+      { protocol: 'https', hostname: 'a.espncdn.com' },
+      { protocol: 'https', hostname: 'cdn.sportmonks.com' },
+    ],
     unoptimized: true,
   },
   eslint: {

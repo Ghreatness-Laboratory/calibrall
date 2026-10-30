@@ -368,6 +368,12 @@ export interface MarketPrediction {
   fragilityFlags?: string[];
   substituteOption?: SubstituteOption | null;
   situationalPatterns?: SituationalPatternInsight[];
+  // Official Lineup Review & Revisions
+  lineupReviewFlag?: boolean; // Set true when a key player is missing and pick depended on them
+  keyPlayerOutWarning?: string; // e.g. "Key striker Erling Haaland not in the XI"
+  preLineupProbability?: number; // Pre-lineup probability before lineup release
+  postLineupProbability?: number; // Post-lineup probability preview (highlight-only)
+  lineupRevision?: number; // 1 = pre-lineup, 2 = post-lineup revision
   similarFixturesComparison?: SimilarFixturesComparison;
   attackingDefendingMatchup?: AttackingDefendingMatchup;
   isSubstituteOnly?: boolean;
@@ -635,4 +641,91 @@ export interface SavedFixture {
   fixture: Fixture;
   notes?: string;
   savedAt: string;
+}
+
+// Official Lineups & Lineup Comparison Types
+export interface LineupPlayer {
+  playerId: string;
+  playerName: string;
+  position: 'GK' | 'DF' | 'MF' | 'FW' | string;
+  isStarter: boolean;
+  isKeyPlayer?: boolean;
+  isCaptain?: boolean;
+  jerseyNumber?: number;
+  minutesPlayed?: number;
+  goals?: number;
+  assists?: number;
+  status?: string; // 'confirmed_starter' | 'benched' | 'sidelined'
+}
+
+export interface TeamLineup {
+  teamId: string;
+  teamName: string;
+  formation: string; // e.g. '4-3-3'
+  status: 'predicted' | 'confirmed';
+  starters: LineupPlayer[];
+  bench: LineupPlayer[];
+  fetchedAt: string;
+}
+
+export interface LineupComparison {
+  teamId: string;
+  teamName: string;
+  expectedFormation: string;
+  confirmedFormation?: string;
+  formationChanged: boolean;
+  rotationCount: number; // starters changed from last match
+  missingKeyPlayers: LineupPlayer[];
+  surpriseStarters: LineupPlayer[];
+  addedPlayers: LineupPlayer[];
+  missingPlayers: LineupPlayer[];
+  impactSummary: string[];
+  hasKeyPlayerOut: boolean;
+  keyPlayerOutNames: string[];
+}
+
+export interface FixtureLineupState {
+  fixtureId: string;
+  status: 'pending' | 'confirmed' | 'unreleased_late';
+  expectedReleaseTimeFormatted: string; // e.g. "13:00 WAT"
+  isWithin30MinsOfKickoff: boolean;
+  home: {
+    expected: TeamLineup;
+    confirmed?: TeamLineup;
+    comparison?: LineupComparison;
+  };
+  away: {
+    expected: TeamLineup;
+    confirmed?: TeamLineup;
+    comparison?: LineupComparison;
+  };
+  anyKeyPlayerOut: boolean;
+  firstKeyPlayerOutName?: string;
+  pickReviewRequired: boolean;
+  impactSummaries: string[];
+}
+
+export interface PickRevisionRecord {
+  id: string;
+  pickId: string;
+  fixtureId: string;
+  revisionNumber: number; // 1 = pre-lineup, 2 = post-lineup
+  label: string; // e.g. "Revision 1 (Pre-lineup)" or "Revision 2 (Post-lineup)"
+  recordedAt: string;
+  kickoffTime: string;
+  marketCode: string;
+  marketName: string;
+  selection: string;
+  probability: number;
+  odds?: number;
+  lineupStatus: 'pre-lineup' | 'confirmed';
+  changeSummary: string;
+  keyPlayerOutFlag: boolean;
+  keyPlayerOutName?: string;
+  recordHash: string;
+  gradingStatus: 'PENDING' | 'GRADED';
+  settlementStatus?: 'WON' | 'LOST' | 'PUSH' | 'VOID';
+  actualScore?: string;
+  brierError?: number;
+  logLoss?: number;
 }

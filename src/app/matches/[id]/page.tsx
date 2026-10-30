@@ -16,7 +16,12 @@ import {
   Clock, 
   Bookmark,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Users,
+  Grid,
+  FileText,
+  Activity,
+  AlertTriangle
 } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
 import { Fixture, MarketPrediction } from '@/types';
@@ -26,7 +31,11 @@ import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
 import { evaluateLiveMatchState } from '@/lib/prediction/liveMatchState';
 import { extractMatchStats, settleMarketPrediction } from '@/lib/prediction/settlementEngine';
 import QuantitativeFactorsAuditPanel from '@/components/QuantitativeFactorsAuditPanel';
-import { displayName, formatMatchTime } from '@/lib/utils/formatText';
+import LineupComparisonPanel from '@/components/LineupComparisonPanel';
+import LineupChip from '@/components/LineupChip';
+import { getFixtureLineupState } from '@/lib/data/lineupsService';
+import { forwardPickLedger } from '@/lib/prediction/forwardPickLedger';
+import { displayName, formatMatchTime, cleanDisplayText } from '@/lib/utils/formatText';
 
 export default function MatchAnalysisPage() {
   const params = useParams();
@@ -152,6 +161,19 @@ export default function MatchAnalysisPage() {
   }, [rawSelected, liveState]);
   const setSelectedPrediction = (p: MarketPrediction | null) => setSelectedPredictionOverride(p);
 
+  // Analysis Tab navigation
+  const [activeAnalysisTab, setActiveAnalysisTab] = useState<'markets' | 'lineups' | 'matrix' | 'audit'>('markets');
+
+  const lineupState = useMemo(() => {
+    if (!fixture || isBasketball) return null;
+    return getFixtureLineupState(fixture);
+  }, [fixture, isBasketball]);
+
+  const pickRevisions = useMemo(() => {
+    if (!fixture) return [];
+    return forwardPickLedger.getPickRevisions(fixture.id);
+  }, [fixture]);
+
   if (isLoading) {
     return (
       <div className="py-16 text-center space-y-3">
@@ -249,6 +271,9 @@ export default function MatchAnalysisPage() {
                 {formatMatchTime(fixture.kickoffTime, 'Africa/Lagos')} WAT
               </span>
             </span>
+            {lineupState && (
+              <LineupChip lineupState={lineupState} />
+            )}
           </div>
         </div>
 
@@ -528,20 +553,83 @@ export default function MatchAnalysisPage() {
         )}
       </div>
 
-      {/* Quantitative Hypothesis & Input Telemetry (Coaches, Weather, H2H, Odds de-vig) */}
-      <QuantitativeFactorsAuditPanel
-        homeTeamName={fixture.homeTeam.name}
-        awayTeamName={fixture.awayTeam.name}
-        venueName={fixture.venue}
-        kickoffTime={fixture.kickoffTime}
-        topPickOdds={topPick?.marketOdds || 1.95}
-        topPickSelection={topPick?.selection || 'Home Win'}
-        topPickProbability={topPick?.modelProbability || 0.54}
-        marketCode={topPick?.marketCode || 'MATCH_RESULT_HOME'}
-      />
+      {/* Tab Navigation for Detailed Match Breakdown */}
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 border-b border-white/[0.07]">
+        <button
+          onClick={() => setActiveAnalysisTab('markets')}
+          type="button"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[12px] font-semibold transition-colors touch-press shrink-0 ${
+            activeAnalysisTab === 'markets'
+              ? 'bg-[#B6E63B]/[0.12] text-[#B6E63B] border border-[#B6E63B]/30'
+              : 'bg-[#151E19] text-[#8B9890] border border-white/[0.07] hover:text-[#ECF1EE]'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>All Markets & EV</span>
+        </button>
 
-      {/* Football: Dixon-Coles Scoreline Matrix & Factors Panel */}
-      {!isBasketball && stats && footballEvaluation && (
+        {!isBasketball && lineupState && (
+          <button
+            onClick={() => setActiveAnalysisTab('lineups')}
+            type="button"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[12px] font-semibold transition-colors touch-press shrink-0 ${
+              activeAnalysisTab === 'lineups'
+                ? 'bg-[#B6E63B]/[0.12] text-[#B6E63B] border border-[#B6E63B]/30'
+                : 'bg-[#151E19] text-[#8B9890] border border-white/[0.07] hover:text-[#ECF1EE]'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Lineups & Comparison</span>
+            {lineupState.anyKeyPlayerOut ? (
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            ) : lineupState.status === 'confirmed' ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-[#B6E63B]" />
+            ) : null}
+          </button>
+        )}
+
+        {!isBasketball && (
+          <button
+            onClick={() => setActiveAnalysisTab('matrix')}
+            type="button"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[12px] font-semibold transition-colors touch-press shrink-0 ${
+              activeAnalysisTab === 'matrix'
+                ? 'bg-[#B6E63B]/[0.12] text-[#B6E63B] border border-[#B6E63B]/30'
+                : 'bg-[#151E19] text-[#8B9890] border border-white/[0.07] hover:text-[#ECF1EE]'
+            }`}
+          >
+            <Grid className="w-3.5 h-3.5" />
+            <span>Poisson Matrix</span>
+          </button>
+        )}
+
+        <button
+          onClick={() => setActiveAnalysisTab('audit')}
+          type="button"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[12px] font-semibold transition-colors touch-press shrink-0 ${
+            activeAnalysisTab === 'audit'
+              ? 'bg-[#B6E63B]/[0.12] text-[#B6E63B] border border-[#B6E63B]/30'
+              : 'bg-[#151E19] text-[#8B9890] border border-white/[0.07] hover:text-[#ECF1EE]'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          <span>Input Telemetry</span>
+        </button>
+      </div>
+
+      {/* TAB 1: Lineups & Comparison */}
+      {activeAnalysisTab === 'lineups' && lineupState && (
+        <LineupComparisonPanel
+          lineupState={lineupState}
+          homeTeamName={homeName}
+          awayTeamName={awayName}
+          topPick={topPick}
+          revisions={pickRevisions}
+        />
+      )}
+
+      {/* TAB 2: Poisson Matrix & State Factors */}
+      {activeAnalysisTab === 'matrix' && !isBasketball && stats && footballEvaluation && (
         <>
           <ScorelineMatrix
             homeTeamName={fixture.homeTeam.name}
@@ -559,32 +647,66 @@ export default function MatchAnalysisPage() {
         </>
       )}
 
-      {/* Main Split: Market Comparison Table & Explanation Engine */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
-        {/* Table */}
-        <div className="lg:col-span-7 space-y-3">
-          <MarketComparisonTable
-            predictions={predictions}
-            selectedPredictionId={selectedPrediction?.id}
-            onSelectPrediction={(p) => setSelectedPrediction(p)}
-            homeTeamName={fixture.homeTeam.name}
-            awayTeamName={fixture.awayTeam.name}
-          />
-        </div>
+      {/* TAB 3: Input Telemetry & Hypothesis Audit */}
+      {activeAnalysisTab === 'audit' && (
+        <QuantitativeFactorsAuditPanel
+          homeTeamName={fixture.homeTeam.name}
+          awayTeamName={fixture.awayTeam.name}
+          venueName={fixture.venue}
+          kickoffTime={fixture.kickoffTime}
+          topPickOdds={topPick?.marketOdds || 1.95}
+          topPickSelection={topPick?.selection || 'Home Win'}
+          topPickProbability={topPick?.modelProbability || 0.54}
+          marketCode={topPick?.marketCode || 'MATCH_RESULT_HOME'}
+        />
+      )}
 
-        {/* Explanation Card */}
-        <div className="lg:col-span-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-semibold text-[#ECF1EE]">Selected line evidence audit</h3>
-            <span className="text-[11px] text-[#B6E63B] font-semibold">Grounded facts</span>
+      {/* TAB 4: Default Markets Table & Explanation Engine */}
+      {activeAnalysisTab === 'markets' && (
+        <div className="space-y-3">
+          {lineupState?.anyKeyPlayerOut && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-[11px] flex items-center justify-between text-[12px]">
+              <div className="flex items-center gap-2 text-amber-300 font-semibold">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Lineup alert: {cleanDisplayText(lineupState.firstKeyPlayerOutName || 'Key player')} missing from starting XI</span>
+              </div>
+              <button
+                onClick={() => setActiveAnalysisTab('lineups')}
+                type="button"
+                className="text-[11px] text-[#B6E63B] hover:underline font-semibold"
+              >
+                Inspect XI →
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+            {/* Table */}
+            <div className="lg:col-span-7 space-y-3">
+              <MarketComparisonTable
+                predictions={predictions}
+                selectedPredictionId={selectedPrediction?.id}
+                onSelectPrediction={(p) => setSelectedPrediction(p)}
+                homeTeamName={fixture.homeTeam.name}
+                awayTeamName={fixture.awayTeam.name}
+              />
+            </div>
+
+            {/* Explanation Card */}
+            <div className="lg:col-span-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[14px] font-semibold text-[#ECF1EE]">Selected line evidence audit</h3>
+                <span className="text-[11px] text-[#B6E63B] font-semibold">Grounded facts</span>
+              </div>
+
+              <ExplanationCard
+                prediction={selectedPrediction}
+                noRecommendationReason={noRecommendationReason}
+              />
+            </div>
           </div>
-
-          <ExplanationCard
-            prediction={selectedPrediction}
-            noRecommendationReason={noRecommendationReason}
-          />
         </div>
-      </div>
+      )}
     </div>
   );
 }

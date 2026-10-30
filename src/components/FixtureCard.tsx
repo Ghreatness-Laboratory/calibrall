@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Fixture, MarketPrediction } from '@/types';
-import { Bookmark, ChevronRight, CheckCircle2, XCircle, MinusCircle, AlertCircle } from 'lucide-react';
+import { Bookmark, ChevronRight, CheckCircle2, XCircle, MinusCircle, AlertCircle, AlertTriangle } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
 import TeamCrest from '@/components/TeamCrest';
+import LineupChip from '@/components/LineupChip';
+import { getFixtureLineupState } from '@/lib/data/lineupsService';
 import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText, displayName, formatMatchTime } from '@/lib/utils/formatText';
 import { settleMarketPrediction, extractMatchStats } from '@/lib/prediction/settlementEngine';
@@ -85,11 +87,15 @@ export default function FixtureCard({
     ? Math.min(100, Math.max(0, parseFloat(probPercent)))
     : 50;
 
+  const lineupState = useMemo(() => {
+    return getFixtureLineupState(fixture);
+  }, [fixture]);
+
   return (
     <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 space-y-2.5 touch-press transition-transform duration-150">
       {/* Header: "League · MD n" caption left, time + bookmark icon right */}
-      <div className="flex items-center justify-between text-[11.5px] text-[#8B9890]">
-        <div className="flex items-center gap-1.5 truncate">
+      <div className="flex items-center justify-between text-[11.5px] text-[#8B9890] gap-2">
+        <div className="flex items-center gap-1.5 truncate flex-wrap">
           <span className="truncate">{cleanDisplayText(fixture.competition.name)}</span>
           <span className="text-[#5E6A63]">·</span>
           <span className="tabular-nums shrink-0">MD {fixture.matchday}</span>
@@ -108,6 +114,9 @@ export default function FixtureCard({
             <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-amber-500/20 text-amber-300 font-mono text-[9.5px] font-semibold border border-amber-500/30">
               HT
             </span>
+          )}
+          {!isFinished && !isInPlay && (
+            <LineupChip lineupState={lineupState} className="ml-0.5" />
           )}
         </div>
 
@@ -236,6 +245,21 @@ export default function FixtureCard({
                   </span>
                 )}
               </div>
+
+              {/* Review: lineup changed notification (never colour alone) */}
+              {(topPrediction.lineupReviewFlag || (lineupState.pickReviewRequired && !isFinished)) && (
+                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-white/[0.05]">
+                  <span className="inline-flex items-center gap-1 text-amber-300 font-semibold">
+                    <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                    <span>Review: lineup changed</span>
+                  </span>
+                  {lineupState.firstKeyPlayerOutName && (
+                    <span className="text-[10.5px] text-[#8B9890] truncate">
+                      {cleanDisplayText(lineupState.firstKeyPlayerOutName)} out
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* Settlement Banner when match completed */}
               {settledTopPrediction && (
