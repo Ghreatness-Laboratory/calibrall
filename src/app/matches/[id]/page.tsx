@@ -30,7 +30,7 @@ import { displayName, formatMatchTime } from '@/lib/utils/formatText';
 
 export default function MatchAnalysisPage() {
   const params = useParams();
-  const id = params?.id as string;
+  const id = (Array.isArray(params?.id) ? params.id[0] : params?.id) as string;
 
   const [fixture, setFixture] = useState<Fixture | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -225,7 +225,9 @@ export default function MatchAnalysisPage() {
             <span className="text-[#5E6A63]">·</span>
             <span className="tabular-nums">MD {fixture.matchday}</span>
             {(() => {
-              const derby = (fixture.isDerby && fixture.derbyName) ? { name: fixture.derbyName } : checkDerby(fixture.homeTeam.name, fixture.awayTeam.name);
+              const derby = (fixture.isDerby && fixture.derbyName)
+                ? { name: fixture.derbyName }
+                : (fixture.homeTeam?.name && fixture.awayTeam?.name ? checkDerby(fixture.homeTeam.name, fixture.awayTeam.name) : null);
               return derby ? (
                 <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
                   {derby.name}

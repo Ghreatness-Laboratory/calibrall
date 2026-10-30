@@ -47,8 +47,23 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// 2. Activate lifecycle: clean up stale cache versions
+// 2. Activate lifecycle: clean up stale cache versions & auto-unregister in dev
 self.addEventListener('activate', (event) => {
+  const isDev =
+    self.location.hostname.includes('ais-dev') ||
+    self.location.hostname === 'localhost' ||
+    self.location.hostname === '127.0.0.1' ||
+    self.location.hostname === '0.0.0.0';
+
+  if (isDev) {
+    event.waitUntil(
+      caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        .then(() => self.registration.unregister())
+        .then(() => self.clients.claim())
+    );
+    return;
+  }
+
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
@@ -78,6 +93,16 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
+  // In development, preview (ais-dev), or local environments, never intercept requests
+  if (
+    self.location.hostname.includes('ais-dev') ||
+    self.location.hostname === 'localhost' ||
+    self.location.hostname === '127.0.0.1' ||
+    self.location.hostname === '0.0.0.0'
+  ) {
+    return;
+  }
+
   // Ignore non-GET requests
   if (request.method !== 'GET') {
     return;
@@ -87,6 +112,16 @@ self.addEventListener('fetch', (event) => {
 
   // Ignore browser extensions and non-http(s) schemes
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return;
+  }
+
+  // Never intercept React Server Component requests, prefetch, or router transitions
+  if (
+    request.headers.get('RSC') === '1' ||
+    request.headers.get('Next-Router-State-Tree') ||
+    request.headers.get('Next-Router-Prefetch') ||
+    url.searchParams.has('_rsc')
+  ) {
     return;
   }
 
@@ -240,7 +275,9 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         } catch (err) {
           if (cached) return cached;
-          return new Response('', { status: 404, statusText: 'Not Found' });
+          // Do not synthesize empty 404 for scripts/chunks: let network failure bubble
+          // so webpack runtime knows it was a connection issue rather than a missing module
+          throw err;
         }
       })()
     );
