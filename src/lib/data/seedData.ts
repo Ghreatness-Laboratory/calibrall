@@ -64,6 +64,18 @@ export const COMPETITIONS: Competition[] = [
     avgCardsPerGame: 4.50,
     isActive: true,
   },
+  {
+    id: 'comp_elc',
+    code: 'ELC',
+    name: 'Championship',
+    country: 'England',
+    emblemUrl: 'https://crests.football-data.org/ELC.png',
+    tier: 2,
+    avgGoalsPerGame: 2.65,
+    avgCornersPerGame: 10.20,
+    avgCardsPerGame: 4.25,
+    isActive: true,
+  },
 ];
 
 export const TEAMS: Record<string, Team> = {

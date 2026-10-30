@@ -6,8 +6,58 @@
 // 4. Exact data status reporting for leagues, seasons, date boundaries, joined teams, and unmatched names
 
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
-import { TEAM_STRENGTH_DATABASE, lookupTeamStrength } from './teamDatabase';
+import { TEAM_STRENGTH_DATABASE, lookupTeamStrength, normalizeTeamLookupKey } from './teamDatabase';
+import { CHAMPIONSHIP_HISTORICAL_MATCHES } from './championshipMatchArchive';
 import { displayName } from '@/lib/utils/formatText';
+
+export interface FormMatchRecord {
+  id: string;
+  provider_id: string;
+  date: string;
+  opponentName: string;
+  opponentId: string;
+  isHome: boolean;
+  teamScore: number;
+  opponentScore: number;
+  result: 'W' | 'D' | 'L';
+  competitionCode: string;
+}
+
+export interface SplitMetrics {
+  matchesCount: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  cleanSheets: number;
+  failedToScore: number;
+  points: number;
+  ppg: number;
+}
+
+export interface TeamHistoryAndForm {
+  teamId: string;
+  teamName: string;
+  storedMatchCount: number;
+  daysSinceLastMatch: number | null;
+  lastMatchDate: string | null;
+  last5: {
+    matches: FormMatchRecord[];
+    formString: string;
+    metrics: SplitMetrics;
+  };
+  last10: {
+    matches: FormMatchRecord[];
+    formString: string;
+    metrics: SplitMetrics;
+  };
+  homeSplit: SplitMetrics;
+  awaySplit: SplitMetrics;
+  timeDecayedAttackRating: number;
+  timeDecayedDefenseRating: number;
+}
 
 export interface StoredMatch {
   id: string;
@@ -81,7 +131,11 @@ export interface DataStatusReport {
 // In-Memory store across the runtime session (shared on globalThis)
 const getGlobalMatches = (): Map<string, StoredMatch> => {
   if (!(globalThis as any).__calibrall_matches_map) {
-    (globalThis as any).__calibrall_matches_map = new Map<string, StoredMatch>();
+    const map = new Map<string, StoredMatch>();
+    for (const m of CHAMPIONSHIP_HISTORICAL_MATCHES) {
+      map.set(m.provider_id, m);
+    }
+    (globalThis as any).__calibrall_matches_map = map;
   }
   return (globalThis as any).__calibrall_matches_map;
 };
@@ -393,6 +447,253 @@ class MatchesStore {
     }
 
     return 0;
+  }
+
+  /**
+   * Defines "history" as team form:
+   * Computes from stored matches:
+   * - last 5 and last 10 results with scores, opponents, and dates
+   * - goals for and against
+   * - home and away splits
+   * - days since last match
+   * - time-decayed attack and defence strengths
+   */
+  async getTeamHistoryAndForm(teamIdOrName: string, asOfDate?: string): Promise<TeamHistoryAndForm> {
+    const lookup = lookupTeamStrength(teamIdOrName);
+    const canonicalId = lookup?.data?.id || teamIdOrName;
+    const teamName = lookup?.data?.name || displayName(teamIdOrName);
+    const teamNorm = normalizeTeamLookupKey(teamName);
+
+    // 1. Gather all stored matches for this team
+    let candidateMatches: StoredMatch[] = [];
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('matches')
+          .select('*')
+          .or(`home_team_id.eq.${canonicalId},away_team_id.eq.${canonicalId}`)
+          .order('kickoff_time', { ascending: false });
+        if (!error && data && data.length > 0) {
+          candidateMatches = data as StoredMatch[];
+        }
+      } catch (err) {
+        console.warn('[MatchesStore] Supabase getTeamHistoryAndForm error:', err);
+      }
+    }
+
+    if (candidateMatches.length === 0) {
+      candidateMatches = Array.from(this.inMemoryMatches.values()).filter(m => {
+        if (m.home_team_id === canonicalId || m.away_team_id === canonicalId) return true;
+        if (normalizeTeamLookupKey(m.home_team_name) === teamNorm) return true;
+        if (normalizeTeamLookupKey(m.away_team_name) === teamNorm) return true;
+        return false;
+      });
+    }
+
+    // Filter to finished matches with scores, respecting asOfDate if provided
+    const finished = candidateMatches.filter(m => {
+      const isFinished = m.status === 'FINISHED' || m.home_score !== null;
+      if (!isFinished) return false;
+      if (asOfDate && m.kickoff_time > asOfDate) return false;
+      return true;
+    }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
+
+    // Map to FormMatchRecord
+    const formMatches: FormMatchRecord[] = finished.map(m => {
+      const isHome = m.home_team_id === canonicalId || normalizeTeamLookupKey(m.home_team_name) === teamNorm;
+      const teamScore = isHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
+      const opponentScore = isHome ? (m.away_score ?? 0) : (m.home_score ?? 0);
+      const opponentName = isHome ? m.away_team_name : m.home_team_name;
+      const opponentId = isHome ? m.away_team_id : m.home_team_id;
+      const result: 'W' | 'D' | 'L' = teamScore > opponentScore ? 'W' : teamScore === opponentScore ? 'D' : 'L';
+      return {
+        id: m.id,
+        provider_id: m.provider_id,
+        date: m.kickoff_time,
+        opponentName,
+        opponentId,
+        isHome,
+        teamScore,
+        opponentScore,
+        result,
+        competitionCode: m.competition_code,
+      };
+    });
+
+    const computeMetrics = (matches: FormMatchRecord[]): SplitMetrics => {
+      let wins = 0;
+      let draws = 0;
+      let losses = 0;
+      let goalsFor = 0;
+      let goalsAgainst = 0;
+      let cleanSheets = 0;
+      let failedToScore = 0;
+
+      for (const m of matches) {
+        goalsFor += m.teamScore;
+        goalsAgainst += m.opponentScore;
+        if (m.result === 'W') wins++;
+        else if (m.result === 'D') draws++;
+        else losses++;
+
+        if (m.opponentScore === 0) cleanSheets++;
+        if (m.teamScore === 0) failedToScore++;
+      }
+
+      const matchesCount = matches.length;
+      const points = wins * 3 + draws * 1;
+      const ppg = matchesCount > 0 ? Number((points / matchesCount).toFixed(2)) : 0;
+      const goalDifference = goalsFor - goalsAgainst;
+
+      return {
+        matchesCount,
+        wins,
+        draws,
+        losses,
+        goalsFor,
+        goalsAgainst,
+        goalDifference,
+        cleanSheets,
+        failedToScore,
+        points,
+        ppg,
+      };
+    };
+
+    const last5Matches = formMatches.slice(0, 5);
+    const last10Matches = formMatches.slice(0, 10);
+    const homeMatches = formMatches.filter(m => m.isHome);
+    const awayMatches = formMatches.filter(m => !m.isHome);
+
+    const last5 = {
+      matches: last5Matches,
+      formString: last5Matches.map(m => m.result).join('-') || 'N/A',
+      metrics: computeMetrics(last5Matches),
+    };
+
+    const last10 = {
+      matches: last10Matches,
+      formString: last10Matches.map(m => m.result).join('-') || 'N/A',
+      metrics: computeMetrics(last10Matches),
+    };
+
+    const homeSplit = computeMetrics(homeMatches);
+    const awaySplit = computeMetrics(awayMatches);
+
+    // Days since last match
+    let daysSinceLastMatch: number | null = null;
+    let lastMatchDate: string | null = null;
+    if (formMatches.length > 0) {
+      lastMatchDate = formMatches[0].date;
+      const refTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
+      const matchTime = new Date(lastMatchDate).getTime();
+      daysSinceLastMatch = Math.max(0, Math.round((refTime - matchTime) / (1000 * 60 * 60 * 24)));
+    }
+
+    // Time-decayed attack and defence strengths (exponential half-life decay ~ 138 days)
+    const baseGoalsPerMatch = 1.35;
+    let timeDecayedAttackRating = lookup?.data?.attackRating ?? 1.10;
+    let timeDecayedDefenseRating = lookup?.data?.defenseRating ?? 1.05;
+
+    if (formMatches.length > 0) {
+      let weightSum = 0;
+      let weightedGoalsScored = 0;
+      let weightedGoalsConceded = 0;
+      const refTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
+
+      for (let i = 0; i < formMatches.length; i++) {
+        const m = formMatches[i];
+        const daysAgo = Math.max(0, (refTime - new Date(m.date).getTime()) / (1000 * 60 * 60 * 24));
+        const w = Math.exp(-0.005 * daysAgo);
+        weightSum += w;
+        weightedGoalsScored += m.teamScore * w;
+        weightedGoalsConceded += m.opponentScore * w;
+      }
+
+      if (weightSum > 0) {
+        const avgScored = weightedGoalsScored / weightSum;
+        const avgConceded = weightedGoalsConceded / weightSum;
+        timeDecayedAttackRating = Number(Math.max(0.65, Math.min(1.85, avgScored / baseGoalsPerMatch)).toFixed(2));
+        timeDecayedDefenseRating = Number(Math.max(0.60, Math.min(1.75, avgConceded / baseGoalsPerMatch)).toFixed(2));
+      }
+    }
+
+    return {
+      teamId: canonicalId,
+      teamName,
+      storedMatchCount: formMatches.length,
+      daysSinceLastMatch,
+      lastMatchDate,
+      last5,
+      last10,
+      homeSplit,
+      awaySplit,
+      timeDecayedAttackRating,
+      timeDecayedDefenseRating,
+    };
+  }
+
+  /**
+   * Contextual Head-to-Head query between two clubs from stored matches.
+   * H2H is strictly treated as a secondary feature with a small weight.
+   */
+  async getHeadToHeadMeetings(teamA: string, teamB: string) {
+    const lookupA = lookupTeamStrength(teamA);
+    const lookupB = lookupTeamStrength(teamB);
+    const idA = lookupA?.data?.id || teamA;
+    const idB = lookupB?.data?.id || teamB;
+    const nameA = lookupA?.data?.name || displayName(teamA);
+    const nameB = lookupB?.data?.name || displayName(teamB);
+    const normA = normalizeTeamLookupKey(nameA);
+    const normB = normalizeTeamLookupKey(nameB);
+
+    const allStored = Array.from(this.inMemoryMatches.values());
+    const h2hMatches = allStored.filter(m => {
+      const isFinished = m.status === 'FINISHED' || m.home_score !== null;
+      if (!isFinished) return false;
+      const matchHomeNorm = normalizeTeamLookupKey(m.home_team_name);
+      const matchAwayNorm = normalizeTeamLookupKey(m.away_team_name);
+
+      const matchesAB = (m.home_team_id === idA || matchHomeNorm === normA) && (m.away_team_id === idB || matchAwayNorm === normB);
+      const matchesBA = (m.home_team_id === idB || matchHomeNorm === normB) && (m.away_team_id === idA || matchAwayNorm === normA);
+      return matchesAB || matchesBA;
+    }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
+
+    let winsA = 0;
+    let draws = 0;
+    let winsB = 0;
+
+    const meetings = h2hMatches.map(m => {
+      const isAHome = m.home_team_id === idA || normalizeTeamLookupKey(m.home_team_name) === normA;
+      const scoreA = isAHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
+      const scoreB = isAHome ? (m.away_score ?? 0) : (m.home_score ?? 0);
+      if (scoreA > scoreB) winsA++;
+      else if (scoreA === scoreB) draws++;
+      else winsB++;
+
+      return {
+        id: m.id,
+        date: m.kickoff_time,
+        homeTeam: m.home_team_name,
+        awayTeam: m.away_team_name,
+        homeGoals: m.home_score ?? 0,
+        awayGoals: m.away_score ?? 0,
+        competitionCode: m.competition_code,
+      };
+    });
+
+    const sampleWeight = Math.min(0.12, meetings.length / (meetings.length + 15));
+
+    return {
+      totalMeetings: meetings.length,
+      meetings: meetings.slice(0, 5),
+      winsA,
+      draws,
+      winsB,
+      sampleWeight: Number(sampleWeight.toFixed(3)),
+      weightDescription: `Secondary feature (low weight ${(sampleWeight * 100).toFixed(1)}%, heavy Bayesian shrinkage applied)`,
+    };
   }
 
   /**

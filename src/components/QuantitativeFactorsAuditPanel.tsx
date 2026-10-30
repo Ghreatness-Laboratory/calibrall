@@ -14,13 +14,16 @@ import {
   Wind,
   Droplets,
   Thermometer,
-  Layers
+  Layers,
+  Activity,
+  Calendar
 } from 'lucide-react';
 import { computeManagerMatchup, ManagerMatchupScore } from '@/lib/prediction/managerStyleEngine';
 import { fetchKickoffWeather, WeatherCondition } from '@/lib/prediction/weatherEngine';
 import { evaluateContextualH2H, H2HEvaluationResult } from '@/lib/prediction/h2hEngine';
 import { generateMultiBookmakerPricing, blendModelWithMarket, OptionMarketPricing, ModelMarketBlendResult } from '@/lib/prediction/oddsEngine';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { TeamHistoryAndForm } from '@/lib/data/matchesStore';
 
 interface Props {
   homeTeamName: string;
@@ -33,7 +36,7 @@ interface Props {
   marketCode?: string;
 }
 
-type TabType = 'tactics' | 'weather' | 'h2h' | 'odds';
+type TabType = 'form' | 'tactics' | 'weather' | 'odds';
 
 export default function QuantitativeFactorsAuditPanel({
   homeTeamName,
@@ -45,9 +48,44 @@ export default function QuantitativeFactorsAuditPanel({
   topPickProbability = 0.54,
   marketCode = 'MATCH_RESULT_HOME'
 }: Props) {
-  const [activeTab, setActiveTab] = useState<TabType>('tactics');
+  const [activeTab, setActiveTab] = useState<TabType>('form');
   const [weather, setWeather] = useState<WeatherCondition | null>(null);
   const [loadingWeather, setLoadingWeather] = useState<boolean>(true);
+  const [formData, setFormData] = useState<{
+    homeForm: TeamHistoryAndForm;
+    awayForm: TeamHistoryAndForm;
+    h2h: {
+      totalMeetings: number;
+      meetings: any[];
+      winsA: number;
+      draws: number;
+      winsB: number;
+      sampleWeight: number;
+      weightDescription: string;
+    };
+  } | null>(null);
+  const [loadingForm, setLoadingForm] = useState<boolean>(true);
+
+  // Load team form & history from stored matches
+  useEffect(() => {
+    let isMounted = true;
+    async function loadForm() {
+      try {
+        setLoadingForm(true);
+        const res = await fetch(`/api/v1/fixtures/form?home=${encodeURIComponent(homeTeamName)}&away=${encodeURIComponent(awayTeamName)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (isMounted) setFormData(json);
+        }
+      } catch (err) {
+        console.error('Failed to load team form:', err);
+      } finally {
+        if (isMounted) setLoadingForm(false);
+      }
+    }
+    loadForm();
+    return () => { isMounted = false; };
+  }, [homeTeamName, awayTeamName]);
 
   // Compute manager matchup
   const managerMatchup: ManagerMatchupScore = React.useMemo(() => {
@@ -145,11 +183,22 @@ export default function QuantitativeFactorsAuditPanel({
         </div>
 
         {/* Tab switchers */}
-        <div className="flex items-center gap-1 bg-[#151E19] p-1 rounded-[11px] border border-white/[0.07] text-[11px]">
+        <div className="flex items-center gap-1 bg-[#151E19] p-1 rounded-[11px] border border-white/[0.07] text-[11px] overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('form')}
+            type="button"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press shrink-0 ${
+              activeTab === 'form' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Form & History</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('tactics')}
             type="button"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press shrink-0 ${
               activeTab === 'tactics' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
             }`}
           >
@@ -160,7 +209,7 @@ export default function QuantitativeFactorsAuditPanel({
           <button
             onClick={() => setActiveTab('weather')}
             type="button"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press shrink-0 ${
               activeTab === 'weather' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
             }`}
           >
@@ -169,20 +218,9 @@ export default function QuantitativeFactorsAuditPanel({
           </button>
 
           <button
-            onClick={() => setActiveTab('h2h')}
-            type="button"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press ${
-              activeTab === 'h2h' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
-            }`}
-          >
-            <History className="w-3.5 h-3.5" />
-            <span>H2H Filter</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('odds')}
             type="button"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press shrink-0 ${
               activeTab === 'odds' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
             }`}
           >
@@ -381,49 +419,254 @@ export default function QuantitativeFactorsAuditPanel({
         </div>
       )}
 
-      {/* TAB 3: CONTEXTUAL HEAD TO HEAD */}
-      {activeTab === 'h2h' && (
-        <div className="space-y-3">
-          <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-[#ECF1EE]">
-                Context Filtered Meetings ({h2hResult.filteredRecentCount} sample size)
-              </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#101713] border border-white/[0.07] text-[#B6E63B]">
-                Bayesian Shrinkage Applied
-              </span>
+      {/* TAB 1: DEFINED TEAM FORM & SECONDARY H2H */}
+      {activeTab === 'form' && (
+        <div className="space-y-4">
+          {loadingForm ? (
+            <div className="py-8 text-center text-[12px] text-[#8B9890] bg-[#151E19] rounded-[11px] border border-white/[0.07]">
+              <div className="w-4 h-4 border-2 border-[#B6E63B] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              Computing team form, rolling splits, and time-decayed ratings from stored matches...
             </div>
-
-            <p className="text-[11.5px] text-[#8B9890]">{cleanDisplayText(h2hResult.summaryText)}</p>
-
-            <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Recent Record</span>
-                <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">
-                  {h2hResult.homeWins}W · {h2hResult.draws}D · {h2hResult.awayWins}L
+          ) : formData ? (
+            <>
+              {/* Form definition notice */}
+              <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-[#B6E63B]" />
+                  <span className="text-[13px] font-semibold text-[#ECF1EE]">
+                    History Defined as Team Form
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#101713] border border-white/[0.07] text-[#B6E63B]">
+                  Exponential Half-Life Decayed
                 </span>
               </div>
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Raw Goal Diff</span>
-                <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">
-                  {h2hResult.avgGoalDifference > 0 ? `+${h2hResult.avgGoalDifference}` : h2hResult.avgGoalDifference}
-                </span>
-              </div>
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Shrunk Weight</span>
-                <span className="text-[13px] font-mono font-bold text-[#B6E63B]">
-                  {(h2hResult.sampleWeight * 100).toFixed(1)}% prior
-                </span>
-              </div>
-            </div>
 
-            <div className="p-2.5 rounded bg-[#101713] border border-white/[0.05] text-[11px] text-[#8B9890] flex items-center gap-2">
-              <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
-              <span>
-                Ablation audit: Raw un-shrunk historical meetings dropped due to negative out of sample skill. Retained strictly with low weight ({(h2hResult.sampleWeight * 100).toFixed(0)}%) under identical tactical systems.
-              </span>
+              {/* Two Column Team Form Comparison */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {/* Home Team Form Card */}
+                {([
+                  { form: formData.homeForm, label: 'Home Team', isHome: true },
+                  { form: formData.awayForm, label: 'Away Team', isHome: false }
+                ]).map(({ form, label, isHome }) => (
+                  <div key={label} className="p-3.5 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-3">
+                    {/* Team Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-white/[0.05] pb-2">
+                      <div>
+                        <span className="text-[10px] uppercase font-mono tracking-wider text-[#8B9890] block">{label}</span>
+                        <h4 className="text-[14px] font-bold text-[#ECF1EE]">{form.teamName}</h4>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px]">
+                        <span className="px-2 py-0.5 rounded bg-[#101713] border border-white/[0.05] text-[#8B9890] font-mono">
+                          {form.storedMatchCount} stored matches
+                        </span>
+                        {form.daysSinceLastMatch !== null && (
+                          <span className="px-2 py-0.5 rounded bg-[#101713] border border-white/[0.05] text-[#B6E63B] font-mono">
+                            {form.daysSinceLastMatch}d rest
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Time Decayed Ratings */}
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
+                        <span className="text-[10px] text-[#8B9890] block">Decayed Attack Strength</span>
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">
+                            {form.timeDecayedAttackRating.toFixed(2)}
+                          </span>
+                          <span className="text-[9.5px] text-[#5E6A63] font-mono">(time-weighted)</span>
+                        </div>
+                      </div>
+                      <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
+                        <span className="text-[10px] text-[#8B9890] block">Decayed Defence Strength</span>
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">
+                            {form.timeDecayedDefenseRating.toFixed(2)}
+                          </span>
+                          <span className="text-[9.5px] text-[#5E6A63] font-mono">(lower is better)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Last 5 Matches with Scores */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11.5px] font-semibold text-[#ECF1EE]">Last 5 Matches with Scores</span>
+                        <span className="text-[10.5px] font-mono font-bold text-[#B6E63B]">
+                          {form.last5.formString}
+                        </span>
+                      </div>
+
+                      {form.last5.matches.length > 0 ? (
+                        <div className="space-y-1">
+                          {form.last5.matches.map((m) => (
+                            <div
+                              key={m.id || m.provider_id}
+                              className="px-2.5 py-1.5 bg-[#101713] rounded-[8px] border border-white/[0.05] flex items-center justify-between text-[11px]"
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <span className={`w-4 h-4 rounded text-[9.5px] font-bold flex items-center justify-center font-mono ${
+                                  m.result === 'W' ? 'bg-[#B6E63B]/20 text-[#B6E63B] border border-[#B6E63B]/30' :
+                                  m.result === 'D' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                  'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                }`}>
+                                  {m.result}
+                                </span>
+                                <span className="text-[#8B9890] text-[10px] font-mono shrink-0">
+                                  {m.date ? new Date(m.date).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }) : '—'}
+                                </span>
+                                <span className="text-[#ECF1EE] truncate">
+                                  {m.isHome ? `vs ${m.opponentName}` : `@ ${m.opponentName}`}
+                                </span>
+                              </div>
+                              <span className="font-mono font-bold text-[#ECF1EE] text-[12px] tabular-nums shrink-0 ml-2">
+                                {m.teamScore} – {m.opponentScore}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-2 bg-[#101713] rounded-[8px] text-[11px] text-[#8B9890] text-center">
+                          No recent finished matches recorded.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Detailed Form Figures */}
+                    <div className="space-y-1.5 pt-1 border-t border-white/[0.05]">
+                      <span className="text-[11.5px] font-semibold text-[#ECF1EE] block">Form Figures & Rolling Splits</span>
+                      
+                      <div className="grid grid-cols-2 gap-1.5 text-[10.5px]">
+                        {/* Last 5 Summary */}
+                        <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-0.5">
+                          <span className="text-[#8B9890] font-mono block text-[9.5px]">Last 5 Window</span>
+                          <span className="text-[#ECF1EE] font-bold font-mono text-[11.5px] block">
+                            {form.last5.metrics.wins}W · {form.last5.metrics.draws}D · {form.last5.metrics.losses}L
+                          </span>
+                          <div className="text-[#8B9890] font-mono text-[10px] flex justify-between">
+                            <span>GF: {form.last5.metrics.goalsFor} | GA: {form.last5.metrics.goalsAgainst}</span>
+                            <span className={form.last5.metrics.goalDifference >= 0 ? 'text-[#B6E63B]' : 'text-rose-400'}>
+                              GD: {form.last5.metrics.goalDifference > 0 ? `+${form.last5.metrics.goalDifference}` : form.last5.metrics.goalDifference}
+                            </span>
+                          </div>
+                          <span className="text-[#5E6A63] font-mono text-[9.5px] block">
+                            {form.last5.metrics.ppg} pts/game
+                          </span>
+                        </div>
+
+                        {/* Last 10 Summary */}
+                        <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-0.5">
+                          <span className="text-[#8B9890] font-mono block text-[9.5px]">Last 10 Window</span>
+                          <span className="text-[#ECF1EE] font-bold font-mono text-[11.5px] block">
+                            {form.last10.metrics.wins}W · {form.last10.metrics.draws}D · {form.last10.metrics.losses}L
+                          </span>
+                          <div className="text-[#8B9890] font-mono text-[10px] flex justify-between">
+                            <span>GF: {form.last10.metrics.goalsFor} | GA: {form.last10.metrics.goalsAgainst}</span>
+                            <span className={form.last10.metrics.goalDifference >= 0 ? 'text-[#B6E63B]' : 'text-rose-400'}>
+                              GD: {form.last10.metrics.goalDifference > 0 ? `+${form.last10.metrics.goalDifference}` : form.last10.metrics.goalDifference}
+                            </span>
+                          </div>
+                          <span className="text-[#5E6A63] font-mono text-[9.5px] block">
+                            {form.last10.metrics.ppg} pts/game
+                          </span>
+                        </div>
+
+                        {/* Home Split */}
+                        <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-0.5">
+                          <span className="text-[#8B9890] font-mono block text-[9.5px]">Home Split ({form.homeSplit.matchesCount}G)</span>
+                          <span className="text-[#ECF1EE] font-mono text-[11px] font-semibold block">
+                            {form.homeSplit.wins}W · {form.homeSplit.draws}D · {form.homeSplit.losses}L
+                          </span>
+                          <span className="text-[#5E6A63] font-mono text-[9.5px] block">
+                            GF: {form.homeSplit.goalsFor} | GA: {form.homeSplit.goalsAgainst} ({form.homeSplit.ppg} PPG)
+                          </span>
+                        </div>
+
+                        {/* Away Split */}
+                        <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-0.5">
+                          <span className="text-[#8B9890] font-mono block text-[9.5px]">Away Split ({form.awaySplit.matchesCount}G)</span>
+                          <span className="text-[#ECF1EE] font-mono text-[11px] font-semibold block">
+                            {form.awaySplit.wins}W · {form.awaySplit.draws}D · {form.awaySplit.losses}L
+                          </span>
+                          <span className="text-[#5E6A63] font-mono text-[9.5px] block">
+                            GF: {form.awaySplit.goalsFor} | GA: {form.awaySplit.goalsAgainst} ({form.awaySplit.ppg} PPG)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Head-to-Head: Secondary Feature with Small Weight (Section Beneath Form) */}
+              <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.05] pb-2">
+                  <div className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-[#8B9890]" />
+                    <span className="text-[13px] font-semibold text-[#ECF1EE]">
+                      Head-to-Head (Secondary Feature with Small Weight)
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#101713] border border-white/[0.07] text-[#B6E63B]">
+                    Weight: {(formData.h2h.sampleWeight * 100).toFixed(1)}% · Bayesian Shrinkage Applied
+                  </span>
+                </div>
+
+                <p className="text-[11.5px] text-[#8B9890]">
+                  {formData.h2h.weightDescription}. Form is the primary signal; historical meetings are strictly dampened toward the general model expectation to prevent small-sample overfitting.
+                </p>
+
+                <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
+                  <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
+                    <span className="text-[10px] text-[#8B9890] block">Recent Meetings</span>
+                    <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">
+                      {formData.h2h.totalMeetings} games
+                    </span>
+                  </div>
+                  <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
+                    <span className="text-[10px] text-[#8B9890] block">Direct Head-to-Head</span>
+                    <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">
+                      {formData.h2h.winsA}W · {formData.h2h.draws}D · {formData.h2h.winsB}L
+                    </span>
+                  </div>
+                  <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
+                    <span className="text-[10px] text-[#8B9890] block">Ablation Role</span>
+                    <span className="text-[13px] font-mono font-bold text-[#B6E63B]">
+                      Secondary Prior
+                    </span>
+                  </div>
+                </div>
+
+                {formData.h2h.meetings.length > 0 && (
+                  <div className="space-y-1 pt-1.5">
+                    <span className="text-[10.5px] text-[#8B9890] font-mono block">Recent Head-to-Head Meetings</span>
+                    {formData.h2h.meetings.map((m: any, idx: number) => (
+                      <div
+                        key={m.id || idx}
+                        className="px-2.5 py-1.5 bg-[#101713] rounded-[8px] border border-white/[0.05] flex items-center justify-between text-[11px]"
+                      >
+                        <span className="text-[#8B9890] text-[10px] font-mono">
+                          {m.date ? new Date(m.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                        </span>
+                        <span className="text-[#ECF1EE] font-medium">
+                          {m.homeTeam} vs {m.awayTeam}
+                        </span>
+                        <span className="font-mono font-bold text-[#B6E63B] text-[12px]">
+                          {m.homeGoals} – {m.awayGoals}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] text-[11.5px] text-[#8B9890]">
+              Stored match history unavailable for these clubs.
             </div>
-          </div>
+          )}
         </div>
       )}
 

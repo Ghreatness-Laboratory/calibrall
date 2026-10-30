@@ -1,7 +1,11 @@
+import { lookupTeamStrength } from './teamDatabase';
+
 // CALIBRALL: Backfill Catalog, Timezone Parser & Idempotent ID Utility
 
 export const DIVISION_MAP: Record<string, string> = {
   PL: 'E0',
+  ELC: 'E1',
+  E2: 'E2',
   PD: 'SP1',
   BL1: 'D1',
   SA: 'I1',
@@ -44,6 +48,8 @@ export function generateBackfillCallList(baseUrl: string = 'https://calibrall.ve
 
   const euroLeagues = [
     { code: 'PL', name: 'Premier League' },
+    { code: 'ELC', name: 'English Championship' },
+    { code: 'E2', name: 'English League One' },
     { code: 'PD', name: 'La Liga' },
     { code: 'BL1', name: 'Bundesliga' },
     { code: 'SA', name: 'Serie A' },
@@ -178,16 +184,20 @@ export function parseBrazilCsvDate(dateStr: string): string | null {
   return `${year}-${month}-${day}`;
 }
 
-/**
- * Creates canonical team identity from the CSV itself:
- * One canonical team per league and CSV name.
- * Attack/defense ratings, discipline, and sample_matches are left NULL until computed.
- * crest_url is left NULL (no made-up URLs).
- */
 export function getCanonicalTeamForCsv(league: string, rawCsvName: string) {
   const cleanName = rawCsvName.trim();
+  const lookup = lookupTeamStrength(cleanName);
+  if (lookup.found && lookup.data) {
+    return {
+      id: lookup.data.id,
+      name: lookup.data.name,
+      shortName: lookup.data.shortName,
+      competitionCode: league,
+    };
+  }
   const sanitized = sanitizeRawTeamForId(cleanName);
-  const canonicalId = `team_${league.toLowerCase()}_${sanitized}`;
+  // Shared team identity without division prefix so promoted/relegated clubs share match history
+  const canonicalId = `team_${sanitized}`;
   return {
     id: canonicalId,
     name: cleanName,

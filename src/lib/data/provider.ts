@@ -19,6 +19,7 @@ import { lookupTeamStrength } from './teamDatabase';
 import { displayName, getTeamAbbreviation } from '../utils/formatText';
 import { validateFixtureIntegrity } from './fixtureIntegrity';
 import { supabase, isSupabaseConfigured, assertPersistenceConfigured } from '@/lib/supabase/client';
+import { matchesStore } from './matchesStore';
 
 export interface ProviderHealth {
   providerName: string;
@@ -66,6 +67,7 @@ export function americanToDecimalOdds(val: string | number | undefined | null): 
 // Mapping of supported European league codes to ESPN soccer slugs
 const ESPN_LEAGUE_MAP: Record<string, { slug: string; name: string; country: string; defaultMatchday: number }> = {
   PL: { slug: 'eng.1', name: 'Premier League', country: 'England', defaultMatchday: 9 },
+  ELC: { slug: 'eng.2', name: 'Championship', country: 'England', defaultMatchday: 12 },
   PD: { slug: 'esp.1', name: 'La Liga', country: 'Spain', defaultMatchday: 10 },
   BL1: { slug: 'ger.1', name: 'Bundesliga', country: 'Germany', defaultMatchday: 8 },
   SA: { slug: 'ita.1', name: 'Serie A', country: 'Italy', defaultMatchday: 9 },
@@ -92,6 +94,13 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture {
 
   const homeLookup = lookupTeamStrength(m.homeTeam);
   const awayLookup = lookupTeamStrength(m.awayTeam);
+
+  if (!homeLookup.found && m.homeTeam?.name) {
+    matchesStore.recordUnmappedFixtureName(m.homeTeam.name, 'Football-Data.org');
+  }
+  if (!awayLookup.found && m.awayTeam?.name) {
+    matchesStore.recordUnmappedFixtureName(m.awayTeam.name, 'Football-Data.org');
+  }
 
   const homeTeam: Team = {
     id: homeLookup.data?.id || `team_${m.homeTeam?.id || m.homeTeam?.name?.toLowerCase().replace(/\s+/g, '_')}`,
@@ -176,6 +185,13 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture {
   const homeLookup = lookupTeamStrength(home);
   const awayLookup = lookupTeamStrength(away);
 
+  if (!homeLookup.found && home.name) {
+    matchesStore.recordUnmappedFixtureName(home.name, 'Sportmonks');
+  }
+  if (!awayLookup.found && away.name) {
+    matchesStore.recordUnmappedFixtureName(away.name, 'Sportmonks');
+  }
+
   const homeTeam: Team = {
     id: homeLookup.data?.id || `team_${home.id || 'home'}`,
     name: home.name || 'Home Team',
@@ -250,6 +266,15 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
 
   const homeLookup = lookupTeamStrength(homeComp.team);
   const awayLookup = lookupTeamStrength(awayComp.team);
+
+  if (!homeLookup.found) {
+    const rawName = homeComp.team?.name || homeComp.team?.displayName || 'Unknown';
+    matchesStore.recordUnmappedFixtureName(rawName, 'ESPN Scoreboard');
+  }
+  if (!awayLookup.found) {
+    const rawName = awayComp.team?.name || awayComp.team?.displayName || 'Unknown';
+    matchesStore.recordUnmappedFixtureName(rawName, 'ESPN Scoreboard');
+  }
 
   // Crest validation: use provider's verified team logo URL, with database fallback
   const homeProviderLogo = homeComp.team?.logo || homeComp.team?.logos?.[0]?.href;

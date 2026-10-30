@@ -875,6 +875,659 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     sampleMatches: 22,
     aliases: ['nottingham forest fc', 'nottingham forest', "nott'm forest", 'nottm forest', 'forest', 'nfo', 'team_nottinghamforest', 'team_nottingham_forest'],
   },
+  manunited: {
+    id: 'team_manunited',
+    name: 'Manchester United FC',
+    shortName: 'Man United',
+    tla: 'MUN',
+    crestUrl: 'https://crests.football-data.org/66.png',
+    competitionCode: 'PL',
+    attackRating: 1.25,
+    defenseRating: 1.10,
+    cornerAttackRating: 1.20,
+    disciplineRating: 1.05,
+    recentForm: ['W', 'D', 'L', 'W', 'D'],
+    sampleMatches: 24,
+    aliases: ['manchester united fc', 'manchester united', 'man united', 'man utd', 'man u', 'mun'],
+  },
+  everton: {
+    id: 'team_everton',
+    name: 'Everton FC',
+    shortName: 'Everton',
+    tla: 'EVE',
+    crestUrl: 'https://crests.football-data.org/62.png',
+    competitionCode: 'PL',
+    attackRating: 1.05,
+    defenseRating: 1.08,
+    cornerAttackRating: 1.08,
+    disciplineRating: 1.02,
+    recentForm: ['D', 'W', 'D', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['everton fc', 'everton', 'eve'],
+  },
+  brighton: {
+    id: 'team_brighton',
+    name: 'Brighton & Hove Albion FC',
+    shortName: 'Brighton',
+    tla: 'BHA',
+    crestUrl: 'https://crests.football-data.org/397.png',
+    competitionCode: 'PL',
+    attackRating: 1.28,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.25,
+    disciplineRating: 0.95,
+    recentForm: ['W', 'W', 'L', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['brighton & hove albion fc', 'brighton & hove albion', 'brighton and hove albion', 'brighton', 'bha'],
+  },
+  westham: {
+    id: 'team_westham',
+    name: 'West Ham United FC',
+    shortName: 'West Ham',
+    tla: 'WHU',
+    crestUrl: 'https://crests.football-data.org/563.png',
+    competitionCode: 'PL',
+    attackRating: 1.18,
+    defenseRating: 1.25,
+    cornerAttackRating: 1.15,
+    disciplineRating: 1.10,
+    recentForm: ['W', 'L', 'D', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['west ham united fc', 'west ham united', 'west ham', 'whu'],
+  },
+  wolves: {
+    id: 'team_wolves',
+    name: 'Wolverhampton Wanderers FC',
+    shortName: 'Wolves',
+    tla: 'WOL',
+    crestUrl: 'https://crests.football-data.org/76.png',
+    competitionCode: 'PL',
+    attackRating: 1.05,
+    defenseRating: 1.30,
+    cornerAttackRating: 1.02,
+    disciplineRating: 1.15,
+    recentForm: ['L', 'L', 'D', 'L', 'L'],
+    sampleMatches: 22,
+    aliases: ['wolverhampton wanderers fc', 'wolverhampton wanderers', 'wolverhampton', 'wolves', 'wol'],
+  },
+  fulham: {
+    id: 'team_fulham',
+    name: 'Fulham FC',
+    shortName: 'Fulham',
+    tla: 'FUL',
+    crestUrl: 'https://crests.football-data.org/63.png',
+    competitionCode: 'PL',
+    attackRating: 1.18,
+    defenseRating: 1.12,
+    cornerAttackRating: 1.15,
+    disciplineRating: 0.98,
+    recentForm: ['L', 'L', 'W', 'W', 'D'],
+    sampleMatches: 22,
+    aliases: ['fulham fc', 'fulham', 'ful'],
+  },
+  bournemouth: {
+    id: 'team_bournemouth',
+    name: 'AFC Bournemouth',
+    shortName: 'Bournemouth',
+    tla: 'BOU',
+    crestUrl: 'https://crests.football-data.org/1044.png',
+    competitionCode: 'PL',
+    attackRating: 1.16,
+    defenseRating: 1.14,
+    cornerAttackRating: 1.22,
+    disciplineRating: 1.12,
+    recentForm: ['W', 'L', 'W', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['afc bournemouth', 'bournemouth', 'bou'],
+  },
+  leicester: {
+    id: 'team_leicester',
+    name: 'Leicester City FC',
+    shortName: 'Leicester',
+    tla: 'LEI',
+    crestUrl: 'https://crests.football-data.org/338.png',
+    competitionCode: 'PL',
+    attackRating: 1.08,
+    defenseRating: 1.28,
+    cornerAttackRating: 1.05,
+    disciplineRating: 1.05,
+    recentForm: ['L', 'W', 'W', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['leicester city fc', 'leicester city', 'leicester', 'lei'],
+  },
+  ipswich: {
+    id: 'team_ipswich',
+    name: 'Ipswich Town FC',
+    shortName: 'Ipswich',
+    tla: 'IPS',
+    crestUrl: 'https://crests.football-data.org/349.png',
+    competitionCode: 'PL',
+    attackRating: 1.02,
+    defenseRating: 1.35,
+    cornerAttackRating: 1.02,
+    disciplineRating: 1.10,
+    recentForm: ['L', 'L', 'D', 'D', 'D'],
+    sampleMatches: 22,
+    aliases: ['ipswich town fc', 'ipswich town', 'ipswich', 'ips'],
+  },
+  southampton: {
+    id: 'team_southampton',
+    name: 'Southampton FC',
+    shortName: 'Southampton',
+    tla: 'SOU',
+    crestUrl: 'https://crests.football-data.org/340.png',
+    competitionCode: 'PL',
+    attackRating: 0.98,
+    defenseRating: 1.38,
+    cornerAttackRating: 1.08,
+    disciplineRating: 1.08,
+    recentForm: ['L', 'L', 'L', 'D', 'L'],
+    sampleMatches: 22,
+    aliases: ['southampton fc', 'southampton', 'saints', 'sou'],
+  },
+
+  // ==========================================
+  // ENGLISH CHAMPIONSHIP (ELC / E1)
+  // ==========================================
+  burnley: {
+    id: 'team_burnley',
+    name: 'Burnley FC',
+    shortName: 'Burnley',
+    tla: 'BUR',
+    crestUrl: 'https://crests.football-data.org/328.png',
+    competitionCode: 'ELC',
+    attackRating: 1.18,
+    defenseRating: 0.82,
+    cornerAttackRating: 1.15,
+    disciplineRating: 0.95,
+    recentForm: ['W', 'D', 'D', 'W', 'W'],
+    sampleMatches: 22,
+    aliases: ['burnley fc', 'burnley', 'bur'],
+  },
+  luton: {
+    id: 'team_luton',
+    name: 'Luton Town FC',
+    shortName: 'Luton Town',
+    tla: 'LUT',
+    crestUrl: 'https://crests.football-data.org/389.png',
+    competitionCode: 'ELC',
+    attackRating: 1.08,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.20,
+    disciplineRating: 1.05,
+    recentForm: ['L', 'W', 'L', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['luton town fc', 'luton town', 'luton', 'lut'],
+  },
+  sheffieldunited: {
+    id: 'team_sheffieldunited',
+    name: 'Sheffield United FC',
+    shortName: 'Sheffield Utd',
+    tla: 'SHU',
+    crestUrl: 'https://crests.football-data.org/356.png',
+    competitionCode: 'ELC',
+    attackRating: 1.15,
+    defenseRating: 0.78,
+    cornerAttackRating: 1.18,
+    disciplineRating: 1.10,
+    recentForm: ['W', 'W', 'W', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['sheffield united fc', 'sheffield united', 'sheffield utd', 'sheffield u', 'shu'],
+  },
+  leeds: {
+    id: 'team_leeds',
+    name: 'Leeds United FC',
+    shortName: 'Leeds',
+    tla: 'LEE',
+    crestUrl: 'https://crests.football-data.org/341.png',
+    competitionCode: 'ELC',
+    attackRating: 1.32,
+    defenseRating: 0.88,
+    cornerAttackRating: 1.30,
+    disciplineRating: 1.05,
+    recentForm: ['W', 'W', 'D', 'W', 'D'],
+    sampleMatches: 24,
+    aliases: ['leeds united fc', 'leeds united', 'leeds', 'lee'],
+  },
+  westbrom: {
+    id: 'team_westbrom',
+    name: 'West Bromwich Albion FC',
+    shortName: 'West Brom',
+    tla: 'WBA',
+    crestUrl: 'https://crests.football-data.org/74.png',
+    competitionCode: 'ELC',
+    attackRating: 1.12,
+    defenseRating: 0.95,
+    cornerAttackRating: 1.12,
+    disciplineRating: 1.00,
+    recentForm: ['D', 'D', 'L', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['west bromwich albion fc', 'west bromwich albion', 'west brom', 'wba'],
+  },
+  norwich: {
+    id: 'team_norwich',
+    name: 'Norwich City FC',
+    shortName: 'Norwich',
+    tla: 'NOR',
+    crestUrl: 'https://crests.football-data.org/68.png',
+    competitionCode: 'ELC',
+    attackRating: 1.20,
+    defenseRating: 1.08,
+    cornerAttackRating: 1.15,
+    disciplineRating: 0.95,
+    recentForm: ['D', 'D', 'W', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['norwich city fc', 'norwich city', 'norwich', 'nor'],
+  },
+  coventry: {
+    id: 'team_coventry',
+    name: 'Coventry City FC',
+    shortName: 'Coventry',
+    tla: 'COV',
+    crestUrl: 'https://crests.football-data.org/1076.png',
+    competitionCode: 'ELC',
+    attackRating: 1.14,
+    defenseRating: 1.12,
+    cornerAttackRating: 1.20,
+    disciplineRating: 0.98,
+    recentForm: ['W', 'L', 'L', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['coventry city fc', 'coventry city', 'coventry', 'cov'],
+  },
+  middlesbrough: {
+    id: 'team_middlesbrough',
+    name: 'Middlesbrough FC',
+    shortName: 'Middlesbrough',
+    tla: 'MID',
+    crestUrl: 'https://crests.football-data.org/343.png',
+    competitionCode: 'ELC',
+    attackRating: 1.16,
+    defenseRating: 1.02,
+    cornerAttackRating: 1.22,
+    disciplineRating: 1.02,
+    recentForm: ['W', 'L', 'L', 'W', 'W'],
+    sampleMatches: 22,
+    aliases: ['middlesbrough fc', 'middlesbrough', 'boro', 'mid'],
+  },
+  preston: {
+    id: 'team_preston',
+    name: 'Preston North End FC',
+    shortName: 'Preston',
+    tla: 'PNE',
+    crestUrl: 'https://crests.football-data.org/1081.png',
+    competitionCode: 'ELC',
+    attackRating: 0.98,
+    defenseRating: 1.12,
+    cornerAttackRating: 1.05,
+    disciplineRating: 1.08,
+    recentForm: ['D', 'W', 'D', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['preston north end fc', 'preston north end', 'preston', 'pne'],
+  },
+  bristolcity: {
+    id: 'team_bristolcity',
+    name: 'Bristol City FC',
+    shortName: 'Bristol City',
+    tla: 'BRC',
+    crestUrl: 'https://crests.football-data.org/387.png',
+    competitionCode: 'ELC',
+    attackRating: 1.06,
+    defenseRating: 1.02,
+    cornerAttackRating: 1.10,
+    disciplineRating: 1.02,
+    recentForm: ['D', 'D', 'W', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['bristol city fc', 'bristol city', 'bristol c', 'brc'],
+  },
+  cardiff: {
+    id: 'team_cardiff',
+    name: 'Cardiff City FC',
+    shortName: 'Cardiff',
+    tla: 'CAR',
+    crestUrl: 'https://crests.football-data.org/315.png',
+    competitionCode: 'ELC',
+    attackRating: 0.98,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.05,
+    disciplineRating: 1.05,
+    recentForm: ['W', 'D', 'W', 'W', 'D'],
+    sampleMatches: 22,
+    aliases: ['cardiff city fc', 'cardiff city', 'cardiff', 'car'],
+  },
+  millwall: {
+    id: 'team_millwall',
+    name: 'Millwall FC',
+    shortName: 'Millwall',
+    tla: 'MIL',
+    crestUrl: 'https://crests.football-data.org/384.png',
+    competitionCode: 'ELC',
+    attackRating: 1.04,
+    defenseRating: 1.02,
+    cornerAttackRating: 1.12,
+    disciplineRating: 1.12,
+    recentForm: ['W', 'W', 'D', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['millwall fc', 'millwall'],
+  },
+  swansea: {
+    id: 'team_swansea',
+    name: 'Swansea City AFC',
+    shortName: 'Swansea',
+    tla: 'SWA',
+    crestUrl: 'https://crests.football-data.org/72.png',
+    competitionCode: 'ELC',
+    attackRating: 1.02,
+    defenseRating: 1.04,
+    cornerAttackRating: 1.08,
+    disciplineRating: 0.95,
+    recentForm: ['L', 'D', 'L', 'D', 'D'],
+    sampleMatches: 22,
+    aliases: ['swansea city afc', 'swansea city', 'swansea', 'swa'],
+  },
+  watford: {
+    id: 'team_watford',
+    name: 'Watford FC',
+    shortName: 'Watford',
+    tla: 'WAT',
+    crestUrl: 'https://crests.football-data.org/346.png',
+    competitionCode: 'ELC',
+    attackRating: 1.14,
+    defenseRating: 1.14,
+    cornerAttackRating: 1.10,
+    disciplineRating: 1.08,
+    recentForm: ['W', 'L', 'W', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['watford fc', 'watford', 'wat'],
+  },
+  sunderland: {
+    id: 'team_sunderland',
+    name: 'Sunderland AFC',
+    shortName: 'Sunderland',
+    tla: 'SUN',
+    crestUrl: 'https://crests.football-data.org/71.png',
+    competitionCode: 'ELC',
+    attackRating: 1.25,
+    defenseRating: 0.88,
+    cornerAttackRating: 1.20,
+    disciplineRating: 1.05,
+    recentForm: ['W', 'W', 'W', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['sunderland afc', 'sunderland', 'sun'],
+  },
+  stokecity: {
+    id: 'team_stokecity',
+    name: 'Stoke City FC',
+    shortName: 'Stoke',
+    tla: 'STK',
+    crestUrl: 'https://crests.football-data.org/70.png',
+    competitionCode: 'ELC',
+    attackRating: 1.04,
+    defenseRating: 1.10,
+    cornerAttackRating: 1.12,
+    disciplineRating: 1.10,
+    recentForm: ['D', 'D', 'D', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['stoke city fc', 'stoke city', 'stoke', 'stk'],
+  },
+  qpr: {
+    id: 'team_qpr',
+    name: 'Queens Park Rangers FC',
+    shortName: 'QPR',
+    tla: 'QPR',
+    crestUrl: 'https://crests.football-data.org/340.png',
+    competitionCode: 'ELC',
+    attackRating: 1.00,
+    defenseRating: 1.16,
+    cornerAttackRating: 1.08,
+    disciplineRating: 1.04,
+    recentForm: ['D', 'L', 'L', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['queens park rangers fc', 'queens park rangers', 'qpr'],
+  },
+  blackburn: {
+    id: 'team_blackburn',
+    name: 'Blackburn Rovers FC',
+    shortName: 'Blackburn',
+    tla: 'ROV',
+    crestUrl: 'https://crests.football-data.org/59.png',
+    competitionCode: 'ELC',
+    attackRating: 1.12,
+    defenseRating: 1.06,
+    cornerAttackRating: 1.14,
+    disciplineRating: 1.06,
+    recentForm: ['L', 'W', 'L', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['blackburn rovers fc', 'blackburn rovers', 'blackburn', 'blk', 'rov'],
+  },
+  sheffieldwednesday: {
+    id: 'team_sheffieldwednesday',
+    name: 'Sheffield Wednesday FC',
+    shortName: 'Sheffield Weds',
+    tla: 'SHW',
+    crestUrl: 'https://crests.football-data.org/345.png',
+    competitionCode: 'ELC',
+    attackRating: 1.05,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.06,
+    disciplineRating: 1.08,
+    recentForm: ['L', 'D', 'W', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['sheffield wednesday fc', 'sheffield wednesday', 'sheffield weds', 'sheff weds', 'shw'],
+  },
+  plymouth: {
+    id: 'team_plymouth',
+    name: 'Plymouth Argyle FC',
+    shortName: 'Plymouth',
+    tla: 'PLY',
+    crestUrl: 'https://crests.football-data.org/1138.png',
+    competitionCode: 'ELC',
+    attackRating: 1.02,
+    defenseRating: 1.25,
+    cornerAttackRating: 1.05,
+    disciplineRating: 1.00,
+    recentForm: ['D', 'L', 'W', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['plymouth argyle fc', 'plymouth argyle', 'plymouth', 'ply'],
+  },
+  portsmouth: {
+    id: 'team_portsmouth',
+    name: 'Portsmouth FC',
+    shortName: 'Portsmouth',
+    tla: 'POR',
+    crestUrl: 'https://crests.football-data.org/325.png',
+    competitionCode: 'ELC',
+    attackRating: 1.02,
+    defenseRating: 1.22,
+    cornerAttackRating: 1.08,
+    disciplineRating: 1.04,
+    recentForm: ['L', 'W', 'D', 'L', 'L'],
+    sampleMatches: 22,
+    aliases: ['portsmouth fc', 'portsmouth', 'pompey', 'por'],
+  },
+  derby: {
+    id: 'team_derby',
+    name: 'Derby County FC',
+    shortName: 'Derby',
+    tla: 'DER',
+    crestUrl: 'https://crests.football-data.org/342.png',
+    competitionCode: 'ELC',
+    attackRating: 1.05,
+    defenseRating: 1.10,
+    cornerAttackRating: 1.06,
+    disciplineRating: 1.06,
+    recentForm: ['D', 'D', 'L', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['derby county fc', 'derby county', 'derby', 'der'],
+  },
+  oxford: {
+    id: 'team_oxford',
+    name: 'Oxford United FC',
+    shortName: 'Oxford Utd',
+    tla: 'OXF',
+    crestUrl: 'https://crests.football-data.org/1082.png',
+    competitionCode: 'ELC',
+    attackRating: 1.04,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.04,
+    disciplineRating: 1.02,
+    recentForm: ['D', 'D', 'D', 'D', 'D'],
+    sampleMatches: 22,
+    aliases: ['oxford united fc', 'oxford united', 'oxford utd', 'oxford', 'oxf'],
+  },
+
+  // ==========================================
+  // ENGLISH LEAGUE ONE & PROMOTED CLUBS (E2)
+  // ==========================================
+  birmingham: {
+    id: 'team_birmingham',
+    name: 'Birmingham City FC',
+    shortName: 'Birmingham',
+    tla: 'BIR',
+    crestUrl: 'https://crests.football-data.org/332.png',
+    competitionCode: 'E2',
+    attackRating: 1.22,
+    defenseRating: 0.90,
+    cornerAttackRating: 1.25,
+    disciplineRating: 1.00,
+    recentForm: ['W', 'W', 'W', 'W', 'D'],
+    sampleMatches: 22,
+    aliases: ['birmingham city fc', 'birmingham city', 'birmingham', 'bir'],
+  },
+  bolton: {
+    id: 'team_bolton',
+    name: 'Bolton Wanderers FC',
+    shortName: 'Bolton',
+    tla: 'BOL',
+    crestUrl: 'https://crests.football-data.org/62.png',
+    competitionCode: 'E2',
+    attackRating: 1.15,
+    defenseRating: 1.05,
+    cornerAttackRating: 1.15,
+    disciplineRating: 1.02,
+    recentForm: ['W', 'D', 'W', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['bolton wanderers fc', 'bolton wanderers', 'bolton'],
+  },
+  wrexham: {
+    id: 'team_wrexham',
+    name: 'Wrexham AFC',
+    shortName: 'Wrexham',
+    tla: 'WXM',
+    crestUrl: 'https://crests.football-data.org/1085.png',
+    competitionCode: 'E2',
+    attackRating: 1.18,
+    defenseRating: 0.95,
+    cornerAttackRating: 1.18,
+    disciplineRating: 0.98,
+    recentForm: ['W', 'D', 'W', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['wrexham afc', 'wrexham', 'wxm'],
+  },
+  lincoln: {
+    id: 'team_lincoln',
+    name: 'Lincoln City FC',
+    shortName: 'Lincoln',
+    tla: 'LCN',
+    crestUrl: 'https://crests.football-data.org/1083.png',
+    competitionCode: 'E2',
+    attackRating: 1.08,
+    defenseRating: 1.02,
+    cornerAttackRating: 1.10,
+    disciplineRating: 1.04,
+    recentForm: ['W', 'D', 'W', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['lincoln city fc', 'lincoln city', 'lincoln', 'lcn'],
+  },
+  charlton: {
+    id: 'team_charlton',
+    name: 'Charlton Athletic FC',
+    shortName: 'Charlton',
+    tla: 'CHA',
+    crestUrl: 'https://crests.football-data.org/348.png',
+    competitionCode: 'E2',
+    attackRating: 1.10,
+    defenseRating: 1.06,
+    cornerAttackRating: 1.12,
+    disciplineRating: 1.06,
+    recentForm: ['D', 'D', 'W', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['charlton athletic fc', 'charlton athletic', 'charlton', 'cha'],
+  },
+  huddersfield: {
+    id: 'team_huddersfield',
+    name: 'Huddersfield Town FC',
+    shortName: 'Huddersfield',
+    tla: 'HUD',
+    crestUrl: 'https://crests.football-data.org/394.png',
+    competitionCode: 'E2',
+    attackRating: 1.12,
+    defenseRating: 1.05,
+    cornerAttackRating: 1.12,
+    disciplineRating: 1.02,
+    recentForm: ['W', 'W', 'D', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['huddersfield town fc', 'huddersfield town', 'huddersfield', 'hud'],
+  },
+  rotherham: {
+    id: 'team_rotherham',
+    name: 'Rotherham United FC',
+    shortName: 'Rotherham',
+    tla: 'ROT',
+    crestUrl: 'https://crests.football-data.org/385.png',
+    competitionCode: 'E2',
+    attackRating: 1.02,
+    defenseRating: 1.12,
+    cornerAttackRating: 1.06,
+    disciplineRating: 1.08,
+    recentForm: ['L', 'D', 'L', 'W', 'W'],
+    sampleMatches: 22,
+    aliases: ['rotherham united fc', 'rotherham united', 'rotherham', 'rot'],
+  },
+  blackpool: {
+    id: 'team_blackpool',
+    name: 'Blackpool FC',
+    shortName: 'Blackpool',
+    tla: 'BLA',
+    crestUrl: 'https://crests.football-data.org/336.png',
+    competitionCode: 'E2',
+    attackRating: 1.14,
+    defenseRating: 1.10,
+    cornerAttackRating: 1.15,
+    disciplineRating: 1.05,
+    recentForm: ['L', 'L', 'L', 'W', 'W'],
+    sampleMatches: 22,
+    aliases: ['blackpool fc', 'blackpool', 'bla'],
+  },
+  reading: {
+    id: 'team_reading',
+    name: 'Reading FC',
+    shortName: 'Reading',
+    tla: 'REA',
+    crestUrl: 'https://crests.football-data.org/355.png',
+    competitionCode: 'E2',
+    attackRating: 1.15,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.12,
+    disciplineRating: 1.00,
+    recentForm: ['W', 'W', 'W', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['reading fc', 'reading', 'rea'],
+  },
+  wigan: {
+    id: 'team_wigan',
+    name: 'Wigan Athletic FC',
+    shortName: 'Wigan',
+    tla: 'WIG',
+    crestUrl: 'https://crests.football-data.org/367.png',
+    competitionCode: 'E2',
+    attackRating: 0.98,
+    defenseRating: 0.95,
+    cornerAttackRating: 1.05,
+    disciplineRating: 1.02,
+    recentForm: ['L', 'L', 'D', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['wigan athletic fc', 'wigan athletic', 'wigan', 'wig'],
+  },
 
   // ==========================================
   // SERIE A (ITALY)
@@ -952,7 +1605,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     disciplineRating: 1.08,
     recentForm: ['W', 'L', 'W', 'W', 'L'],
     sampleMatches: 22,
-    aliases: ['ac milan', 'milan', 'mil'],
+    aliases: ['ac milan', 'milan'],
   },
   atalanta: {
     id: 'team_atalanta',
@@ -1087,7 +1740,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     disciplineRating: 1.02,
     recentForm: ['D', 'D', 'W', 'D', 'L'],
     sampleMatches: 114,
-    aliases: ['bologna fc 1909', 'bologna fc', 'bologna', 'bol'],
+    aliases: ['bologna fc 1909', 'bologna fc', 'bologna'],
   },
   udinese: {
     id: 'team_udinese',
@@ -1828,8 +2481,16 @@ export const COMPETITION_CLUBS: Record<string, string[]> = {
     'team_mancity', 'team_arsenal', 'team_liverpool', 'team_chelsea', 'team_tottenham',
     'team_astonvilla', 'team_manunited', 'team_newcastle', 'team_brighton', 'team_westham',
     'team_brentford', 'team_fulham', 'team_bournemouth', 'team_crystalpalace', 'team_wolves',
-    'team_everton', 'team_nottinghamforest', 'team_leicester', 'team_ipswich', 'team_southampton',
-    'team_luton', 'team_burnley', 'team_sheffieldunited', 'team_hull'
+    'team_everton', 'team_nottinghamforest', 'team_leicester', 'team_ipswich', 'team_southampton'
+  ],
+  ELC: [
+    'team_burnley', 'team_luton', 'team_sheffieldunited', 'team_leeds', 'team_westbrom',
+    'team_norwich', 'team_hull', 'team_coventry', 'team_middlesbrough', 'team_preston',
+    'team_bristolcity', 'team_cardiff', 'team_millwall', 'team_swansea', 'team_watford',
+    'team_sunderland', 'team_stokecity', 'team_qpr', 'team_blackburn', 'team_sheffieldwednesday',
+    'team_plymouth', 'team_portsmouth', 'team_derby', 'team_oxford',
+    'team_birmingham', 'team_bolton', 'team_wrexham', 'team_lincoln', 'team_charlton',
+    'team_rotherham', 'team_huddersfield', 'team_blackpool', 'team_wigan', 'team_reading'
   ],
   PD: [
     'team_realmadrid', 'team_barcelona', 'team_atletico', 'team_athletic', 'team_realsociedad',
@@ -1873,29 +2534,23 @@ export const COMPETITION_CLUBS: Record<string, string[]> = {
 };
 
 /**
- * Normalizes any string representation of a team name for fuzzy lookup.
- * Strips noise words, accents, punctuation, and leading club acronyms.
+ * Normalizes a team lookup key strictly without stripping prefixes, suffixes, or words.
+ * Strips accents, lowercases, trims, and strips non-alphanumeric punctuation.
  */
 export function normalizeTeamLookupKey(raw: string): string {
   if (!raw) return '';
-  let str = raw
+  return raw
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, ''); // strip accents
-
-  // Strip common team prefixes
-  str = str.replace(/^(1\.\s*fsv|1\.\s*fc|1\.\s*|fc|cf|sc|sv|afc|as|us|ec|sbv|tsg\s*1899|tsg|ac|ss)\s+/g, '');
-  // Strip common suffixes
-  str = str.replace(/\s+(fc|cf|cfc|osc|city|united|rotterdam|eindhoven|nijmegen|munchen|münchen|04|05|07|1846|1848|1899|29)$/g, '');
-  // Strip non-alphanumeric
-  str = str.replace(/[^a-z0-9]/g, '');
-  return str;
+    .replace(/[\u0300-\u036f]/g, '') // strip accents
+    .replace(/[^a-z0-9]/g, '');      // strip non-alphanumeric characters (spaces, punctuation)
 }
 
 /**
- * Intelligent team strength lookup.
- * Returns found = true and genuine team data if verified.
- * Returns found = false if team is truly missing from inputs (enforces Rule 2).
+ * Exact, normalized team strength lookup.
+ * NO prefix stripping, NO substring / "includes" matching, NO blind TLA matching.
+ * Resolves ONLY through exact canonical IDs or exact normalized aliases.
+ * If there is no exact match, returns found = false (team stays unmapped).
  */
 export function lookupTeamStrength(
   teamIdentifier: { id?: string | number; name?: string; shortName?: string; tla?: string } | string
@@ -1910,62 +2565,38 @@ export function lookupTeamStrength(
   const rawId = typeof teamIdentifier === 'object' && teamIdentifier.id !== undefined && teamIdentifier.id !== null
     ? String(teamIdentifier.id)
     : '';
-  const rawTla = typeof teamIdentifier === 'object' && teamIdentifier.tla !== undefined && teamIdentifier.tla !== null
-    ? String(teamIdentifier.tla)
-    : '';
 
-  // 1. Direct ID match & normalized ID match
+  // 1. Exact ID match
   const cleanId = rawId.replace(/^team_/, '').toLowerCase();
   if (cleanId && TEAM_STRENGTH_DATABASE[cleanId]) {
     return { found: true, data: TEAM_STRENGTH_DATABASE[cleanId] };
   }
-  // Try stripping league prefix (e.g. team_pd_villarreal -> villarreal, team_bl1_m_gladbach -> m_gladbach)
-  const strippedLeague = cleanId.replace(/^(pl|pd|bl1|sa|fl1|ded|bsa)_/, '');
-  if (strippedLeague && TEAM_STRENGTH_DATABASE[strippedLeague]) {
-    return { found: true, data: TEAM_STRENGTH_DATABASE[strippedLeague] };
-  }
-  // Match without underscores
-  const noUnderscore = cleanId.replace(/_/g, '');
-  const noUnderscoreLeague = strippedLeague.replace(/_/g, '');
-  for (const [key, record] of Object.entries(TEAM_STRENGTH_DATABASE)) {
-    const keyClean = key.replace(/_/g, '');
-    const recIdClean = record.id.replace(/^team_/, '').replace(/_/g, '').toLowerCase();
-    if (keyClean === noUnderscore || keyClean === noUnderscoreLeague || recIdClean === noUnderscore || recIdClean === noUnderscoreLeague) {
+  for (const record of Object.values(TEAM_STRENGTH_DATABASE)) {
+    if (record.id === rawId || record.id.toLowerCase() === `team_${cleanId}`) {
       return { found: true, data: record };
     }
   }
 
-  // 2. Direct TLA match (when TLA is specific)
-  if (rawTla && rawTla !== 'HOM' && rawTla !== 'AWY') {
-    const matchByTla = Object.values(TEAM_STRENGTH_DATABASE).find(
-      t => t.tla.toUpperCase() === rawTla.toUpperCase()
-    );
-    if (matchByTla) {
-      return { found: true, data: matchByTla };
-    }
-  }
-
-  // 3. Exact alias or name match
+  // 2. Exact alias or name match (case-insensitive and exact normalized key)
   const targetNorm = normalizeTeamLookupKey(rawName);
   const targetLower = rawName.toLowerCase().trim();
 
+  if (!targetNorm) {
+    return { found: false, data: null };
+  }
+
   for (const record of Object.values(TEAM_STRENGTH_DATABASE)) {
-    if (record.name.toLowerCase() === targetLower || record.shortName.toLowerCase() === targetLower) {
+    if (record.name.toLowerCase().trim() === targetLower || record.shortName.toLowerCase().trim() === targetLower) {
       return { found: true, data: record };
     }
-    if (record.aliases.some(a => a === targetLower || normalizeTeamLookupKey(a) === targetNorm)) {
+    if (normalizeTeamLookupKey(record.name) === targetNorm || normalizeTeamLookupKey(record.shortName) === targetNorm) {
+      return { found: true, data: record };
+    }
+    if (record.aliases.some(a => a.toLowerCase().trim() === targetLower || normalizeTeamLookupKey(a) === targetNorm)) {
       return { found: true, data: record };
     }
   }
 
-  // 4. Normalized substring match (e.g. "fortuna sittard" matches "sittard")
-  for (const record of Object.values(TEAM_STRENGTH_DATABASE)) {
-    const recordNorm = normalizeTeamLookupKey(record.name);
-    const shortNorm = normalizeTeamLookupKey(record.shortName);
-    if (targetNorm && (targetNorm.includes(recordNorm) || recordNorm.includes(targetNorm) || targetNorm.includes(shortNorm) || shortNorm.includes(targetNorm))) {
-      return { found: true, data: record };
-    }
-  }
-
+  // No exact match -> stays unmapped (no fuzzy / substring / TLA guessing)
   return { found: false, data: null };
 }
