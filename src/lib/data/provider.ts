@@ -94,7 +94,7 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture {
   const awayLookup = lookupTeamStrength(m.awayTeam);
 
   const homeTeam: Team = {
-    id: `team_${m.homeTeam?.id || m.homeTeam?.name?.toLowerCase().replace(/\s+/g, '_')}`,
+    id: homeLookup.data?.id || `team_${m.homeTeam?.id || m.homeTeam?.name?.toLowerCase().replace(/\s+/g, '_')}`,
     name: m.homeTeam?.name || 'Home Team',
     shortName: homeLookup.found && homeLookup.data ? homeLookup.data.shortName : displayName(m.homeTeam),
     tla: homeLookup.found && homeLookup.data ? homeLookup.data.tla : getTeamAbbreviation(m.homeTeam),
@@ -108,7 +108,7 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture {
   };
 
   const awayTeam: Team = {
-    id: `team_${m.awayTeam?.id || m.awayTeam?.name?.toLowerCase().replace(/\s+/g, '_')}`,
+    id: awayLookup.data?.id || `team_${m.awayTeam?.id || m.awayTeam?.name?.toLowerCase().replace(/\s+/g, '_')}`,
     name: m.awayTeam?.name || 'Away Team',
     shortName: awayLookup.found && awayLookup.data ? awayLookup.data.shortName : displayName(m.awayTeam),
     tla: awayLookup.found && awayLookup.data ? awayLookup.data.tla : getTeamAbbreviation(m.awayTeam),
@@ -177,7 +177,7 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture {
   const awayLookup = lookupTeamStrength(away);
 
   const homeTeam: Team = {
-    id: `team_${home.id || 'home'}`,
+    id: homeLookup.data?.id || `team_${home.id || 'home'}`,
     name: home.name || 'Home Team',
     shortName: homeLookup.found && homeLookup.data ? homeLookup.data.shortName : displayName(home),
     tla: homeLookup.found && homeLookup.data ? homeLookup.data.tla : getTeamAbbreviation(home),
@@ -191,7 +191,7 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture {
   };
 
   const awayTeam: Team = {
-    id: `team_${away.id || 'away'}`,
+    id: awayLookup.data?.id || `team_${away.id || 'away'}`,
     name: away.name || 'Away Team',
     shortName: awayLookup.found && awayLookup.data ? awayLookup.data.shortName : displayName(away),
     tla: awayLookup.found && awayLookup.data ? awayLookup.data.tla : getTeamAbbreviation(away),
@@ -256,7 +256,7 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
   const awayProviderLogo = awayComp.team?.logo || awayComp.team?.logos?.[0]?.href;
 
   const homeTeam: Team = {
-    id: `team_${homeComp.team?.id || homeComp.id || homeLookup.data?.id || 'home'}`,
+    id: homeLookup.data?.id || `team_${homeComp.team?.id || homeComp.id || 'home'}`,
     name: homeComp.team?.name || homeComp.team?.displayName || 'Home Team',
     shortName: homeLookup.found && homeLookup.data ? homeLookup.data.shortName : (homeComp.team?.shortDisplayName || homeComp.team?.name),
     tla: homeLookup.found && homeLookup.data ? homeLookup.data.tla : (homeComp.team?.abbreviation || getTeamAbbreviation(homeComp.team?.name)),
@@ -270,7 +270,7 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
   };
 
   const awayTeam: Team = {
-    id: `team_${awayComp.team?.id || awayComp.id || awayLookup.data?.id || 'away'}`,
+    id: awayLookup.data?.id || `team_${awayComp.team?.id || awayComp.id || 'away'}`,
     name: awayComp.team?.name || awayComp.team?.displayName || 'Away Team',
     shortName: awayLookup.found && awayLookup.data ? awayLookup.data.shortName : (awayComp.team?.shortDisplayName || awayComp.team?.name),
     tla: awayLookup.found && awayLookup.data ? awayLookup.data.tla : (awayComp.team?.abbreviation || getTeamAbbreviation(awayComp.team?.name)),

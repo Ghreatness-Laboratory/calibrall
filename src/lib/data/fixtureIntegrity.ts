@@ -123,13 +123,17 @@ export function validateFixtureIntegrity(
     const compCode = f.competition.code.toUpperCase();
     const authorizedClubs = COMPETITION_CLUBS[compCode];
     if (authorizedClubs && authorizedClubs.length > 0) {
+      const normalizeId = (id: string) => id.toLowerCase().replace(/^team_/, '').replace(/^(pl|pd|bl1|sa|fl1|ded|bsa)_/, '').replace(/[^a-z0-9]/g, '');
       const homeId = homeTeamLookup.data?.id || f.homeTeam.id;
       const awayId = awayTeamLookup.data?.id || f.awayTeam.id;
-      const homeComp = homeTeamLookup.data?.competitionCode || 'Unknown';
-      const awayComp = awayTeamLookup.data?.competitionCode || 'Unknown';
 
-      const homeBelongs = authorizedClubs.includes(homeId);
-      const awayBelongs = authorizedClubs.includes(awayId);
+      const homeBelongs = (homeTeamLookup.data?.competitionCode === compCode) ||
+        authorizedClubs.some(c => normalizeId(c) === normalizeId(homeId));
+      const awayBelongs = (awayTeamLookup.data?.competitionCode === compCode) ||
+        authorizedClubs.some(c => normalizeId(c) === normalizeId(awayId));
+
+      const homeComp = homeTeamLookup.data?.competitionCode || (homeBelongs ? compCode : 'Unknown');
+      const awayComp = awayTeamLookup.data?.competitionCode || (awayBelongs ? compCode : 'Unknown');
 
       if (!homeBelongs || !awayBelongs) {
         const msg = `[Integrity Check FAILED] Cross-competition league mismatch: ${f.homeTeam.name} (${homeComp}) vs ${f.awayTeam.name} (${awayComp}) in competition ${compCode} (${f.competition.name}). Fixture rejected.`;
