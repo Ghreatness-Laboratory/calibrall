@@ -788,16 +788,16 @@ export function calculateBookmakerMargin(oddsList: number[]): number {
   return Math.max(0, sumImplied - 1.0);
 }
 
-import { RiskTier, ConfidenceTier } from '@/types';
+import { isTeamNewsEnabled } from './featureFlags';
 
 /**
  * Calculates Confidence Tier according to calibrated mathematical rules (No "Safe"):
- * - HIGH: calibrated probability 75% or higher, high confidence score (>= 0.70), zero risk flags
- * - MEDIUM: calibrated probability 60-75%
+ * - HIGH: calibrated probability 75% or higher, high confidence score (>= 0.70), team news active
+ * - MEDIUM: calibrated probability 60-75% (or capped from High when team news is absent)
  * - LOW: below 60%, higher variance or speculative
  */
 export function calculateConfidenceTier(probability: number, confidenceScore: number = 0.8, edge?: number): ConfidenceTier {
-  if (probability >= 0.75 && confidenceScore >= 0.70) {
+  if (isTeamNewsEnabled() && probability >= 0.75 && confidenceScore >= 0.70) {
     return 'HIGH';
   } else if (probability >= 0.60) {
     return 'MEDIUM';
@@ -808,7 +808,7 @@ export function calculateConfidenceTier(probability: number, confidenceScore: nu
 
 export function calculateRiskTier(probability: number, confidenceScore: number = 0.8, edge?: number, legacyMode: boolean = false): RiskTier {
   if (legacyMode) {
-    if (probability >= 0.75 && confidenceScore >= 0.70) return 'SAFE';
+    if (probability >= 0.75 && confidenceScore >= 0.70) return isTeamNewsEnabled() ? 'MODERATE' : 'MODERATE';
     if (probability >= 0.60) return 'MODERATE';
     if (probability >= 0.45) return 'RISKY';
     return 'LONGSHOT';

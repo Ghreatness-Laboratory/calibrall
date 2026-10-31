@@ -9,6 +9,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { TEAM_STRENGTH_DATABASE, lookupTeamStrength, normalizeTeamLookupKey } from './teamDatabase';
 import { CHAMPIONSHIP_HISTORICAL_MATCHES } from './championshipMatchArchive';
 import { REAL_250_MATCHES } from './realMatchArchive';
+import FREE_SOURCES_MATCHES from './free_sources_matches.json';
 import { COMPETITIONS } from './seedData';
 import { displayName } from '@/lib/utils/formatText';
 
@@ -167,9 +168,51 @@ export interface DataStatusReport {
 const getGlobalMatches = (): Map<string, StoredMatch> => {
   if (!(globalThis as any).__calibrall_matches_map) {
     const map = new Map<string, StoredMatch>();
-    for (const m of CHAMPIONSHIP_HISTORICAL_MATCHES) {
-      map.set(m.provider_id, m);
+
+    // 1. Primary Free Sources matches (football-data.co.uk genuine 3+ seasons & active season)
+    if (Array.isArray(FREE_SOURCES_MATCHES)) {
+      for (const m of (FREE_SOURCES_MATCHES as any[])) {
+        map.set(m.id, {
+          id: m.id,
+          provider_id: m.provider_id,
+          competition_code: m.competition_code,
+          season: m.season,
+          matchday: null,
+          home_team_id: m.home_team_id,
+          away_team_id: m.away_team_id,
+          home_team_name: m.home_team_name,
+          away_team_name: m.away_team_name,
+          kickoff_time: m.kickoff_time,
+          status: m.status as any,
+          home_score: m.home_score,
+          away_score: m.away_score,
+          home_half_time_score: m.home_half_time_score,
+          away_half_time_score: m.away_half_time_score,
+          home_corners: m.home_corners,
+          away_corners: m.away_corners,
+          home_first_half_corners: null,
+          away_first_half_corners: null,
+          home_yellow_cards: m.home_yellow_cards,
+          away_yellow_cards: m.away_yellow_cards,
+          home_red_cards: m.home_red_cards,
+          away_red_cards: m.away_red_cards,
+          home_shots: m.home_shots,
+          away_shots: m.away_shots,
+          home_shots_on_target: m.home_shots_on_target,
+          away_shots_on_target: m.away_shots_on_target,
+          source: m.source || 'football-data.co.uk:free',
+        });
+      }
     }
+
+    // 2. Championship archive
+    for (const m of CHAMPIONSHIP_HISTORICAL_MATCHES) {
+      if (!map.has(m.provider_id)) {
+        map.set(m.provider_id, m);
+      }
+    }
+
+    // 3. Historical real archive
     for (const rm of REAL_250_MATCHES) {
       if (!map.has(rm.id)) {
         const homeLookup = lookupTeamStrength(rm.homeTeam);
@@ -214,7 +257,75 @@ const getGlobalMatches = (): Map<string, StoredMatch> => {
 // Map keyed by `${match_id}:${bookmaker}:${market_code}:${source}` for idempotent upserts
 const getGlobalOddsMap = (): Map<string, StoredOddsSnapshot> => {
   if (!(globalThis as any).__calibrall_odds_unique_map) {
-    (globalThis as any).__calibrall_odds_unique_map = new Map<string, StoredOddsSnapshot>();
+    const oMap = new Map<string, StoredOddsSnapshot>();
+    // Seed verified closing odds from free sources
+    if (Array.isArray(FREE_SOURCES_MATCHES)) {
+      for (const m of (FREE_SOURCES_MATCHES as any[])) {
+        if (m.closing_odds) {
+          if (m.closing_odds.homeWin) {
+            oMap.set(`${m.id}:ClosingConsensus:1X2_HOME:football-data.co.uk`, {
+              match_id: m.id,
+              bookmaker: 'ClosingConsensus',
+              market_code: '1X2_HOME',
+              selection: `${m.home_team_name} to win`,
+              decimal_odds: m.closing_odds.homeWin,
+              observed_at: null,
+              snapshot_type: 'csv_closing',
+              source: 'football-data.co.uk:free',
+            });
+          }
+          if (m.closing_odds.draw) {
+            oMap.set(`${m.id}:ClosingConsensus:1X2_DRAW:football-data.co.uk`, {
+              match_id: m.id,
+              bookmaker: 'ClosingConsensus',
+              market_code: '1X2_DRAW',
+              selection: 'Draw',
+              decimal_odds: m.closing_odds.draw,
+              observed_at: null,
+              snapshot_type: 'csv_closing',
+              source: 'football-data.co.uk:free',
+            });
+          }
+          if (m.closing_odds.awayWin) {
+            oMap.set(`${m.id}:ClosingConsensus:1X2_AWAY:football-data.co.uk`, {
+              match_id: m.id,
+              bookmaker: 'ClosingConsensus',
+              market_code: '1X2_AWAY',
+              selection: `${m.away_team_name} to win`,
+              decimal_odds: m.closing_odds.awayWin,
+              observed_at: null,
+              snapshot_type: 'csv_closing',
+              source: 'football-data.co.uk:free',
+            });
+          }
+          if (m.closing_odds.over25) {
+            oMap.set(`${m.id}:ClosingConsensus:TOTAL_GOALS_O25:football-data.co.uk`, {
+              match_id: m.id,
+              bookmaker: 'ClosingConsensus',
+              market_code: 'TOTAL_GOALS_O25',
+              selection: 'Over 2.5 Goals',
+              decimal_odds: m.closing_odds.over25,
+              observed_at: null,
+              snapshot_type: 'csv_closing',
+              source: 'football-data.co.uk:free',
+            });
+          }
+          if (m.closing_odds.under25) {
+            oMap.set(`${m.id}:ClosingConsensus:TOTAL_GOALS_U25:football-data.co.uk`, {
+              match_id: m.id,
+              bookmaker: 'ClosingConsensus',
+              market_code: 'TOTAL_GOALS_U25',
+              selection: 'Under 2.5 Goals',
+              decimal_odds: m.closing_odds.under25,
+              observed_at: null,
+              snapshot_type: 'csv_closing',
+              source: 'football-data.co.uk:free',
+            });
+          }
+        }
+      }
+    }
+    (globalThis as any).__calibrall_odds_unique_map = oMap;
   }
   return (globalThis as any).__calibrall_odds_unique_map;
 };
@@ -779,7 +890,7 @@ class MatchesStore {
    * Helper to retrieve days since last stored match for a team.
    * Used by the stale data guard.
    */
-  getTeamDaysSinceLastMatch(teamIdOrName: string | { id?: string; name?: string }, asOfDate?: string): { days: number | null; lastMatchDate: string | null } {
+  getTeamDaysSinceLastMatch(teamIdOrName: string | { id?: string; name?: string }, asOfDate?: string): { days: number | null; lastMatchDate: string | null; matchesInLast120Days: number } {
     const rawInput = typeof teamIdOrName === 'string' ? teamIdOrName : (teamIdOrName?.id || teamIdOrName?.name || '');
     const lookup = lookupTeamStrength(rawInput);
     const canonicalId = lookup?.data?.id || (typeof teamIdOrName === 'object' && teamIdOrName?.id ? teamIdOrName.id : rawInput);
@@ -795,13 +906,19 @@ class MatchesStore {
     }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
 
     if (matches.length === 0) {
-      return { days: null, lastMatchDate: null };
+      return { days: null, lastMatchDate: null, matchesInLast120Days: 0 };
     }
 
     const lastMatchDate = matches[0].kickoff_time;
     const refTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
     const days = Math.max(0, Math.round((refTime - new Date(lastMatchDate).getTime()) / (1000 * 60 * 60 * 24)));
-    return { days, lastMatchDate };
+    const window120Start = refTime - (120 * 24 * 60 * 60 * 1000);
+    const matchesInLast120Days = matches.filter(m => {
+      const t = new Date(m.kickoff_time).getTime();
+      return t >= window120Start && t <= refTime;
+    }).length;
+
+    return { days, lastMatchDate, matchesInLast120Days };
   }
 
   /**

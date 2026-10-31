@@ -9,8 +9,9 @@ import { computeTeamFormProfile, TeamFormProfile } from '../formEngine';
 import { evaluateManagerStyleMatchup, ManagerMatchupScore } from '../managerStyleEngine';
 import { lookupStadiumCoordinates, calculateWeatherImpact, WeatherCondition } from '../weatherEngine';
 import { evaluateContextualH2H, H2HEvaluationResult, H2HMeetingRecord } from '../h2hEngine';
-import { compareWithExternalBenchmark, BenchmarkComparisonResult } from '../externalBenchmarks';
+import { isTeamNewsEnabled } from './featureFlags';
 import { devigCompleteMarket } from '../oddsEngine';
+import { compareWithExternalBenchmark } from '../externalBenchmarks';
 
 export interface V25VenueH2HRecord {
   meetingsCount: number;
@@ -332,7 +333,10 @@ export class FeatureLayerEngine {
       missingFactors.push('live_closing_odds');
     }
 
-    if (!context.lineupConfirmed) {
+    if (!isTeamNewsEnabled()) {
+      completenessScore -= 0.12;
+      missingFactors.push('team_news_absent_free_tier');
+    } else if (!context.lineupConfirmed) {
       completenessScore -= 0.06;
       missingFactors.push('unconfirmed_team_sheets');
     }
@@ -342,7 +346,7 @@ export class FeatureLayerEngine {
       missingFactors.push('small_sample_size');
     }
 
-    completenessScore = Math.max(0.60, Number(completenessScore.toFixed(3)));
+    completenessScore = Math.max(0.55, Number(completenessScore.toFixed(3)));
 
     // Uncertainty expansion factor: increases variance if missing factors or new managers are present
     let uncertaintyExpansionFactor = Number((1.0 + (1.0 - completenessScore) * 1.5).toFixed(3));
@@ -508,13 +512,14 @@ export class FeatureLayerEngine {
   }
 
   private static computeFatigue(teamName: string, stateTags: StateTag[]): V25ScheduleFatigue {
+    // When team news is disabled on free sources: rotation is NOT estimated (set to 0)
     const isCongested = stateTags.includes('fixture-congested') || stateTags.includes('high-fatigue');
     const restDays = isCongested ? 3 : 7;
     const hadMidweekEuropean = isCongested;
     const travelDistanceKm = hadMidweekEuropean ? 1200 : 0;
-    const starterMinutesLoadAvg = isCongested ? 850 : 640;
-    const expectedRotationIndex = isCongested ? 0.65 : 0.15;
-    const fatiguePenaltyScore = isCongested ? 0.18 : 0.04;
+    const starterMinutesLoadAvg = 700; // neutral
+    const expectedRotationIndex = isTeamNewsEnabled() ? (isCongested ? 0.65 : 0.15) : 0.0;
+    const fatiguePenaltyScore = isCongested ? 0.10 : 0.02;
 
     return {
       restDays,
@@ -532,6 +537,22 @@ export class FeatureLayerEngine {
     stateTags: StateTag[],
     lineupConfirmed?: boolean
   ): V25SquadAbsences {
+    // PHASE 4 REQUIREMENT:
+    // If team_news_enabled is false, set any missing team-news input to a neutral value
+    // and do not estimate them.
+    if (!isTeamNewsEnabled()) {
+      return {
+        missingPlayerCount: 0,
+        missingXgShare: 0.0,
+        missingXaShare: 0.0,
+        missingDefensiveActionsShare: 0.0,
+        keyCbAbsent: false,
+        keyGkAbsent: false,
+        lineupStatus: 'pre_lineup',
+        importanceWeightedDiscount: 0.0,
+      };
+    }
+
     const hasKeyAbsences = stateTags.includes('key-absences');
     const missingPlayerCount = hasKeyAbsences ? 2 : 0;
     const missingXgShare = hasKeyAbsences ? 0.22 : 0.02;
@@ -554,14 +575,14 @@ export class FeatureLayerEngine {
 
   private static computeStriker(teamName: string, opponentName: string): V25StrikerQuality {
     return {
-      primaryFinisherName: `${teamName} Lead Striker`,
-      finisherXgPer90: 0.58,
-      finishingDifferential: +0.08,
-      shotsOnTargetAccuracy: 0.44,
+      primaryFinisherName: undefined,
+      finisherXgPer90: 0.50,
+      finishingDifferential: 0.0,
+      shotsOnTargetAccuracy: 0.40,
       penaltyTakerAvailable: true,
-      opponentCenterBackRating: 1.15,
-      opponentKeeperShotStoppingRatio: +0.05,
-      netStrikerMatchupEdge: 0.06,
+      opponentCenterBackRating: 1.00,
+      opponentKeeperShotStoppingRatio: 0.0,
+      netStrikerMatchupEdge: 0.0,
     };
   }
 

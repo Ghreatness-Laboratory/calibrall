@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Fixture, MarketPrediction } from '@/types';
-import { Bookmark, ChevronRight, CheckCircle2, XCircle, MinusCircle, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Bookmark, ChevronRight, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
 import TeamCrest from '@/components/TeamCrest';
 import LineupChip from '@/components/LineupChip';
@@ -11,6 +11,7 @@ import { getFixtureLineupState } from '@/lib/data/lineupsService';
 import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText, displayName, formatMatchTime } from '@/lib/utils/formatText';
 import { settleMarketPrediction, extractMatchStats } from '@/lib/prediction/settlementEngine';
+import { isTeamNewsEnabled } from '@/lib/prediction/featureFlags';
 
 interface Props {
   fixture: Fixture;
@@ -88,7 +89,14 @@ export default function FixtureCard({
   const homeName = displayName(fixture.homeTeam);
   const awayName = displayName(fixture.awayTeam);
 
-  const tierBadge = topPrediction ? getRiskTierBadge(topPrediction.confidenceTier || topPrediction.riskTier) : null;
+  // Stale data check: parse "last match N days ago" if present
+  const staleDaysMatch = noRecommendationReason?.match(/last match (\d+) days ago/);
+  const staleDays = staleDaysMatch ? staleDaysMatch[1] : null;
+
+  const rawTier = topPrediction ? getRiskTierBadge(topPrediction.confidenceTier || topPrediction.riskTier) : null;
+  // Eliminate word "Safe" everywhere
+  const tierLabel = rawTier?.label === 'SAFE' ? 'HIGH' : (rawTier?.label || 'MEDIUM');
+
   const dataCoverage = topPrediction?.dataCompletenessScore !== undefined && topPrediction?.dataCompletenessScore !== null
     ? Math.round(topPrediction.dataCompletenessScore * 100) 
     : (topPrediction?.dataQualityScore !== undefined && topPrediction?.dataQualityScore !== null ? Math.round(topPrediction.dataQualityScore * 100) : null);
@@ -122,47 +130,64 @@ export default function FixtureCard({
   }, [fixture]);
 
   return (
-    <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 space-y-2.5 touch-press transition-transform duration-150">
-      {/* Header: "League · MD n" caption left, time + bookmark icon right */}
-      <div className="flex items-center justify-between text-[11.5px] text-[#8B9890] gap-2">
+    <div className="bg-[#101713] border border-white/[0.07] rounded-[13px] p-2.5 space-y-2 touch-press transition-transform duration-150">
+      {/* Header: League & Matchday left, Local Time (13px/600) + Bookmark right */}
+      <div className="flex items-center justify-between text-[11px] text-[#8B9890] gap-2">
         <div className="flex items-center gap-1.5 truncate flex-wrap">
           <span className="truncate">{cleanDisplayText(fixture.competition.name)}</span>
           <span className="text-[#5E6A63]">·</span>
           <span className="tabular-nums shrink-0">MD {fixture.matchday}</span>
+
+          {/* Slim amber tag "Stale data · 546d" if data is stale */}
+          {staleDays && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-amber-500/15 text-amber-300 font-mono text-[9.5px] font-semibold border border-amber-500/30">
+              Stale data · {staleDays}d
+            </span>
+          )}
+
           {isFinished && (
-            <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-[#B6E63B]/[0.12] text-[#B6E63B] font-mono text-[9.5px] font-semibold border border-[#B6E63B]/30">
-              Match completed
+            <span className="ml-1 px-1.5 py-0.2 rounded-[4px] bg-[#B6E63B]/[0.12] text-[#B6E63B] font-mono text-[9.5px] font-semibold border border-[#B6E63B]/30">
+              FT
             </span>
           )}
           {isInPlay && (
-            <span className="ml-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-rose-500/20 text-rose-300 font-mono text-[9.5px] font-semibold border border-rose-500/30">
+            <span className="ml-1 inline-flex items-center gap-1 px-1.5 py-0.2 rounded-[4px] bg-rose-500/20 text-rose-300 font-mono text-[9.5px] font-semibold border border-rose-500/30">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
               LIVE {displayMinute}&apos;
             </span>
           )}
           {isPaused && (
-            <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-amber-500/20 text-amber-300 font-mono text-[9.5px] font-semibold border border-amber-500/30">
+            <span className="ml-1 px-1.5 py-0.2 rounded-[4px] bg-amber-500/20 text-amber-300 font-mono text-[9.5px] font-semibold border border-amber-500/30">
               HT
             </span>
           )}
           {isPostponed && (
-            <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-amber-500/20 text-amber-300 font-mono text-[9.5px] font-semibold border border-amber-500/30">
+            <span className="ml-1 px-1.5 py-0.2 rounded-[4px] bg-amber-500/20 text-amber-300 font-mono text-[9.5px] font-semibold border border-amber-500/30">
               Postponed
             </span>
           )}
-          {!isFinished && (
+
+          {/* Only render lineup chip if team news enabled */}
+          {isTeamNewsEnabled() && !isFinished && (
             <LineupChip lineupState={lineupState} isPastKickoff={isPastKickoff} className="ml-0.5" />
+          )}
+
+          {/* Data coverage indicator */}
+          {!staleDays && (
+            <span className="text-[9.5px] text-[#5E6A63] font-mono ml-1">
+              {dataCoverage !== null ? `${dataCoverage}% data` : 'free data'}
+            </span>
           )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[11.5px] text-[#8B9890] tabular-nums" suppressHydrationWarning>
+          <span className="text-[13px] font-[600] text-[#ECF1EE] tabular-nums" suppressHydrationWarning>
             {statusBadgeText}
           </span>
           <button
             onClick={handleToggleBookmark}
             type="button"
-            className="w-7 h-7 flex items-center justify-center -mr-1 rounded-full hover:bg-[#151E19] transition-colors"
+            className="w-6 h-6 flex items-center justify-center -mr-1 rounded-full hover:bg-[#151E19] transition-colors"
             title={isSaved ? 'Remove bookmark' : 'Bookmark fixture'}
             aria-label={isSaved ? 'Remove bookmark' : 'Bookmark fixture'}
           >
@@ -178,11 +203,11 @@ export default function FixtureCard({
 
       {/* Main fixture matchup row */}
       <Link href={`/matches/${fixture.id}`} className="block">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2.5">
           {/* Two team rows (28px crest, name 13 semibold) */}
-          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+          <div className="flex flex-col gap-1 min-w-0 flex-1">
             {/* Home team row */}
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <TeamCrest
                 crestUrl={fixture.homeTeam.crestUrl}
                 teamName={cleanDisplayText(homeName)}
@@ -192,14 +217,14 @@ export default function FixtureCard({
                 {cleanDisplayText(homeName)}
               </span>
               {isFinished && (
-                <span className="text-[13px] font-[600] text-[#ECF1EE] ml-auto mr-2 tabular-nums">
+                <span className="text-[13px] font-[600] text-[#ECF1EE] ml-auto mr-1.5 tabular-nums">
                   {stats.homeScore}
                 </span>
               )}
             </div>
 
             {/* Away team row */}
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <TeamCrest
                 crestUrl={fixture.awayTeam.crestUrl}
                 teamName={cleanDisplayText(awayName)}
@@ -209,56 +234,53 @@ export default function FixtureCard({
                 {cleanDisplayText(awayName)}
               </span>
               {isFinished && (
-                <span className="text-[13px] font-[600] text-[#ECF1EE] ml-auto mr-2 tabular-nums">
+                <span className="text-[13px] font-[600] text-[#ECF1EE] ml-auto mr-1.5 tabular-nums">
                   {stats.awayScore}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Right: "Analysis" + chevron, vertically centered */}
-          <div className="flex items-center gap-0.5 text-[12.5px] font-[600] text-[#B6E63B] shrink-0">
+          {/* Right: "Analysis" button + chevron */}
+          <div className="flex items-center gap-1 text-[12px] font-[600] text-[#B6E63B] px-2 py-1 rounded-[8px] bg-[#B6E63B]/[0.08] border border-[#B6E63B]/20 shrink-0">
             <span>Analysis</span>
-            <ChevronRight className="w-4 h-4 text-[#B6E63B]" strokeWidth={2} />
+            <ChevronRight className="w-3.5 h-3.5 text-[#B6E63B]" strokeWidth={2.5} />
           </div>
         </div>
 
-        {/* When match is completed, show completed statistics row */}
+        {/* When match is completed, show compact stats summary */}
         {isFinished && (
-          <div className="mt-2 pt-2 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-2 text-[10.5px] text-[#8B9890] font-mono">
+          <div className="mt-1.5 pt-1.5 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-1.5 text-[10px] text-[#8B9890] font-mono">
             <div>
               <span className="text-[#ECF1EE] font-semibold">FT: {stats.homeScore} · {stats.awayScore}</span>
-              <span className="text-[#5E6A63] ml-1.5">(HT: {stats.homeHalfTimeScore} · {stats.awayHalfTimeScore})</span>
+              <span className="text-[#5E6A63] ml-1">(HT: {stats.homeHalfTimeScore} · {stats.awayHalfTimeScore})</span>
             </div>
-            <div className="flex items-center gap-2.5">
-              <span>Corners: {stats.totalCorners} ({stats.homeCorners}H · {stats.awayCorners}A)</span>
+            <div className="flex items-center gap-2">
+              <span>Corners: {stats.totalCorners}</span>
               <span>Cards: {stats.totalCardPoints}</span>
             </div>
           </div>
         )}
 
-        {/* Pick block inset in a raised surface (radius 11) */}
-        <div className="mt-2.5">
+        {/* Pick block inset in a raised surface */}
+        <div className="mt-2">
           {topPrediction ? (
-            <div className="bg-[#151E19] rounded-[11px] p-2.5 space-y-1.5">
-              {/* Row 1: "Top pick" (or "Pre-match pick" if in play) caption, small amber chip, data completeness. Right: Odds/EV only when real odds exist */}
-              <div className="flex items-center justify-between text-[11px] gap-2">
+            <div className="bg-[#151E19] rounded-[10px] p-2 space-y-1">
+              {/* Row 1: Pick tag + Risk/Confidence tier + Odds */}
+              <div className="flex items-center justify-between text-[10.5px] gap-2">
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-[#8B9890]">{isInPlay ? 'Pre-match pick' : 'Top pick'}</span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#E2AE45]/[0.15] text-[#E2AE45] leading-tight">
-                    {cleanDisplayText(tierBadge?.label || 'MEDIUM')}
-                  </span>
-                  <span className="text-[#5E6A63] tabular-nums">
-                    {dataCoverage !== null ? `${dataCoverage}% data` : '—'}
+                  <span className="text-[#8B9890]">{isInPlay ? 'Live pick' : 'Top lean'}</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-semibold bg-[#E2AE45]/[0.15] text-[#E2AE45] leading-tight">
+                    {cleanDisplayText(tierLabel)}
                   </span>
                   {topPrediction.sanityTripwire && (
-                    <span className="px-1.5 py-0.5 rounded-[4px] bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9.5px] font-mono font-semibold">
+                    <span className="px-1 py-0.2 rounded-[4px] bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9px] font-mono font-semibold">
                       Check data
                     </span>
                   )}
                 </div>
 
-                <div className="text-[11px] text-[#8B9890] tabular-nums truncate text-right">
+                <div className="text-[10.5px] text-[#8B9890] tabular-nums truncate text-right">
                   {hasRealOdds ? (
                     <span>
                       {topPrediction?.bookmakerName ? `${topPrediction.bookmakerName} ` : ''}@{oddsFormatted} · {evFormatted} EV
@@ -269,53 +291,38 @@ export default function FixtureCard({
                 </div>
               </div>
 
-              {/* Row 2: pick name 13.5 semibold left; prob % with real uncertainty accent right */}
+              {/* Row 2: pick name 13 semibold left; prob % right */}
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[13.5px] font-[600] text-[#ECF1EE] truncate">
+                <span className="text-[13px] font-[600] text-[#ECF1EE] truncate">
                   {cleanDisplayText(formatSelectionName(topPrediction.selection))}
                 </span>
                 {probPercent && (
-                  <span className="text-[12.5px] font-[600] text-[#B6E63B] tabular-nums shrink-0">
+                  <span className="text-[12px] font-[600] text-[#B6E63B] tabular-nums shrink-0">
                     {probPercent}%{uncertaintyText}
                   </span>
                 )}
               </div>
 
-              {/* Review: lineup changed notification (never colour alone) */}
-              {(topPrediction.lineupReviewFlag || (lineupState.pickReviewRequired && !isFinished)) && (
-                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-white/[0.05]">
-                  <span className="inline-flex items-center gap-1 text-amber-300 font-semibold">
-                    <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
-                    <span>Review: lineup changed</span>
-                  </span>
-                  {lineupState.firstKeyPlayerOutName && (
-                    <span className="text-[10.5px] text-[#8B9890] truncate">
-                      {cleanDisplayText(lineupState.firstKeyPlayerOutName)} out
-                    </span>
-                  )}
-                </div>
-              )}
-
               {/* Settlement Banner when match completed */}
               {settledTopPrediction && (
-                <div className={`mt-1 px-2.5 py-1.5 rounded-[8px] flex items-center justify-between text-[11px] font-mono border ${
+                <div className={`mt-0.5 px-2 py-1 rounded-[6px] flex items-center justify-between text-[10px] font-mono border ${
                   settledTopPrediction.settlementStatus === 'WON'
                     ? 'bg-[#B6E63B]/[0.12] border-[#B6E63B]/40 text-[#B6E63B]'
                     : settledTopPrediction.settlementStatus === 'PUSH'
                     ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
                     : 'bg-white/[0.04] border-white/[0.08] text-[#8B9890]'
                 }`}>
-                  <div className="flex items-center gap-1.5">
-                    {settledTopPrediction.settlementStatus === 'WON' && <CheckCircle2 className="w-3.5 h-3.5 text-[#B6E63B]" />}
-                    {settledTopPrediction.settlementStatus === 'LOST' && <XCircle className="w-3.5 h-3.5 text-rose-400" />}
-                    {settledTopPrediction.settlementStatus === 'PUSH' && <MinusCircle className="w-3.5 h-3.5 text-amber-400" />}
-                    <span>{cleanDisplayText(settledTopPrediction.lineComparisonText)}</span>
+                  <div className="flex items-center gap-1">
+                    {settledTopPrediction.settlementStatus === 'WON' && <CheckCircle2 className="w-3 h-3 text-[#B6E63B]" />}
+                    {settledTopPrediction.settlementStatus === 'LOST' && <XCircle className="w-3 h-3 text-rose-400" />}
+                    {settledTopPrediction.settlementStatus === 'PUSH' && <MinusCircle className="w-3 h-3 text-amber-400" />}
+                    <span className="truncate">{cleanDisplayText(settledTopPrediction.lineComparisonText)}</span>
                   </div>
-                  <span className="font-bold uppercase tracking-wider">{settledTopPrediction.settlementStatus}</span>
+                  <span className="font-bold uppercase tracking-wider shrink-0">{settledTopPrediction.settlementStatus}</span>
                 </div>
               )}
 
-              {/* Row 3: 4px progress bar below */}
+              {/* Progress bar */}
               {!isFinished && (
                 <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
                   <div
@@ -326,7 +333,7 @@ export default function FixtureCard({
               )}
             </div>
           ) : (
-            <div className="bg-[#151E19] rounded-[11px] p-2.5 flex items-center justify-between text-[11.5px] text-[#8B9890]">
+            <div className="bg-[#151E19] rounded-[10px] p-2 flex items-center justify-between text-[11px] text-[#8B9890]">
               <span className="break-words leading-tight">
                 {cleanDisplayText(
                   noRecommendationReason && noRecommendationReason !== 'Not enough data'

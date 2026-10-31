@@ -4,6 +4,7 @@ import React from 'react';
 import { FixtureLineupState } from '@/types';
 import { CheckCircle2, Clock, AlertTriangle, AlertCircle } from 'lucide-react';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { isTeamNewsEnabled } from '@/lib/prediction/featureFlags';
 
 interface Props {
   lineupState: FixtureLineupState;
@@ -12,6 +13,11 @@ interface Props {
 }
 
 export default function LineupChip({ lineupState, className = '', isPastKickoff = false }: Props) {
+  // Free tier / no paid provider: hide all lineup elements
+  if (!isTeamNewsEnabled()) {
+    return null;
+  }
+
   const { status, expectedReleaseTimeFormatted, isWithin30MinsOfKickoff, anyKeyPlayerOut, firstKeyPlayerOutName } = lineupState;
 
   // 1. Key player out on confirmed lineup: Amber/Red with AlertTriangle icon + explicit name text (never colour alone)

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import { formatOdds, formatSelectionName } from '@/lib/prediction/marketCatalog';
+import { isTeamNewsEnabled } from '@/lib/prediction/featureFlags';
 
 interface Props {
   lineupState: FixtureLineupState;
@@ -38,6 +39,21 @@ export default function LineupComparisonPanel({
   topPick,
   revisions = [],
 }: Props) {
+  if (!isTeamNewsEnabled()) {
+    return (
+      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-4 text-center space-y-2">
+        <div className="w-8 h-8 rounded-full bg-[#151E19] flex items-center justify-center mx-auto text-[#B6E63B]">
+          <Users className="w-4 h-4" />
+        </div>
+        <h4 className="text-[14px] font-semibold text-[#ECF1EE]">Starting Lineups Disabled (Free Tier)</h4>
+        <p className="text-[12px] text-[#8B9890] max-w-md mx-auto leading-relaxed">
+          Calibrall runs strictly on free sources (football-data.co.uk, football-data.org, Prof. Sean Elvidge CC BY 4.0).
+          To prevent hallucinated data, lineup dependencies are deactivated and confidence is honestly capped at Medium tier.
+        </p>
+      </div>
+    );
+  }
+
   const [selectedTeamTab, setSelectedTeamTab] = useState<'home' | 'away'>('home');
   const [showBench, setShowBench] = useState<boolean>(true);
 

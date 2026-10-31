@@ -369,13 +369,20 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     };
   }
 
-  // STALE DATA GUARD:
-  // If a team's most recent stored match is more than 21 days old in season,
-  // abstain and show "Data out of date: last match N days ago"
+  // STALE DATA GATE:
+  // If either team's newest match is older than 21 days in season,
+  // or has fewer than 5 matches in the last 120 days:
+  // Show "Insufficient data" with no pick, tier or EV.
   const homeLastMatch = matchesStore.getTeamDaysSinceLastMatch(fixture.homeTeam.id || fixture.homeTeam.name, fixture.kickoffTime);
   const awayLastMatch = matchesStore.getTeamDaysSinceLastMatch(fixture.awayTeam.id || fixture.awayTeam.name, fixture.kickoffTime);
 
-  if (homeLastMatch.days !== null && homeLastMatch.days > 21) {
+  const isHomeStale = (homeLastMatch.days !== null && homeLastMatch.days > 21) || homeLastMatch.matchesInLast120Days < 5;
+  const isAwayStale = (awayLastMatch.days !== null && awayLastMatch.days > 21) || awayLastMatch.matchesInLast120Days < 5;
+
+  if (isHomeStale) {
+    const reason = (homeLastMatch.days !== null && homeLastMatch.days > 21)
+      ? `Data out of date: last match ${homeLastMatch.days} days ago`
+      : `Data out of date: only ${homeLastMatch.matchesInLast120Days} matches in last 120 days (min 5 required)`;
     return {
       homeXg: 0,
       awayXg: 0,
@@ -390,11 +397,14 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       stateTags: ['low-sample'] as StateTag[],
       lineupConfirmed: false,
       verifiedOdds: fixture.verifiedOdds,
-      noRecommendationReason: `Data out of date: last match ${homeLastMatch.days} days ago`,
+      noRecommendationReason: reason,
     };
   }
 
-  if (awayLastMatch.days !== null && awayLastMatch.days > 21) {
+  if (isAwayStale) {
+    const reason = (awayLastMatch.days !== null && awayLastMatch.days > 21)
+      ? `Data out of date: last match ${awayLastMatch.days} days ago`
+      : `Data out of date: only ${awayLastMatch.matchesInLast120Days} matches in last 120 days (min 5 required)`;
     return {
       homeXg: 0,
       awayXg: 0,
@@ -409,7 +419,7 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       stateTags: ['low-sample'] as StateTag[],
       lineupConfirmed: false,
       verifiedOdds: fixture.verifiedOdds,
-      noRecommendationReason: `Data out of date: last match ${awayLastMatch.days} days ago`,
+      noRecommendationReason: reason,
     };
   }
 

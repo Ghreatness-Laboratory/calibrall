@@ -278,7 +278,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
     qualificationCriteria: {
       minProbability: 0.60,
       minEv: 0.035,
-      minEdge: 0.025,
+      minEdge: 0.045, // Handicap hurdle: requires >= 60% probability and +4.5% edge
     },
     isEnabled: true,
   },
@@ -297,9 +297,9 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
       maxUncertaintyScore: 0.20,
     },
     qualificationCriteria: {
-      minProbability: 0.50,
+      minProbability: 0.60, // Handicap hurdle: requires >= 60% probability
       minEv: 0.04,
-      minEdge: 0.03,
+      minEdge: 0.045, // Handicap hurdle: requires +4.5% edge
     },
     isEnabled: true,
   },

@@ -151,8 +151,18 @@ export default function Footer() {
           </div>
         )}
 
+        {/* Data attribution section */}
+        <div className="pt-2 border-t border-white/[0.05] text-center text-[10.5px] text-[#5E6A63] space-y-1 max-w-2xl mx-auto leading-relaxed">
+          <p>
+            Data sources & attribution: <span className="text-[#8B9890]">football-data.co.uk</span> (stats, referee, corners, cards & consensus odds), <span className="text-[#8B9890]">football-data.org</span> (fixtures & status), <span className="text-[#8B9890]">England Football Results</span> (Prof. Sean Elvidge, CC BY 4.0, H2H & historical archives), <span className="text-[#8B9890]">openfootball</span> (CC0-1.0 schedule fallback), and <span className="text-[#8B9890]">TheSportsDB</span> (crests & metadata).
+          </p>
+          <p className="font-medium text-[#8B9890]">
+            Statistical analysis, not financial or betting advice. 18+. Gamble responsibly.
+          </p>
+        </div>
+
         {/* Ending centered footer line at 10.5px in subtle text color */}
-        <div className="text-center pt-1 text-[10.5px] text-[#5E6A63]">
+        <div className="text-center pt-1 text-[10px] text-[#5E6A63]">
           © 2024 to {currentYear} Calibrall. All model projections recorded on ledger.
         </div>
       </div>

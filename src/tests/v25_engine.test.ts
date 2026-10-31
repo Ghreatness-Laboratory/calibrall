@@ -7,6 +7,7 @@ import { ConfidenceEngine } from '../lib/prediction/v25/confidenceEngine';
 import { FeatureLayerEngine } from '../lib/prediction/v25/featureLayer';
 import { DixonColesV25Evaluator } from '../lib/prediction/v25/v25Evaluator';
 import { getRiskTierBadge } from '../lib/prediction/marketCatalog';
+import { isTeamNewsEnabled } from '../lib/prediction/featureFlags';
 
 export function runDixonColesV25Tests(): { passed: boolean; failures: string[] } {
   const failures: string[] = [];
@@ -109,13 +110,20 @@ export function runDixonColesV25Tests(): { passed: boolean; failures: string[] }
   });
   assert(!safeLabelFound, 'No prediction in v2.5 carries the label "SAFE"');
 
-  // High tier pick in dominant fixture must have confirmed lineups, tight uncertainty spread, and 0 risk flags
-  const highTierPicks = evalResult.predictions.filter(p => p.confidenceTier === 'HIGH');
-  assert(highTierPicks.length > 0, 'Dominant Manchester City fixture contains High confidence selections');
-  highTierPicks.forEach(p => {
-    assert((p.riskFlags || []).length === 0, 'High confidence pick has zero risk flags', p.selection);
-    assert((p.uncertaintySpread ?? 1.0) <= 0.05, 'High confidence pick has narrow uncertainty spread <= 5%', p.selection);
-  });
+  // High tier pick in dominant fixture when team news enabled, or capped to Medium when team news absent (Phase 4 rule)
+  if (isTeamNewsEnabled()) {
+    const highTierPicks = evalResult.predictions.filter(p => p.confidenceTier === 'HIGH');
+    assert(highTierPicks.length > 0, 'Dominant Manchester City fixture contains High confidence selections');
+    highTierPicks.forEach(p => {
+      assert((p.riskFlags || []).length === 0, 'High confidence pick has zero risk flags', p.selection);
+      assert((p.uncertaintySpread ?? 1.0) <= 0.05, 'High confidence pick has narrow uncertainty spread <= 5%', p.selection);
+    });
+  } else {
+    const highTierPicks = evalResult.predictions.filter(p => p.confidenceTier === 'HIGH');
+    assert(highTierPicks.length === 0, 'No High confidence selections when team news is absent (Phase 4 rule)');
+    const mediumTierPicks = evalResult.predictions.filter(p => p.confidenceTier === 'MEDIUM');
+    assert(mediumTierPicks.length > 0, 'Dominant Manchester City fixture contains Medium confidence selections when capped');
+  }
 
   return {
     passed: failures.length === 0,

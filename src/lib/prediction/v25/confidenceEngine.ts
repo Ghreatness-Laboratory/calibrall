@@ -4,6 +4,7 @@
 
 import { ConfidenceTier, SupportedOptionType } from '@/types';
 import { V25FixtureFeatures } from './featureLayer';
+import { isTeamNewsEnabled } from './featureFlags';
 
 export interface V25RiskFlagEvaluation {
   flags: string[];
@@ -149,6 +150,7 @@ export class ConfidenceEngine {
     const hasAdverseNegativeEdge = edgeOverMarket !== undefined && edgeOverMarket < -0.05;
 
     if (
+      isTeamNewsEnabled() &&
       calibratedProb >= 0.70 &&
       uncertaintySpread <= 0.055 &&
       dataCompleteness >= 0.85 &&
@@ -160,7 +162,7 @@ export class ConfidenceEngine {
     } else if (
       calibratedProb >= 0.55 &&
       uncertaintySpread <= 0.075 &&
-      dataCompleteness >= 0.75 &&
+      dataCompleteness >= 0.65 &&
       riskEvaluation.downgradesCount <= 1 &&
       !riskEvaluation.hasVenueH2HContradiction && // Venue contradiction forbids MEDIUM on handicaps
       !riskEvaluation.hasAdverseFormGap
@@ -168,6 +170,11 @@ export class ConfidenceEngine {
       tier = 'MEDIUM';
     } else {
       tier = 'LOW';
+    }
+
+    // MANDATORY CAP: No High tier allowed when team news is absent
+    if (!isTeamNewsEnabled() && tier === 'HIGH') {
+      tier = 'MEDIUM';
     }
 
     // Specialized Asian Handicap gating rule:
