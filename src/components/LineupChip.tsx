@@ -13,9 +13,15 @@ interface Props {
 }
 
 export default function LineupChip({ lineupState, className = '', isPastKickoff = false }: Props) {
-  // Free tier / no paid provider: hide all lineup elements
+  // Free tier / no paid provider: show neutral team news note
   if (!isTeamNewsEnabled()) {
-    return null;
+    return (
+      <span
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[9.5px] font-mono bg-[#151E19] text-[#8B9890] border border-white/[0.07] ${className}`}
+      >
+        <span>Team news: not included</span>
+      </span>
+    );
   }
 
   const { status, expectedReleaseTimeFormatted, isWithin30MinsOfKickoff, anyKeyPlayerOut, firstKeyPlayerOutName } = lineupState;

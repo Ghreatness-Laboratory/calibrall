@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getMatchesStore } from '@/lib/data/matchesStore';
-import { getUnmatchedNames } from '@/lib/data/canonicalTeams';
+import { getUnmatchedNames, CANONICAL_TEAMS } from '@/lib/data/canonicalTeams';
 import { getMissingBadges } from '@/lib/data/sources/theSportsDb';
 import { isTeamNewsEnabled } from '@/lib/prediction/featureFlags';
 

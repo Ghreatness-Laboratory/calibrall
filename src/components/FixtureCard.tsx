@@ -167,8 +167,8 @@ export default function FixtureCard({
             </span>
           )}
 
-          {/* Only render lineup chip if team news enabled */}
-          {isTeamNewsEnabled() && !isFinished && (
+          {/* Render lineup / team news note */}
+          {!isFinished && (
             <LineupChip lineupState={lineupState} isPastKickoff={isPastKickoff} className="ml-0.5" />
           )}
 
@@ -336,15 +336,17 @@ export default function FixtureCard({
             <div className="bg-[#151E19] rounded-[10px] p-2 flex items-center justify-between text-[11px] text-[#8B9890]">
               <span className="break-words leading-tight">
                 {cleanDisplayText(
-                  noRecommendationReason && noRecommendationReason !== 'Not enough data'
-                    ? noRecommendationReason
-                    : (fixture.insufficientData
-                        ? (fixture.homeTeam.hasRealTeamStrength === false && fixture.awayTeam.hasRealTeamStrength === false
-                            ? `Needs history: ${displayName(fixture.homeTeam)} (0 matches), ${displayName(fixture.awayTeam)} (0)`
-                            : (fixture.homeTeam.hasRealTeamStrength === false
-                                ? `Needs history: ${displayName(fixture.homeTeam)} (0 matches)`
-                                : `Needs history: ${displayName(fixture.awayTeam)} (0 matches)`))
-                        : 'No strong lean')
+                  noRecommendationReason && noRecommendationReason.startsWith('Data out of date')
+                    ? 'Insufficient data'
+                    : (noRecommendationReason && noRecommendationReason !== 'Not enough data'
+                        ? noRecommendationReason
+                        : (fixture.insufficientData
+                            ? (fixture.homeTeam.hasRealTeamStrength === false && fixture.awayTeam.hasRealTeamStrength === false
+                                ? `Needs history: ${displayName(fixture.homeTeam)} (0 matches), ${displayName(fixture.awayTeam)} (0)`
+                                : (fixture.homeTeam.hasRealTeamStrength === false
+                                    ? `Needs history: ${displayName(fixture.homeTeam)} (0 matches)`
+                                    : `Needs history: ${displayName(fixture.awayTeam)} (0 matches)`))
+                            : 'No strong lean'))
                 )}
               </span>
             </div>

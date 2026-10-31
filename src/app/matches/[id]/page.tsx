@@ -247,6 +247,18 @@ export default function MatchAnalysisPage() {
             <span className="text-[#5E6A63]">·</span>
             <span className="tabular-nums">MD {fixture.matchday}</span>
             {(() => {
+              const staleMatch = noRecommendationReason?.match(/last match (\d+) days ago/);
+              const sDays = staleMatch ? staleMatch[1] : null;
+              if (sDays) {
+                return (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-amber-500/15 text-amber-300 font-mono text-[9.5px] font-semibold border border-amber-500/30">
+                    Stale data · {sDays}d
+                  </span>
+                );
+              }
+              return null;
+            })()}
+            {(() => {
               const derby = (fixture.isDerby && fixture.derbyName)
                 ? { name: fixture.derbyName }
                 : (fixture.homeTeam?.name && fixture.awayTeam?.name ? checkDerby(fixture.homeTeam.name, fixture.awayTeam.name) : null);
@@ -543,11 +555,13 @@ export default function MatchAnalysisPage() {
           <div>
             <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#8B9890] mb-1">
               <AlertCircle className="w-3.5 h-3.5" strokeWidth={2} />
-              <span>No qualified recommendation</span>
-            </div>
-            <h3 className="text-[14px] font-semibold text-[#ECF1EE]">Statistical evidence insufficient</h3>
+            <h3 className="text-[14px] font-semibold text-[#ECF1EE]">
+              {noRecommendationReason?.startsWith('Data out of date') ? 'Insufficient data' : 'Statistical evidence insufficient'}
+            </h3>
             <p className="text-[12px] text-[#8B9890] mt-0.5 max-w-2xl leading-normal">
-              {noRecommendationReason || "Current market lines reflect efficient pricing. Abstaining to maintain statistical calibration."}
+              {noRecommendationReason?.startsWith('Data out of date') 
+                ? 'Model pick, tier, and expected value withheld due to match staleness exceeding the 21-day threshold.'
+                : (noRecommendationReason || "Current market lines reflect efficient pricing. Abstaining to maintain statistical calibration.")}
             </p>
           </div>
         )}

@@ -28,6 +28,7 @@ import {
   ChevronUp 
 } from 'lucide-react';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { isTeamNewsEnabled } from '@/lib/prediction/featureFlags';
 
 interface Props {
   contextEvaluation: ContextEvaluationResult;
@@ -76,22 +77,28 @@ export default function FactorsAndStatePanel({
 
         {/* Lineup Confirmation Status Pill */}
         <div>
-          {lineupStatus === 'confirmed' ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] bg-[rgba(182,230,59,0.12)] border border-[#B6E63B]/30 text-[#B6E63B] font-mono text-[11px] font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Official lineups confirmed</span>
-            </div>
+          {isTeamNewsEnabled() ? (
+            lineupStatus === 'confirmed' ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] bg-[rgba(182,230,59,0.12)] border border-[#B6E63B]/30 text-[#B6E63B] font-mono text-[11px] font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Lineups confirmed</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] bg-[rgba(226,174,69,0.12)] border border-[#E2AE45]/30 text-[#E2AE45] font-mono text-[11px] font-semibold">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Pre lineup mode</span>
+              </div>
+            )
           ) : (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] bg-[rgba(226,174,69,0.12)] border border-[#E2AE45]/30 text-[#E2AE45] font-mono text-[11px] font-semibold">
-              <Clock className="w-3.5 h-3.5" />
-              <span>Pre lineup mode (T &gt; 60m)</span>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] bg-[#151E19] border border-white/[0.07] text-[#8B9890] font-mono text-[11px]">
+              <span>Team news: not included</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Pre lineup Warning Banner if applicable */}
-      {lineupStatus === 'pre-lineup' && (
+      {isTeamNewsEnabled() && lineupStatus === 'pre-lineup' && (
         <div className="p-3 bg-[#151E19] border border-[#E2AE45]/20 rounded-[11px] text-[12px] text-[#8B9890] flex items-start gap-2">
           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#E2AE45]" />
           <div className="leading-normal">

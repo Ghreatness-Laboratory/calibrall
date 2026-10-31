@@ -1,6 +1,4 @@
 {
   "/page": "app/page.js",
-  "/api/health/route": "app/api/health/route.js",
-  "/api/health/data/route": "app/api/health/data/route.js",
-  "/matches/page": "app/matches/page.js"
+  "/api/health/data/route": "app/api/health/data/route.js"
 }

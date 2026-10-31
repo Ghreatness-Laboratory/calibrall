@@ -305,6 +305,64 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Data Sources & Attributions */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-[#8B9890] px-1">
+            Data sources & attributions
+          </div>
+          <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] divide-y divide-white/[0.07] overflow-hidden text-[12px]">
+            <div className="p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[#ECF1EE]">football-data.co.uk</span>
+                <span className="text-[10px] font-mono text-[#B6E63B] bg-[#B6E63B]/10 px-1.5 py-0.5 rounded border border-[#B6E63B]/20">Primary Stats</span>
+              </div>
+              <p className="text-[11.5px] text-[#8B9890] leading-relaxed">
+                Scores, half-time results, shots on target, corners, disciplinary cards, referee assignments, and closing consensus market odds across European leagues. Free for research, personal, and statistical analysis with attribution.
+              </p>
+            </div>
+
+            <div className="p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[#ECF1EE]">Sean Elvidge (England-football-results)</span>
+                <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">CC BY 4.0</span>
+              </div>
+              <p className="text-[11.5px] text-[#8B9890] leading-relaxed">
+                Comprehensive historical English league results archive used strictly for long-run home advantage baselines and venue-specific head-to-head records. Licensed under Creative Commons Attribution 4.0 International.
+              </p>
+            </div>
+
+            <div className="p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[#ECF1EE]">football-data.org</span>
+                <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">Free Tier API</span>
+              </div>
+              <p className="text-[11.5px] text-[#8B9890] leading-relaxed">
+                Live match fixtures, matchday schedules, and in-play status for Premier League and Tier 1 European competitions under free plan token limits.
+              </p>
+            </div>
+
+            <div className="p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[#ECF1EE]">openfootball (football.json)</span>
+                <span className="text-[10px] font-mono text-[#8B9890] bg-white/[0.05] px-1.5 py-0.5 rounded border border-white/[0.1]">Public Domain (CC0)</span>
+              </div>
+              <p className="text-[11.5px] text-[#8B9890] leading-relaxed">
+                Open public domain fixtures and match calendars utilized as an independent validation and fallback source.
+              </p>
+            </div>
+
+            <div className="p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[#ECF1EE]">TheSportsDB.com</span>
+                <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">Art & Badges</span>
+              </div>
+              <p className="text-[11.5px] text-[#8B9890] leading-relaxed">
+                Club crest artwork, badge URLs, and stadium metadata sourced via free community access (key 123) with local cache preservation.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Save Button */}
         <div className="pt-2">
           <button
