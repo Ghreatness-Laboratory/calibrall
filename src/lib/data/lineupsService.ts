@@ -494,10 +494,11 @@ export function getFixtureLineupState(
   }
 
   // Determine overall status
+  const isPastKickoff = now >= kickoffMs;
   let status: 'pending' | 'confirmed' | 'unreleased_late' = 'pending';
   if (homeConfirmed && awayConfirmed) {
     status = 'confirmed';
-  } else if (isWithin30Mins) {
+  } else if (isWithin30Mins || isPastKickoff) {
     status = 'unreleased_late';
   }
 

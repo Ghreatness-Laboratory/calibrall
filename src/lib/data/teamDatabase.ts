@@ -2470,6 +2470,99 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     sampleMatches: 20,
     aliases: ['esporte clube vitoria', 'ec vitoria', 'ec vitória', 'vitoria', 'vitória', 'vit'],
   },
+  // ==========================================
+  // PORTUGUESE PRIMEIRA LIGA (P1 / PPL)
+  // ==========================================
+  sportingcp: {
+    id: 'team_sportingcp',
+    name: 'Sporting Clube de Portugal',
+    shortName: 'Sporting CP',
+    tla: 'SCP',
+    crestUrl: 'https://crests.football-data.org/498.png',
+    competitionCode: 'P1',
+    attackRating: 1.58,
+    defenseRating: 0.72,
+    cornerAttackRating: 1.38,
+    disciplineRating: 0.90,
+    recentForm: ['W', 'W', 'W', 'W', 'W'],
+    sampleMatches: 24,
+    aliases: ['sporting clube de portugal', 'sporting cp', 'sporting lisbon', 'sporting', 'scp'],
+  },
+  casapia: {
+    id: 'team_casapia',
+    name: 'Casa Pia AC',
+    shortName: 'Casa Pia',
+    tla: 'CAS',
+    crestUrl: 'https://crests.football-data.org/5533.png',
+    competitionCode: 'P1',
+    attackRating: 0.95,
+    defenseRating: 1.15,
+    cornerAttackRating: 0.98,
+    disciplineRating: 1.10,
+    recentForm: ['D', 'W', 'L', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['casa pia ac', 'casa pia', 'casa pia atletico clube', 'cas'],
+  },
+  benfica: {
+    id: 'team_benfica',
+    name: 'SL Benfica',
+    shortName: 'Benfica',
+    tla: 'SLB',
+    crestUrl: 'https://crests.football-data.org/1903.png',
+    competitionCode: 'P1',
+    attackRating: 1.54,
+    defenseRating: 0.76,
+    cornerAttackRating: 1.35,
+    disciplineRating: 0.88,
+    recentForm: ['W', 'W', 'W', 'D', 'W'],
+    sampleMatches: 24,
+    aliases: ['sl benfica', 'benfica', 'sport lisboa e benfica', 'slb'],
+  },
+  porto: {
+    id: 'team_porto',
+    name: 'FC Porto',
+    shortName: 'Porto',
+    tla: 'FCP',
+    crestUrl: 'https://crests.football-data.org/503.png',
+    competitionCode: 'P1',
+    attackRating: 1.48,
+    defenseRating: 0.80,
+    cornerAttackRating: 1.30,
+    disciplineRating: 0.92,
+    recentForm: ['W', 'W', 'L', 'W', 'W'],
+    sampleMatches: 24,
+    aliases: ['fc porto', 'porto', 'futebol clube do porto', 'fcp'],
+  },
+  braga: {
+    id: 'team_braga',
+    name: 'SC Braga',
+    shortName: 'Braga',
+    tla: 'SCB',
+    crestUrl: 'https://crests.football-data.org/5613.png',
+    competitionCode: 'P1',
+    attackRating: 1.32,
+    defenseRating: 0.98,
+    cornerAttackRating: 1.22,
+    disciplineRating: 0.95,
+    recentForm: ['W', 'D', 'W', 'W', 'L'],
+    sampleMatches: 24,
+    aliases: ['sc braga', 'braga', 'sporting clube de braga', 'scb'],
+  },
+  vitoriasc: {
+    id: 'team_vitoriasc',
+    name: 'Vitória SC',
+    shortName: 'Vitória SC',
+    tla: 'VIT',
+    crestUrl: 'https://crests.football-data.org/5543.png',
+    competitionCode: 'P1',
+    attackRating: 1.15,
+    defenseRating: 1.05,
+    cornerAttackRating: 1.12,
+    disciplineRating: 1.05,
+    recentForm: ['W', 'D', 'D', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['vitoria sc', 'vitória sc', 'vitoria de guimaraes', 'vitória de guimarães', 'guimaraes'],
+  },
 };
 
 /**
@@ -2530,6 +2623,12 @@ export const COMPETITION_CLUBS: Record<string, string[]> = {
     'team_vasco', 'team_athleticopr', 'team_bragantino', 'team_fortaleza', 'team_bahia',
     'team_cuiaba', 'team_juventude', 'team_criciuma', 'team_atleticogo', 'team_vitoria',
     'team_santos'
+  ],
+  P1: [
+    'team_sportingcp', 'team_casapia', 'team_benfica', 'team_porto', 'team_braga', 'team_vitoriasc'
+  ],
+  PPL: [
+    'team_sportingcp', 'team_casapia', 'team_benfica', 'team_porto', 'team_braga', 'team_vitoriasc'
   ]
 };
 

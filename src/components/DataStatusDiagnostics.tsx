@@ -20,11 +20,35 @@ interface UnderSampledTeam {
   matchCount: number;
 }
 
+interface LeagueLatestDate {
+  league: string;
+  leagueName: string;
+  count: number;
+  earliestDate: string | null;
+  latestDate: string | null;
+  daysAgo: number | null;
+  isStale: boolean;
+}
+
+interface TeamLatestDate {
+  teamId: string;
+  name: string;
+  shortName: string;
+  competitionCode: string;
+  matchCount: number;
+  earliestDate: string | null;
+  latestDate: string | null;
+  daysAgo: number | null;
+  isStale: boolean;
+}
+
 interface DataStatusData {
   totalMatches: number;
   earliestDate: string | null;
   latestDate: string | null;
   matchesPerLeagueAndSeason: LeagueSeasonStat[];
+  leagueLatestDates?: LeagueLatestDate[];
+  teamLatestDates?: TeamLatestDate[];
   teamsWithFewerThan10Matches: UnderSampledTeam[];
   unmatchedNamesCount?: number;
   unmatchedNames?: string[];
@@ -41,24 +65,37 @@ export default function DataStatusDiagnostics() {
   const [adminSecretInput, setAdminSecretInput] = useState<string>('');
   const [isSecretSaved, setIsSecretSaved] = useState<boolean>(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [teamSearchQuery, setTeamSearchQuery] = useState<string>('');
 
-  // Call list including 2526 and 2627 for all leagues, BSA 2025 and 2026, dropping 1920
+  // Comprehensive backfill call list for all supported leagues & extra leagues
   const exampleCalls = [
-    { league: 'PL', season: '2627', desc: 'Premier League 2026-27 (Current In-Play)' },
-    { league: 'PL', season: '2526', desc: 'Premier League 2025-26' },
-    { league: 'PD', season: '2627', desc: 'La Liga 2026-27 (Current In-Play)' },
-    { league: 'PD', season: '2526', desc: 'La Liga 2025-26' },
-    { league: 'BL1', season: '2627', desc: 'Bundesliga 2026-27 (Current In-Play)' },
-    { league: 'BL1', season: '2526', desc: 'Bundesliga 2025-26' },
-    { league: 'SA', season: '2627', desc: 'Serie A 2026-27 (Current In-Play)' },
-    { league: 'SA', season: '2526', desc: 'Serie A 2025-26' },
-    { league: 'FL1', season: '2627', desc: 'Ligue 1 2026-27 (Current In-Play)' },
-    { league: 'FL1', season: '2526', desc: 'Ligue 1 2025-26' },
-    { league: 'DED', season: '2627', desc: 'Eredivisie 2026-27 (Current In-Play)' },
-    { league: 'DED', season: '2526', desc: 'Eredivisie 2025-26' },
-    { league: 'BSA', season: '2026', desc: 'Brazil Série A 2026' },
-    { league: 'BSA', season: '2025', desc: 'Brazil Série A 2025' },
-    { league: 'BSA', season: '2024', desc: 'Brazil Série A 2024' },
+    { league: 'ELC', season: '2627', desc: 'Championship 2026-27 (Current In-Play) · Has Corners & Cards' },
+    { league: 'ELC', season: '2526', desc: 'Championship 2025-26 · Has Corners & Cards' },
+    { league: 'PL', season: '2627', desc: 'Premier League 2026-27 (Current In-Play) · Has Corners & Cards' },
+    { league: 'PL', season: '2526', desc: 'Premier League 2025-26 · Has Corners & Cards' },
+    { league: 'PD', season: '2627', desc: 'La Liga 2026-27 (Current In-Play) · Has Corners & Cards' },
+    { league: 'PD', season: '2526', desc: 'La Liga 2025-26 · Has Corners & Cards' },
+    { league: 'BL1', season: '2627', desc: 'Bundesliga 2026-27 (Current In-Play) · Has Corners & Cards' },
+    { league: 'BL1', season: '2526', desc: 'Bundesliga 2025-26 · Has Corners & Cards' },
+    { league: 'SA', season: '2627', desc: 'Serie A 2026-27 (Current In-Play) · Has Corners & Cards' },
+    { league: 'SA', season: '2526', desc: 'Serie A 2025-26 · Has Corners & Cards' },
+    { league: 'FL1', season: '2627', desc: 'Ligue 1 2026-27 (Current In-Play) · Has Corners & Cards' },
+    { league: 'FL1', season: '2526', desc: 'Ligue 1 2025-26 · Has Corners & Cards' },
+    { league: 'DED', season: '2627', desc: 'Eredivisie 2026-27 (Current In-Play) · Has Corners & Cards' },
+    { league: 'DED', season: '2526', desc: 'Eredivisie 2025-26 · Has Corners & Cards' },
+    { league: 'P1', season: '2627', desc: 'Portugal Primeira Liga 2026-27 (Current In-Play) · Has Corners & Cards' },
+    { league: 'P1', season: '2526', desc: 'Portugal Primeira Liga 2025-26 · Has Corners & Cards' },
+    { league: 'T1', season: '2627', desc: 'Turkey Süper Lig 2026-27 (Current In-Play) · Has Corners & Cards' },
+    { league: 'T1', season: '2526', desc: 'Turkey Süper Lig 2025-26 · Has Corners & Cards' },
+    { league: 'SC0', season: '2627', desc: 'Scotland Premiership 2026-27 (Current In-Play) · Has Corners & Cards' },
+    { league: 'SC0', season: '2526', desc: 'Scotland Premiership 2025-26 · Has Corners & Cards' },
+    { league: 'DNK', season: '2026', desc: 'Denmark Superliga (Extra League /new/DNK.csv) · No Corners/Cards' },
+    { league: 'NOR', season: '2026', desc: 'Norway Eliteserien (Extra League /new/NOR.csv) · No Corners/Cards' },
+    { league: 'FIN', season: '2026', desc: 'Finland Veikkausliiga (Extra League /new/FIN.csv) · No Corners/Cards' },
+    { league: 'JPN', season: '2026', desc: 'Japan J1 League (Extra League /new/JPN.csv) · No Corners/Cards' },
+    { league: 'ARG', season: '2026', desc: 'Argentina Liga Profesional (Extra League /new/ARG.csv) · No Corners/Cards' },
+    { league: 'BSA', season: '2026', desc: 'Brazil Série A 2026 (Extra League /new/BRA.csv) · No Corners/Cards' },
+    { league: 'BSA', season: '2025', desc: 'Brazil Série A 2025 (Extra League /new/BRA.csv) · No Corners/Cards' },
   ];
 
   const fetchDataStatus = async (secretOverride?: string) => {
@@ -286,6 +323,112 @@ export default function DataStatusDiagnostics() {
                       </span>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Latest Stored Match Date Per League */}
+          {data.leagueLatestDates && data.leagueLatestDates.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <div className="text-[11.5px] font-semibold text-[#ECF1EE] flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-[#B6E63B]" />
+                  <span>Latest Stored Match Date Per League</span>
+                </span>
+                <span className="text-[10px] font-mono text-[#5E6A63]">
+                  {data.leagueLatestDates.filter(l => !l.isStale).length} / {data.leagueLatestDates.length} current
+                </span>
+              </div>
+              <div className="border border-white/[0.07] bg-[#151E19] rounded-[10px] overflow-hidden text-[11px] font-mono">
+                <div className="grid grid-cols-5 px-3 py-1.5 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
+                  <span className="col-span-2">League</span>
+                  <span className="text-right">Stored Matches</span>
+                  <span className="text-right">Latest Loaded Date</span>
+                  <span className="text-right">Staleness Status</span>
+                </div>
+                <div className="divide-y divide-white/[0.04] max-h-56 overflow-y-auto">
+                  {data.leagueLatestDates.map((l) => (
+                    <div key={l.league} className="grid grid-cols-5 px-3 py-1.5 text-[#8B9890] hover:text-[#ECF1EE] items-center">
+                      <div className="col-span-2 truncate pr-2">
+                        <span className="font-semibold text-[#ECF1EE]">{l.league}</span>
+                        <span className="text-[#5E6A63] ml-1.5 text-[10px] truncate">{l.leagueName}</span>
+                      </div>
+                      <span className="text-right font-bold tabular-nums text-[#B6E63B]">{l.count}</span>
+                      <span className="text-right text-[#ECF1EE] truncate">
+                        {l.latestDate ? l.latestDate.substring(0, 10) : 'None'}
+                      </span>
+                      <div className="text-right">
+                        {l.isStale ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                            {l.daysAgo !== null ? `Stale (${l.daysAgo}d ago)` : 'No Data'}
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-[#B6E63B]/10 text-[#B6E63B] border border-[#B6E63B]/30">
+                            Active ({l.daysAgo}d ago)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Latest Stored Match Date Per Club */}
+          {data.teamLatestDates && data.teamLatestDates.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <div className="text-[11.5px] font-semibold text-[#ECF1EE] flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#B6E63B]" />
+                  <span>Latest Stored Match Date Per Club ({data.teamLatestDates.length} registered)</span>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Filter club name / league..."
+                  value={teamSearchQuery}
+                  onChange={(e) => setTeamSearchQuery(e.target.value)}
+                  className="bg-black/40 border border-white/[0.08] rounded px-2 py-0.5 text-[10.5px] font-mono text-[#ECF1EE] placeholder-[#5E6A63] outline-none w-44"
+                />
+              </div>
+              <div className="border border-white/[0.07] bg-[#151E19] rounded-[10px] overflow-hidden text-[11px] font-mono">
+                <div className="grid grid-cols-5 px-3 py-1.5 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
+                  <span className="col-span-2">Club Name</span>
+                  <span className="text-right">Stored Matches</span>
+                  <span className="text-right">Latest Match</span>
+                  <span className="text-right">Staleness Status</span>
+                </div>
+                <div className="divide-y divide-white/[0.04] max-h-56 overflow-y-auto">
+                  {data.teamLatestDates
+                    .filter((t) => {
+                      if (!teamSearchQuery.trim()) return true;
+                      const q = teamSearchQuery.toLowerCase().trim();
+                      return t.name.toLowerCase().includes(q) || t.shortName.toLowerCase().includes(q) || t.competitionCode.toLowerCase().includes(q);
+                    })
+                    .map((t) => (
+                      <div key={t.teamId} className="grid grid-cols-5 px-3 py-1.5 text-[#8B9890] hover:text-[#ECF1EE] items-center">
+                        <div className="col-span-2 truncate pr-2">
+                          <span className="font-semibold text-[#ECF1EE]">{t.shortName}</span>
+                          <span className="text-[#5E6A63] ml-1.5 text-[10px]">({t.competitionCode})</span>
+                        </div>
+                        <span className="text-right font-bold tabular-nums text-[#B6E63B]">{t.matchCount}</span>
+                        <span className="text-right text-[#ECF1EE] truncate">
+                          {t.latestDate ? t.latestDate.substring(0, 10) : 'None'}
+                        </span>
+                        <div className="text-right">
+                          {t.isStale ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                              {t.daysAgo !== null ? `Stale (${t.daysAgo}d)` : 'Needs Backfill'}
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-[#B6E63B]/10 text-[#B6E63B] border border-[#B6E63B]/30">
+                              Active ({t.daysAgo}d)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                 </div>
               </div>
             </div>

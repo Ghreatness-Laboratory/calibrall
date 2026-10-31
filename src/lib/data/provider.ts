@@ -64,7 +64,7 @@ export function americanToDecimalOdds(val: string | number | undefined | null): 
   return 1.0;
 }
 
-// Mapping of supported European league codes to ESPN soccer slugs
+// Mapping of supported league codes to ESPN soccer slugs
 const ESPN_LEAGUE_MAP: Record<string, { slug: string; name: string; country: string; defaultMatchday: number }> = {
   PL: { slug: 'eng.1', name: 'Premier League', country: 'England', defaultMatchday: 9 },
   ELC: { slug: 'eng.2', name: 'Championship', country: 'England', defaultMatchday: 12 },
@@ -74,6 +74,16 @@ const ESPN_LEAGUE_MAP: Record<string, { slug: string; name: string; country: str
   FL1: { slug: 'fra.1', name: 'Ligue 1', country: 'France', defaultMatchday: 9 },
   DED: { slug: 'ned.1', name: 'Eredivisie', country: 'Netherlands', defaultMatchday: 10 },
   CL: { slug: 'uefa.champions', name: 'UEFA Champions League', country: 'Europe', defaultMatchday: 3 },
+  P1: { slug: 'por.1', name: 'Primeira Liga', country: 'Portugal', defaultMatchday: 9 },
+  PPL: { slug: 'por.1', name: 'Primeira Liga', country: 'Portugal', defaultMatchday: 9 },
+  T1: { slug: 'tur.1', name: 'Süper Lig', country: 'Turkey', defaultMatchday: 10 },
+  TSL: { slug: 'tur.1', name: 'Süper Lig', country: 'Turkey', defaultMatchday: 10 },
+  SC0: { slug: 'sco.1', name: 'Scottish Premiership', country: 'Scotland', defaultMatchday: 10 },
+  SP: { slug: 'sco.1', name: 'Scottish Premiership', country: 'Scotland', defaultMatchday: 10 },
+  BSA: { slug: 'bra.1', name: 'Série A', country: 'Brazil', defaultMatchday: 30 },
+  BRA: { slug: 'bra.1', name: 'Série A', country: 'Brazil', defaultMatchday: 30 },
+  ARG: { slug: 'arg.1', name: 'Liga Profesional', country: 'Argentina', defaultMatchday: 15 },
+  JPN: { slug: 'jpn.1', name: 'J1 League', country: 'Japan', defaultMatchday: 25 },
 };
 
 // Normalize Football-Data.org fixture
@@ -367,6 +377,10 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
     }
   }
 
+  const rawClock = ev.status?.displayClock || ev.status?.clock;
+  const parsedMinute = rawClock ? parseInt(String(rawClock).replace(/[^0-9]/g, ''), 10) : undefined;
+  const statusDetail = ev.status?.type?.shortDetail || ev.status?.type?.description;
+
   return {
     id: `fix_espn_${ev.id}`,
     providerId: String(ev.id),
@@ -381,6 +395,8 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
     kickoffTime: ev.date,
     matchday, // Sourced from provider; never hardcoded
     status,
+    minute: !isNaN(parsedMinute as number) ? parsedMinute : undefined,
+    statusDetail,
     homeScore,
     awayScore,
     venue: compData.venue?.fullName || 'European Stadium',

@@ -229,6 +229,8 @@ export interface Fixture {
   kickoffTime: string; // ISO string
   matchday: number;
   status: MatchStatus;
+  minute?: number;
+  statusDetail?: string;
   homeScore?: number | null;
   awayScore?: number | null;
   homeHalfTimeScore?: number | null;

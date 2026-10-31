@@ -9,6 +9,8 @@ export const revalidate = 0;
 
 import {
   DIVISION_MAP,
+  EXTRA_LEAGUES_MAP,
+  LEAGUE_METADATA,
   SUPPORTED_EUROPEAN_SEASONS,
   SUPPORTED_BRAZIL_SEASONS,
   generateBackfillCallList,
@@ -34,7 +36,8 @@ export async function GET(req: NextRequest) {
     service: 'Calibrall Admin Backfill Pipeline',
     status: 'ACTIVE',
     authentication: 'Header x-admin-secret required (min 32 characters, constant-time evaluated)',
-    supportedLeagues: Object.keys(DIVISION_MAP).concat(['BSA']),
+    supportedLeagues: Array.from(new Set([...Object.keys(DIVISION_MAP), ...Object.keys(EXTRA_LEAGUES_MAP)])),
+    leagueCapabilities: LEAGUE_METADATA,
     supportedEuropeanSeasons: SUPPORTED_EUROPEAN_SEASONS,
     supportedBrazilSeasons: SUPPORTED_BRAZIL_SEASONS,
     droppedSeasons: ['1920', '2019'],
@@ -63,7 +66,7 @@ export async function POST(req: NextRequest) {
   if (season === '1920' || season === '2019') {
     return NextResponse.json(
       {
-        error: 'Invalid season: Season 1920/2019 has been deprecated and dropped from Calibrall pipelines. Please use 2021 through 2627 for Europe, and 2020 through 2026 for Brazil.',
+        error: 'Invalid season: Season 1920/2019 has been deprecated and dropped from Calibrall pipelines. Please use 2021 through 2627 for Europe, and 2020 through 2026 for Brazil/extra leagues.',
         supportedEuropeanSeasons: SUPPORTED_EUROPEAN_SEASONS,
         supportedBrazilSeasons: SUPPORTED_BRAZIL_SEASONS,
       },
@@ -77,16 +80,18 @@ export async function POST(req: NextRequest) {
   let sourceUsed = 'football-data.co.uk';
 
   try {
-    // 3. Option A: Brazil Série A CSV
-    if (league === 'BSA') {
-      sourceUsed = 'football-data.co.uk:BRA';
-      const csvRes = await fetch('https://football-data.co.uk/new/BRA.csv', {
+    // 3. Option A: Extra-League CSV files (/new/{CODE}.csv) - BSA, BRA, ARG, DNK, NOR, FIN, JPN
+    const extraFileCode = EXTRA_LEAGUES_MAP[league];
+    if (extraFileCode) {
+      sourceUsed = `football-data.co.uk:${extraFileCode}`;
+      const csvUrl = `https://football-data.co.uk/new/${extraFileCode}.csv`;
+      const csvRes = await fetch(csvUrl, {
         headers: { 'User-Agent': 'Calibrall/1.0' },
         cache: 'no-store',
       });
 
       if (!csvRes.ok) {
-        throw new Error(`Failed to fetch Brazil CSV from football-data.co.uk: HTTP ${csvRes.status}`);
+        throw new Error(`Failed to fetch ${league} CSV from ${csvUrl}: HTTP ${csvRes.status}`);
       }
 
       const csvRawText = await csvRes.text();
@@ -104,10 +109,10 @@ export async function POST(req: NextRequest) {
       });
 
       if (records.length === 0) {
-        throw new Error('Empty Brazil CSV response');
+        throw new Error(`Empty CSV response for ${league}`);
       }
 
-      // Map requested season to Brazil season year: e.g. "2024", "2025", "2026"
+      // Map requested season to year or split year format
       const targetSeasonYear = season.length === 4 && season.startsWith('20')
         ? season
         : season === '2627' ? '2026'
@@ -120,8 +125,19 @@ export async function POST(req: NextRequest) {
         : season;
 
       for (const row of records) {
-        const rowSeason = row['Season']?.trim();
-        if (rowSeason !== targetSeasonYear) continue;
+        const rowSeason = row['Season']?.trim() || '';
+        const matchesSeason = (
+          rowSeason === season ||
+          rowSeason === targetSeasonYear ||
+          rowSeason.replace('/', '') === season ||
+          ((season === '2627' || season === '2026') && (rowSeason === '2026' || rowSeason === '2026/2027' || rowSeason === '2627')) ||
+          ((season === '2526' || season === '2025') && (rowSeason === '2025' || rowSeason === '2025/2026' || rowSeason === '2526')) ||
+          ((season === '2425' || season === '2024') && (rowSeason === '2024' || rowSeason === '2024/2025' || rowSeason === '2425')) ||
+          ((season === '2324' || season === '2023') && (rowSeason === '2023' || rowSeason === '2023/2024' || rowSeason === '2324')) ||
+          ((season === '2223' || season === '2022') && (rowSeason === '2022' || rowSeason === '2022/2023' || rowSeason === '2223')) ||
+          ((season === '2122' || season === '2021') && (rowSeason === '2021' || rowSeason === '2021/2022' || rowSeason === '2122'))
+        );
+        if (!matchesSeason) continue;
 
         const rawHome = row['Home']?.trim();
         const rawAway = row['Away']?.trim();
@@ -131,52 +147,47 @@ export async function POST(req: NextRequest) {
         }
 
         const rawDate = row['Date']?.trim();
-        // Brazil matches stored date-only (YYYY-MM-DD with null time)
-        const isoKickoff = parseBrazilCsvDate(rawDate);
+        const rawTime = row['Time']?.trim() || null;
+        const isoKickoff = parseLondonCsvDateTime(rawDate, rawTime) || parseBrazilCsvDate(rawDate);
         if (!isoKickoff) {
           rowsSkipped++;
           continue; // Skip invalid date row
         }
 
-        // Canonical team identity created directly from CSV itself: One canonical team per league and CSV name
-        // Never skips matches due to unknown team!
-        const homeResolved = getCanonicalTeamForCsv('BSA', rawHome);
-        const awayResolved = getCanonicalTeamForCsv('BSA', rawAway);
+        const homeResolved = getCanonicalTeamForCsv(league, rawHome);
+        const awayResolved = getCanonicalTeamForCsv(league, rawAway);
 
         const hg = parseInt(row['HG'], 10);
         const ag = parseInt(row['AG'], 10);
         const isFinished = !isNaN(hg) && !isNaN(ag);
 
         const cleanDateStr = rawDate.replace(/\//g, '');
-        // provider_id format independent of team IDs for idempotent re-runs:
-        // fdco:{div}:{season}:{yyyymmdd}:{homeRaw}:{awayRaw}
-        const providerId = `fdco:bra:${targetSeasonYear}:${cleanDateStr}:${sanitizeRawTeamForId(rawHome)}:${sanitizeRawTeamForId(rawAway)}`;
+        const providerId = `fdco:${extraFileCode.toLowerCase()}:${targetSeasonYear}:${cleanDateStr}:${sanitizeRawTeamForId(rawHome)}:${sanitizeRawTeamForId(rawAway)}`;
 
-        // Matchday: take from provider if present, or null. Never compute from row index!
         const matchdayRaw = row['Round'] || row['Matchday'] || row['MW'] || null;
         const matchday = matchdayRaw ? parseInt(matchdayRaw, 10) : null;
 
         matches.push({
           id: providerId,
           provider_id: providerId,
-          competition_code: 'BSA',
+          competition_code: league,
           season: season,
           matchday: !isNaN(matchday as number) ? matchday : null,
           home_team_id: homeResolved.id,
           away_team_id: awayResolved.id,
           home_team_name: homeResolved.name,
           away_team_name: awayResolved.name,
-          kickoff_time: isoKickoff, // date-only
+          kickoff_time: isoKickoff,
           status: isFinished ? 'FINISHED' : 'SCHEDULED',
           home_score: isFinished ? hg : null,
           away_score: isFinished ? ag : null,
-          source: 'football-data.co.uk:brazil',
+          source: `football-data.co.uk:${extraFileCode.toLowerCase()}`,
         });
 
         // Pre-match odds (observed_at: null, snapshot_type: 'csv_pre_match')
-        const preH = parseFloat(row['AvgH'] || row['PH'] || row['MaxH']);
-        const preD = parseFloat(row['AvgD'] || row['PD'] || row['MaxD']);
-        const preA = parseFloat(row['AvgA'] || row['PA'] || row['MaxA']);
+        const preH = parseFloat(row['AvgH'] || row['PH'] || row['MaxH'] || row['B365H']);
+        const preD = parseFloat(row['AvgD'] || row['PD'] || row['MaxD'] || row['B365D']);
+        const preA = parseFloat(row['AvgA'] || row['PA'] || row['MaxA'] || row['B365A']);
 
         if (!isNaN(preH) && preH >= 1.01) {
           oddsSnapshots.push({
@@ -187,7 +198,7 @@ export async function POST(req: NextRequest) {
             decimal_odds: preH,
             observed_at: null,
             snapshot_type: 'csv_pre_match',
-            source: 'football-data.co.uk:brazil',
+            source: `football-data.co.uk:${extraFileCode.toLowerCase()}`,
           });
         }
         if (!isNaN(preD) && preD >= 1.01) {
@@ -199,7 +210,7 @@ export async function POST(req: NextRequest) {
             decimal_odds: preD,
             observed_at: null,
             snapshot_type: 'csv_pre_match',
-            source: 'football-data.co.uk:brazil',
+            source: `football-data.co.uk:${extraFileCode.toLowerCase()}`,
           });
         }
         if (!isNaN(preA) && preA >= 1.01) {
@@ -211,14 +222,14 @@ export async function POST(req: NextRequest) {
             decimal_odds: preA,
             observed_at: null,
             snapshot_type: 'csv_pre_match',
-            source: 'football-data.co.uk:brazil',
+            source: `football-data.co.uk:${extraFileCode.toLowerCase()}`,
           });
         }
 
         // Closing odds (observed_at: null, snapshot_type: 'csv_closing')
-        const closeH = parseFloat(row['AvgCH'] || row['PSCH']);
-        const closeD = parseFloat(row['AvgCD'] || row['PSCD']);
-        const closeA = parseFloat(row['AvgCA'] || row['PSCA']);
+        const closeH = parseFloat(row['AvgCH'] || row['PSCH'] || row['MaxCH'] || row['B365CH']);
+        const closeD = parseFloat(row['AvgCD'] || row['PSCD'] || row['MaxCD'] || row['B365CD']);
+        const closeA = parseFloat(row['AvgCA'] || row['PSCA'] || row['MaxCA'] || row['B365CA']);
 
         if (!isNaN(closeH) && closeH >= 1.01) {
           oddsSnapshots.push({
@@ -229,7 +240,7 @@ export async function POST(req: NextRequest) {
             decimal_odds: closeH,
             observed_at: null,
             snapshot_type: 'csv_closing',
-            source: 'football-data.co.uk:brazil:closing',
+            source: `football-data.co.uk:${extraFileCode.toLowerCase()}:closing`,
           });
         }
         if (!isNaN(closeD) && closeD >= 1.01) {
@@ -241,7 +252,7 @@ export async function POST(req: NextRequest) {
             decimal_odds: closeD,
             observed_at: null,
             snapshot_type: 'csv_closing',
-            source: 'football-data.co.uk:brazil:closing',
+            source: `football-data.co.uk:${extraFileCode.toLowerCase()}:closing`,
           });
         }
         if (!isNaN(closeA) && closeA >= 1.01) {
@@ -253,17 +264,17 @@ export async function POST(req: NextRequest) {
             decimal_odds: closeA,
             observed_at: null,
             snapshot_type: 'csv_closing',
-            source: 'football-data.co.uk:brazil:closing',
+            source: `football-data.co.uk:${extraFileCode.toLowerCase()}:closing`,
           });
         }
       }
     } else {
-      // 4. Option B: European Leagues CSV (PL, PD, BL1, SA, FL1, DED)
+      // 4. Option B: European Seasonal Leagues CSV (PL, ELC, PD, BL1, SA, FL1, DED, P1, T1, SC0, etc.)
       const divCode = DIVISION_MAP[league];
       if (!divCode) {
         return NextResponse.json(
           {
-            error: `Unsupported league code '${league}'. Supported leagues: ${Object.keys(DIVISION_MAP).join(', ')}, BSA`,
+            error: `Unsupported league code '${league}'. Supported leagues: ${Array.from(new Set([...Object.keys(DIVISION_MAP), ...Object.keys(EXTRA_LEAGUES_MAP)])).join(', ')}`,
           },
           { status: 400 }
         );

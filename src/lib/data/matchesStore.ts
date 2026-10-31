@@ -109,6 +109,28 @@ export interface StoredOddsSnapshot {
   source: string;
 }
 
+export interface LeagueLatestDateInfo {
+  league: string;
+  leagueName: string;
+  count: number;
+  earliestDate: string | null;
+  latestDate: string | null;
+  daysAgo: number | null;
+  isStale: boolean;
+}
+
+export interface TeamLatestDateInfo {
+  teamId: string;
+  name: string;
+  shortName: string;
+  competitionCode: string;
+  matchCount: number;
+  earliestDate: string | null;
+  latestDate: string | null;
+  daysAgo: number | null;
+  isStale: boolean;
+}
+
 export interface DataStatusReport {
   totalMatches: number;
   earliestDate: string | null;
@@ -120,6 +142,8 @@ export interface DataStatusReport {
     earliestDate: string;
     latestDate: string;
   }[];
+  leagueLatestDates: LeagueLatestDateInfo[];
+  teamLatestDates: TeamLatestDateInfo[];
   teamsWithFewerThan10Matches: {
     teamId: string;
     name: string;
@@ -930,6 +954,28 @@ class MatchesStore {
     const leagueSeasonMap = new Map<string, { league: string; season: string; count: number; earliestDate: string; latestDate: string }>();
     const teamFinishedCounts = new Map<string, number>();
 
+    const KNOWN_LEAGUES: { code: string; name: string }[] = [
+      { code: 'PL', name: 'Premier League (England)' },
+      { code: 'ELC', name: 'Championship (England)' },
+      { code: 'PD', name: 'La Liga (Spain)' },
+      { code: 'BL1', name: 'Bundesliga (Germany)' },
+      { code: 'SA', name: 'Serie A (Italy)' },
+      { code: 'FL1', name: 'Ligue 1 (France)' },
+      { code: 'DED', name: 'Eredivisie (Netherlands)' },
+      { code: 'P1', name: 'Primeira Liga (Portugal)' },
+      { code: 'T1', name: 'Süper Lig (Turkey)' },
+      { code: 'SC0', name: 'Premiership (Scotland)' },
+      { code: 'DNK', name: 'Superliga (Denmark)' },
+      { code: 'NOR', name: 'Eliteserien (Norway)' },
+      { code: 'FIN', name: 'Veikkausliiga (Finland)' },
+      { code: 'JPN', name: 'J1 League (Japan)' },
+      { code: 'ARG', name: 'Liga Profesional (Argentina)' },
+      { code: 'BSA', name: 'Série A (Brazil)' },
+    ];
+
+    const leagueStatsMap = new Map<string, { count: number; earliestDate: string | null; latestDate: string | null }>();
+    const teamMatchesMap = new Map<string, { count: number; earliestDate: string | null; latestDate: string | null }>();
+
     let earliestDate: string | null = null;
     let latestDate: string | null = null;
 
@@ -958,7 +1004,88 @@ class MatchesStore {
         teamFinishedCounts.set(m.home_team_id, (teamFinishedCounts.get(m.home_team_id) || 0) + 1);
         teamFinishedCounts.set(m.away_team_id, (teamFinishedCounts.get(m.away_team_id) || 0) + 1);
       }
+
+      // League stats
+      const lCode = m.competition_code.toUpperCase();
+      const lStat = leagueStatsMap.get(lCode) || { count: 0, earliestDate: null, latestDate: null };
+      lStat.count++;
+      if (!lStat.earliestDate || kDate < lStat.earliestDate) lStat.earliestDate = kDate;
+      if (!lStat.latestDate || kDate > lStat.latestDate) lStat.latestDate = kDate;
+      leagueStatsMap.set(lCode, lStat);
+
+      // Team match stats (home & away)
+      const homeStat = teamMatchesMap.get(m.home_team_id) || { count: 0, earliestDate: null, latestDate: null };
+      homeStat.count++;
+      if (!homeStat.earliestDate || kDate < homeStat.earliestDate) homeStat.earliestDate = kDate;
+      if (!homeStat.latestDate || kDate > homeStat.latestDate) homeStat.latestDate = kDate;
+      teamMatchesMap.set(m.home_team_id, homeStat);
+
+      const awayStat = teamMatchesMap.get(m.away_team_id) || { count: 0, earliestDate: null, latestDate: null };
+      awayStat.count++;
+      if (!awayStat.earliestDate || kDate < awayStat.earliestDate) awayStat.earliestDate = kDate;
+      if (!awayStat.latestDate || kDate > awayStat.latestDate) awayStat.latestDate = kDate;
+      teamMatchesMap.set(m.away_team_id, awayStat);
     }
+
+    const nowMs = Date.now();
+    const STALE_THRESHOLD_DAYS = 21; // Matchmind standard staleness threshold
+
+    const leagueLatestDates: LeagueLatestDateInfo[] = KNOWN_LEAGUES.map((l) => {
+      // Also check alternative codes if applicable (e.g. P1 vs PPL, T1 vs TSL, SC0 vs SP)
+      const altCodes = [l.code];
+      if (l.code === 'P1') altCodes.push('PPL');
+      if (l.code === 'T1') altCodes.push('TSL');
+      if (l.code === 'SC0') altCodes.push('SP');
+      if (l.code === 'BSA') altCodes.push('BRA');
+
+      let totalCount = 0;
+      let earliest: string | null = null;
+      let latest: string | null = null;
+
+      for (const code of altCodes) {
+        const stat = leagueStatsMap.get(code);
+        if (stat) {
+          totalCount += stat.count;
+          if (!earliest || (stat.earliestDate && stat.earliestDate < earliest)) earliest = stat.earliestDate;
+          if (!latest || (stat.latestDate && stat.latestDate > latest)) latest = stat.latestDate;
+        }
+      }
+
+      const daysAgo = latest
+        ? Math.floor((nowMs - new Date(latest).getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+      const isStale = daysAgo === null || daysAgo > STALE_THRESHOLD_DAYS;
+
+      return {
+        league: l.code,
+        leagueName: l.name,
+        count: totalCount,
+        earliestDate: earliest,
+        latestDate: latest,
+        daysAgo,
+        isStale,
+      };
+    });
+
+    const teamLatestDates: TeamLatestDateInfo[] = registeredTeams.map((t) => {
+      const stat = teamMatchesMap.get(t.id) || { count: 0, earliestDate: null, latestDate: null };
+      const daysAgo = stat.latestDate
+        ? Math.floor((nowMs - new Date(stat.latestDate).getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+      const isStale = daysAgo === null || daysAgo > STALE_THRESHOLD_DAYS;
+
+      return {
+        teamId: t.id,
+        name: t.name,
+        shortName: t.shortName,
+        competitionCode: t.competitionCode,
+        matchCount: stat.count,
+        earliestDate: stat.earliestDate,
+        latestDate: stat.latestDate,
+        daysAgo,
+        isStale,
+      };
+    });
 
     // 3. Identify every team with fewer than 10 matches by joining the teams table
     const teamsWithFewerThan10Matches: {
@@ -992,6 +1119,16 @@ class MatchesStore {
       matchesPerLeagueAndSeason: Array.from(leagueSeasonMap.values()).sort(
         (a, b) => a.league.localeCompare(b.league) || b.season.localeCompare(a.season)
       ),
+      leagueLatestDates: leagueLatestDates.sort((a, b) => {
+        if (a.count === 0 && b.count > 0) return 1;
+        if (b.count === 0 && a.count > 0) return -1;
+        return (a.daysAgo ?? 9999) - (b.daysAgo ?? 9999);
+      }),
+      teamLatestDates: teamLatestDates.sort((a, b) => {
+        if (a.matchCount === 0 && b.matchCount > 0) return 1;
+        if (b.matchCount === 0 && a.matchCount > 0) return -1;
+        return (a.daysAgo ?? 9999) - (b.daysAgo ?? 9999) || a.name.localeCompare(b.name);
+      }),
       teamsWithFewerThan10Matches: teamsWithFewerThan10Matches.sort(
         (a, b) => a.matchCount - b.matchCount || a.name.localeCompare(b.name)
       ),

@@ -8,9 +8,10 @@ import { cleanDisplayText } from '@/lib/utils/formatText';
 interface Props {
   lineupState: FixtureLineupState;
   className?: string;
+  isPastKickoff?: boolean;
 }
 
-export default function LineupChip({ lineupState, className = '' }: Props) {
+export default function LineupChip({ lineupState, className = '', isPastKickoff = false }: Props) {
   const { status, expectedReleaseTimeFormatted, isWithin30MinsOfKickoff, anyKeyPlayerOut, firstKeyPlayerOutName } = lineupState;
 
   // 1. Key player out on confirmed lineup: Amber/Red with AlertTriangle icon + explicit name text (never colour alone)
@@ -38,19 +39,19 @@ export default function LineupChip({ lineupState, className = '' }: Props) {
     );
   }
 
-  // 3. Late release within 30 minutes of kickoff: Yellow/Neutral advisory, never guessing!
-  if (status === 'unreleased_late' || isWithin30MinsOfKickoff) {
+  // 3. Past kickoff or unreleased late: Remove "Lineups pending" and display "Lineups not released"
+  if (isPastKickoff || status === 'unreleased_late' || isWithin30MinsOfKickoff) {
     return (
       <span
         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/25 ${className}`}
       >
         <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" strokeWidth={2} />
-        <span>Lineup not released yet</span>
+        <span>Lineups not released</span>
       </span>
     );
   }
 
-  // 4. Standard pending: Grey with Clock icon and expected release time (~T-60)
+  // 4. Standard pending (Strictly pre-kickoff): Grey with Clock icon and expected release time (~T-60)
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-normal bg-[#151E19] text-[#8B9890] border border-white/[0.07] ${className}`}
