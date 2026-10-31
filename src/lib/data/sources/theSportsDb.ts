@@ -42,11 +42,7 @@ export class TheSportsDbService {
     const cached = this.cache.get(teamNameOrId);
     if (cached) return cached;
 
-    const apiKey = process.env.THESPORTSDB_API_KEY?.trim();
-    if (!apiKey) {
-      // Use cached/fallback
-      return this.cache.get(teamNameOrId) || null;
-    }
+    const apiKey = process.env.THESPORTSDB_API_KEY?.trim() || '123';
 
     const now = Date.now();
     const elapsed = now - this.lastCallTime;
@@ -95,3 +91,7 @@ export class TheSportsDbService {
 }
 
 export const theSportsDbService = new TheSportsDbService();
+
+export function getMissingBadges(): string[] {
+  return theSportsDbService.getClubsWithoutCrest();
+}

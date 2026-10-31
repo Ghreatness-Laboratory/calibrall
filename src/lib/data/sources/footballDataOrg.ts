@@ -12,14 +12,14 @@ export class FootballDataOrgService {
   private lastRequestTime = 0;
   private minIntervalMs = 6100; // 10 calls per 60s -> ~6.1s between calls
   private lastSyncTime: string | null = null;
-  private coverage = ['PL', 'BL1', 'PD', 'SA', 'FL1', 'DED', 'PPL', 'CL'];
+  private coverage = ['PL', 'ELC', 'BL1', 'PD', 'SA', 'FL1', 'DED', 'PPL', 'CL'];
 
   public getCoveredCompetitions(): string[] {
     return this.coverage;
   }
 
   public getMissingCompetitions(): string[] {
-    return ['ELC (Championship)', 'E2 (League One)', 'E3 (League Two)', 'SC0 (Scottish Premiership)'];
+    return ['E2 (League One)', 'E3 (League Two)', 'SC0 (Scottish Premiership)'];
   }
 
   private async waitForToken(): Promise<void> {

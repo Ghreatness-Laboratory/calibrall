@@ -12,6 +12,7 @@ import { REAL_250_MATCHES } from './realMatchArchive';
 import FREE_SOURCES_MATCHES from './free_sources_matches.json';
 import { COMPETITIONS } from './seedData';
 import { displayName } from '@/lib/utils/formatText';
+import { lookupCanonicalTeam } from './canonicalTeams';
 
 export interface FormMatchRecord {
   id: string;
@@ -205,10 +206,13 @@ const getGlobalMatches = (): Map<string, StoredMatch> => {
       }
     }
 
-    // 2. Championship archive
+    // 2. Championship archive (fallback only)
     for (const m of CHAMPIONSHIP_HISTORICAL_MATCHES) {
       if (!map.has(m.provider_id)) {
-        map.set(m.provider_id, m);
+        map.set(m.provider_id, {
+          ...m,
+          source: 'championshipMatchArchive:historical',
+        });
       }
     }
 
@@ -892,18 +896,45 @@ class MatchesStore {
    */
   getTeamDaysSinceLastMatch(teamIdOrName: string | { id?: string; name?: string }, asOfDate?: string): { days: number | null; lastMatchDate: string | null; matchesInLast120Days: number } {
     const rawInput = typeof teamIdOrName === 'string' ? teamIdOrName : (teamIdOrName?.id || teamIdOrName?.name || '');
-    const lookup = lookupTeamStrength(rawInput);
-    const canonicalId = lookup?.data?.id || (typeof teamIdOrName === 'object' && teamIdOrName?.id ? teamIdOrName.id : rawInput);
-    const teamName = lookup?.data?.name || (typeof teamIdOrName === 'object' && teamIdOrName?.name ? teamIdOrName.name : displayName(rawInput));
+    const canon = lookupCanonicalTeam(rawInput);
+    const canonicalId = canon ? canon.canonicalId : (typeof rawInput === 'string' && rawInput.startsWith('team_') ? rawInput : `team_${normalizeTeamLookupKey(rawInput)}`);
+    const teamName = canon ? canon.canonicalName : (typeof rawInput === 'string' ? displayName(rawInput) : (teamIdOrName?.name || ''));
     const teamNorm = normalizeTeamLookupKey(teamName);
 
-    const matches = Array.from(this.inMemoryMatches.values()).filter(m => {
+    // Rule: Live data as primary, static archive as fallback only if live store has no record
+    const liveMatches = Array.from(this.inMemoryMatches.values()).filter(m => {
       if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
       if (asOfDate && m.kickoff_time > asOfDate) return false;
+      if (m.source === 'championshipMatchArchive:historical') return false;
+
+      const homeCanon = lookupCanonicalTeam(m.home_team_id) || lookupCanonicalTeam(m.home_team_name);
+      const awayCanon = lookupCanonicalTeam(m.away_team_id) || lookupCanonicalTeam(m.away_team_name);
+      const mHomeId = homeCanon?.canonicalId || m.home_team_id;
+      const mAwayId = awayCanon?.canonicalId || m.away_team_id;
+
+      if (mHomeId === canonicalId || mAwayId === canonicalId) return true;
       const homeNorm = normalizeTeamLookupKey(m.home_team_name);
       const awayNorm = normalizeTeamLookupKey(m.away_team_name);
-      return m.home_team_id === canonicalId || m.away_team_id === canonicalId || homeNorm === teamNorm || awayNorm === teamNorm;
+      return homeNorm === teamNorm || awayNorm === teamNorm;
     }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
+
+    let matches = liveMatches;
+    if (matches.length === 0) {
+      matches = Array.from(this.inMemoryMatches.values()).filter(m => {
+        if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
+        if (asOfDate && m.kickoff_time > asOfDate) return false;
+
+        const homeCanon = lookupCanonicalTeam(m.home_team_id) || lookupCanonicalTeam(m.home_team_name);
+        const awayCanon = lookupCanonicalTeam(m.away_team_id) || lookupCanonicalTeam(m.away_team_name);
+        const mHomeId = homeCanon?.canonicalId || m.home_team_id;
+        const mAwayId = awayCanon?.canonicalId || m.away_team_id;
+
+        if (mHomeId === canonicalId || mAwayId === canonicalId) return true;
+        const homeNorm = normalizeTeamLookupKey(m.home_team_name);
+        const awayNorm = normalizeTeamLookupKey(m.away_team_name);
+        return homeNorm === teamNorm || awayNorm === teamNorm;
+      }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
+    }
 
     if (matches.length === 0) {
       return { days: null, lastMatchDate: null, matchesInLast120Days: 0 };
