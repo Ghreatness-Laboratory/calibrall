@@ -10,6 +10,8 @@ import SWUpdateToast from '@/components/pwa/SWUpdateToast';
 import OfflineBanner from '@/components/pwa/OfflineBanner';
 import { SportProvider } from '@/lib/context/SportContext';
 
+export const dynamic = 'force-dynamic';
+
 export const viewport: Viewport = {
   themeColor: '#0A0F0D',
   width: 'device-width',
