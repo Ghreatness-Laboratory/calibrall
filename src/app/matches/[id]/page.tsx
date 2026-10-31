@@ -555,6 +555,8 @@ export default function MatchAnalysisPage() {
           <div>
             <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#8B9890] mb-1">
               <AlertCircle className="w-3.5 h-3.5" strokeWidth={2} />
+              <span>Model status</span>
+            </div>
             <h3 className="text-[14px] font-semibold text-[#ECF1EE]">
               {noRecommendationReason?.startsWith('Data out of date') ? 'Insufficient data' : 'Statistical evidence insufficient'}
             </h3>

@@ -221,8 +221,11 @@ export class CanonicalMatchStore {
     }
 
     const newestDate = dates[0];
-    const newestTimestamp = new Date(newestDate).getTime();
-    const daysSince = Math.max(0, Math.round((refTimestamp - newestTimestamp) / (1000 * 60 * 60 * 24)));
+    const newestDateStr = newestDate.slice(0, 10);
+    const refDateStr = refDate ? refDate.slice(0, 10) : new Date(refTimestamp).toISOString().slice(0, 10);
+    const newestDayTimestamp = new Date(`${newestDateStr}T00:00:00Z`).getTime();
+    const refDayTimestamp = new Date(`${refDateStr}T00:00:00Z`).getTime();
+    const daysSince = Math.max(0, Math.round((refDayTimestamp - newestDayTimestamp) / (1000 * 60 * 60 * 24)));
 
     // Count matches in last 120 days
     const window120Start = refTimestamp - 120 * 24 * 60 * 60 * 1000;

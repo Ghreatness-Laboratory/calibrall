@@ -27,6 +27,7 @@ export function runChelseaTottenhamRegressionTest(): { passed: boolean; details:
     awayTeamName: 'Chelsea',
     competitionCode: 'PL',
     competitionName: 'Premier League',
+    kickoffTime: '2023-11-06T20:00:00Z',
     homeAttackRating: 1.35,
     homeDefenseRating: 1.05,
     awayAttackRating: 1.40,
