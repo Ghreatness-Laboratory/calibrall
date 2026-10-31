@@ -25,11 +25,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/matches/page.js"
-    ],
-    "/predictions/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/predictions/page.js"
     ]
   }
 }

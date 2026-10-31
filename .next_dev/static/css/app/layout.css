@@ -664,6 +664,9 @@ video {
 .mr-1{
   margin-right: 0.25rem;
 }
+.mr-1\.5{
+  margin-right: 0.375rem;
+}
 .mr-2{
   margin-right: 0.5rem;
 }
@@ -1281,6 +1284,9 @@ video {
 }
 .rounded-\[12px\]{
   border-radius: 12px;
+}
+.rounded-\[13px\]{
+  border-radius: 13px;
 }
 .rounded-\[14px\]{
   border-radius: 14px;

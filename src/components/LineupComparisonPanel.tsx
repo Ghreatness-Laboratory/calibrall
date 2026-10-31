@@ -39,6 +39,9 @@ export default function LineupComparisonPanel({
   topPick,
   revisions = [],
 }: Props) {
+  const [selectedTeamTab, setSelectedTeamTab] = useState<'home' | 'away'>('home');
+  const [showBench, setShowBench] = useState<boolean>(true);
+
   if (!isTeamNewsEnabled()) {
     return (
       <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-4 text-center space-y-2">
@@ -53,9 +56,6 @@ export default function LineupComparisonPanel({
       </div>
     );
   }
-
-  const [selectedTeamTab, setSelectedTeamTab] = useState<'home' | 'away'>('home');
-  const [showBench, setShowBench] = useState<boolean>(true);
 
   const activeTeamData = selectedTeamTab === 'home' ? lineupState.home : lineupState.away;
   const activeTeamName = selectedTeamTab === 'home' ? homeTeamName : awayTeamName;

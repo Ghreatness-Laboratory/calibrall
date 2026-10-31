@@ -369,7 +369,7 @@ async function run() {
     const lambdaNoRest = avgLeagueHomeGoals * (0.6 * homeAtt + 0.4 * homeSplitAtt) * (0.6 * awayDef + 0.4 * awaySplitDef) * hFormAdj * h2hHomeBoost;
     const muNoRest = avgLeagueAwayGoals * (0.6 * awayAtt + 0.4 * awaySplitAtt) * (0.6 * homeDef + 0.4 * homeSplitDef) * aFormAdj * (2.0 - h2hHomeBoost);
 
-    function compute1X2(lam: number, mu: number): [number, number, number] {
+    const compute1X2 = (lam: number, mu: number): [number, number, number] => {
       let hw = 0, dr = 0, aw = 0, tot = 0;
       for (let x = 0; x <= 8; x++) {
         for (let y = 0; y <= 8; y++) {

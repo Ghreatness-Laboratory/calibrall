@@ -11,7 +11,7 @@ import { lookupStadiumCoordinates, calculateWeatherImpact, WeatherCondition } fr
 import { evaluateContextualH2H, H2HEvaluationResult, H2HMeetingRecord } from '../h2hEngine';
 import { isTeamNewsEnabled } from './featureFlags';
 import { devigCompleteMarket } from '../oddsEngine';
-import { compareWithExternalBenchmark } from '../externalBenchmarks';
+import { compareWithExternalBenchmark, BenchmarkComparisonResult } from '../externalBenchmarks';
 
 export interface V25VenueH2HRecord {
   meetingsCount: number;

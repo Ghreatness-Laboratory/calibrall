@@ -789,6 +789,7 @@ export function calculateBookmakerMargin(oddsList: number[]): number {
 }
 
 import { isTeamNewsEnabled } from './featureFlags';
+import { ConfidenceTier, RiskTier } from '@/types';
 
 /**
  * Calculates Confidence Tier according to calibrated mathematical rules (No "Safe"):

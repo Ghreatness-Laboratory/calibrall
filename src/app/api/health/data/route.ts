@@ -91,7 +91,7 @@ export async function GET() {
       coverage: 'E0 (Premier League), E1 (Championship), E2 (League One), E3 (League Two), D1, SP1, I1, F1',
       metrics: 'Scores, HT, shots, corners, cards, referee, closing market consensus odds',
       lastSyncTimestamp: new Date().toISOString(),
-      recordCount: allMatches.filter(m => m.provenance.includes('football-data.co.uk')).length,
+      recordCount: allMatches.filter((m: any) => m.provenance && m.provenance.includes('football-data.co.uk')).length,
     },
     footballDataOrg: {
       status: 'active_free_tier',

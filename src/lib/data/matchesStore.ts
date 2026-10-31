@@ -898,7 +898,8 @@ class MatchesStore {
     const rawInput = typeof teamIdOrName === 'string' ? teamIdOrName : (teamIdOrName?.id || teamIdOrName?.name || '');
     const canon = lookupCanonicalTeam(rawInput);
     const canonicalId = canon ? canon.canonicalId : (typeof rawInput === 'string' && rawInput.startsWith('team_') ? rawInput : `team_${normalizeTeamLookupKey(rawInput)}`);
-    const teamName = canon ? canon.canonicalName : (typeof rawInput === 'string' ? displayName(rawInput) : (teamIdOrName?.name || ''));
+    const rawName = typeof teamIdOrName === 'string' ? teamIdOrName : (teamIdOrName?.name || '');
+    const teamName = canon ? canon.canonicalName : (typeof rawInput === 'string' ? displayName(rawInput) : (rawName || ''));
     const teamNorm = normalizeTeamLookupKey(teamName);
 
     // Rule: Live data as primary, static archive as fallback only if live store has no record
@@ -1501,6 +1502,73 @@ class MatchesStore {
       persistenceMode: (isSupabaseConfigured && supabase) ? 'SUPABASE_PRODUCTION' : 'IN_MEMORY_SANDBOX',
     };
   }
+
+  getAllMatches(): any[] {
+    return Array.from(this.inMemoryMatches.values()).map(m => ({
+      id: m.id,
+      competitionCode: m.competition_code,
+      season: m.season,
+      date: m.kickoff_time ? m.kickoff_time.slice(0, 10) : '',
+      kickoffTime: m.kickoff_time,
+      homeTeamName: m.home_team_name,
+      awayTeamName: m.away_team_name,
+      homeScore: m.home_score,
+      awayScore: m.away_score,
+      homeHalfTimeScore: m.home_half_time_score,
+      awayHalfTimeScore: m.away_half_time_score,
+      homeCorners: m.home_corners,
+      awayCorners: m.away_corners,
+      homeYellowCards: m.home_yellow_cards,
+      awayYellowCards: m.away_yellow_cards,
+      homeRedCards: m.home_red_cards,
+      awayRedCards: m.away_red_cards,
+      homeShots: m.home_shots,
+      awayShots: m.away_shots,
+      homeShotsOnTarget: m.home_shots_on_target,
+      awayShotsOnTarget: m.away_shots_on_target,
+      referee: (m as any).referee || null,
+      oddsHomeWin: (m as any).odds_home_win || null,
+      provenance: m.source || '',
+    }));
+  }
+
+  getStats(): {
+    totalMatches: number;
+    earliestDate: string | null;
+    latestDate: string | null;
+    uniqueLeagues: number;
+    uniqueTeams: number;
+  } {
+    const matches = Array.from(this.inMemoryMatches.values());
+    const leagues = new Set<string>();
+    const teams = new Set<string>();
+    let earliestDate: string | null = null;
+    let latestDate: string | null = null;
+
+    for (const m of matches) {
+      if (m.competition_code) leagues.add(m.competition_code);
+      if (m.home_team_name) teams.add(m.home_team_name);
+      if (m.away_team_name) teams.add(m.away_team_name);
+      const d = m.kickoff_time ? m.kickoff_time.slice(0, 10) : '';
+      if (d) {
+        if (!earliestDate || d < earliestDate) earliestDate = d;
+        if (!latestDate || d > latestDate) latestDate = d;
+      }
+    }
+
+    return {
+      totalMatches: matches.length,
+      earliestDate,
+      latestDate,
+      uniqueLeagues: leagues.size,
+      uniqueTeams: teams.size,
+    };
+  }
 }
 
 export const matchesStore = new MatchesStore();
+
+export function getMatchesStore(): MatchesStore {
+  return matchesStore;
+}
+
