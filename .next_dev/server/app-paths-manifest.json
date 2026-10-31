@@ -1,6 +1,6 @@
 {
   "/page": "app/page.js",
-  "/predictions/page": "app/predictions/page.js",
-  "/api/v1/health/route": "app/api/v1/health/route.js",
-  "/matches/page": "app/matches/page.js"
+  "/matches/page": "app/matches/page.js",
+  "/matches/[id]/page": "app/matches/[id]/page.js",
+  "/api/v1/fixtures/route": "app/api/v1/fixtures/route.js"
 }

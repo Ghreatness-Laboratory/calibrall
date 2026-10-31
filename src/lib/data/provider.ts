@@ -681,12 +681,18 @@ export class LiveFootballDataProvider implements FootballDataProvider {
           ? [params.competitionCode]
           : Object.keys(ESPN_LEAGUE_MAP);
 
+        // Deduplicate league requests by slug so aliases (e.g. P1/PPL, T1/TSL, SC0/SP, BSA/BRA) are fetched only once
+        const uniqueSlugs = new Map<string, { code: string; info: typeof ESPN_LEAGUE_MAP[string] }>();
+        for (const code of targetLeagues) {
+          const info = ESPN_LEAGUE_MAP[code];
+          if (info && !uniqueSlugs.has(info.slug)) {
+            uniqueSlugs.set(info.slug, { code, info });
+          }
+        }
+
         // Fetch scoreboards for requested leagues for today in YYYYMMDD
         const dateParam = dateFrom.replace(/-/g, '');
-        const espnPromises = targetLeagues.map(async (code) => {
-          const leagueInfo = ESPN_LEAGUE_MAP[code];
-          if (!leagueInfo) return [];
-
+        const espnPromises = Array.from(uniqueSlugs.values()).map(async ({ code, info: leagueInfo }) => {
           try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -737,7 +743,17 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         const allParsed = results.flat();
 
         if (allParsed.length > 0) {
-          ingestedFixtures = allParsed;
+          // Deduplicate fixtures by fixture id / providerId
+          const seenKeys = new Set<string>();
+          const deduped: Fixture[] = [];
+          for (const f of allParsed) {
+            const key = f.id || `${f.providerName}_${f.providerId}`;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              deduped.push(f);
+            }
+          }
+          ingestedFixtures = deduped;
           providerNameUsed = 'ESPN Live Scoreboard & DraftKings Lines';
         }
       } catch (err: any) {

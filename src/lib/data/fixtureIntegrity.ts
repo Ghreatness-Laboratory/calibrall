@@ -7,7 +7,7 @@
 // 5. Look up crest by team id and verify/align with provider crest URL.
 
 import { Fixture } from '@/types';
-import { lookupTeamStrength, normalizeTeamLookupKey, COMPETITION_CLUBS } from './teamDatabase';
+import { lookupTeamStrength, normalizeTeamLookupKey, COMPETITION_CLUBS, COMPETITION_COUNTRY_MAP } from './teamDatabase';
 
 export interface IntegrityValidationReport {
   isValid: boolean;
@@ -38,8 +38,20 @@ export function validateFixtureIntegrity(
   const dateFromMs = options?.dateFrom ? new Date(options.dateFrom).getTime() : 0;
   const dateToMs = options?.dateTo ? new Date(options.dateTo).getTime() + (24 * 3600 * 1000 - 1) : Infinity;
 
-  // 1. First pass: individual fixture checks (providerId, date range, crest validation)
+  // 0. Deduplicate incoming fixtures by fixture id or provider id
+  const seenFixtureKeys = new Set<string>();
+  const deduplicatedFixtures: Fixture[] = [];
   for (const f of fixtures) {
+    const key = f.id || (f.providerId ? `${f.providerName || ''}_${f.providerId}` : '');
+    if (key && seenFixtureKeys.has(key)) {
+      continue;
+    }
+    if (key) seenFixtureKeys.add(key);
+    deduplicatedFixtures.push(f);
+  }
+
+  // 1. First pass: individual fixture checks (providerId, date range, crest validation)
+  for (const f of deduplicatedFixtures) {
     // Rule 1: Must have a providerId
     if (!f.providerId || typeof f.providerId !== 'string' || !f.providerId.trim()) {
       const msg = `[Integrity Check FAILED] Fixture ${f.id} has no valid providerId. Rejecting.`;
@@ -119,29 +131,43 @@ export function validateFixtureIntegrity(
     }
 
     // Rule 5: League Membership Integrity Check
-    // Both teams in a domestic league fixture must belong to that competition's club list.
+    // Both teams in a domestic league fixture must belong to that competition's league system.
+    // Strictly rejects cross-competition mismatches between foreign national systems (e.g. German clubs in English Premier League).
     const compCode = f.competition.code.toUpperCase();
     const authorizedClubs = COMPETITION_CLUBS[compCode];
-    if (authorizedClubs && authorizedClubs.length > 0) {
-      const normalizeId = (id: string) => id.toLowerCase().replace(/^team_/, '').replace(/^(pl|pd|bl1|sa|fl1|ded|bsa)_/, '').replace(/[^a-z0-9]/g, '');
+    if (authorizedClubs && authorizedClubs.length > 0 && compCode !== 'CL') {
+      const normalizeId = (id: string) => id.toLowerCase().replace(/^team_/, '').replace(/^(pl|pd|bl1|sa|fl1|ded|bsa|p1|ppl)_/, '').replace(/[^a-z0-9]/g, '');
       const homeId = homeTeamLookup.data?.id || f.homeTeam.id;
       const awayId = awayTeamLookup.data?.id || f.awayTeam.id;
 
-      const homeBelongs = (homeTeamLookup.data?.competitionCode === compCode) ||
-        authorizedClubs.some(c => normalizeId(c) === normalizeId(homeId));
-      const awayBelongs = (awayTeamLookup.data?.competitionCode === compCode) ||
-        authorizedClubs.some(c => normalizeId(c) === normalizeId(awayId));
+      const compCountry = COMPETITION_COUNTRY_MAP[compCode];
+      const homeComp = homeTeamLookup.data?.competitionCode;
+      const awayComp = awayTeamLookup.data?.competitionCode;
+      const homeCountry = homeComp ? COMPETITION_COUNTRY_MAP[homeComp] : undefined;
+      const awayCountry = awayComp ? COMPETITION_COUNTRY_MAP[awayComp] : undefined;
 
-      const homeComp = homeTeamLookup.data?.competitionCode || (homeBelongs ? compCode : 'Unknown');
-      const awayComp = awayTeamLookup.data?.competitionCode || (awayBelongs ? compCode : 'Unknown');
+      // 1. Authorized club list direct match or exact competition code match
+      const homeDirectBelongs = (homeComp === compCode) || authorizedClubs.some(c => normalizeId(c) === normalizeId(homeId));
+      const awayDirectBelongs = (awayComp === compCode) || authorizedClubs.some(c => normalizeId(c) === normalizeId(awayId));
 
-      if (!homeBelongs || !awayBelongs) {
-        const msg = `[Integrity Check FAILED] Cross-competition league mismatch: ${f.homeTeam.name} (${homeComp}) vs ${f.awayTeam.name} (${awayComp}) in competition ${compCode} (${f.competition.name}). Fixture rejected.`;
+      // 2. Domestic league pyramid fluidity (e.g. English domestic pyramid promotion/relegation between PL & ELC)
+      const homeDomesticBelongs = homeDirectBelongs || (Boolean(compCountry) && homeCountry === compCountry);
+      const awayDomesticBelongs = awayDirectBelongs || (Boolean(compCountry) && awayCountry === compCountry);
+
+      // 3. Foreign country conflict: club is registered to a different national league system
+      const homeForeignConflict = Boolean(compCountry && homeCountry && homeCountry !== compCountry);
+      const awayForeignConflict = Boolean(compCountry && awayCountry && awayCountry !== compCountry);
+
+      const homeDisplayComp = homeComp || (homeDomesticBelongs ? compCode : 'Unknown');
+      const awayDisplayComp = awayComp || (awayDomesticBelongs ? compCode : 'Unknown');
+
+      if (homeForeignConflict || awayForeignConflict) {
+        const msg = `[Integrity Check FAILED] Cross-competition league mismatch: ${f.homeTeam.name} (${homeDisplayComp}) vs ${f.awayTeam.name} (${awayDisplayComp}) in competition ${compCode} (${f.competition.name}). Fixture rejected.`;
         console.error(msg);
         violations.push(msg);
         rejectedFixtures.push({
           fixtureId: f.id,
-          reason: `Cross-competition mismatch: ${f.homeTeam.name} belongs to ${homeComp}, ${f.awayTeam.name} belongs to ${awayComp} (Competition: ${compCode})`,
+          reason: `Cross-competition mismatch: ${f.homeTeam.name} belongs to ${homeDisplayComp}, ${f.awayTeam.name} belongs to ${awayDisplayComp} (Competition: ${compCode})`,
         });
         continue;
       }
@@ -153,19 +179,25 @@ export function validateFixtureIntegrity(
   // 2. Second pass: 48-Hour Duplicate Team Integrity Check
   // "the same team can't appear in two fixtures within 48 hours"
   const acceptedFixtures: Fixture[] = [];
-  const teamScheduledTimes = new Map<string, { fixtureId: string; kickoffMs: number; teamName: string }[]>();
+  const teamScheduledTimes = new Map<string, { fixtureId: string; kickoffMs: number; teamName: string; matchKey: string }[]>();
 
   for (const f of validFixtures) {
     const kickoffMs = new Date(f.kickoffTime).getTime();
     const homeKey = normalizeTeamLookupKey(f.homeTeam.name) || f.homeTeam.id;
     const awayKey = normalizeTeamLookupKey(f.awayTeam.name) || f.awayTeam.id;
+    const currentMatchKey = `${homeKey}_${awayKey}`;
 
     let hasConflict = false;
 
     // Check home team
     const homePrev = teamScheduledTimes.get(homeKey) || [];
     for (const prev of homePrev) {
+      if (prev.fixtureId === f.id) continue;
       const deltaHours = Math.abs(kickoffMs - prev.kickoffMs) / (3600 * 1000);
+      if (prev.matchKey === currentMatchKey && deltaHours < 2.0) {
+        // Same match duplicate from multiple sources/aliases
+        continue;
+      }
       if (deltaHours < 48.0) {
         const msg = `[Integrity Check FAILED] Duplicate team scheduling: "${f.homeTeam.name}" scheduled in fixtures ${prev.fixtureId} and ${f.id} within ${deltaHours.toFixed(1)} hours (< 48h limit). Rejecting fixture ${f.id}.`;
         console.error(msg);
@@ -181,7 +213,12 @@ export function validateFixtureIntegrity(
     // Check away team
     const awayPrev = teamScheduledTimes.get(awayKey) || [];
     for (const prev of awayPrev) {
+      if (prev.fixtureId === f.id) continue;
       const deltaHours = Math.abs(kickoffMs - prev.kickoffMs) / (3600 * 1000);
+      if (prev.matchKey === currentMatchKey && deltaHours < 2.0) {
+        // Same match duplicate from multiple sources/aliases
+        continue;
+      }
       if (deltaHours < 48.0) {
         const msg = `[Integrity Check FAILED] Duplicate team scheduling: "${f.awayTeam.name}" scheduled in fixtures ${prev.fixtureId} and ${f.id} within ${deltaHours.toFixed(1)} hours (< 48h limit). Rejecting fixture ${f.id}.`;
         console.error(msg);
@@ -195,10 +232,10 @@ export function validateFixtureIntegrity(
     if (hasConflict) continue;
 
     // Record scheduled kickoffs for both teams
-    homePrev.push({ fixtureId: f.id, kickoffMs, teamName: f.homeTeam.name });
+    homePrev.push({ fixtureId: f.id, kickoffMs, teamName: f.homeTeam.name, matchKey: currentMatchKey });
     teamScheduledTimes.set(homeKey, homePrev);
 
-    awayPrev.push({ fixtureId: f.id, kickoffMs, teamName: f.awayTeam.name });
+    awayPrev.push({ fixtureId: f.id, kickoffMs, teamName: f.awayTeam.name, matchKey: currentMatchKey });
     teamScheduledTimes.set(awayKey, awayPrev);
 
     acceptedFixtures.push(f);

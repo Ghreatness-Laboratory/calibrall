@@ -2563,6 +2563,81 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     sampleMatches: 22,
     aliases: ['vitoria sc', 'vitória sc', 'vitoria de guimaraes', 'vitória de guimarães', 'guimaraes'],
   },
+  levante: {
+    id: 'team_levante',
+    name: 'Levante UD',
+    shortName: 'Levante',
+    tla: 'LEV',
+    crestUrl: 'https://crests.football-data.org/98.png',
+    competitionCode: 'PD',
+    attackRating: 1.10,
+    defenseRating: 1.12,
+    cornerAttackRating: 1.05,
+    disciplineRating: 1.08,
+    recentForm: ['W', 'D', 'L', 'W', 'D'],
+    sampleMatches: 22,
+    aliases: ['levante ud', 'levante', 'lev'],
+  },
+  malaga: {
+    id: 'team_malaga',
+    name: 'Málaga CF',
+    shortName: 'Málaga',
+    tla: 'MAL',
+    crestUrl: 'https://crests.football-data.org/84.png',
+    competitionCode: 'PD',
+    attackRating: 1.05,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.02,
+    disciplineRating: 1.10,
+    recentForm: ['D', 'W', 'L', 'D', 'W'],
+    sampleMatches: 20,
+    aliases: ['málaga cf', 'malaga cf', 'málaga', 'malaga', 'mal'],
+  },
+  schalke: {
+    id: 'team_schalke',
+    name: 'FC Schalke 04',
+    shortName: 'Schalke 04',
+    tla: 'S04',
+    crestUrl: 'https://crests.football-data.org/6.png',
+    competitionCode: 'BL1',
+    attackRating: 1.08,
+    defenseRating: 1.18,
+    cornerAttackRating: 1.04,
+    disciplineRating: 1.12,
+    recentForm: ['L', 'D', 'W', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['fc schalke 04', 'schalke 04', 'schalke', 's04'],
+  },
+  troyes: {
+    id: 'team_troyes',
+    name: 'ES Troyes AC',
+    shortName: 'Troyes',
+    tla: 'EST',
+    crestUrl: 'https://crests.football-data.org/531.png',
+    competitionCode: 'FL1',
+    attackRating: 1.02,
+    defenseRating: 1.20,
+    cornerAttackRating: 1.01,
+    disciplineRating: 1.06,
+    recentForm: ['D', 'L', 'L', 'W', 'D'],
+    sampleMatches: 20,
+    aliases: ['es troyes ac', 'troyes ac', 'troyes', 'est'],
+  },
+  lemans: {
+    id: 'team_lemans',
+    name: 'Le Mans FC',
+    shortName: 'Le Mans',
+    tla: 'LEM',
+    crestUrl: 'https://crests.football-data.org/532.png',
+    competitionCode: 'FL1',
+    attackRating: 0.98,
+    defenseRating: 1.22,
+    cornerAttackRating: 0.98,
+    disciplineRating: 1.05,
+    recentForm: ['L', 'D', 'L', 'D', 'W'],
+    sampleMatches: 20,
+    aliases: ['le mans fc', 'le mans', 'lemans', 'lem'],
+  },
 };
 
 /**
@@ -2589,14 +2664,15 @@ export const COMPETITION_CLUBS: Record<string, string[]> = {
     'team_realmadrid', 'team_barcelona', 'team_atletico', 'team_athletic', 'team_realsociedad',
     'team_betis', 'team_villarreal', 'team_valencia', 'team_sevilla', 'team_girona',
     'team_osasuna', 'team_getafe', 'team_celtavigo', 'team_mallorca', 'team_rayovallecano',
-    'team_laspalmas', 'team_alaves', 'team_leganes', 'team_espanyol', 'team_valladolid'
+    'team_laspalmas', 'team_alaves', 'team_leganes', 'team_espanyol', 'team_valladolid',
+    'team_levante', 'team_malaga'
   ],
   BL1: [
     'team_bayern', 'team_leverkusen', 'team_dortmund', 'team_leipzig', 'team_frankfurt',
     'team_stuttgart', 'team_freiburg', 'team_hoffenheim', 'team_bremen', 'team_augsburg',
     'team_wolfsburg', 'team_mgladbach', 'team_m_gladbach', 'team_unionberlin', 'team_union_berlin',
     'team_mainz', 'team_heidenheim', 'team_stpauli', 'team_st_pauli', 'team_kiel', 'team_bochum',
-    'team_paderborn', 'team_elversberg'
+    'team_paderborn', 'team_elversberg', 'team_schalke'
   ],
   SA: [
     'team_inter', 'team_milan', 'team_juventus', 'team_atalanta', 'team_napoli',
@@ -2609,7 +2685,7 @@ export const COMPETITION_CLUBS: Record<string, string[]> = {
     'team_psg', 'team_monaco', 'team_marseille', 'team_lille', 'team_lyon',
     'team_lens', 'team_rennes', 'team_nice', 'team_reims', 'team_toulouse',
     'team_strasbourg', 'team_montpellier', 'team_nantes', 'team_brest', 'team_lehavre',
-    'team_auxerre', 'team_angers', 'team_saintetienne'
+    'team_auxerre', 'team_angers', 'team_saintetienne', 'team_troyes', 'team_lemans'
   ],
   DED: [
     'team_psv', 'team_feyenoord', 'team_ajax', 'team_twente', 'team_az',
@@ -2630,6 +2706,30 @@ export const COMPETITION_CLUBS: Record<string, string[]> = {
   PPL: [
     'team_sportingcp', 'team_casapia', 'team_benfica', 'team_porto', 'team_braga', 'team_vitoriasc'
   ]
+};
+
+/**
+ * National football system association for each competition code
+ */
+export const COMPETITION_COUNTRY_MAP: Record<string, string> = {
+  PL: 'ENG',
+  ELC: 'ENG',
+  PD: 'ESP',
+  BL1: 'GER',
+  SA: 'ITA',
+  FL1: 'FRA',
+  DED: 'NED',
+  P1: 'POR',
+  PPL: 'POR',
+  TSL: 'TUR',
+  T1: 'TUR',
+  SC0: 'SCO',
+  SP: 'SCO',
+  BSA: 'BRA',
+  BRA: 'BRA',
+  ARG: 'ARG',
+  JPN: 'JPN',
+  CL: 'EUR',
 };
 
 /**

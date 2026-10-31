@@ -84,6 +84,26 @@ export function runCrossCompetitionIntegrityTests(): { passed: boolean; failures
     createDummyFixture('fix_fl1_nic_ren', 'FL1', 'Ligue 1', 'Nice', 'Stade Rennais'),
     // 5. Lille vs Lens in FL1 (Ligue 1)
     createDummyFixture('fix_fl1_lil_len', 'FL1', 'Ligue 1', 'Lille', 'Lens'),
+    // 6. AFC Bournemouth vs Leeds United in PL (English pyramid promotion/relegation)
+    createDummyFixture('fix_pl_bou_lee', 'PL', 'Premier League', 'AFC Bournemouth', 'Leeds United'),
+    // 7. Coventry City vs Sunderland in PL
+    createDummyFixture('fix_pl_cov_sun', 'PL', 'Premier League', 'Coventry City', 'Sunderland'),
+    // 8. Hull City vs Ipswich Town in PL
+    createDummyFixture('fix_pl_hul_ips', 'PL', 'Premier League', 'Hull City', 'Ipswich Town'),
+    // 9. Southampton vs Queens Park Rangers in ELC
+    createDummyFixture('fix_elc_sou_qpr', 'ELC', 'Championship', 'Southampton', 'Queens Park Rangers'),
+    // 10. West Ham United vs West Bromwich Albion in ELC
+    createDummyFixture('fix_elc_whu_wba', 'ELC', 'Championship', 'West Ham United', 'West Bromwich Albion'),
+    // 11. Wolverhampton Wanderers vs Cardiff City in ELC
+    createDummyFixture('fix_elc_wol_car', 'ELC', 'Championship', 'Wolverhampton Wanderers', 'Cardiff City'),
+    // 12. Levante vs Atlético Madrid in PD
+    createDummyFixture('fix_pd_lev_atm', 'PD', 'La Liga', 'Levante', 'Atlético Madrid'),
+    // 13. Real Betis vs Málaga in PD
+    createDummyFixture('fix_pd_bet_mal', 'PD', 'La Liga', 'Real Betis', 'Málaga'),
+    // 14. Schalke 04 vs RB Leipzig in BL1
+    createDummyFixture('fix_bl1_s04_rbl', 'BL1', 'Bundesliga', 'Schalke 04', 'RB Leipzig'),
+    // 15. Troyes vs Le Mans in FL1
+    createDummyFixture('fix_fl1_tro_lem', 'FL1', 'Ligue 1', 'Troyes', 'Le Mans'),
   ];
 
   for (const f of testFixtures) {
