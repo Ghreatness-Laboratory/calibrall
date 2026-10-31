@@ -41,10 +41,11 @@ export function evaluateContextualH2H(
   homeTeam: string,
   awayTeam: string,
   meetings: H2HMeetingRecord[],
-  expectedModelGoalDiff: number = 0.45
+  expectedModelGoalDiff: number = 0.0
 ): H2HEvaluationResult {
   // 1. Filter to recent meetings with similar squad / manager context (past 4 seasons)
-  const recentMeetings = meetings.filter(m => m.isSimilarManagerContext);
+  // If isSimilarManagerContext is undefined or true, include it
+  const recentMeetings = meetings.filter(m => m.isSimilarManagerContext !== false);
   const n = recentMeetings.length;
 
   if (n === 0) {
@@ -54,8 +55,8 @@ export function evaluateContextualH2H(
       homeWins: 0,
       draws: 0,
       awayWins: 0,
-      avgGoalDifference: expectedModelGoalDiff,
-      shrunkGoalDifference: expectedModelGoalDiff,
+      avgGoalDifference: 0.0,
+      shrunkGoalDifference: 0.0,
       sampleWeight: 0.0,
       venueContradictionDetected: false,
       ablationStatus: 'retained_low_weight',

@@ -150,6 +150,7 @@ export interface FixtureContext {
   awayTeamName: string;
   competitionCode: string;
   competitionName: string;
+  kickoffTime?: string;
   homeAttackRating: number;
   homeDefenseRating: number;
   awayAttackRating: number;
@@ -237,6 +238,8 @@ export interface Fixture {
   awayHalfTimeScore?: number | null;
   homeCorners?: number | null;
   awayCorners?: number | null;
+  homeFirstHalfCorners?: number | null;
+  awayFirstHalfCorners?: number | null;
   homeYellowCards?: number | null;
   awayYellowCards?: number | null;
   homeRedCards?: number | null;

@@ -3,11 +3,12 @@
 // Covers all 12 contextual dimensions with Bayesian shrinkage and explicit missing data penalties.
 
 import { FixtureContext, StateTag } from '@/types';
+import { matchesStore } from '@/lib/data/matchesStore';
 import { checkDerby } from '../contextFactors';
 import { computeTeamFormProfile, TeamFormProfile } from '../formEngine';
 import { evaluateManagerStyleMatchup, ManagerMatchupScore } from '../managerStyleEngine';
 import { lookupStadiumCoordinates, calculateWeatherImpact, WeatherCondition } from '../weatherEngine';
-import { evaluateContextualH2H, H2HEvaluationResult } from '../h2hEngine';
+import { evaluateContextualH2H, H2HEvaluationResult, H2HMeetingRecord } from '../h2hEngine';
 import { compareWithExternalBenchmark, BenchmarkComparisonResult } from '../externalBenchmarks';
 import { devigCompleteMarket } from '../oddsEngine';
 
@@ -194,6 +195,10 @@ export const VERIFIED_RIVALRIES_CATALOG: Record<string, { name: string; intensit
   'real-madrid:atletico-madrid': { name: 'Madrid Derby', intensity: 1.30, city: 'Madrid' },
   'inter:milan': { name: 'Derby della Madonnina', intensity: 1.30, city: 'Milan' },
   'milan:inter': { name: 'Derby della Madonnina', intensity: 1.30, city: 'Milan' },
+  'ac-milan:inter-milan': { name: 'Derby della Madonnina', intensity: 1.30, city: 'Milan' },
+  'inter-milan:ac-milan': { name: 'Derby della Madonnina', intensity: 1.30, city: 'Milan' },
+  'ac-milan:internazionale': { name: 'Derby della Madonnina', intensity: 1.30, city: 'Milan' },
+  'internazionale:ac-milan': { name: 'Derby della Madonnina', intensity: 1.30, city: 'Milan' },
   'roma:lazio': { name: 'Derby della Capitale', intensity: 1.40, city: 'Rome' },
   'lazio:roma': { name: 'Derby della Capitale', intensity: 1.40, city: 'Rome' },
   'juventus:inter': { name: 'Derby d Italia', intensity: 1.25, city: 'Italy' },
@@ -209,44 +214,6 @@ function normalizeTeamSlug(name: string): string {
     .trim()
     .replace(/\s+/g, '-');
 }
-
-/**
- * Historical venue-specific head-to-head records database
- * Stores recent meetings across European elite football.
- */
-export const HISTORICAL_VENUE_H2H_DATABASE: Record<string, {
-  meetings: { date: string; homeTeam: string; awayTeam: string; homeScore: number; awayScore: number; venue: string }[];
-}> = {
-  'tottenham-hotspur:chelsea': {
-    meetings: [
-      { date: '2024-02-26', homeTeam: 'Tottenham Hotspur', awayTeam: 'Chelsea', homeScore: 2, awayScore: 0, venue: 'Tottenham Hotspur Stadium' },
-      { date: '2023-02-26', homeTeam: 'Tottenham Hotspur', awayTeam: 'Chelsea', homeScore: 2, awayScore: 0, venue: 'Tottenham Hotspur Stadium' },
-      { date: '2022-01-12', homeTeam: 'Tottenham Hotspur', awayTeam: 'Chelsea', homeScore: 0, awayScore: 1, venue: 'Tottenham Hotspur Stadium' },
-      { date: '2021-09-19', homeTeam: 'Tottenham Hotspur', awayTeam: 'Chelsea', homeScore: 0, awayScore: 3, venue: 'Tottenham Hotspur Stadium' },
-    ]
-  },
-  'bologna:roma': {
-    meetings: [
-      { date: '2023-12-17', homeTeam: 'Bologna', awayTeam: 'Roma', homeScore: 2, awayScore: 0, venue: 'Stadio Renato Dall Ara' },
-      { date: '2023-05-14', homeTeam: 'Bologna', awayTeam: 'Roma', homeScore: 0, awayScore: 0, venue: 'Stadio Renato Dall Ara' },
-      { date: '2021-12-01', homeTeam: 'Bologna', awayTeam: 'Roma', homeScore: 1, awayScore: 0, venue: 'Stadio Renato Dall Ara' },
-    ]
-  },
-  'arsenal:chelsea': {
-    meetings: [
-      { date: '2024-04-23', homeTeam: 'Arsenal', awayTeam: 'Chelsea', homeScore: 5, awayScore: 0, venue: 'Emirates Stadium' },
-      { date: '2023-05-02', homeTeam: 'Arsenal', awayTeam: 'Chelsea', homeScore: 3, awayScore: 1, venue: 'Emirates Stadium' },
-      { date: '2021-08-22', homeTeam: 'Arsenal', awayTeam: 'Chelsea', homeScore: 0, awayScore: 2, venue: 'Emirates Stadium' },
-    ]
-  },
-  'manchester-city:liverpool': {
-    meetings: [
-      { date: '2023-11-25', homeTeam: 'Manchester City', awayTeam: 'Liverpool', homeScore: 1, awayScore: 1, venue: 'Etihad Stadium' },
-      { date: '2023-04-01', homeTeam: 'Manchester City', awayTeam: 'Liverpool', homeScore: 4, awayScore: 1, venue: 'Etihad Stadium' },
-      { date: '2022-04-10', homeTeam: 'Manchester City', awayTeam: 'Liverpool', homeScore: 2, awayScore: 2, venue: 'Etihad Stadium' },
-    ]
-  }
-};
 
 /**
  * Team specific home advantage parameters (learned from 4 seasons of league data,
@@ -337,7 +304,23 @@ export class FeatureLayerEngine {
     const discipline = this.computeDiscipline(context, isDerby);
 
     // 12. Contextual H2H with heavy shrinkage (kappa = 15)
-    const h2hContext = evaluateContextualH2H(context.homeTeamName, context.awayTeamName, []);
+    const h2hData = matchesStore.getHeadToHeadMeetingsSync(context.homeTeamName, context.awayTeamName, context.kickoffTime);
+    const mappedMeetings: H2HMeetingRecord[] = h2hData.meetings.map(m => ({
+      date: m.date,
+      season: m.season,
+      competitionCode: m.competitionCode,
+      homeTeam: m.homeTeam,
+      awayTeam: m.awayTeam,
+      homeGoals: m.homeGoals,
+      awayGoals: m.awayGoals,
+      isSimilarManagerContext: true,
+    }));
+    const h2hContext = evaluateContextualH2H(
+      context.homeTeamName,
+      context.awayTeamName,
+      mappedMeetings,
+      context.homeXg - context.awayXg
+    );
 
     // 13. External licensed benchmark comparison
     const externalBenchmark = compareWithExternalBenchmark('1X2_HOME', 0.52);
@@ -405,10 +388,11 @@ export class FeatureLayerEngine {
   }
 
   private static computeVenueH2H(homeSlug: string, awaySlug: string, context: FixtureContext): V25VenueH2HRecord {
-    const key = `${homeSlug}:${awaySlug}`;
-    const entry = HISTORICAL_VENUE_H2H_DATABASE[key];
+    const h2h = matchesStore.getHeadToHeadMeetingsSync(context.homeTeamName, context.awayTeamName, context.kickoffTime);
+    // Filter to meetings where context.homeTeamName played at home
+    const venueMeetings = h2h.meetings.filter(m => m.isHomeForA);
 
-    if (!entry || entry.meetings.length === 0) {
+    if (!venueMeetings || venueMeetings.length === 0) {
       // Prior-only fallback when no direct meetings recorded at this venue
       return {
         meetingsCount: 0,
@@ -424,42 +408,43 @@ export class FeatureLayerEngine {
       };
     }
 
-    const meetings = entry.meetings;
     let homeWins = 0;
     let draws = 0;
     let awayWins = 0;
     let weightedGoalDiffSum = 0;
     let weightsSum = 0;
 
-    meetings.forEach((m, idx) => {
-      if (m.homeScore > m.awayScore) homeWins++;
-      else if (m.homeScore === m.awayScore) draws++;
+    venueMeetings.forEach((m, idx) => {
+      const homeScore = m.homeGoals;
+      const awayScore = m.awayGoals;
+      if (homeScore > awayScore) homeWins++;
+      else if (homeScore === awayScore) draws++;
       else awayWins++;
 
       // Recency decay: lambda = 0.85 per meeting back
       const weight = Math.pow(0.85, idx);
-      weightedGoalDiffSum += (m.homeScore - m.awayScore) * weight;
+      weightedGoalDiffSum += (homeScore - awayScore) * weight;
       weightsSum += weight;
     });
 
     const recencyWeightedGoalDiff = weightsSum > 0 ? weightedGoalDiffSum / weightsSum : 0;
-    const avgGoalDiff = meetings.reduce((acc, m) => acc + (m.homeScore - m.awayScore), 0) / meetings.length;
+    const avgGoalDiff = venueMeetings.reduce((acc, m) => acc + (m.homeGoals - m.awayGoals), 0) / venueMeetings.length;
 
     // Bayesian shrinkage toward prior model expectation (e.g. prior goal difference = homeXg - awayXg)
     const priorExpectedGoalDiff = context.homeXg - context.awayXg;
-    const N = meetings.length;
+    const N = venueMeetings.length;
     const K = 4.0; // Shrinkage weight
     const shrunkGoalDiff = Number(((N * recencyWeightedGoalDiff + K * priorExpectedGoalDiff) / (N + K)).toFixed(3));
 
-    const lastMeeting = meetings[0];
-    const lastWinner = lastMeeting.homeScore > lastMeeting.awayScore ? 'home' : lastMeeting.homeScore < lastMeeting.awayScore ? 'away' : 'draw';
+    const lastMeeting = venueMeetings[0];
+    const lastWinner = lastMeeting.homeGoals > lastMeeting.awayGoals ? 'home' : lastMeeting.homeGoals < lastMeeting.awayGoals ? 'away' : 'draw';
 
     // Check if venue history strongly contradicts an away handicap or away result
     // e.g. If home team won the last meeting at home and has positive goal diff, an away +1 handicap has venue contradiction!
     const venueContradictionFlag = lastWinner === 'home' && homeWins >= awayWins;
 
     return {
-      meetingsCount: meetings.length,
+      meetingsCount: venueMeetings.length,
       homeWins,
       draws,
       awayWins,
@@ -467,7 +452,7 @@ export class FeatureLayerEngine {
       recencyWeightedHomeGoalDiff: Number(recencyWeightedGoalDiff.toFixed(2)),
       shrunkGoalDiff,
       lastMeetingWinner: lastWinner,
-      lastMeetingVenue: lastMeeting.venue,
+      lastMeetingVenue: null,
       venueContradictionFlag,
     };
   }

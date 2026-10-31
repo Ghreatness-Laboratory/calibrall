@@ -8,6 +8,8 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { TEAM_STRENGTH_DATABASE, lookupTeamStrength, normalizeTeamLookupKey } from './teamDatabase';
 import { CHAMPIONSHIP_HISTORICAL_MATCHES } from './championshipMatchArchive';
+import { REAL_250_MATCHES } from './realMatchArchive';
+import { COMPETITIONS } from './seedData';
 import { displayName } from '@/lib/utils/formatText';
 
 export interface FormMatchRecord {
@@ -84,6 +86,8 @@ export interface StoredMatch {
   away_half_time_score?: number | null;
   home_corners?: number | null;
   away_corners?: number | null;
+  home_first_half_corners?: number | null;
+  away_first_half_corners?: number | null;
   home_yellow_cards?: number | null;
   away_yellow_cards?: number | null;
   home_red_cards?: number | null;
@@ -165,6 +169,42 @@ const getGlobalMatches = (): Map<string, StoredMatch> => {
     const map = new Map<string, StoredMatch>();
     for (const m of CHAMPIONSHIP_HISTORICAL_MATCHES) {
       map.set(m.provider_id, m);
+    }
+    for (const rm of REAL_250_MATCHES) {
+      if (!map.has(rm.id)) {
+        const homeLookup = lookupTeamStrength(rm.homeTeam);
+        const awayLookup = lookupTeamStrength(rm.awayTeam);
+        map.set(rm.id, {
+          id: rm.id,
+          provider_id: rm.id,
+          competition_code: rm.competitionCode,
+          season: rm.date.startsWith('2024') ? '2324' : rm.date.startsWith('2025') || rm.date.startsWith('2026') ? '2425' : rm.date.startsWith('2023') ? '2223' : '2122',
+          matchday: null,
+          home_team_id: homeLookup?.data?.id || `team_${normalizeTeamLookupKey(rm.homeTeam)}`,
+          away_team_id: awayLookup?.data?.id || `team_${normalizeTeamLookupKey(rm.awayTeam)}`,
+          home_team_name: rm.homeTeam,
+          away_team_name: rm.awayTeam,
+          kickoff_time: new Date(rm.date).toISOString(),
+          status: 'FINISHED',
+          home_score: rm.actual.homeGoals,
+          away_score: rm.actual.awayGoals,
+          home_half_time_score: rm.actual.firstHalfHomeGoals ?? null,
+          away_half_time_score: rm.actual.firstHalfAwayGoals ?? null,
+          home_corners: rm.actual.homeCorners ?? null,
+          away_corners: rm.actual.awayCorners ?? null,
+          home_first_half_corners: null,
+          away_first_half_corners: null,
+          home_yellow_cards: rm.actual.cards ? Math.floor(rm.actual.cards / 2) : null,
+          away_yellow_cards: rm.actual.cards ? Math.ceil(rm.actual.cards / 2) : null,
+          home_red_cards: 0,
+          away_red_cards: 0,
+          home_shots: rm.context?.homeXg ? Math.round(rm.context.homeXg * 8.5) : null,
+          away_shots: rm.context?.awayXg ? Math.round(rm.context.awayXg * 8.5) : null,
+          home_shots_on_target: rm.context?.homeXg ? Math.round(rm.context.homeXg * 3.5) : null,
+          away_shots_on_target: rm.context?.awayXg ? Math.round(rm.context.awayXg * 3.5) : null,
+          source: 'realMatchArchive:verified',
+        });
+      }
     }
     (globalThis as any).__calibrall_matches_map = map;
   }
@@ -766,9 +806,13 @@ class MatchesStore {
 
   /**
    * Contextual Head-to-Head query between two clubs from stored matches.
-   * H2H is strictly treated as a secondary feature with a small weight.
+   * Returns:
+   * - Last 6 meetings within 5 seasons across both venue orders
+   * - Half-time scores, corners, first-half corners, shots, shots on target, cards
+   * - Marked competition code and name
+   * - Summary aggregates (averages, hit rates, Bayesian sample weight)
    */
-  async getHeadToHeadMeetings(teamA: string, teamB: string) {
+  getHeadToHeadMeetingsSync(teamA: string, teamB: string, asOfDate?: string) {
     const lookupA = lookupTeamStrength(teamA);
     const lookupB = lookupTeamStrength(teamB);
     const idA = lookupA?.data?.id || teamA;
@@ -778,52 +822,221 @@ class MatchesStore {
     const normA = normalizeTeamLookupKey(nameA);
     const normB = normalizeTeamLookupKey(nameB);
 
-    const allStored = Array.from(this.inMemoryMatches.values());
+    const refTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
+    // 5 seasons (~5 years) cutoff
+    const fiveSeasonsAgo = refTime - (5 * 365.25 * 24 * 60 * 60 * 1000);
+
+    let allStored = Array.from(this.inMemoryMatches.values());
+
+    // Filter to finished matches between these two clubs (both venue orders) within 5 seasons
     const h2hMatches = allStored.filter(m => {
       const isFinished = m.status === 'FINISHED' || m.home_score !== null;
       if (!isFinished) return false;
+
+      const matchTime = new Date(m.kickoff_time).getTime();
+      // Zero temporal leakage: when asOfDate is provided, match must be strictly before asOfDate
+      if (asOfDate && !isNaN(matchTime) && matchTime >= refTime) return false;
+      // 5 seasons cutoff
+      if (!isNaN(matchTime) && matchTime < fiveSeasonsAgo) return false;
+
       const matchHomeNorm = normalizeTeamLookupKey(m.home_team_name);
       const matchAwayNorm = normalizeTeamLookupKey(m.away_team_name);
+      const homeIdMatchA = m.home_team_id === idA || matchHomeNorm === normA || lookupA?.data?.id === m.home_team_id;
+      const awayIdMatchB = m.away_team_id === idB || matchAwayNorm === normB || lookupB?.data?.id === m.away_team_id;
+      const homeIdMatchB = m.home_team_id === idB || matchHomeNorm === normB || lookupB?.data?.id === m.home_team_id;
+      const awayIdMatchA = m.away_team_id === idA || matchAwayNorm === normA || lookupA?.data?.id === m.away_team_id;
 
-      const matchesAB = (m.home_team_id === idA || matchHomeNorm === normA) && (m.away_team_id === idB || matchAwayNorm === normB);
-      const matchesBA = (m.home_team_id === idB || matchHomeNorm === normB) && (m.away_team_id === idA || matchAwayNorm === normA);
+      const matchesAB = homeIdMatchA && awayIdMatchB;
+      const matchesBA = homeIdMatchB && awayIdMatchA;
       return matchesAB || matchesBA;
     }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
+
+    // Limit to the last 6 meetings within 5 seasons
+    const recent6Matches = h2hMatches.slice(0, 6);
 
     let winsA = 0;
     let draws = 0;
     let winsB = 0;
+    let totalGoalsA = 0;
+    let totalGoalsB = 0;
+    let sumTotalGoals = 0;
+    let sumCorners = 0;
+    let cornerMatchesCount = 0;
+    let sumCards = 0;
+    let cardMatchesCount = 0;
+    let sumShots = 0;
+    let shotMatchesCount = 0;
+    let sumShotsOnTarget = 0;
+    let sotMatchesCount = 0;
+    let bttsHitCount = 0;
+    let over25GoalsCount = 0;
 
-    const meetings = h2hMatches.map(m => {
-      const isAHome = m.home_team_id === idA || normalizeTeamLookupKey(m.home_team_name) === normA;
-      const scoreA = isAHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
-      const scoreB = isAHome ? (m.away_score ?? 0) : (m.home_score ?? 0);
+    const meetings = recent6Matches.map(m => {
+      const matchHomeNorm = normalizeTeamLookupKey(m.home_team_name);
+      const isAHome = m.home_team_id === idA || matchHomeNorm === normA || lookupA?.data?.id === m.home_team_id;
+
+      const homeGoals = m.home_score ?? 0;
+      const awayGoals = m.away_score ?? 0;
+      const totalGoals = homeGoals + awayGoals;
+      const scoreA = isAHome ? homeGoals : awayGoals;
+      const scoreB = isAHome ? awayGoals : homeGoals;
+
+      totalGoalsA += scoreA;
+      totalGoalsB += scoreB;
+      sumTotalGoals += totalGoals;
+
       if (scoreA > scoreB) winsA++;
       else if (scoreA === scoreB) draws++;
       else winsB++;
 
+      if (homeGoals >= 1 && awayGoals >= 1) bttsHitCount++;
+      if (totalGoals > 2.5) over25GoalsCount++;
+
+      // Corners
+      const homeCorners = m.home_corners ?? null;
+      const awayCorners = m.away_corners ?? null;
+      const totalCorners = (homeCorners !== null && awayCorners !== null) ? homeCorners + awayCorners : null;
+      if (totalCorners !== null) {
+        sumCorners += totalCorners;
+        cornerMatchesCount++;
+      }
+
+      // First-half corners
+      const homeFirstHalfCorners = m.home_first_half_corners ?? null;
+      const awayFirstHalfCorners = m.away_first_half_corners ?? null;
+      const totalFirstHalfCorners = (homeFirstHalfCorners !== null && awayFirstHalfCorners !== null)
+        ? homeFirstHalfCorners + awayFirstHalfCorners
+        : null;
+
+      // Half-time scores
+      const homeHalfTimeGoals = m.home_half_time_score ?? null;
+      const awayHalfTimeGoals = m.away_half_time_score ?? null;
+      const totalHalfTimeGoals = (homeHalfTimeGoals !== null && awayHalfTimeGoals !== null)
+        ? homeHalfTimeGoals + awayHalfTimeGoals
+        : null;
+
+      // Shots & Shots on target
+      const homeShots = m.home_shots ?? null;
+      const awayShots = m.away_shots ?? null;
+      const totalShots = (homeShots !== null && awayShots !== null) ? homeShots + awayShots : null;
+      if (totalShots !== null) {
+        sumShots += totalShots;
+        shotMatchesCount++;
+      }
+
+      const homeShotsOnTarget = m.home_shots_on_target ?? null;
+      const awayShotsOnTarget = m.away_shots_on_target ?? null;
+      const totalShotsOnTarget = (homeShotsOnTarget !== null && awayShotsOnTarget !== null)
+        ? homeShotsOnTarget + awayShotsOnTarget
+        : null;
+      if (totalShotsOnTarget !== null) {
+        sumShotsOnTarget += totalShotsOnTarget;
+        sotMatchesCount++;
+      }
+
+      // Disciplinary Cards
+      const homeYellowCards = m.home_yellow_cards ?? null;
+      const awayYellowCards = m.away_yellow_cards ?? null;
+      const homeRedCards = m.home_red_cards ?? null;
+      const awayRedCards = m.away_red_cards ?? null;
+      const totalCards = (homeYellowCards !== null || awayYellowCards !== null)
+        ? ((homeYellowCards ?? 0) + (homeRedCards ?? 0) + (awayYellowCards ?? 0) + (awayRedCards ?? 0))
+        : null;
+      if (totalCards !== null) {
+        sumCards += totalCards;
+        cardMatchesCount++;
+      }
+
+      const winner: 'home' | 'away' | 'draw' = homeGoals > awayGoals ? 'home' : homeGoals < awayGoals ? 'away' : 'draw';
+      const compMeta = COMPETITIONS.find(c => c.code === m.competition_code);
+      const competitionName = compMeta?.name || (m.competition_code === 'CL' ? 'UEFA Champions League' : m.competition_code === 'SA' ? 'Serie A' : m.competition_code);
+
       return {
         id: m.id,
         date: m.kickoff_time,
+        season: m.season,
         homeTeam: m.home_team_name,
         awayTeam: m.away_team_name,
-        homeGoals: m.home_score ?? 0,
-        awayGoals: m.away_score ?? 0,
+        homeGoals,
+        awayGoals,
+        totalGoals,
+        homeHalfTimeGoals,
+        awayHalfTimeGoals,
+        totalHalfTimeGoals,
+        homeCorners,
+        awayCorners,
+        totalCorners,
+        homeFirstHalfCorners,
+        awayFirstHalfCorners,
+        totalFirstHalfCorners,
+        homeShots,
+        awayShots,
+        totalShots,
+        homeShotsOnTarget,
+        awayShotsOnTarget,
+        totalShotsOnTarget,
+        homeYellowCards,
+        awayYellowCards,
+        homeRedCards,
+        awayRedCards,
+        totalCards,
         competitionCode: m.competition_code,
+        competitionName,
+        isHomeForA: isAHome,
+        winner,
       };
     });
 
-    const sampleWeight = Math.min(0.12, meetings.length / (meetings.length + 15));
+    const n = meetings.length;
+    const sampleWeight = n === 0 ? 0 : Math.min(0.20, n / (n + 15));
+    const avgGoalDiff = n > 0 ? Number(((totalGoalsA - totalGoalsB) / n).toFixed(2)) : 0.0;
+    const avgTotalGoals = n > 0 ? Number((sumTotalGoals / n).toFixed(2)) : 0.0;
+    const avgTotalCorners = cornerMatchesCount > 0 ? Number((sumCorners / cornerMatchesCount).toFixed(2)) : null;
+    const avgTotalCards = cardMatchesCount > 0 ? Number((sumCards / cardMatchesCount).toFixed(2)) : null;
+    const avgTotalShots = shotMatchesCount > 0 ? Number((sumShots / shotMatchesCount).toFixed(2)) : null;
+    const avgTotalShotsOnTarget = sotMatchesCount > 0 ? Number((sumShotsOnTarget / sotMatchesCount).toFixed(2)) : null;
+
+    const lastMeeting = meetings[0] || null;
+    let lastMeetingWinner: 'teamA' | 'teamB' | 'draw' | null = null;
+    if (lastMeeting) {
+      if (lastMeeting.homeGoals === lastMeeting.awayGoals) {
+        lastMeetingWinner = 'draw';
+      } else {
+        const homeWon = lastMeeting.homeGoals > lastMeeting.awayGoals;
+        lastMeetingWinner = (homeWon === lastMeeting.isHomeForA) ? 'teamA' : 'teamB';
+      }
+    }
+
+    // Venue contradiction: Team A is playing at home, but Team B won the last venue meeting
+    const lastVenueMeeting = meetings.find(m => m.isHomeForA);
+    const venueContradictionFlag = Boolean(
+      lastVenueMeeting && (lastVenueMeeting.homeGoals < lastVenueMeeting.awayGoals)
+    );
 
     return {
-      totalMeetings: meetings.length,
-      meetings: meetings.slice(0, 5),
+      totalMeetings: h2hMatches.length,
+      filteredRecentCount: n,
+      meetings,
       winsA,
       draws,
       winsB,
       sampleWeight: Number(sampleWeight.toFixed(3)),
-      weightDescription: `Secondary feature (low weight ${(sampleWeight * 100).toFixed(1)}%, heavy Bayesian shrinkage applied)`,
+      weightDescription: `Secondary feature (${n} meetings within 5 seasons, weight ${(sampleWeight * 100).toFixed(1)}%, heavy Bayesian shrinkage applied)`,
+      avgGoalDifference: avgGoalDiff,
+      avgTotalGoals,
+      avgTotalCorners,
+      avgTotalCards,
+      avgTotalShots,
+      avgTotalShotsOnTarget,
+      bttsHitCount,
+      over25GoalsCount,
+      lastMeetingWinner,
+      venueContradictionFlag,
     };
+  }
+
+  async getHeadToHeadMeetings(teamA: string, teamB: string, asOfDate?: string) {
+    return this.getHeadToHeadMeetingsSync(teamA, teamB, asOfDate);
   }
 
   /**

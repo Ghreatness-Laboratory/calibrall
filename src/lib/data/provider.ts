@@ -246,6 +246,8 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture {
     status: m.state?.state === 'FINISHED' ? 'FINISHED' : 'TIMED',
     homeScore: m.scores?.find((s: any) => s.description === 'CURRENT')?.score?.participant1 ?? null,
     awayScore: m.scores?.find((s: any) => s.description === 'CURRENT')?.score?.participant2 ?? null,
+    homeHalfTimeScore: m.scores?.find((s: any) => s.description === '1ST_HALF' || s.description === 'HT' || s.description === 'HALFTIME')?.score?.participant1 ?? null,
+    awayHalfTimeScore: m.scores?.find((s: any) => s.description === '1ST_HALF' || s.description === 'HT' || s.description === 'HALFTIME')?.score?.participant2 ?? null,
     venue: m.venue?.name || 'Stadium',
     dataFreshness: fetchTime,
   };
@@ -468,6 +470,18 @@ function mapDbMatchToFixture(m: any, fetchTime: string): Fixture {
     awayScore: m.away_score,
     homeHalfTimeScore: m.home_half_time_score,
     awayHalfTimeScore: m.away_half_time_score,
+    homeCorners: m.home_corners,
+    awayCorners: m.away_corners,
+    homeFirstHalfCorners: m.home_first_half_corners,
+    awayFirstHalfCorners: m.away_first_half_corners,
+    homeYellowCards: m.home_yellow_cards,
+    awayYellowCards: m.away_yellow_cards,
+    homeRedCards: m.home_red_cards,
+    awayRedCards: m.away_red_cards,
+    homeShots: m.home_shots,
+    awayShots: m.away_shots,
+    homeShotsOnTarget: m.home_shots_on_target,
+    awayShotsOnTarget: m.away_shots_on_target,
     dataFreshness: m.updated_at || fetchTime,
   };
 }
