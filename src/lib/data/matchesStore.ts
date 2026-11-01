@@ -903,37 +903,28 @@ class MatchesStore {
     const teamNorm = normalizeTeamLookupKey(teamName);
 
     // Rule: Live data as primary, static archive as fallback only if live store has no record
-    const liveMatches = Array.from(this.inMemoryMatches.values()).filter(m => {
-      if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
-      if (asOfDate && m.kickoff_time > asOfDate) return false;
-      if (m.source === 'championshipMatchArchive:historical') return false;
-
-      const homeCanon = lookupCanonicalTeam(m.home_team_id) || lookupCanonicalTeam(m.home_team_name);
-      const awayCanon = lookupCanonicalTeam(m.away_team_id) || lookupCanonicalTeam(m.away_team_name);
-      const mHomeId = homeCanon?.canonicalId || m.home_team_id;
-      const mAwayId = awayCanon?.canonicalId || m.away_team_id;
-
-      if (mHomeId === canonicalId || mAwayId === canonicalId) return true;
+    const matchesList = Array.from(this.inMemoryMatches.values());
+    const isTargetTeam = (m: StoredMatch): boolean => {
+      if (m.home_team_id === canonicalId || m.away_team_id === canonicalId) return true;
+      if (m.home_team_name === teamName || m.away_team_name === teamName) return true;
       const homeNorm = normalizeTeamLookupKey(m.home_team_name);
       const awayNorm = normalizeTeamLookupKey(m.away_team_name);
       return homeNorm === teamNorm || awayNorm === teamNorm;
+    };
+
+    const liveMatches = matchesList.filter(m => {
+      if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
+      if (asOfDate && m.kickoff_time > asOfDate) return false;
+      if (m.source === 'championshipMatchArchive:historical') return false;
+      return isTargetTeam(m);
     }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
 
     let matches = liveMatches;
     if (matches.length === 0) {
-      matches = Array.from(this.inMemoryMatches.values()).filter(m => {
+      matches = matchesList.filter(m => {
         if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
         if (asOfDate && m.kickoff_time > asOfDate) return false;
-
-        const homeCanon = lookupCanonicalTeam(m.home_team_id) || lookupCanonicalTeam(m.home_team_name);
-        const awayCanon = lookupCanonicalTeam(m.away_team_id) || lookupCanonicalTeam(m.away_team_name);
-        const mHomeId = homeCanon?.canonicalId || m.home_team_id;
-        const mAwayId = awayCanon?.canonicalId || m.away_team_id;
-
-        if (mHomeId === canonicalId || mAwayId === canonicalId) return true;
-        const homeNorm = normalizeTeamLookupKey(m.home_team_name);
-        const awayNorm = normalizeTeamLookupKey(m.away_team_name);
-        return homeNorm === teamNorm || awayNorm === teamNorm;
+        return isTargetTeam(m);
       }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
     }
 

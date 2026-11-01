@@ -151,7 +151,17 @@ assert.strictEqual(stale30Status.isStale, true, 'Team with newest match 30 days 
 assert.strictEqual(stale30Status.daysSinceLastMatch, 30, 'Days since last match is exactly 30');
 assert(stale30Status.staleReason?.includes('30 days ago'), 'Stale reason mentions 30 days ago');
 
-console.log('✓ Staleness evaluation gate passed (5d passes, 30d triggers Insufficient Data).');
+// Team with ZERO match records must FAIL CLOSED and return "Insufficient data"
+const emptyStore = new CanonicalMatchStore();
+const zeroRecordsStatus = emptyStore.getStalenessStatus('team_empty_club', '2026-10-31T15:00:00Z');
+assert.strictEqual(zeroRecordsStatus.isStale, true, 'Team with zero records fails closed');
+assert.strictEqual(zeroRecordsStatus.status, 'INSUFFICIENT', 'Team with zero records has status INSUFFICIENT');
+assert.strictEqual(zeroRecordsStatus.displayStatus, 'Insufficient data', 'Team with zero records displays "Insufficient data"');
+assert.strictEqual(zeroRecordsStatus.newestMatchDate, null, 'newestMatchDate is null for zero records');
+assert.strictEqual(zeroRecordsStatus.daysSinceLastMatch, null, 'daysSinceLastMatch is null for zero records');
+assert.strictEqual(zeroRecordsStatus.matchesInLast120Days, 0, 'matchesInLast120Days is 0 for zero records');
+
+console.log('✓ Staleness evaluation gate passed (5d passes, 30d triggers Insufficient Data, 0 records triggers Insufficient data).');
 
 // 4. Feature Flag & Confidence Tier Capping
 console.log('4. Testing team_news_enabled feature flag and confidence capping...');

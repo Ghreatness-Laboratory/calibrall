@@ -1310,12 +1310,23 @@ export function normalizeLookupKey(name: string): string {
 
 // Registry lookup with alias & strict normalization
 const UNMATCHED_NAMES_LOG = new Set<string>();
+const LOOKUP_CACHE = new Map<string, CanonicalTeam | null>();
 
 export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | null {
   if (!rawNameOrId) return null;
   const input = typeof rawNameOrId === 'string' ? rawNameOrId.trim() : (rawNameOrId.name || rawNameOrId.shortName || rawNameOrId.id || '').toString().trim();
   if (!input) return null;
 
+  if (LOOKUP_CACHE.has(input)) {
+    return LOOKUP_CACHE.get(input)!;
+  }
+
+  const res = doLookupCanonicalTeam(input);
+  LOOKUP_CACHE.set(input, res);
+  return res;
+}
+
+function doLookupCanonicalTeam(input: string): CanonicalTeam | null {
   // 1. Direct manual override (exact and lowercase trimmed)
   const manualMap = manualOverrides as Record<string, string>;
   if (manualMap[input] && CANONICAL_TEAMS[manualMap[input]]) {
@@ -1397,4 +1408,5 @@ export function getUnmatchedNames(): string[] {
 
 export function clearUnmatchedNames(): void {
   UNMATCHED_NAMES_LOG.clear();
+  LOOKUP_CACHE.clear();
 }

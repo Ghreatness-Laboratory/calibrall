@@ -7,11 +7,13 @@ import path from 'path';
 import { lookupCanonicalTeam } from '../src/lib/data/canonicalTeams';
 
 const SEASONS = ['2324', '2425', '2526', '2627'];
-const DIVISIONS = ['E0', 'E1', 'D1', 'SP1', 'I1', 'F1'];
+const DIVISIONS = ['E0', 'E1', 'E2', 'E3', 'D1', 'SP1', 'I1', 'F1'];
 
 const DIV_MAP: Record<string, string> = {
   E0: 'PL',
   E1: 'ELC',
+  E2: 'E2',
+  E3: 'E3',
   D1: 'BL1',
   SP1: 'PD',
   I1: 'SA',
@@ -55,6 +57,15 @@ async function run() {
   const allMatches: any[] = [];
   const unmatchedSet = new Set<string>();
 
+  const auditSummary: {
+    div: string;
+    season: string;
+    csvRows: number;
+    stored: number;
+    rejected: number;
+    rejectionReasons: string;
+  }[] = [];
+
   for (const div of DIVISIONS) {
     const compCode = DIV_MAP[div] || div;
     for (const season of SEASONS) {
@@ -66,11 +77,29 @@ async function run() {
         });
         if (!res.ok) {
           console.warn(`HTTP ${res.status} for ${url}`);
+          auditSummary.push({
+            div,
+            season,
+            csvRows: 0,
+            stored: 0,
+            rejected: 0,
+            rejectionReasons: `HTTP ${res.status}`,
+          });
           continue;
         }
         const text = await res.text();
         const lines = text.trim().split('\n').filter(l => l.trim().length > 0);
-        if (lines.length < 2) continue;
+        if (lines.length < 2) {
+          auditSummary.push({
+            div,
+            season,
+            csvRows: 0,
+            stored: 0,
+            rejected: 0,
+            rejectionReasons: 'Empty CSV',
+          });
+          continue;
+        }
 
         const header = parseCsvLine(lines[0]);
         const colIndex = (col: string) => header.indexOf(col);
@@ -107,17 +136,34 @@ async function run() {
         const idxAvgCAHA = colIndex('AvgCAHA') !== -1 ? colIndex('AvgCAHA') : colIndex('AvgAHA');
 
         let seasonMatches = 0;
+        let seasonRejected = 0;
+        const reasonsSet = new Set<string>();
+
+        const totalCsvRows = lines.length - 1;
+
         for (let i = 1; i < lines.length; i++) {
           const row = parseCsvLine(lines[i]);
-          if (row.length < 5) continue;
+          if (row.length < 5) {
+            seasonRejected++;
+            reasonsSet.add('Row length < 5 columns');
+            continue;
+          }
 
           const rawDate = row[idxDate];
           const parsedDate = parseDate(rawDate);
-          if (!parsedDate) continue;
+          if (!parsedDate) {
+            seasonRejected++;
+            reasonsSet.add('Invalid/unparseable date');
+            continue;
+          }
 
           const rawHome = row[idxHome];
           const rawAway = row[idxAway];
-          if (!rawHome || !rawAway) continue;
+          if (!rawHome || !rawAway) {
+            seasonRejected++;
+            reasonsSet.add('Missing Home or Away team name');
+            continue;
+          }
 
           const homeCanon = lookupCanonicalTeam(rawHome);
           const awayCanon = lookupCanonicalTeam(rawAway);
@@ -130,7 +176,18 @@ async function run() {
 
           const fthg = parseInt(row[idxFTHG], 10);
           const ftag = parseInt(row[idxFTAG], 10);
-          if (isNaN(fthg) || isNaN(ftag)) continue;
+          if (isNaN(fthg) || isNaN(ftag)) {
+            seasonRejected++;
+            reasonsSet.add('Score is NaN (unplayed match)');
+            continue;
+          }
+
+          // Impossible score sanity check (<0 or >25)
+          if (fthg < 0 || fthg > 25 || ftag < 0 || ftag > 25) {
+            seasonRejected++;
+            reasonsSet.add(`Impossible score: ${fthg}-${ftag}`);
+            continue;
+          }
 
           const hthg = idxHTHG !== -1 ? parseInt(row[idxHTHG], 10) : null;
           const htag = idxHTAG !== -1 ? parseInt(row[idxHTAG], 10) : null;
@@ -204,7 +261,16 @@ async function run() {
           });
           seasonMatches++;
         }
-        console.log(`Ingested ${seasonMatches} matches for ${season} ${div}`);
+
+        auditSummary.push({
+          div,
+          season,
+          csvRows: totalCsvRows,
+          stored: seasonMatches,
+          rejected: seasonRejected,
+          rejectionReasons: seasonRejected === 0 ? 'None (100% valid)' : Array.from(reasonsSet).join('; '),
+        });
+        console.log(`Ingested ${seasonMatches} matches for ${season} ${div} (CSV rows: ${totalCsvRows}, rejected: ${seasonRejected})`);
       } catch (e: any) {
         console.error(`Error ingesting ${season} ${div}:`, e?.message);
       }
@@ -220,6 +286,15 @@ async function run() {
 
   const outPath = path.resolve(process.cwd(), 'src/lib/data/free_sources_matches.json');
   fs.writeFileSync(outPath, JSON.stringify(finalMatches, null, 2));
+
+  console.log(`\n========================================================================================`);
+  console.log(`INGESTION AUDIT SUMMARY: SOURCE CSV ROWS VS STORED ROWS`);
+  console.log(`========================================================================================`);
+  console.log(`| Division | Season | Source CSV Rows | Stored Rows | Rejected Rows | Rejection Reasons |`);
+  console.log(`|---|---|---|---|---|---|`);
+  auditSummary.forEach(s => {
+    console.log(`| ${s.div.padEnd(8, ' ')} | ${s.season.padEnd(6, ' ')} | ${s.csvRows.toString().padEnd(15, ' ')} | ${s.stored.toString().padEnd(11, ' ')} | ${s.rejected.toString().padEnd(13, ' ')} | ${s.rejectionReasons} |`);
+  });
 
   console.log(`\n✅ Ingestion complete!`);
   console.log(`Total canonical matches written: ${finalMatches.length}`);

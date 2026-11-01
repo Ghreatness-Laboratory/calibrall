@@ -94,11 +94,13 @@ export async function GET() {
       recordCount: allMatches.filter((m: any) => m.provenance && m.provenance.includes('football-data.co.uk')).length,
     },
     footballDataOrg: {
-      status: 'active_free_tier',
-      license: 'Free tier token (10 calls/min, 10 active competitions)',
-      coverage: 'PL, BL1, PD, SA, FL1, DED, PPL, CL',
-      note: 'Free tier excludes Championship (ELC) and lower tiers',
-      lastSyncTimestamp: new Date().toISOString(),
+      status: 'DISABLED',
+      license: 'Free tier token (unconfigured / missing FOOTBALL_DATA_API_KEY)',
+      coverage: 'None (Disabled)',
+      note: 'DISABLED: FOOTBALL_DATA_API_KEY is not configured in environment and ELC is excluded on free tier. Provenance claim for football-data.org is NOT in effect. Store count: 0.',
+      recordCount: 0,
+      provenanceClaimInEffect: false,
+      lastSyncTimestamp: null,
     },
     seanElvidgeResults: {
       status: 'active',

@@ -73,6 +73,8 @@ export interface StalenessStatus {
   matchesInLast120Days: number;
   isStale: boolean;
   staleReason?: string;
+  status: 'PASS' | 'INSUFFICIENT' | 'STALE';
+  displayStatus: string;
 }
 
 export class CanonicalMatchStore {
@@ -175,11 +177,7 @@ export class CanonicalMatchStore {
     if (!this.teamsMatchDates.has(teamId)) {
       this.teamsMatchDates.set(teamId, []);
     }
-    const list = this.teamsMatchDates.get(teamId)!;
-    if (!list.includes(dateStr)) {
-      list.push(dateStr);
-      list.sort((a, b) => b.localeCompare(a)); // newest first
-    }
+    this.teamsMatchDates.get(teamId)!.push(dateStr);
   }
 
   public getMatches(filter?: { competitionCode?: string; season?: string; teamId?: string }): CanonicalMatch[] {
@@ -205,9 +203,12 @@ export class CanonicalMatchStore {
     const teamId = canon ? canon.canonicalId : (teamIdOrName.startsWith('team_') ? teamIdOrName : `team_${teamIdOrName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`);
     const teamName = canon ? canon.canonicalName : teamIdOrName;
 
-    const dates = this.teamsMatchDates.get(teamId) || [];
+    const rawDates = this.teamsMatchDates.get(teamId) || [];
+    const dates = rawDates.length > 0 ? Array.from(new Set(rawDates)).sort((a, b) => b.localeCompare(a)) : [];
     const refTimestamp = refDate ? new Date(refDate).getTime() : Date.now();
 
+    // FAIL-CLOSED GATE:
+    // A team with zero match records in the database must ALWAYS be treated as INSUFFICIENT, never as pass.
     if (dates.length === 0) {
       return {
         teamId,
@@ -216,7 +217,9 @@ export class CanonicalMatchStore {
         daysSinceLastMatch: null,
         matchesInLast120Days: 0,
         isStale: true,
-        staleReason: 'Data out of date: no recent matches stored in database',
+        staleReason: 'Insufficient data: zero match records stored in database',
+        status: 'INSUFFICIENT',
+        displayStatus: 'Insufficient data',
       };
     }
 
@@ -248,6 +251,9 @@ export class CanonicalMatchStore {
       staleReason = `Data out of date: only ${matchesIn120} matches in last 120 days (min 5 required)`;
     }
 
+    const status: 'PASS' | 'INSUFFICIENT' | 'STALE' = isStale ? 'STALE' : 'PASS';
+    const displayStatus: string = isStale ? 'Insufficient data' : 'Active';
+
     return {
       teamId,
       teamName,
@@ -256,6 +262,8 @@ export class CanonicalMatchStore {
       matchesInLast120Days: matchesIn120,
       isStale,
       staleReason,
+      status,
+      displayStatus,
     };
   }
 

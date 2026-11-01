@@ -135,13 +135,19 @@ export function evaluateFixtureMarkets(
   maxRankedOptions: number = 8,
   allowedOptionTypes?: SupportedOptionType[]
 ): EvaluatedFixtureResult {
-  // Stale data guard & missing team strength hard guard
-  if (context.insufficientData || context.hasRealTeamStrength === false || context.noRecommendationReason?.startsWith('Data out of date')) {
+  // Stale data guard & missing team strength hard guard (Fail-Closed)
+  if (
+    context.insufficientData || 
+    context.hasRealTeamStrength === false || 
+    context.noRecommendationReason?.startsWith('Data out of date') ||
+    context.noRecommendationReason?.startsWith('Insufficient data') ||
+    context.noRecommendationReason === 'Insufficient data'
+  ) {
     return {
       predictions: [],
       rankedOptions: [],
       topPick: null,
-      noRecommendationReason: context.noRecommendationReason || 'Not enough data',
+      noRecommendationReason: context.noRecommendationReason || 'Insufficient data',
       contextEvaluation: {
         stateTags: context.stateTags || [],
         lineupStatus: 'confirmed',
