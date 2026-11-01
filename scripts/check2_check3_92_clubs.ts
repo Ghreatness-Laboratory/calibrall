@@ -25,16 +25,23 @@ async function runCheck2And3() {
   const plTeams = allTeams.filter(t => t.competitionCode === 'PL');
   const elcTeams = allTeams.filter(t => t.competitionCode === 'ELC');
   const e2Teams = allTeams.filter(t => t.competitionCode === 'E2');
-  const e3Teams = allTeams.filter(t => t.competitionCode === 'E3').slice(0, 24);
+  const e3Teams = allTeams.filter(t => t.competitionCode === 'E3');
+  const natTeams = allTeams.filter(t => t.competitionCode === 'NAT');
   const clubs92 = [...plTeams, ...elcTeams, ...e2Teams, ...e3Teams];
 
   const allStored = Array.from(matchesStore.inMemoryMatches.values());
   const fdcMatches = allStored.filter(m => (m.source || '').includes('football-data.co.uk'));
 
-  // Get all canonical matches for Elvidge and openfootball
+  // Get all canonical matches (Finished results only)
   const allCanonical = canonicalMatchStore.getMatches();
+  const allFixtures = canonicalMatchStore.getFixtures();
   const elvidgeMatches = allCanonical.filter(m => m.provenance?.historySource === 'elvidge');
   const openFootballMatches = allCanonical.filter(m => m.provenance?.statusSource === 'openfootball' || m.provenance?.historySource === 'openfootball');
+  const openFootballFixtures = allFixtures.filter(m => m.provenance?.statusSource === 'openfootball' || m.provenance?.historySource === 'openfootball');
+
+  console.log(`\nCanonical Stores: ${allCanonical.length} FINISHED matches in matches table, ${allFixtures.length} SCHEDULED fixtures in fixtures table.`);
+  console.log(`openfootball: ${openFootballMatches.length} finished match results, ${openFootballFixtures.length} future scheduled fixtures.`);
+  console.log(`Relegated / Out-of-Scope clubs (NAT): ${natTeams.length} clubs (${natTeams.map(t => t.canonicalName).join(', ')})`);
 
   console.log('\n========================================================================================');
   console.log('AUDITING ALL 92 ENGLISH LEAGUE CLUBS:');

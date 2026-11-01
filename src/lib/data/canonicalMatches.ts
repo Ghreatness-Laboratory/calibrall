@@ -78,8 +78,9 @@ export interface StalenessStatus {
 }
 
 export class CanonicalMatchStore {
-  private matchesMap: Map<string, CanonicalMatch> = new Map();
-  private teamsMatchDates: Map<string, string[]> = new Map();
+  private matchesMap: Map<string, CanonicalMatch> = new Map(); // Finished completed matches
+  private fixturesMap: Map<string, CanonicalMatch> = new Map(); // Scheduled future fixtures table
+  private teamsMatchDates: Map<string, string[]> = new Map(); // Finished match dates only
 
   constructor() {
     this.initGlobal();
@@ -88,9 +89,11 @@ export class CanonicalMatchStore {
   private initGlobal() {
     if (!(globalThis as any).__calibrall_canonical_matches) {
       (globalThis as any).__calibrall_canonical_matches = new Map<string, CanonicalMatch>();
+      (globalThis as any).__calibrall_canonical_fixtures = new Map<string, CanonicalMatch>();
       (globalThis as any).__calibrall_team_match_dates = new Map<string, string[]>();
     }
     this.matchesMap = (globalThis as any).__calibrall_canonical_matches;
+    this.fixturesMap = (globalThis as any).__calibrall_canonical_fixtures;
     this.teamsMatchDates = (globalThis as any).__calibrall_team_match_dates;
   }
 
@@ -124,7 +127,10 @@ export class CanonicalMatchStore {
     }
 
     const key = this.generateKey(raw.date, raw.homeTeamId, raw.awayTeamId);
-    const existing = this.matchesMap.get(key);
+    const existing = this.matchesMap.get(key) || this.fixturesMap.get(key);
+
+    const isFinished = raw.status === 'FINISHED' || (raw.homeScore !== null && raw.homeScore !== undefined && raw.awayScore !== null && raw.awayScore !== undefined);
+    const resolvedStatus = isFinished ? 'FINISHED' : (raw.status || existing?.status || 'TIMED');
 
     const merged: CanonicalMatch = {
       id: key,
@@ -137,7 +143,7 @@ export class CanonicalMatchStore {
       awayTeamId: raw.awayTeamId,
       homeTeamName: raw.homeTeamName || existing?.homeTeamName || raw.homeTeamId,
       awayTeamName: raw.awayTeamName || existing?.awayTeamName || raw.awayTeamId,
-      status: raw.status || existing?.status || 'FINISHED',
+      status: resolvedStatus,
       homeScore: raw.homeScore ?? existing?.homeScore ?? null,
       awayScore: raw.awayScore ?? existing?.awayScore ?? null,
       homeHalfTimeScore: raw.homeHalfTimeScore ?? existing?.homeHalfTimeScore ?? null,
@@ -158,17 +164,24 @@ export class CanonicalMatchStore {
       closingOdds: raw.closingOdds || existing?.closingOdds,
       provenance: {
         statsSource: (source === 'football-data.co.uk' ? source : existing?.provenance?.statsSource) || source,
-        statusSource: (source === 'football-data.org' || source === 'espn' ? source : existing?.provenance?.statusSource) || source,
+        statusSource: (source === 'football-data.org' || source === 'espn' || source === 'openfootball' ? source : existing?.provenance?.statusSource) || source,
         historySource: (source === 'elvidge' ? source : existing?.provenance?.historySource) || source,
         ingestedAt: new Date().toISOString(),
       },
     };
 
-    this.matchesMap.set(key, merged);
+    if (resolvedStatus === 'FINISHED') {
+      // Completed match stored in matches table
+      this.matchesMap.set(key, merged);
+      this.fixturesMap.delete(key);
 
-    // Track dates for home and away
-    this.addTeamDate(raw.homeTeamId, merged.date);
-    this.addTeamDate(raw.awayTeamId, merged.date);
+      // Track completed match dates for home and away
+      this.addTeamDate(raw.homeTeamId, merged.date);
+      this.addTeamDate(raw.awayTeamId, merged.date);
+    } else {
+      // Scheduled / future fixture stored in dedicated fixtures table
+      this.fixturesMap.set(key, merged);
+    }
 
     return { success: true };
   }
@@ -194,8 +207,26 @@ export class CanonicalMatchStore {
     return list.sort((a, b) => b.kickoffTime.localeCompare(a.kickoffTime));
   }
 
+  public getFixtures(filter?: { competitionCode?: string; season?: string; teamId?: string }): CanonicalMatch[] {
+    let list = Array.from(this.fixturesMap.values());
+    if (filter?.competitionCode && filter.competitionCode !== 'ALL') {
+      list = list.filter(m => m.competitionCode === filter.competitionCode);
+    }
+    if (filter?.season && filter.season !== 'ALL') {
+      list = list.filter(m => m.season === filter.season);
+    }
+    if (filter?.teamId) {
+      list = list.filter(m => m.homeTeamId === filter.teamId || m.awayTeamId === filter.teamId);
+    }
+    return list.sort((a, b) => a.kickoffTime.localeCompare(b.kickoffTime));
+  }
+
   public getTotalMatchesCount(): number {
     return this.matchesMap.size;
+  }
+
+  public getTotalFixturesCount(): number {
+    return this.fixturesMap.size;
   }
 
   public getStalenessStatus(teamIdOrName: string, refDate?: string): StalenessStatus {

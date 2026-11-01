@@ -183,12 +183,14 @@ const allTeams = Object.values(CANONICAL_TEAMS);
 const plTeams = allTeams.filter(t => t.competitionCode === 'PL');
 const elcTeams = allTeams.filter(t => t.competitionCode === 'ELC');
 const e2Teams = allTeams.filter(t => t.competitionCode === 'E2');
-const e3Teams = allTeams.filter(t => t.competitionCode === 'E3').slice(0, 24);
+const e3Teams = allTeams.filter(t => t.competitionCode === 'E3');
+const natTeams = allTeams.filter(t => t.competitionCode === 'NAT');
 const clubs92 = [...plTeams, ...elcTeams, ...e2Teams, ...e3Teams];
 
 let gatePassCount = 0;
 let gateInsufficientCount = 0;
 let gateStaleCount = 0;
+const gatedReasons: { id: string; name: string; div: string; reason: string }[] = [];
 
 console.log('| # | Canonical ID | Club Name | Div | Last Match Date | Days Ago | 120d Matches | Gate Status | Gate Display |');
 console.log('|---|---|---|---|---|---|---|---|---|');
@@ -202,14 +204,17 @@ clubs92.forEach((club, idx) => {
     status = 'INSUFFICIENT';
     display = 'Insufficient data (0 matches)';
     gateInsufficientCount++;
+    gatedReasons.push({ id: club.canonicalId, name: club.canonicalName, div: club.competitionCode, reason: 'Zero match records stored in database' });
   } else if (query.days > 21) {
     status = 'STALE';
     display = `Stale (>21d: ${query.days}d ago)`;
     gateStaleCount++;
+    gatedReasons.push({ id: club.canonicalId, name: club.canonicalName, div: club.competitionCode, reason: `Last match ${query.days} days ago (>21d limit)` });
   } else if (query.matchesInLast120Days < 5) {
     status = 'STALE';
     display = `Stale (<5 in 120d: ${query.matchesInLast120Days})`;
     gateStaleCount++;
+    gatedReasons.push({ id: club.canonicalId, name: club.canonicalName, div: club.competitionCode, reason: `Only ${query.matchesInLast120Days} matches in last 120 days (<5 minimum required)` });
   } else {
     gatePassCount++;
   }
@@ -220,14 +225,39 @@ clubs92.forEach((club, idx) => {
   console.log(`| ${(idx + 1).toString().padStart(2, ' ')} | ${club.canonicalId.padEnd(25, ' ')} | ${club.canonicalName.padEnd(26, ' ')} | ${club.competitionCode.padEnd(3, ' ')} | ${lastDateStr.padEnd(10, ' ')} | ${daysStr.padEnd(8, ' ')} | ${query.matchesInLast120Days.toString().padEnd(12, ' ')} | ${status.padEnd(12, ' ')} | ${display} |`);
 });
 
+console.log('\n--- AUDITING RELEGATED / OUT-OF-SCOPE CLUBS (NAT) ---');
+console.log('| # | Canonical ID | Club Name | Div | Last Match Date | Days Ago | 120d Matches | Gate Status | Gating Reason |');
+console.log('|---|---|---|---|---|---|---|---|---|');
+natTeams.forEach((club, idx) => {
+  const query = matchesStore.getTeamDaysSinceLastMatch(club.canonicalId, '2026-10-31T15:00:00Z');
+  let status = 'STALE';
+  let reason = '';
+  if (query.lastMatchDate === null) {
+    status = 'INSUFFICIENT';
+    reason = 'Insufficient data: 0 matches';
+  } else {
+    reason = `Relegated out of scope to National League; last match ${query.days}d ago (${query.lastMatchDate?.slice(0, 10)})`;
+  }
+  const lastDateStr = query.lastMatchDate ? query.lastMatchDate.slice(0, 10) : 'NONE';
+  const daysStr = query.days !== null ? query.days.toString() : 'N/A';
+  console.log(`| ${(idx + 1).toString().padStart(2, ' ')} | ${club.canonicalId.padEnd(25, ' ')} | ${club.canonicalName.padEnd(26, ' ')} | ${club.competitionCode.padEnd(3, ' ')} | ${lastDateStr.padEnd(10, ' ')} | ${daysStr.padEnd(8, ' ')} | ${query.matchesInLast120Days.toString().padEnd(12, ' ')} | ${status.padEnd(12, ' ')} | ${reason} |`);
+});
+
 console.log('\n========================================================================================');
 console.log('92-CLUB STALENESS GATE SUMMARY:');
 console.log('========================================================================================');
 console.log(`Total Clubs Audited: ${clubs92.length}`);
+console.log(`Clubs With Records: ${clubs92.filter(c => matchesStore.getTeamDaysSinceLastMatch(c.canonicalId).lastMatchDate !== null).length} clubs`);
 console.log(`PASS Gate: ${gatePassCount} clubs`);
 console.log(`INSUFFICIENT DATA Gate (0 match records): ${gateInsufficientCount} clubs`);
 console.log(`STALE Gate (>21d or <5 in 120d): ${gateStaleCount} clubs`);
-console.log(`Total Gated (Insufficient + Stale): ${gateInsufficientCount + gateStaleCount} clubs`);
+console.log(`Total In-Scope Gated: ${gateInsufficientCount + gateStaleCount} clubs`);
+if (gatedReasons.length > 0) {
+  console.log('Gated Clubs Reasons:');
+  gatedReasons.forEach(r => console.log(`  - [${r.div}] ${r.name} (${r.id}): ${r.reason}`));
+} else {
+  console.log('Gated Clubs Reasons: None. All 92 clubs in the 2026/27 English Football League pass the gate.');
+}
 
 console.log('\n[CODE PATHS THAT PRODUCED THE GATING]:');
 console.log('1. Detection Path: src/lib/data/canonicalMatches.ts lines 211-260 (getStalenessStatus)');
