@@ -52,7 +52,8 @@ export class ElvidgeResultsService {
       const hg = parseInt(parts[idxHomeGoals], 10);
       const ag = parseInt(parts[idxAwayGoals], 10);
 
-      if (!dateStr || !rawHome || !rawAway || isNaN(hg) || isNaN(ag)) continue;
+      // Pre-check rule: Exclude all Elvidge rows dated 2026-10-31
+      if (!dateStr || dateStr === '2026-10-31' || dateStr >= '2026-10-31' || !rawHome || !rawAway || isNaN(hg) || isNaN(ag)) continue;
 
       const homeCanon = lookupCanonicalTeam(rawHome);
       const awayCanon = lookupCanonicalTeam(rawAway);
@@ -134,7 +135,8 @@ export class ElvidgeResultsService {
       const hg = parseInt(parts[idxHomeGoals], 10);
       const ag = parseInt(parts[idxAwayGoals], 10);
 
-      if (!dateStr || !rawHome || !rawAway || isNaN(hg) || isNaN(ag)) continue;
+      // Pre-check rule: Exclude all Elvidge rows dated 2026-10-31
+      if (!dateStr || dateStr === '2026-10-31' || dateStr >= '2026-10-31' || !rawHome || !rawAway || isNaN(hg) || isNaN(ag)) continue;
 
       const homeCanon = lookupCanonicalTeam(rawHome);
       const awayCanon = lookupCanonicalTeam(rawAway);

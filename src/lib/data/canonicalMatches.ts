@@ -175,9 +175,11 @@ export class CanonicalMatchStore {
       this.matchesMap.set(key, merged);
       this.fixturesMap.delete(key);
 
-      // Track completed match dates for home and away
-      this.addTeamDate(raw.homeTeamId, merged.date);
-      this.addTeamDate(raw.awayTeamId, merged.date);
+      // Track completed match dates for home and away (Elvidge is strictly used for H2H only)
+      if (source !== 'elvidge') {
+        this.addTeamDate(raw.homeTeamId, merged.date);
+        this.addTeamDate(raw.awayTeamId, merged.date);
+      }
     } else {
       // Scheduled / future fixture stored in dedicated fixtures table
       this.fixturesMap.set(key, merged);

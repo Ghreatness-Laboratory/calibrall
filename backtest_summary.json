@@ -2,56 +2,56 @@
   "report": {
     "matchResult": {
       "market": "1X2 Match Result",
-      "samples": 4507,
-      "logLoss": 1.0333,
-      "brier": 0.6206,
-      "baselineLogLoss": 1.0767,
-      "closingOddsLogLoss": 0.9841,
-      "closingOddsBrier": 0.587
+      "samples": 6710,
+      "logLoss": 1.0488,
+      "brier": 0.6312,
+      "baselineLogLoss": 1.0759,
+      "closingOddsLogLoss": 0.9981,
+      "closingOddsBrier": 0.5966
     },
     "over25Goals": {
       "market": "Over / Under 2.5 Goals",
-      "samples": 4507,
-      "logLoss": 0.7041,
-      "brier": 0.2536,
-      "baselineLogLoss": 0.6925,
-      "closingOddsLogLoss": 0.6738,
-      "closingOddsBrier": 0.2406
+      "samples": 6710,
+      "logLoss": 0.7039,
+      "brier": 0.2539,
+      "baselineLogLoss": 0.6932,
+      "closingOddsLogLoss": 0.6772,
+      "closingOddsBrier": 0.2422
     },
     "btts": {
       "market": "Both Teams To Score (BTTS)",
-      "samples": 4507,
-      "logLoss": 0.6999,
-      "brier": 0.2527,
-      "baselineLogLoss": 0.6916
+      "samples": 6710,
+      "logLoss": 0.6996,
+      "brier": 0.2526,
+      "baselineLogLoss": 0.692
     },
     "corners": {
       "market": "Corners (Over 9.5 NegBinomial)",
-      "samples": 4506,
-      "logLoss": 0.6961,
-      "brier": 0.2514,
+      "samples": 6709,
+      "logLoss": 0.6969,
+      "brier": 0.2518,
       "baselineLogLoss": 0.6931
     },
     "cards": {
       "market": "Bookings / Cards (Over 3.5 NegBinomial w/ Ref)",
-      "samples": 4506,
-      "logLoss": 1.0419,
-      "brier": 0.3888,
-      "baselineLogLoss": 0.6781
+      "samples": 6709,
+      "logLoss": 1.0502,
+      "brier": 0.3903,
+      "baselineLogLoss": 0.68
     },
     "firstHalf": {
       "market": "1st Half Over 0.5 Goals",
-      "samples": 4506,
-      "logLoss": 0.6017,
-      "brier": 0.2053,
-      "baselineLogLoss": 0.6021
+      "samples": 6709,
+      "logLoss": 0.6117,
+      "brier": 0.2101,
+      "baselineLogLoss": 0.6117
     },
     "highestScoringHalf": {
       "market": "Highest Scoring Half (2nd vs Equal vs 1st)",
-      "samples": 4506,
-      "logLoss": 1.0705,
-      "brier": 0.6473,
-      "baselineLogLoss": 1.0685
+      "samples": 6709,
+      "logLoss": 1.0718,
+      "brier": 0.6482,
+      "baselineLogLoss": 1.0695
     }
   },
   "tierTracker": {
@@ -61,51 +61,51 @@
       "sumProb": 0
     },
     "MEDIUM": {
-      "count": 1046,
-      "hits": 663,
-      "sumProb": 728.4890364611614
+      "count": 1170,
+      "hits": 718,
+      "sumProb": 809.4240665654524
     },
     "LOW": {
-      "count": 3461,
-      "hits": 1500,
-      "sumProb": 1561.6689529338614
+      "count": 5540,
+      "hits": 2376,
+      "sumProb": 2486.931852936221
     }
   },
   "ablationResults": [
     {
       "feature": "Time-decayed Form (EMA 5-match goals)",
       "status": "KEPT",
-      "deltaLogLoss": "+0.01446",
+      "deltaLogLoss": "+0.01574",
       "reason": "Removing increases log loss by +0.0121 (statistically significant predictive signal)"
     },
     {
       "feature": "Home / Away Splits (Venue-specific attack/def)",
       "status": "KEPT",
-      "deltaLogLoss": "+0.05143",
+      "deltaLogLoss": "+0.05095",
       "reason": "Removing increases log loss by +0.0084 (captures home advantage variance)"
     },
     {
       "feature": "Venue-specific H2H (Shrunk Bayes on last 8-10 meetings)",
       "status": "KEPT",
-      "deltaLogLoss": "+0.01972",
+      "deltaLogLoss": "+0.02051",
       "reason": "Removing increases log loss by +0.0039 (mild boost in historical rivalries)"
     },
     {
       "feature": "Rest Days & Calendar Fatigue (<72h turnaround)",
       "status": "KEPT",
-      "deltaLogLoss": "+0.01971",
+      "deltaLogLoss": "+0.02025",
       "reason": "Removing increases log loss by +0.0028 (schedule congestion dampens away attack)"
     },
     {
       "feature": "Referee Disciplinary Tendencies (football-data.co.uk)",
       "status": "KEPT",
-      "deltaLogLoss": "+0.00938",
+      "deltaLogLoss": "+0.01326",
       "reason": "Removing increases card log loss by +0.0142 (crucial for card market variance)"
     },
     {
       "feature": "Market Prior Blend (15% de-vigged closing odds benchmark)",
       "status": "KEPT",
-      "deltaLogLoss": "+0.01977",
+      "deltaLogLoss": "+0.02051",
       "reason": "Removing increases log loss by +0.0185 (stabilizes extreme parameter estimates)"
     },
     {
