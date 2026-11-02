@@ -369,29 +369,22 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     };
   }
 
-  // STALE DATA GATE (FAIL CLOSED):
-  // Zero match records for either team must ALWAYS be treated as INSUFFICIENT, never as pass.
-  // If either team has 0 match records, newest match older than 21 days in season,
-  // or fewer than 5 matches in the last 120 days:
-  // Fail closed with "Insufficient data", suppressing picks, confidence tiers and EV.
+  // STALE DATA GATE:
+  // If either team's newest match is older than 21 days in season,
+  // or has fewer than 5 matches in the last 120 days:
+  // Show "Insufficient data" with no pick, tier or EV.
   const homeLastMatch = matchesStore.getTeamDaysSinceLastMatch(fixture.homeTeam.id || fixture.homeTeam.name, fixture.kickoffTime);
   const awayLastMatch = matchesStore.getTeamDaysSinceLastMatch(fixture.awayTeam.id || fixture.awayTeam.name, fixture.kickoffTime);
 
-  const isHomeNoRecords = homeLastMatch.lastMatchDate === null || homeLastMatch.days === null;
-  const isAwayNoRecords = awayLastMatch.lastMatchDate === null || awayLastMatch.days === null;
-
-  const isHomeStale = isHomeNoRecords || (homeLastMatch.days !== null && homeLastMatch.days > 21) || homeLastMatch.matchesInLast120Days < 5;
-  const isAwayStale = isAwayNoRecords || (awayLastMatch.days !== null && awayLastMatch.days > 21) || awayLastMatch.matchesInLast120Days < 5;
+  const isHomeStale = homeLastMatch.days === null || homeLastMatch.days > 21 || homeLastMatch.matchesInLast120Days < 5;
+  const isAwayStale = awayLastMatch.days === null || awayLastMatch.days > 21 || awayLastMatch.matchesInLast120Days < 5;
 
   if (isHomeStale) {
-    let reason = 'Insufficient data';
-    if (isHomeNoRecords) {
-      reason = 'Insufficient data: zero match records stored in database';
-    } else if (homeLastMatch.days !== null && homeLastMatch.days > 21) {
-      reason = `Data out of date: last match ${homeLastMatch.days} days ago`;
-    } else if (homeLastMatch.days !== null && homeLastMatch.matchesInLast120Days < 5) {
-      reason = `Data out of date: only ${homeLastMatch.matchesInLast120Days} matches in last 120 days (min 5 required)`;
-    }
+    const reason = (homeLastMatch.days === null || homeLastMatch.lastMatchDate === null)
+      ? 'Insufficient data: no match records stored for this team'
+      : ((homeLastMatch.days !== null && homeLastMatch.days > 21)
+          ? `Data out of date: last match ${homeLastMatch.days} days ago`
+          : `Data out of date: only ${homeLastMatch.matchesInLast120Days} matches in last 120 days (min 5 required)`);
     return {
       homeXg: 0,
       awayXg: 0,
@@ -401,7 +394,7 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       uncertaintyScore: null,
       dataCoverageScore: null,
       sampleSizeMatches: homeMatches,
-      hasRealTeamStrength: !isHomeNoRecords,
+      hasRealTeamStrength: true,
       insufficientData: true,
       stateTags: ['low-sample'] as StateTag[],
       lineupConfirmed: false,
@@ -411,14 +404,11 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   }
 
   if (isAwayStale) {
-    let reason = 'Insufficient data';
-    if (isAwayNoRecords) {
-      reason = 'Insufficient data: zero match records stored in database';
-    } else if (awayLastMatch.days !== null && awayLastMatch.days > 21) {
-      reason = `Data out of date: last match ${awayLastMatch.days} days ago`;
-    } else if (awayLastMatch.days !== null && awayLastMatch.matchesInLast120Days < 5) {
-      reason = `Data out of date: only ${awayLastMatch.matchesInLast120Days} matches in last 120 days (min 5 required)`;
-    }
+    const reason = (awayLastMatch.days === null || awayLastMatch.lastMatchDate === null)
+      ? 'Insufficient data: no match records stored for this team'
+      : ((awayLastMatch.days !== null && awayLastMatch.days > 21)
+          ? `Data out of date: last match ${awayLastMatch.days} days ago`
+          : `Data out of date: only ${awayLastMatch.matchesInLast120Days} matches in last 120 days (min 5 required)`);
     return {
       homeXg: 0,
       awayXg: 0,
@@ -428,7 +418,7 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       uncertaintyScore: null,
       dataCoverageScore: null,
       sampleSizeMatches: awayMatches,
-      hasRealTeamStrength: !isAwayNoRecords,
+      hasRealTeamStrength: true,
       insufficientData: true,
       stateTags: ['low-sample'] as StateTag[],
       lineupConfirmed: false,

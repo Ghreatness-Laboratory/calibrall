@@ -406,7 +406,7 @@ export default function LineupComparisonPanel({
         {revisions && revisions.length > 0 ? (
           <div className="space-y-1.5 pt-1">
             <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-[#8B9890]">
-              Immutable pick revision audit ledger
+              Immutable model revision audit ledger
             </span>
             <div className="border border-white/[0.07] rounded-[10px] overflow-hidden divide-y divide-white/[0.07]">
               {revisions.map((rev) => (

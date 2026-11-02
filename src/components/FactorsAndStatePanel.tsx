@@ -188,10 +188,10 @@ export default function FactorsAndStatePanel({
       <div className="space-y-2.5 pt-1">
         <div className="flex items-center justify-between">
           <h3 className="text-[14px] font-semibold text-[#ECF1EE]">
-            Top {rankedOptions.length} ranked options
+            Model probability analysis ({rankedOptions.length} markets)
           </h3>
           <span className="text-[11px] text-[#8B9890]">
-            Authorized catalogue
+            Data coverage
           </span>
         </div>
 
@@ -204,22 +204,21 @@ export default function FactorsAndStatePanel({
             const selectionName = formatSelectionName(opt.selection);
             const optionTypeLabel = getOptionTypeLabel(opt.optionType);
             const periodLabel = getPeriodLabel(opt.period);
-            const evFormatted = formatExpectedValue(opt.expectedValue);
             const oddsFormatted = formatOdds(opt.marketOdds);
 
             // Subline reason
             let sublineReason = 'High uncertainty';
             const tierLower = (opt.evidenceTier || '').toLowerCase();
             if (opt.qualificationStatus === 'QUALIFIED_VALUE') {
-              sublineReason = 'Qualified value';
+              sublineReason = 'Model probability';
             } else if (opt.qualificationStatus === 'QUALIFIED_PROBABILITY') {
-              sublineReason = 'Statistical edge';
+              sublineReason = 'Model probability';
             } else if (tierLower.includes('inadequate data')) {
               sublineReason = 'Inadequate data';
             } else if (tierLower.includes('draw')) {
               sublineReason = 'Draw variance';
             } else if (opt.qualificationStatus === 'UNQUALIFIED_MARGINAL' || tierLower.includes('marginal')) {
-              sublineReason = 'Marginal edge';
+              sublineReason = 'Withheld: analysis only';
             } else if (tierLower.includes('sub')) {
               sublineReason = 'Sub threshold probability';
             }
@@ -251,11 +250,11 @@ export default function FactorsAndStatePanel({
                   <div className="shrink-0">
                     {isQualified ? (
                       <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-[6px] border border-[#B6E63B]/40 text-[#B6E63B] bg-[rgba(182,230,59,0.12)]">
-                        Qualified
+                        Calibrated
                       </span>
                     ) : (
                       <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-[6px] border border-[#E2AE45]/40 text-[#E2AE45] bg-[rgba(226,174,69,0.12)]">
-                        Abstain
+                        Withheld: analysis only
                       </span>
                     )}
                   </div>
@@ -272,7 +271,7 @@ export default function FactorsAndStatePanel({
                   <span>{cleanDisplayText(sublineReason)}</span>
                 </div>
 
-                {/* Row 3: 3 equal columns (Prob, Odds, EV). Labels 11px muted, values mono 13px, tabular-nums */}
+                {/* Row 3: 3 equal columns (Prob, Odds, Calibration status) */}
                 <div className="grid grid-cols-3 gap-2 pt-2.5 mt-2.5 border-t border-white/[0.05] text-left">
                   <div>
                     <span className="text-[10.5px] text-[#8B9890] block">Prob</span>
@@ -289,9 +288,9 @@ export default function FactorsAndStatePanel({
                   </div>
 
                   <div>
-                    <span className="text-[10.5px] text-[#8B9890] block">EV</span>
-                    <span className={`font-mono text-[13px] tabular-nums font-semibold ${evFormatted.colorClass}`}>
-                      {cleanDisplayText(evFormatted.text)}
+                    <span className="text-[10.5px] text-[#8B9890] block">Calibration status</span>
+                    <span className="font-mono text-[11.5px] tabular-nums font-semibold text-[#8B9890]">
+                      {isQualified ? 'Calibrated' : 'Withheld: analysis only'}
                     </span>
                   </div>
                 </div>

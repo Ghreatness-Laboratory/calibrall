@@ -66,7 +66,7 @@ export default function BottomNav() {
       isActive: isFixturesActive,
     },
     {
-      id: 'picks',
+      id: 'analysis',
       label: 'Analysis',
       href: '/predictions',
       icon: Target,

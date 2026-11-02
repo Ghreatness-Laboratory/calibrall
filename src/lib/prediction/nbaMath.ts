@@ -187,7 +187,7 @@ export function calculateNBAScoreProjection(
       line: sportsbook.spreadLineTeamA,
       diff: spreadDiff,
       leanTeam: coverTeam,
-      recommendation: `${coverTeam} cover lean (${Math.abs(spreadDiff).toFixed(2)} pt edge vs ${sportsbook.spreadLineTeamA > 0 ? '+' : ''}${sportsbook.spreadLineTeamA} spread)`,
+      recommendation: `${coverTeam} margin projection (${Math.abs(spreadDiff).toFixed(2)} pt differential vs ${sportsbook.spreadLineTeamA > 0 ? '+' : ''}${sportsbook.spreadLineTeamA} spread)`,
     };
   }
 

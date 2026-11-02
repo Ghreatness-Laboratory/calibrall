@@ -78,7 +78,7 @@ export default function PerformancePage() {
           Forward record & calibration
         </h1>
         <p className="text-[12px] text-[#8B9890]">
-          The forward record is the only accuracy measure of the platform. Every recommendation is stored prior to kickoff with an immutable timestamp and graded after full time.
+          The forward record is the only accuracy measure of the platform. Every model probability projection is stored prior to kickoff with an immutable timestamp and graded after full time.
         </p>
       </div>
 
@@ -89,7 +89,7 @@ export default function PerformancePage() {
           <span>Immutable pre kickoff forward ledger protocol</span>
         </div>
         <p className="text-[12px] leading-[1.5] text-[#8B9890]">
-          Every recommendation is stored before match kickoff with a timestamp, model version, probability, market line, and bookmaker odds, and cannot be edited afterwards. Graded strictly after full time. Retrospective illustrations are excluded from all accuracy figures.
+          Every model probability projection is stored before match kickoff with a timestamp, model version, probability, market line, and bookmaker odds, and cannot be edited afterwards. Graded strictly after full time. Retrospective illustrations are excluded from all accuracy figures.
         </p>
       </div>
 
@@ -197,12 +197,8 @@ export default function PerformancePage() {
                           <span className="text-[13px] font-semibold text-[#ECF1EE]">
                             {cleanDisplayText(fam.familyDisplayName)}
                           </span>
-                          <span className={`text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-[6px] border ${
-                            isValue 
-                              ? 'bg-[rgba(182,230,59,0.12)] border-[#B6E63B]/40 text-[#B6E63B]'
-                              : 'bg-[rgba(226,174,69,0.12)] border-[#E2AE45]/40 text-[#E2AE45]'
-                          }`}>
-                            {isValue ? 'VALUE ELIGIBLE' : 'PROBABILITY ANALYSIS ONLY'}
+                          <span className="text-[9.5px] font-mono uppercase px-2 py-0.5 rounded-[6px] border bg-[rgba(182,230,59,0.12)] border-[#B6E63B]/40 text-[#B6E63B]">
+                            PROBABILITY ANALYSIS ONLY
                           </span>
                         </div>
                         <div className="text-[11px] font-mono text-[#8B9890] mt-0.5 tabular-nums">
@@ -265,7 +261,7 @@ export default function PerformancePage() {
                 <span>Pre kickoff ledger protocol · The platform only accuracy measure</span>
               </div>
               <p className="text-[12px] leading-[1.55] text-[#8B9890]">
-                Every recommendation from model deployment onwards is logged prior to kickoff with an immutable timestamp, model version, probability, market line, and bookmaker odds. Entries are sealed with a cryptographic hash and cannot be altered or backfilled. Grading occurs strictly after full time against official match results.
+                Every model projection from model deployment onwards is logged prior to kickoff with an immutable timestamp, model version, probability, market line, and bookmaker odds. Entries are sealed with a cryptographic hash and cannot be altered or backfilled. Grading occurs strictly after full time against official match results.
               </p>
             </div>
 
@@ -419,9 +415,9 @@ export default function PerformancePage() {
                           </span>
                         </div>
                         <div>
-                          <span className="text-[#8B9890] block text-[10px]">Statistical edge</span>
+                          <span className="text-[#8B9890] block text-[10px]">Calibration status</span>
                           <span className="text-[#B6E63B] font-bold tabular-nums">
-                            {formatSignedValue(pick.edge * 100, '%')}
+                            Calibrated
                           </span>
                         </div>
                       </div>

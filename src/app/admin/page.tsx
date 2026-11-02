@@ -288,14 +288,14 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Market Family Concentration & Recommendation Telemetry */}
+      {/* Market Family Concentration & Model Selection Telemetry */}
       {monitoringReport && (
         <div className="bg-[#0f2219] border border-white/[0.08] rounded-[12px] p-4 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
             <div>
               <h2 className="font-[500] text-[#e8efe9] text-[14px] flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-[#b8e63a]" />
-                <span>Market family recommendation telemetry (Trailing {monitoringReport.sampleWindow} fixtures)</span>
+                <span>Market family model selection telemetry (Trailing {monitoringReport.sampleWindow} fixtures)</span>
               </h2>
               <p className="text-[11px] text-[#8fa69a] mt-0.5">
                 Diagnostic monitoring only. Alert threshold configured at {monitoringReport.thresholdPct}% ceiling.

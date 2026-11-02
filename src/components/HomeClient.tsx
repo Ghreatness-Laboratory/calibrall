@@ -92,9 +92,9 @@ export default function HomeClient() {
 
       {/* 4. HOME SCREEN HERO */}
       <section className="space-y-2.5 pt-1">
-        {/* Mono eyebrow: CALIBRATED MODELING ENGINE */}
+        {/* Mono eyebrow: STATISTICAL PROBABILITY ENGINE */}
         <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B9890]">
-          CALIBRATED MODELING ENGINE
+          STATISTICAL PROBABILITY ENGINE
         </div>
 
         {/* H1: 23px, line height 1.2, weight 700, letter spacing -0.025em. Second sentence is lime */}
@@ -102,12 +102,12 @@ export default function HomeClient() {
           {isBasketball ? (
             <>
               Stop guessing NBA margins.{' '}
-              <span className="text-[#B6E63B]">Inspect calibrated distributions.</span>
+              <span className="text-[#B6E63B]">Calibrated probabilistic models.</span>
             </>
           ) : (
             <>
               Stop guessing match winners.{' '}
-              <span className="text-[#B6E63B]">Inspect calibrated distributions.</span>
+              <span className="text-[#B6E63B]">Calibrated probabilistic models.</span>
             </>
           )}
         </h1>
@@ -115,8 +115,8 @@ export default function HomeClient() {
         {/* Short description 2 to 3 lines (13px, line height 1.55) */}
         <p className="text-[13px] leading-[1.55] text-[#8B9890]">
           {isBasketball
-            ? 'Calibrall evaluates possession efficiency, offensive ratings, and sportsbook margins to surface calibrated model probabilities, and abstains when data is thin.'
-            : 'Calibrall evaluates goals, corners, both teams to score, cards and 1X2 lines to surface calibrated model probabilities, and abstains when data is thin.'}
+            ? 'Calibrall evaluates possession efficiency, offensive ratings, and sportsbook margins to project calibrated probabilities, and abstains when data is thin.'
+            : 'Calibrall evaluates goals, corners, both teams to score, cards and 1X2 lines to project calibrated probabilities, and abstains when data is thin.'}
         </p>
 
         {/* Action Buttons */}
@@ -143,7 +143,7 @@ export default function HomeClient() {
           </Link>
         </div>
 
-        {/* Row of three equal stat tiles: Brier score, Markets, Min. edge */}
+        {/* Row of three equal stat tiles: Brier score, Markets, Calibration status */}
         <div className="grid grid-cols-3 gap-2 pt-1">
           <div className="h-[66px] p-2.5 bg-[#101713] border border-white/[0.07] rounded-[14px] flex flex-col justify-between">
             <span className="text-[10.5px] text-[#8B9890] font-normal leading-tight">
@@ -165,10 +165,10 @@ export default function HomeClient() {
 
           <div className="h-[66px] p-2.5 bg-[#101713] border border-white/[0.07] rounded-[14px] flex flex-col justify-between">
             <span className="text-[10.5px] text-[#8B9890] font-normal leading-tight">
-              Data coverage
+              Calibration status
             </span>
-            <span className="text-[17px] font-[650] text-[#ECF1EE] tabular-nums leading-none">
-              99.2%
+            <span className="text-[14px] font-[650] text-[#ECF1EE] font-mono leading-none">
+              Calibrated
             </span>
           </div>
         </div>
@@ -306,7 +306,7 @@ export default function HomeClient() {
           Why match winners are often the worst market
         </h2>
         <p className="text-[13px] leading-[1.55] text-[#8B9890]">
-          Standard tipsters force a 1X2 pick on every fixture. Calibrall evaluates multiple lines to find calibrated value and abstains when edges are absent.
+          Standard models force a 1X2 projection on every fixture. Calibrall evaluates multiple lines to find calibrated models and abstains when evidence is absent.
         </p>
 
         {/* Two compact cards: Multi market ranking & Discipline to abstain */}
@@ -319,7 +319,7 @@ export default function HomeClient() {
               <h3 className="text-[13px] font-[600] text-[#ECF1EE]">Multi market ranking</h3>
             </div>
             <p className="text-[12px] leading-[1.5] text-[#8B9890]">
-              We evaluate totals, both teams to score, corners, cards and results simultaneously to find where real value lies.
+              We evaluate totals, both teams to score, corners, cards and results simultaneously to analyze full match distributions.
             </p>
           </div>
 
@@ -331,7 +331,7 @@ export default function HomeClient() {
               <h3 className="text-[13px] font-[600] text-[#ECF1EE]">Discipline to abstain</h3>
             </div>
             <p className="text-[12px] leading-[1.5] text-[#8B9890]">
-              When modeled probability fails to clear the hurdle (+3.0% edge), the engine abstains rather than inventing a pick.
+              When modeled probability fails to clear the hurdle, the engine abstains rather than inventing a projection.
             </p>
           </div>
         </div>

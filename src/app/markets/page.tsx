@@ -181,7 +181,7 @@ export default function MarketExplorerPage() {
         <p className="text-[12px] text-[#8B9890]">
           {isBasketball
             ? 'Compare model probability, pricing, and margin differential across NBA matchups.'
-            : 'Compare model probability, pricing, and edge for specific option lines across all European fixtures.'}
+            : 'Compare model probability, pricing, and calibration status for specific option lines across all European fixtures.'}
         </p>
       </div>
 
@@ -264,7 +264,7 @@ export default function MarketExplorerPage() {
                   <th className="py-2.5 px-3">Modeled selection</th>
                   <th className="py-2.5 px-3">Probability</th>
                   <th className="py-2.5 px-3">Odds</th>
-                  <th className="py-2.5 px-3">EV / Edge</th>
+                  <th className="py-2.5 px-3">Calibration status</th>
                   <th className="py-2.5 px-3 text-right">Action</th>
                 </tr>
               </thead>
@@ -289,14 +289,7 @@ export default function MarketExplorerPage() {
                       {prediction.marketOdds ? `@${formatOdds(prediction.marketOdds)}` : 'N/A'}
                     </td>
                     <td className="py-3 px-3 font-mono text-[11px] tabular-nums">
-                      {prediction.expectedValue !== undefined && prediction.expectedValue !== null ? (
-                        (() => {
-                          const evData = formatExpectedValue(prediction.expectedValue);
-                          return <span className={evData.colorClass}>{evData.text}</span>;
-                        })()
-                      ) : (
-                        <span className="text-[#8B9890]">Probability based</span>
-                      )}
+                      <span className="text-[#8B9890]">Withheld: analysis only</span>
                     </td>
                     <td className="py-3 px-3 text-right">
                       <Link

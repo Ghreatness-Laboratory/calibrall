@@ -675,7 +675,7 @@ export default function NBAScoreProjectionTool() {
                       <span>Spread Against The Spread (ATS)</span>
                     </span>
                     <span className="px-1.5 py-0.5 rounded-[4px] font-mono font-semibold text-[10px] bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30">
-                      SIDE LEAN
+                      MARGIN PROJECTION
                     </span>
                   </div>
                   <div className="text-[12.5px] font-medium text-[var(--text)]">

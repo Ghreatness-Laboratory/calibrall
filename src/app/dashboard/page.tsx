@@ -127,10 +127,10 @@ export default function DashboardPage() {
     });
   }, [fixtures, searchQuery, activeTab, isBasketball]);
 
-  // Aggregate top market opportunities across football fixtures
+  // Aggregate top market models across football fixtures
   const topOpportunities = useMemo(() => {
     if (isBasketball) return [];
-    const qualified: {
+    const models: {
       fixtureId: string;
       homeTeam: Team;
       awayTeam: Team;
@@ -140,14 +140,12 @@ export default function DashboardPage() {
       selection: string;
       probability: number;
       odds?: number;
-      expectedValue?: number | null;
-      edge?: number;
     }[] = [];
 
     evaluatedFixtures.forEach(({ fixture, predictions }) => {
       predictions.forEach(p => {
         if (p.qualificationStatus === 'QUALIFIED_VALUE' || p.qualificationStatus === 'QUALIFIED_PROBABILITY') {
-          qualified.push({
+          models.push({
             fixtureId: fixture.id,
             homeTeam: fixture.homeTeam,
             awayTeam: fixture.awayTeam,
@@ -157,14 +155,12 @@ export default function DashboardPage() {
             selection: p.selection,
             probability: p.modelProbability,
             odds: p.marketOdds,
-            expectedValue: p.expectedValue,
-            edge: p.edge,
           });
         }
       });
     });
 
-    return qualified.sort((a, b) => (b.expectedValue ?? 0) - (a.expectedValue ?? 0)).slice(0, 5);
+    return models.sort((a, b) => b.probability - a.probability).slice(0, 5);
   }, [evaluatedFixtures, isBasketball]);
 
   if (isSwitching) {
@@ -195,7 +191,7 @@ export default function DashboardPage() {
           <p className="text-[12px] text-[#8B9890] mt-0.5">
             {isBasketball 
               ? 'Multi team efficiency modeling, projected totals, spreads, and pace analysis for all 30 NBA franchises.'
-              : 'Real time multi market evaluation across analyzed market categories. Every model projection, on record.'}
+              : 'Real time multi market evaluation across the authorized catalog types. Every call, on record.'}
           </p>
         </div>
 
@@ -244,7 +240,7 @@ export default function DashboardPage() {
               <span className="font-mono text-[var(--text-3)] text-[10.5px]">Mean: 10.8</span>
             </div>
             <p className="text-[12px] text-[var(--text-2)] leading-normal">
-              Man City vs Tottenham corner expectation (11.0 total) offers statistical data coverage on Over 9.5 corners.
+              Man City vs Tottenham corner expectation (11.0 total) offers calibrated model probability on Over 9.5 corners.
             </p>
           </div>
 

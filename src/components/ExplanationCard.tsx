@@ -46,8 +46,8 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
     if (explanation?.headline) return cleanDisplayText(explanation.headline);
     const probVal = calibratedProbability ?? prediction.modelProbability;
     const spreadText = uncertaintySpread !== undefined ? ` ± ${(uncertaintySpread * 100).toFixed(1)}%` : '';
-    const probText = ` (${(probVal * 100).toFixed(1)}% prob${spreadText})`;
-    return cleanDisplayText(`Model probability: ${prediction.selection.toLowerCase()}${probText}`);
+    const probText = ` (${(probVal * 100).toFixed(1)}% model probability${spreadText})`;
+    return cleanDisplayText(`${prediction.selection.toLowerCase()}${probText}`);
   };
 
   return (
@@ -195,7 +195,7 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono tracking-wider uppercase text-[#B6E63B] font-semibold flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5" strokeWidth={2} />
-                <span>Lower Variance Alternative Projection</span>
+                <span>Alternative Line Projection</span>
               </span>
               <span className="px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-mono bg-[rgba(182,230,59,0.12)] text-[#B6E63B] border border-[#B6E63B]/30 font-semibold">
                 &#8722;{substituteOption.varianceReductionPct}% variance
@@ -218,7 +218,7 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
                 </div>
                 <div className="text-[10.5px] text-[#8B9890]">
                   {substituteOption.edgeOverBaseline !== undefined 
-                    ? `Data coverage: verified` 
+                    ? `+${(substituteOption.edgeOverBaseline * 100).toFixed(1)}% delta` 
                     : (substituteOption.odds ? `@${substituteOption.odds.toFixed(2)}` : '')}
                 </div>
               </div>

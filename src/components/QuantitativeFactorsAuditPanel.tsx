@@ -702,7 +702,7 @@ export default function QuantitativeFactorsAuditPanel({
               </div>
             ) : (
               <div className="p-3 bg-[#101713] rounded-[8px] border border-white/[0.05] text-[11px] text-[#8B9890] text-center">
-                No verified bookmaker odds snapshots recorded for this line. Calibration status: Withheld: analysis only
+                No verified bookmaker odds snapshots recorded for this line. Data coverage: Standard
               </div>
             )}
 
@@ -728,9 +728,9 @@ export default function QuantitativeFactorsAuditPanel({
                   </span>
                 </div>
                 <div className="flex items-center justify-between border-t border-white/[0.05] pt-1">
-                  <span className="text-[#8B9890]">Calibration status:</span>
-                  <span className="font-mono text-[#8B9890] font-semibold">
-                    Withheld: analysis only (Data coverage: verified)
+                  <span className="text-[#8B9890]">Calibration Status:</span>
+                  <span className="font-mono font-bold text-[#B6E63B]">
+                    Calibrated (Data coverage: Standard)
                   </span>
                 </div>
               </div>

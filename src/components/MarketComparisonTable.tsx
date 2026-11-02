@@ -219,7 +219,7 @@ export default function MarketComparisonTable({
               ) : (
                 <span className="text-[9px] text-[#5E6A63]">No odds</span>
               )}
-              <span className="text-[#8B9890] text-[9.5px]">Analysis only</span>
+              <span className="text-[#8B9890] tabular-nums">Analysis only</span>
             </div>
           </div>
 
@@ -267,12 +267,12 @@ export default function MarketComparisonTable({
                 <span className="text-[#ECF1EE]">{oddsFormatted}</span>
               </div>
               <div>
-                <span>Data coverage: </span>
-                <span className="text-[#ECF1EE]">verified</span>
-              </div>
-              <div>
                 <span>Calibration status: </span>
                 <span className="text-[#8B9890]">Withheld: analysis only</span>
+              </div>
+              <div>
+                <span>Data coverage: </span>
+                <span className="text-[#ECF1EE]">Standard</span>
               </div>
               <div>
                 <span>Confidence: </span>
@@ -299,7 +299,7 @@ export default function MarketComparisonTable({
       <div className="p-3.5 border-b border-white/[0.07] flex flex-wrap items-center justify-between gap-3 bg-[#151E19]/50">
         <div>
           <h3 className="text-[14px] font-semibold text-[#ECF1EE] flex items-center gap-2">
-            <span>Market Intel & Model Projections ({predictions.length})</span>
+            <span>Market Intel & Candidate Lines ({predictions.length})</span>
           </h3>
           <p className="text-[11px] text-[#8B9890] mt-0.5">
             Dixon Coles bivariate distributions & negative binomial models grouped by risk tier.
@@ -369,7 +369,7 @@ export default function MarketComparisonTable({
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#E2AE45]" />
                 <h4 className="text-[12.5px] font-semibold text-[#E2AE45]">
-                  MEDIUM CONFIDENCE TIERS (Balanced Probabilities and Moderate Variance)
+                  MEDIUM CONFIDENCE TIERS (Balanced Model Probability and Moderate Variance)
                 </h4>
                 <span className="text-[10px] font-mono text-[#8B9890] bg-white/[0.05] px-1.5 py-0.5 rounded">
                   {tierGroups.moderate.length} lines
@@ -391,7 +391,7 @@ export default function MarketComparisonTable({
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
                 <h4 className="text-[12.5px] font-semibold text-orange-400">
-                  LOW CONFIDENCE PROJECTIONS (Higher Variance or Risk Flags Present)
+                  LOW CONFIDENCE TIERS (Higher Variance or Risk Flags Present)
                 </h4>
                 <span className="text-[10px] font-mono text-[#8B9890] bg-white/[0.05] px-1.5 py-0.5 rounded">
                   {tierGroups.risky.length} lines
@@ -403,7 +403,7 @@ export default function MarketComparisonTable({
                 {tierGroups.risky.map(renderPredictionRow)}
               </div>
             ) : (
-              <p className="text-[11px] text-[#8B9890] italic px-2 py-1">No markets classified in this projection tier.</p>
+              <p className="text-[11px] text-[#8B9890] italic px-2 py-1">No markets classified as low confidence tiers.</p>
             )}
           </div>
 
@@ -487,7 +487,7 @@ export default function MarketComparisonTable({
                     <span className="font-mono text-[#B6E63B] font-bold tabular-nums">{(safestHomeHandicap.modelProbability * 100).toFixed(0)}%</span>
                   </div>
                   {safestHomeHandicap.pushProbability !== undefined && (
-                    <div className="text-[10px] text-[#8B9890] tabular-nums">Push probability: {(safestHomeHandicap.pushProbability * 100).toFixed(0)}% (Void/Neutral)</div>
+                    <div className="text-[10px] text-[#8B9890] tabular-nums">Push returns neutral outcome (Push: {(safestHomeHandicap.pushProbability * 100).toFixed(0)}%)</div>
                   )}
                 </div>
               )}
@@ -500,7 +500,7 @@ export default function MarketComparisonTable({
                     <span className="font-mono text-[#B6E63B] font-bold tabular-nums">{(safestAwayHandicap.modelProbability * 100).toFixed(0)}%</span>
                   </div>
                   {safestAwayHandicap.pushProbability !== undefined && (
-                    <div className="text-[10px] text-[#8B9890] tabular-nums">Push probability: {(safestAwayHandicap.pushProbability * 100).toFixed(0)}% (Void/Neutral)</div>
+                    <div className="text-[10px] text-[#8B9890] tabular-nums">Push returns neutral outcome (Push: {(safestAwayHandicap.pushProbability * 100).toFixed(0)}%)</div>
                   )}
                 </div>
               )}

@@ -67,20 +67,20 @@ export default function MethodologyPage() {
       <section className="p-4 bg-[#101713] border border-white/[0.07] rounded-[14px] space-y-2.5">
         <h2 className="text-[15px] font-semibold text-[#ECF1EE] flex items-center gap-2">
           <Layers className="w-4 h-4 text-[#B6E63B]" />
-          <span>3. Intelligent market selection &amp; expected value</span>
+          <span>3. Intelligent market selection &amp; model probability</span>
         </h2>
         <p className="text-[13px] text-[#8B9890] leading-[1.55]">
-          Rather than forcing a match winner pick on every game, the platform evaluates all eligible market candidates. For decimal odds O and modeled probability p, expected return is:
+          Rather than forcing a match winner projection on every game, the platform evaluates all eligible market candidates. For model probability p and baseline probability p₀, probability difference is:
         </p>
         <div className="p-3 bg-[#151E19] rounded-[11px] border border-white/[0.07] font-mono text-center text-[13px] font-semibold text-[#B6E63B]">
-          EV = (p × O) &#8722; 1.0
+          Δp = p &#8722; p₀
         </div>
         <p className="text-[13px] text-[#8B9890] leading-[1.55]">
           Candidates qualify only if they pass three non negotiable checks:
         </p>
         <ol className="list-decimal pl-5 space-y-1 text-[#ECF1EE] text-[12.5px] leading-[1.55]">
           <li><strong className="text-[#ECF1EE]">Data coverage:</strong> At least 85% verified underlying statistics across a minimum 12 match sample.</li>
-          <li><strong className="text-[#ECF1EE]">Statistical edge:</strong> Modeled probability must exceed bookmaker implied probability by at least +3.0% to overcome overround.</li>
+          <li><strong className="text-[#ECF1EE]">Calibration status:</strong> Modeled probability must satisfy calibration threshold criteria to ensure reliability.</li>
           <li><strong className="text-[#ECF1EE]">Correlation filter:</strong> Highly correlated selections within the same game (e.g. Over 2.5 Goals and BTTS Yes) are penalized to prevent artificial diversification.</li>
         </ol>
       </section>

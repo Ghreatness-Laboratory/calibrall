@@ -73,14 +73,11 @@ export interface StalenessStatus {
   matchesInLast120Days: number;
   isStale: boolean;
   staleReason?: string;
-  status: 'PASS' | 'INSUFFICIENT' | 'STALE';
-  displayStatus: string;
 }
 
 export class CanonicalMatchStore {
-  private matchesMap: Map<string, CanonicalMatch> = new Map(); // Finished completed matches
-  private fixturesMap: Map<string, CanonicalMatch> = new Map(); // Scheduled future fixtures table
-  private teamsMatchDates: Map<string, string[]> = new Map(); // Finished match dates only
+  private matchesMap: Map<string, CanonicalMatch> = new Map();
+  private teamsMatchDates: Map<string, string[]> = new Map();
 
   constructor() {
     this.initGlobal();
@@ -89,11 +86,9 @@ export class CanonicalMatchStore {
   private initGlobal() {
     if (!(globalThis as any).__calibrall_canonical_matches) {
       (globalThis as any).__calibrall_canonical_matches = new Map<string, CanonicalMatch>();
-      (globalThis as any).__calibrall_canonical_fixtures = new Map<string, CanonicalMatch>();
       (globalThis as any).__calibrall_team_match_dates = new Map<string, string[]>();
     }
     this.matchesMap = (globalThis as any).__calibrall_canonical_matches;
-    this.fixturesMap = (globalThis as any).__calibrall_canonical_fixtures;
     this.teamsMatchDates = (globalThis as any).__calibrall_team_match_dates;
   }
 
@@ -127,10 +122,7 @@ export class CanonicalMatchStore {
     }
 
     const key = this.generateKey(raw.date, raw.homeTeamId, raw.awayTeamId);
-    const existing = this.matchesMap.get(key) || this.fixturesMap.get(key);
-
-    const isFinished = raw.status === 'FINISHED' || (raw.homeScore !== null && raw.homeScore !== undefined && raw.awayScore !== null && raw.awayScore !== undefined);
-    const resolvedStatus = isFinished ? 'FINISHED' : (raw.status || existing?.status || 'TIMED');
+    const existing = this.matchesMap.get(key);
 
     const merged: CanonicalMatch = {
       id: key,
@@ -143,7 +135,7 @@ export class CanonicalMatchStore {
       awayTeamId: raw.awayTeamId,
       homeTeamName: raw.homeTeamName || existing?.homeTeamName || raw.homeTeamId,
       awayTeamName: raw.awayTeamName || existing?.awayTeamName || raw.awayTeamId,
-      status: resolvedStatus,
+      status: raw.status || existing?.status || 'FINISHED',
       homeScore: raw.homeScore ?? existing?.homeScore ?? null,
       awayScore: raw.awayScore ?? existing?.awayScore ?? null,
       homeHalfTimeScore: raw.homeHalfTimeScore ?? existing?.homeHalfTimeScore ?? null,
@@ -164,26 +156,17 @@ export class CanonicalMatchStore {
       closingOdds: raw.closingOdds || existing?.closingOdds,
       provenance: {
         statsSource: (source === 'football-data.co.uk' ? source : existing?.provenance?.statsSource) || source,
-        statusSource: (source === 'football-data.org' || source === 'espn' || source === 'openfootball' ? source : existing?.provenance?.statusSource) || source,
+        statusSource: (source === 'football-data.org' || source === 'espn' ? source : existing?.provenance?.statusSource) || source,
         historySource: (source === 'elvidge' ? source : existing?.provenance?.historySource) || source,
         ingestedAt: new Date().toISOString(),
       },
     };
 
-    if (resolvedStatus === 'FINISHED') {
-      // Completed match stored in matches table
-      this.matchesMap.set(key, merged);
-      this.fixturesMap.delete(key);
+    this.matchesMap.set(key, merged);
 
-      // Track completed match dates for home and away (Elvidge is strictly used for H2H only)
-      if (source !== 'elvidge') {
-        this.addTeamDate(raw.homeTeamId, merged.date);
-        this.addTeamDate(raw.awayTeamId, merged.date);
-      }
-    } else {
-      // Scheduled / future fixture stored in dedicated fixtures table
-      this.fixturesMap.set(key, merged);
-    }
+    // Track dates for home and away
+    this.addTeamDate(raw.homeTeamId, merged.date);
+    this.addTeamDate(raw.awayTeamId, merged.date);
 
     return { success: true };
   }
@@ -192,7 +175,11 @@ export class CanonicalMatchStore {
     if (!this.teamsMatchDates.has(teamId)) {
       this.teamsMatchDates.set(teamId, []);
     }
-    this.teamsMatchDates.get(teamId)!.push(dateStr);
+    const list = this.teamsMatchDates.get(teamId)!;
+    if (!list.includes(dateStr)) {
+      list.push(dateStr);
+      list.sort((a, b) => b.localeCompare(a)); // newest first
+    }
   }
 
   public getMatches(filter?: { competitionCode?: string; season?: string; teamId?: string }): CanonicalMatch[] {
@@ -209,26 +196,8 @@ export class CanonicalMatchStore {
     return list.sort((a, b) => b.kickoffTime.localeCompare(a.kickoffTime));
   }
 
-  public getFixtures(filter?: { competitionCode?: string; season?: string; teamId?: string }): CanonicalMatch[] {
-    let list = Array.from(this.fixturesMap.values());
-    if (filter?.competitionCode && filter.competitionCode !== 'ALL') {
-      list = list.filter(m => m.competitionCode === filter.competitionCode);
-    }
-    if (filter?.season && filter.season !== 'ALL') {
-      list = list.filter(m => m.season === filter.season);
-    }
-    if (filter?.teamId) {
-      list = list.filter(m => m.homeTeamId === filter.teamId || m.awayTeamId === filter.teamId);
-    }
-    return list.sort((a, b) => a.kickoffTime.localeCompare(b.kickoffTime));
-  }
-
   public getTotalMatchesCount(): number {
     return this.matchesMap.size;
-  }
-
-  public getTotalFixturesCount(): number {
-    return this.fixturesMap.size;
   }
 
   public getStalenessStatus(teamIdOrName: string, refDate?: string): StalenessStatus {
@@ -236,12 +205,9 @@ export class CanonicalMatchStore {
     const teamId = canon ? canon.canonicalId : (teamIdOrName.startsWith('team_') ? teamIdOrName : `team_${teamIdOrName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`);
     const teamName = canon ? canon.canonicalName : teamIdOrName;
 
-    const rawDates = this.teamsMatchDates.get(teamId) || [];
-    const dates = rawDates.length > 0 ? Array.from(new Set(rawDates)).sort((a, b) => b.localeCompare(a)) : [];
+    const dates = this.teamsMatchDates.get(teamId) || [];
     const refTimestamp = refDate ? new Date(refDate).getTime() : Date.now();
 
-    // FAIL-CLOSED GATE:
-    // A team with zero match records in the database must ALWAYS be treated as INSUFFICIENT, never as pass.
     if (dates.length === 0) {
       return {
         teamId,
@@ -250,9 +216,7 @@ export class CanonicalMatchStore {
         daysSinceLastMatch: null,
         matchesInLast120Days: 0,
         isStale: true,
-        staleReason: 'Insufficient data: zero match records stored in database',
-        status: 'INSUFFICIENT',
-        displayStatus: 'Insufficient data',
+        staleReason: 'Insufficient data: no match records stored in database',
       };
     }
 
@@ -284,9 +248,6 @@ export class CanonicalMatchStore {
       staleReason = `Data out of date: only ${matchesIn120} matches in last 120 days (min 5 required)`;
     }
 
-    const status: 'PASS' | 'INSUFFICIENT' | 'STALE' = isStale ? 'STALE' : 'PASS';
-    const displayStatus: string = isStale ? 'Insufficient data' : 'Active';
-
     return {
       teamId,
       teamName,
@@ -295,8 +256,6 @@ export class CanonicalMatchStore {
       matchesInLast120Days: matchesIn120,
       isStale,
       staleReason,
-      status,
-      displayStatus,
     };
   }
 

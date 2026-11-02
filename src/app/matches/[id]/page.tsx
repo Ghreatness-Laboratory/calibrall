@@ -388,7 +388,7 @@ export default function MatchAnalysisPage() {
               </div>
 
               <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Pre match probability audit</span>
+                <span className="text-[10px] text-[#8B9890] block">Pre match model audit</span>
                 <span className={`font-mono font-bold text-[13px] ${
                   topPick?.settlementStatus === 'WON' ? 'text-[#B6E63B]' :
                   topPick?.settlementStatus === 'LOST' ? 'text-rose-400' :
@@ -498,14 +498,14 @@ export default function MatchAnalysisPage() {
         ) : null}
       </div>
 
-      {/* Model Probability Analysis Banner */}
+      {/* Flagship Recommendation Banner */}
       <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
         {topPick ? (
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#B6E63B] font-semibold">
                 <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={2} />
-                <span>Model probability</span>
+                <span>Model probability & calibration status</span>
               </div>
               {(() => {
                 const tier = getRiskTierBadge(topPick.riskTier);
@@ -520,15 +520,18 @@ export default function MatchAnalysisPage() {
                   Check data
                 </span>
               )}
-              <span className="text-[10.5px] text-[#8B9890] bg-[#151E19] px-2 py-0.5 rounded-full border border-white/[0.07] font-mono">
-                Data coverage: verified
-              </span>
-              <span className="text-[10px] text-[#8B9890] font-mono">
-                Withheld: analysis only
-              </span>
+              {topPick.marketOdds ? (
+                <span className="text-[11px] text-[#ECF1EE] bg-[#151E19] px-2 py-0.5 rounded-full border border-white/[0.07] tabular-nums font-mono">
+                  {topPick.bookmakerName ? `${topPick.bookmakerName} ` : ''}@{formatOdds(topPick.marketOdds)}
+                </span>
+              ) : (
+                <span className="text-[10.5px] text-[#8B9890] bg-[#151E19] px-2 py-0.5 rounded-full border border-white/[0.07] font-mono">
+                  Data coverage: Standard
+                </span>
+              )}
             </div>
             <h3 className="text-[15px] font-semibold text-[#ECF1EE]">
-              {formatSelectionName(topPick.selection)} · {((topPick.calibratedProbability ?? topPick.modelProbability) * 100).toFixed(1)}% probability
+              {formatSelectionName(topPick.selection)} · {((topPick.calibratedProbability ?? topPick.modelProbability) * 100).toFixed(1)}% model probability
             </h3>
             {topPick.plainEnglishReason && (
               <p className="text-[12px] text-[#8B9890] mt-1 max-w-2xl leading-normal">
@@ -551,13 +554,15 @@ export default function MatchAnalysisPage() {
           <div>
             <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#8B9890] mb-1">
               <AlertCircle className="w-3.5 h-3.5" strokeWidth={2} />
-              <span>Model calibration status</span>
+              <span>Calibration status</span>
             </div>
             <h3 className="text-[14px] font-semibold text-[#ECF1EE]">
-              Withheld: analysis only
+              {(noRecommendationReason?.startsWith('Data out of date') || noRecommendationReason?.startsWith('Insufficient data')) ? 'Insufficient data' : 'Statistical evidence insufficient'}
             </h3>
             <p className="text-[12px] text-[#8B9890] mt-0.5 max-w-2xl leading-normal">
-              Model probability and calibration distributions displayed for research analysis only. All betting recommendations withheld.
+              {(noRecommendationReason?.startsWith('Data out of date') || noRecommendationReason?.startsWith('Insufficient data'))
+                ? (noRecommendationReason || 'Model probability and calibration status withheld: analysis only due to match staleness exceeding the 21-day threshold or missing records.')
+                : (noRecommendationReason || "Current market lines reflect efficient pricing. Abstaining to maintain statistical calibration.")}
             </p>
           </div>
         )}
@@ -575,7 +580,7 @@ export default function MatchAnalysisPage() {
           }`}
         >
           <FileText className="w-3.5 h-3.5" />
-          <span>All Markets & Distributions</span>
+          <span>Market Intel & Model Probability</span>
         </button>
 
         {!isBasketball && lineupState && (

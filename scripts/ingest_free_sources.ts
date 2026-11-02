@@ -1,5 +1,6 @@
 // CALIBRALL: Free Sources Ingestion Script
 // Downloads and normalizes football-data.co.uk CSVs across 2324, 2425, 2526, and 2627 seasons
+// Backfills E0 (Premier League), E1 (Championship), E2 (League One), E3 (League Two), D1, SP1, I1, F1
 // Generates src/lib/data/free_sources_matches.json
 
 import fs from 'fs';
@@ -19,6 +20,15 @@ const DIV_MAP: Record<string, string> = {
   I1: 'SA',
   F1: 'FL1',
 };
+
+export interface IngestionStats {
+  division: string;
+  season: string;
+  sourceRows: number;
+  storedRows: number;
+  rejectedRows: number;
+  rejectedDetails: { row: number; reason: string; raw: string }[];
+}
 
 function parseCsvLine(line: string): string[] {
   const result: string[] = [];
@@ -56,52 +66,40 @@ async function run() {
   console.log('--- STARTING FREE SOURCES INGESTION (football-data.co.uk) ---');
   const allMatches: any[] = [];
   const unmatchedSet = new Set<string>();
-
-  const auditSummary: {
-    div: string;
-    season: string;
-    csvRows: number;
-    stored: number;
-    rejected: number;
-    rejectionReasons: string;
-  }[] = [];
+  const statsList: IngestionStats[] = [];
 
   for (const div of DIVISIONS) {
     const compCode = DIV_MAP[div] || div;
     for (const season of SEASONS) {
-      const url = `https://www.football-data.co.uk/mmz4281/${season}/${div}.csv`;
+      const url = `https://football-data.co.uk/mmz4281/${season}/${div}.csv`;
+      const stats: IngestionStats = {
+        division: div,
+        season: `20${season.slice(0, 2)}/20${season.slice(2, 4)}`,
+        sourceRows: 0,
+        storedRows: 0,
+        rejectedRows: 0,
+        rejectedDetails: [],
+      };
+
       try {
-        console.log(`Fetching ${season} ${div}...`);
+        console.log(`Fetching ${season} ${div} from ${url}...`);
         const res = await fetch(url, {
           headers: { 'User-Agent': 'CalibrallFootballResearch/2.0' },
         });
         if (!res.ok) {
           console.warn(`HTTP ${res.status} for ${url}`);
-          auditSummary.push({
-            div,
-            season,
-            csvRows: 0,
-            stored: 0,
-            rejected: 0,
-            rejectionReasons: `HTTP ${res.status}`,
-          });
+          statsList.push(stats);
           continue;
         }
         const text = await res.text();
-        const lines = text.trim().split('\n').filter(l => l.trim().length > 0);
-        if (lines.length < 2) {
-          auditSummary.push({
-            div,
-            season,
-            csvRows: 0,
-            stored: 0,
-            rejected: 0,
-            rejectionReasons: 'Empty CSV',
-          });
+        const rawLines = text.split(/\r?\n/).map(l => l.trim());
+        const nonEmptyLines = rawLines.filter(l => l.length > 0);
+        if (nonEmptyLines.length < 2) {
+          statsList.push(stats);
           continue;
         }
 
-        const header = parseCsvLine(lines[0]);
+        const header = parseCsvLine(nonEmptyLines[0]);
         const colIndex = (col: string) => header.indexOf(col);
 
         const idxDate = colIndex('Date');
@@ -135,33 +133,30 @@ async function run() {
         const idxAvgCAHH = colIndex('AvgCAHH') !== -1 ? colIndex('AvgCAHH') : colIndex('AvgAHH');
         const idxAvgCAHA = colIndex('AvgCAHA') !== -1 ? colIndex('AvgCAHA') : colIndex('AvgAHA');
 
-        let seasonMatches = 0;
-        let seasonRejected = 0;
-        const reasonsSet = new Set<string>();
+        stats.sourceRows = nonEmptyLines.length - 1;
 
-        const totalCsvRows = lines.length - 1;
-
-        for (let i = 1; i < lines.length; i++) {
-          const row = parseCsvLine(lines[i]);
+        for (let i = 1; i < nonEmptyLines.length; i++) {
+          const rawLine = nonEmptyLines[i];
+          const row = parseCsvLine(rawLine);
           if (row.length < 5) {
-            seasonRejected++;
-            reasonsSet.add('Row length < 5 columns');
+            stats.rejectedRows++;
+            stats.rejectedDetails.push({ row: i, reason: 'Row has fewer than 5 columns (truncated/blank line)', raw: rawLine });
             continue;
           }
 
           const rawDate = row[idxDate];
           const parsedDate = parseDate(rawDate);
           if (!parsedDate) {
-            seasonRejected++;
-            reasonsSet.add('Invalid/unparseable date');
+            stats.rejectedRows++;
+            stats.rejectedDetails.push({ row: i, reason: `Unparseable date: "${rawDate}"`, raw: rawLine });
             continue;
           }
 
           const rawHome = row[idxHome];
           const rawAway = row[idxAway];
           if (!rawHome || !rawAway) {
-            seasonRejected++;
-            reasonsSet.add('Missing Home or Away team name');
+            stats.rejectedRows++;
+            stats.rejectedDetails.push({ row: i, reason: 'Missing HomeTeam or AwayTeam name', raw: rawLine });
             continue;
           }
 
@@ -177,15 +172,15 @@ async function run() {
           const fthg = parseInt(row[idxFTHG], 10);
           const ftag = parseInt(row[idxFTAG], 10);
           if (isNaN(fthg) || isNaN(ftag)) {
-            seasonRejected++;
-            reasonsSet.add('Score is NaN (unplayed match)');
+            stats.rejectedRows++;
+            stats.rejectedDetails.push({ row: i, reason: `Missing or NaN final score (FTHG: "${row[idxFTHG]}", FTAG: "${row[idxFTAG]}")`, raw: rawLine });
             continue;
           }
 
-          // Impossible score sanity check (<0 or >25)
-          if (fthg < 0 || fthg > 25 || ftag < 0 || ftag > 25) {
-            seasonRejected++;
-            reasonsSet.add(`Impossible score: ${fthg}-${ftag}`);
+          // Strict Score sanity
+          if (fthg < 0 || ftag < 0 || fthg > 25 || ftag > 25) {
+            stats.rejectedRows++;
+            stats.rejectedDetails.push({ row: i, reason: `Impossible score: ${fthg}-${ftag} (exceeds [0, 25] bounds)`, raw: rawLine });
             continue;
           }
 
@@ -259,25 +254,18 @@ async function run() {
             } : null,
             source: 'football-data.co.uk:free',
           });
-          seasonMatches++;
+          stats.storedRows++;
         }
-
-        auditSummary.push({
-          div,
-          season,
-          csvRows: totalCsvRows,
-          stored: seasonMatches,
-          rejected: seasonRejected,
-          rejectionReasons: seasonRejected === 0 ? 'None (100% valid)' : Array.from(reasonsSet).join('; '),
-        });
-        console.log(`Ingested ${seasonMatches} matches for ${season} ${div} (CSV rows: ${totalCsvRows}, rejected: ${seasonRejected})`);
+        console.log(`-> ${div} ${season}: ${stats.storedRows} stored / ${stats.sourceRows} source rows (${stats.rejectedRows} rejected)`);
+        statsList.push(stats);
       } catch (e: any) {
         console.error(`Error ingesting ${season} ${div}:`, e?.message);
+        statsList.push(stats);
       }
     }
   }
 
-  // Deduplicate matches by id
+  // Deduplicate matches by composite key (date_homeTeamId_awayTeamId)
   const dedupedMap = new Map<string, any>();
   for (const m of allMatches) {
     dedupedMap.set(m.id, m);
@@ -288,20 +276,20 @@ async function run() {
   fs.writeFileSync(outPath, JSON.stringify(finalMatches, null, 2));
 
   console.log(`\n========================================================================================`);
-  console.log(`INGESTION AUDIT SUMMARY: SOURCE CSV ROWS VS STORED ROWS`);
+  console.log(`INGESTION REPORT: SOURCE ROWS VS STORED ROWS`);
   console.log(`========================================================================================`);
   console.log(`| Division | Season | Source CSV Rows | Stored Rows | Rejected Rows | Rejection Reasons |`);
   console.log(`|---|---|---|---|---|---|`);
-  auditSummary.forEach(s => {
-    console.log(`| ${s.div.padEnd(8, ' ')} | ${s.season.padEnd(6, ' ')} | ${s.csvRows.toString().padEnd(15, ' ')} | ${s.stored.toString().padEnd(11, ' ')} | ${s.rejected.toString().padEnd(13, ' ')} | ${s.rejectionReasons} |`);
+  statsList.forEach(s => {
+    const reasons = s.rejectedRows === 0 ? 'None (100% valid)' : `${s.rejectedRows} rows rejected (${s.rejectedDetails.map(d => d.reason).slice(0, 2).join('; ')})`;
+    console.log(`| ${s.division.padEnd(8, ' ')} | ${s.season.padEnd(9, ' ')} | ${s.sourceRows.toString().padEnd(15, ' ')} | ${s.storedRows.toString().padEnd(11, ' ')} | ${s.rejectedRows.toString().padEnd(13, ' ')} | ${reasons} |`);
   });
 
-  console.log(`\n✅ Ingestion complete!`);
-  console.log(`Total canonical matches written: ${finalMatches.length}`);
+  console.log(`\nTotal canonical matches written: ${finalMatches.length}`);
   console.log(`File saved: ${outPath}`);
   console.log(`Unmatched clubs count: ${unmatchedSet.size}`);
   if (unmatchedSet.size > 0) {
-    console.log(`Sample unmatched:`, Array.from(unmatchedSet).slice(0, 10));
+    console.log(`Unmatched:`, Array.from(unmatchedSet));
   }
 }
 

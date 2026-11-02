@@ -35,10 +35,9 @@ divisions.forEach(div => {
       expected = season === '2026/2027' ? '80 (MD 1-8 active)' : '380 (Full season 20x19)';
     } else if (div.code === 'ELC') {
       expected = season === '2026/2027' ? '144 (MD 1-12 active)' : '552 (Full season 24x23)';
-    } else if (div.code === 'E2') {
-      expected = season === '2026/2027' ? '143 (MD 1-12 active)' : '552 (Full season 24x23)';
-    } else if (div.code === 'E3') {
-      expected = season === '2026/2027' ? '151 (MD 1-13 active)' : '552 (Full season 24x23)';
+    } else {
+      expected = '0 (Excluded from ingest_free_sources.ts)';
+      reasons = 'Division not configured in SEASONS/DIVISIONS array of ingestion pipeline';
     }
 
     console.log(`| ${div.label.padEnd(23, ' ')} | ${season} | ${matching.length.toString().padEnd(13, ' ')} | ${expected.padEnd(31, ' ')} | ${rejected.toString().padEnd(13, ' ')} | ${reasons} |`);

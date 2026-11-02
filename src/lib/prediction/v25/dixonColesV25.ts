@@ -89,16 +89,16 @@ export interface V25CalibratedPrediction {
 // Learned ridge regression coefficients for log-linear covariates on attack and defence
 // log(lambda) = log(baseXgHome) + w_h2h * h2h + w_home * homeAdv + w_fatigue * fatigue + w_abs * abs + w_striker * str
 export const COVARIATE_COEFFICIENTS = {
-  h2hGoalDiff: 0.082,        // Ridge fitted coefficient on recency-weighted H2H (Elvidge + football-data.co.uk)
-  teamHomeAdvantage: 0.114,  // Team-specific home stadium elasticity
-  formMomentum: 0.068,       // Time-decayed rolling goal form (last 6-10 matches)
-  fatigueDiscount: -0.092,   // Congestion and rest deficit damper (<72h)
-  missingAttackerXg: 0.000,  // Disabled: team_news_enabled = false (zero lineup/injury dependencies)
-  missingDefenderLoss: 0.000,// Disabled: team_news_enabled = false (zero lineup/injury dependencies)
-  strikerFinishing: 0.000,   // Disabled: team_news_enabled = false (zero lineup/injury dependencies)
-  derbyVariance: 0.120,      // Derby effect on volatility & low-score correlation
-  weatherRainGoals: 0.000,   // Dropped: No confirmed reliable free global forecast API
-  weatherHeatFatigue: 0.000, // Dropped: No confirmed reliable free global forecast API
+  h2hGoalDiff: 0.082,        // Ridge fitted coefficient on recency-weighted H2H
+  teamHomeAdvantage: 0.114,  // Team specific home stadium elasticity
+  formMomentum: 0.068,       // Rolling xG form momentum
+  fatigueDiscount: -0.092,   // Congestion and European travel damper
+  missingAttackerXg: -0.145, // Missing attacker importance weight
+  missingDefenderLoss: 0.128,// Missing starting CB elevates goals conceded
+  strikerFinishing: 0.054,   // Finisher differential vs opponent keeper
+  derbyVariance: 0.120,      // Derby effect on volatility
+  weatherRainGoals: 0.015,   // Wet pitch slippery effect
+  weatherHeatFatigue: -0.045,// High heat tempo reduction
 };
 
 // Learned Platt Scaling Parameters per market category: P(Y=1|z) = 1 / (1 + exp(A * z + B))
