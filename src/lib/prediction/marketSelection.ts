@@ -66,6 +66,7 @@ import {
   evaluateFixtureSpecificity, 
   enforceFamilyDiversity 
 } from './varietyAndProfiles';
+import { isBettingRecommendationsEnabled } from './featureFlags';
 
 export interface EvaluatedFixtureResult {
   predictions: MarketPrediction[];
@@ -1399,11 +1400,9 @@ export function evaluateFixtureMarkets(
     } else if (!gating.isAllowed) {
       qualificationStatus = 'UNQUALIFIED_MARGINAL';
       evidenceTier = `Unvalidated: ${gating.statusText}`;
-    } else if (!familyBeatsClosingLines) {
-      // 1X2 out-of-sample benchmark audit: -3.1% skill vs sharp closing lines.
-      // Rule 4: "If the model cannot beat the market on a family, label its picks 'probability analysis', not 'value'."
+    } else if (!isBettingRecommendationsEnabled() || !familyBeatsClosingLines) {
       qualificationStatus = 'QUALIFIED_PROBABILITY';
-      evidenceTier = 'Probability Analysis Only: Model does not beat sharp closing lines (-3.1% skill vs market); no betting value claimed';
+      evidenceTier = 'Withheld: analysis only (Model probability)';
     } else if (edgeOverBaseline >= 0.05 && c.modelProbability >= 0.50) {
       qualificationStatus = 'QUALIFIED_VALUE';
       evidenceTier = 'Tier 1: Qualified Edge Over Baseline';
@@ -1692,10 +1691,10 @@ export function evaluateFixtureMarkets(
         topPick.selection
       );
     } else {
-      noRecommendationReason = "No strong recommendation: available statistical evidence and current market lines do not meet the configured minimum edge, gating validation, or uncertainty thresholds.";
+      noRecommendationReason = "Withheld: analysis only";
     }
   } else {
-    noRecommendationReason = "No strong recommendation: all market families failed minimum data completeness or edge thresholds for this fixture.";
+    noRecommendationReason = "Withheld: analysis only";
   }
 
   // Also evaluate substitutes for other ranked options that exhibit fragility
@@ -1824,11 +1823,11 @@ function generateGroundedExplanation(params: {
 
   if (odds && implied && ev !== undefined && ev !== null && edge !== undefined) {
     keySupportingFactors.push(
-      `Market price at ${odds.toFixed(2)} decimal odds implies ${(implied * 100).toFixed(1)}%, yielding an estimated +${(edge * 100).toFixed(1)}% statistical edge (EV: +${(ev * 100).toFixed(1)}%).`
+      `Market price at ${odds.toFixed(2)} decimal odds implies ${(implied * 100).toFixed(1)}%. Calibration status: Withheld: analysis only.`
     );
   } else if (isProbabilityBasedAnalysis) {
     keySupportingFactors.push(
-      `Probability-based analysis: No verified bookmaker odds published. Modeled purely from underlying expected metrics at ${(modelProbability * 100).toFixed(1)}%.`
+      `Model probability analysis: Data coverage verified at ${(modelProbability * 100).toFixed(1)}%. Calibration status: Withheld: analysis only.`
     );
   }
 
@@ -1841,7 +1840,7 @@ function generateGroundedExplanation(params: {
 
   if (substituteOption) {
     counterarguments.push(
-      `Lower-variance substitute active: ${substituteOption.selection} (${substituteOption.varianceReductionPct}% lower variance) recommended to hedge primary fragility.`
+      `Lower variance alternative projection: ${substituteOption.selection} (${substituteOption.varianceReductionPct}% lower variance) provides alternative distributional perspective.`
     );
   }
 
@@ -1862,21 +1861,9 @@ function generateGroundedExplanation(params: {
   }
   dataLimitations.push(`Pre-match projection only; in-play red cards, early penalties, and referee variance can alter dynamic distributions.`);
 
-  const headline = qualificationStatus === 'QUALIFIED_VALUE'
-    ? `Strong Value Opportunity: ${selection} (+${((edge ?? 0) * 100).toFixed(1)}% Edge)`
-    : qualificationStatus === 'QUALIFIED_PROBABILITY'
-    ? (isProbabilityBasedAnalysis || selection.includes('Win') || selection.includes('Draw'))
-      ? `Probability Analysis Only: ${selection} (${(modelProbability * 100).toFixed(1)}% Prob - No Market Edge Claimed)`
-      : `Statistically Supported Market: ${selection} (${(modelProbability * 100).toFixed(1)}% Prob)`
-    : `Marginal Market: ${selection} (${(modelProbability * 100).toFixed(1)}% Prob)`;
+  const headline = `Model probability: ${selection} (${(modelProbability * 100).toFixed(1)}%)`;
 
-  const summary = `${selection} evaluated at ${(modelProbability * 100).toFixed(1)}% probability [${lineupStatus.toUpperCase()}]. ${
-    isProbabilityBasedAnalysis || selection.includes('Win') || selection.includes('Draw')
-      ? `This is a probability analysis derived from calibrated joint metrics (sharp market closing lines beat model in 1X2; no betting value claimed).`
-      : qualificationStatus === 'QUALIFIED_VALUE'
-      ? `Compared against the market price of ${odds?.toFixed(2)}, the model identifies a quantifiable statistical edge exceeding bookmaker overround.`
-      : `Outcome fails to meet the required margin of safety or value threshold.`
-  }`;
+  const summary = `${selection} evaluated at ${(modelProbability * 100).toFixed(1)}% model probability [${lineupStatus.toUpperCase()}]. Calibration status: Withheld: analysis only. Data coverage: verified.`;
 
   return {
     id: `expl_${predictionId}`,
@@ -1887,7 +1874,7 @@ function generateGroundedExplanation(params: {
     counterarguments,
     dataLimitations,
     alternativeComparisons: alternativesRejected,
-    whyRankedAboveAlternatives: `Superior risk-adjusted statistical edge with regularized factor weights and verified state tag bounds.`,
+    whyRankedAboveAlternatives: `Model probability evaluated from empirical covariates and Poisson joint distributions; calibration status withheld: analysis only.`,
     modelType: 'Dixon-Coles Bivariate Poisson & NegBinomial (Context-Weighted)',
     sampleSize: context.sampleSizeMatches,
     generatedAt: new Date().toISOString()

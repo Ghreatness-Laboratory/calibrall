@@ -195,7 +195,7 @@ export default function DashboardPage() {
           <p className="text-[12px] text-[#8B9890] mt-0.5">
             {isBasketball 
               ? 'Multi team efficiency modeling, projected totals, spreads, and pace analysis for all 30 NBA franchises.'
-              : 'Real time multi market evaluation across the authorized catalog types. Every call, on record.'}
+              : 'Real time multi market evaluation across analyzed market categories. Every model projection, on record.'}
           </p>
         </div>
 
@@ -244,7 +244,7 @@ export default function DashboardPage() {
               <span className="font-mono text-[var(--text-3)] text-[10.5px]">Mean: 10.8</span>
             </div>
             <p className="text-[12px] text-[var(--text-2)] leading-normal">
-              Man City vs Tottenham corner expectation (11.0 total) offers qualified statistical support on Over 9.5 corners.
+              Man City vs Tottenham corner expectation (11.0 total) offers statistical data coverage on Over 9.5 corners.
             </p>
           </div>
 

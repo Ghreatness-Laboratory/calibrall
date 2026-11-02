@@ -67,7 +67,7 @@ export default function BottomNav() {
     },
     {
       id: 'picks',
-      label: 'Picks',
+      label: 'Analysis',
       href: '/predictions',
       icon: Target,
       isActive: isPicksActive,

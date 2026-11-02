@@ -99,17 +99,17 @@ export default function PricingPage() {
             <div>
               <h3 className="text-[15px] font-semibold text-[#ECF1EE]">Pro Terminal</h3>
               <div className="text-[22px] font-bold text-[#ECF1EE] mt-1 tabular-nums">$29 <span className="text-[12px] text-[#8B9890] font-normal">/ mo</span></div>
-              <p className="text-[12px] text-[#8B9890] mt-1">Complete multi market ranking, expected value analysis, corners & cards.</p>
+              <p className="text-[12px] text-[#8B9890] mt-1">Complete multi market distributions, model probability analysis, corners & cards.</p>
             </div>
 
             <ul className="space-y-2 text-[12px] text-[#8B9890]">
               <li className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" strokeWidth={2} />
-                <span className="text-[#ECF1EE]">All supported options catalog</span>
+                <span className="text-[#ECF1EE]">All modeled market categories</span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" strokeWidth={2} />
-                <span className="text-[#ECF1EE]">Expected value (EV) & Edge</span>
+                <span className="text-[#ECF1EE]">Model probability & calibration curves</span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" strokeWidth={2} />

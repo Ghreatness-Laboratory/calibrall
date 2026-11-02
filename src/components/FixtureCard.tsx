@@ -262,16 +262,16 @@ export default function FixtureCard({
           </div>
         )}
 
-        {/* Pick block inset in a raised surface */}
+        {/* Model probability analysis block */}
         <div className="mt-2">
           {topPrediction ? (
             <div className="bg-[#151E19] rounded-[10px] p-2 space-y-1">
-              {/* Row 1: Pick tag + Risk/Confidence tier + Odds */}
+              {/* Row 1: Model probability tag + Calibration status */}
               <div className="flex items-center justify-between text-[10.5px] gap-2">
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-[#8B9890]">{isInPlay ? 'Live pick' : 'Top lean'}</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-semibold bg-[#E2AE45]/[0.15] text-[#E2AE45] leading-tight">
-                    {cleanDisplayText(tierLabel)}
+                  <span className="text-[#8B9890] font-medium">Model probability</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-semibold bg-white/[0.06] text-[#8B9890] border border-white/[0.08] leading-tight">
+                    Analysis only
                   </span>
                   {topPrediction.sanityTripwire && (
                     <span className="px-1 py-0.2 rounded-[4px] bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9px] font-mono font-semibold">
@@ -280,18 +280,12 @@ export default function FixtureCard({
                   )}
                 </div>
 
-                <div className="text-[10.5px] text-[#8B9890] tabular-nums truncate text-right">
-                  {hasRealOdds ? (
-                    <span>
-                      {topPrediction?.bookmakerName ? `${topPrediction.bookmakerName} ` : ''}@{oddsFormatted} · {evFormatted} EV
-                    </span>
-                  ) : (
-                    <span className="text-[#5E6A63]">Odds: — · EV: —</span>
-                  )}
+                <div className="text-[10.5px] text-[#8B9890] tabular-nums truncate text-right font-mono">
+                  <span>Calibration status: Withheld: analysis only</span>
                 </div>
               </div>
 
-              {/* Row 2: pick name 13 semibold left; prob % right */}
+              {/* Row 2: selection name 13 semibold left; prob % right */}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[13px] font-[600] text-[#ECF1EE] truncate">
                   {cleanDisplayText(formatSelectionName(topPrediction.selection))}
@@ -346,7 +340,7 @@ export default function FixtureCard({
                                 : (fixture.homeTeam.hasRealTeamStrength === false
                                     ? `Needs history: ${displayName(fixture.homeTeam)} (0 matches)`
                                     : `Needs history: ${displayName(fixture.awayTeam)} (0 matches)`))
-                            : 'No strong lean'))
+                            : 'Withheld: analysis only'))
                 )}
               </span>
             </div>

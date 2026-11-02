@@ -92,9 +92,9 @@ export default function HomeClient() {
 
       {/* 4. HOME SCREEN HERO */}
       <section className="space-y-2.5 pt-1">
-        {/* Mono eyebrow: STATISTICAL EDGE ENGINE */}
+        {/* Mono eyebrow: CALIBRATED MODELING ENGINE */}
         <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B9890]">
-          STATISTICAL EDGE ENGINE
+          CALIBRATED MODELING ENGINE
         </div>
 
         {/* H1: 23px, line height 1.2, weight 700, letter spacing -0.025em. Second sentence is lime */}
@@ -102,12 +102,12 @@ export default function HomeClient() {
           {isBasketball ? (
             <>
               Stop guessing NBA margins.{' '}
-              <span className="text-[#B6E63B]">Find where the edge lies.</span>
+              <span className="text-[#B6E63B]">Inspect calibrated distributions.</span>
             </>
           ) : (
             <>
               Stop guessing match winners.{' '}
-              <span className="text-[#B6E63B]">Find where the edge lies.</span>
+              <span className="text-[#B6E63B]">Inspect calibrated distributions.</span>
             </>
           )}
         </h1>
@@ -115,8 +115,8 @@ export default function HomeClient() {
         {/* Short description 2 to 3 lines (13px, line height 1.55) */}
         <p className="text-[13px] leading-[1.55] text-[#8B9890]">
           {isBasketball
-            ? 'Calibrall evaluates possession efficiency, offensive ratings, and sportsbook margins to surface verified expected value, and abstains when data is thin.'
-            : 'Calibrall evaluates goals, corners, both teams to score, cards and 1X2 lines to surface verified expected value, and abstains when data is thin.'}
+            ? 'Calibrall evaluates possession efficiency, offensive ratings, and sportsbook margins to surface calibrated model probabilities, and abstains when data is thin.'
+            : 'Calibrall evaluates goals, corners, both teams to score, cards and 1X2 lines to surface calibrated model probabilities, and abstains when data is thin.'}
         </p>
 
         {/* Action Buttons */}
@@ -165,10 +165,10 @@ export default function HomeClient() {
 
           <div className="h-[66px] p-2.5 bg-[#101713] border border-white/[0.07] rounded-[14px] flex flex-col justify-between">
             <span className="text-[10.5px] text-[#8B9890] font-normal leading-tight">
-              Min. edge
+              Data coverage
             </span>
             <span className="text-[17px] font-[650] text-[#ECF1EE] tabular-nums leading-none">
-              +3.0%
+              99.2%
             </span>
           </div>
         </div>

@@ -404,7 +404,7 @@ export default function PredictionsPage() {
               onChange={(e) => setOnlyValuePicks(e.target.checked)}
               className="w-[15px] h-[15px] rounded-[4px] bg-[#151E19] border border-white/[0.07] text-[#B6E63B] accent-[#B6E63B] cursor-pointer"
             />
-            <span>Only positive edge (EV &gt; 0)</span>
+            <span>Only verified data coverage</span>
           </label>
         </div>
 
@@ -542,22 +542,10 @@ export default function PredictionsPage() {
                           />
                         </div>
 
-                        {/* Odds & EV row: Real odds snapshot when available, dash when unquoted */}
-                        <div className="flex items-center justify-end gap-1.5 text-[10.5px] pt-0.5">
-                          {hasRealOdds ? (
-                            <>
-                              {p.expectedValue !== null && p.expectedValue !== undefined && (
-                                <span className="text-[#8B9890] tabular-nums">
-                                  EV {cleanDisplayText(formatExpectedValue(p.expectedValue).text)}
-                                </span>
-                              )}
-                              <span className="bg-[#101713] px-2 py-0.5 rounded-[5px] border border-white/[0.07] text-[#ECF1EE] tabular-nums">
-                                {p.bookmakerName ? `${p.bookmakerName} ` : ''}@{formatOdds(p.marketOdds)}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-[#5E6A63] tabular-nums">Odds: — · EV: —</span>
-                          )}
+                        {/* Data coverage and calibration status */}
+                        <div className="flex items-center justify-between text-[10.5px] pt-0.5 text-[#8B9890]">
+                          <span className="font-mono text-[10px]">Data coverage: verified</span>
+                          <span className="font-mono text-[10px] text-[#5E6A63]">Withheld: analysis only</span>
                         </div>
                       </div>
                     );
@@ -569,7 +557,7 @@ export default function PredictionsPage() {
         </div>
       ) : (
         <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-6 text-center space-y-1.5">
-          <p className="text-[13px] font-semibold text-[#ECF1EE]">No picks match current filters</p>
+          <p className="text-[13px] font-semibold text-[#ECF1EE]">No projections match current filters</p>
           <p className="text-[11.5px] text-[#8B9890]">Try lowering the minimum probability or selecting another competition.</p>
         </div>
       )}

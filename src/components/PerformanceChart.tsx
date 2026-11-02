@@ -38,7 +38,7 @@ export default function PerformanceChart({
           <span className="text-[21px] font-bold text-[#B6E63B] font-mono tabular-nums leading-tight block">
             {(hitRate * 100).toFixed(1)}%
           </span>
-          <span className="text-[10.5px] text-[#5E6A63] block mt-1 font-mono">Qualified picks</span>
+          <span className="text-[10.5px] text-[#5E6A63] block mt-1 font-mono">Model projections</span>
         </div>
 
         {/* Tile 3: Brier calibration */}
@@ -50,13 +50,13 @@ export default function PerformanceChart({
           <span className="text-[10.5px] text-[#B6E63B] block mt-1 font-mono">&lt; 0.20 Target</span>
         </div>
 
-        {/* Tile 4: Level stake ROI */}
+        {/* Tile 4: Benchmark yield */}
         <div className="p-3.5 bg-[#101713] border border-white/[0.07] rounded-[14px]">
-          <span className="text-[10.5px] text-[#8B9890] block mb-0.5">Level stake ROI</span>
+          <span className="text-[10.5px] text-[#8B9890] block mb-0.5">Benchmark yield</span>
           <span className="text-[21px] font-bold text-[#B6E63B] font-mono tabular-nums leading-tight block">
             +{(roi * 100).toFixed(1)}%
           </span>
-          <span className="text-[10.5px] text-[#5E6A63] block mt-1 font-mono">Flat 1 unit stake</span>
+          <span className="text-[10.5px] text-[#5E6A63] block mt-1 font-mono">Closing-line test</span>
         </div>
       </div>
 

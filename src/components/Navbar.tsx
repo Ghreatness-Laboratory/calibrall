@@ -92,7 +92,7 @@ export default function Navbar() {
 
   const navLinks = [
     { label: 'Fixtures', href: '/matches' },
-    { label: 'Picks', href: '/predictions' },
+    { label: 'Analysis', href: '/predictions' },
     { label: 'Markets', href: '/markets' },
     { label: 'Record', href: '/performance' },
     { label: 'Watchlist', href: '/saved' },

@@ -187,8 +187,8 @@ export default function SettingsPage() {
                     <ShieldCheck className="w-4 h-4" strokeWidth={2} />
                   </div>
                   <div>
-                    <h3 className="text-[13px] font-[600] text-[#ECF1EE]">Min statistical edge</h3>
-                    <p className="text-[11.5px] text-[#8B9890]">Safety hurdle required against bookmaker implied odds</p>
+                    <h3 className="text-[13px] font-[600] text-[#ECF1EE]">Min data coverage threshold</h3>
+                    <p className="text-[11.5px] text-[#8B9890]">Data coverage requirement for model calibration analysis</p>
                   </div>
                 </div>
                 <span className="text-[#B6E63B] font-semibold tabular-nums text-[12.5px]">
