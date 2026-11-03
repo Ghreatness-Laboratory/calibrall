@@ -21,7 +21,7 @@
 
 Every market was evaluated against consensus closing odds on identical matches with 2,000 bootstrap resamples (fixed seed=42):
 
-| Market | Samples | Model Log Loss | Closing Odds Log Loss | Paired Diff (Model - Closing) | 95% Bootstrap CI | Profit (Units) | ROI % [95% CI] | Classification | Reason / Notes |
+| Market | Samples | Model Log Loss | Closing Odds Log Loss | Paired Diff (Model - Closing) | 95% Bootstrap CI (2,000 resamples, seed=42) | Profit (Units) | ROI % [95% CI (2,000 resamples, seed=42)] | Classification | Reason / Notes |
 |---|---|---|---|---|---|---|---|---|---|
 | **1X2 Match Result** | 6,710 | 1.0488 | 0.9981 | +0.0507 | [+0.0438, +0.0582] | -315.56 | -4.70% [-7.5%, -1.9%] | **LOSES TO CLOSING** | Paired difference CI strictly above zero; model lags efficient consensus closing lines |
 | **Over / Under 2.5 Goals** | 6,710 | 0.7048 | 0.6772 | +0.0276 | [+0.0218, +0.0333] | -442.03 | -6.59% [-8.6%, -4.6%] | **LOSES TO CLOSING** | Paired difference CI strictly above zero |
@@ -32,10 +32,13 @@ Every market was evaluated against consensus closing odds on identical matches w
 | **Corners (Over 9.5)** | 6,709 | 0.6969 | N/A | N/A | N/A | N/A | N/A | **NO CLOSING DATA** | Corner lines and closing odds omitted in source files |
 | **Bookings (Over 3.5)** | 6,709 | 1.0502 | N/A | N/A | N/A | N/A | N/A | **NO CLOSING DATA** | Disciplinary card closing odds omitted in source files |
 
-### Asian Handicap Individual Line Breakdown
+### Asian Handicap Individual Line Breakdown (Reconciled: All 24 Lines Sum to 6,273)
 
-| Line | Samples | Model Loss | Closing Loss | Paired Diff | 95% Bootstrap CI | Profit | ROI % [95% CI] | Classification |
+| Line | Samples | Model Loss | Closing Loss | Paired Diff | 95% Bootstrap CI (2,000 resamples, seed=42) | Profit | ROI % [95% CI (2,000 resamples, seed=42)] | Classification |
 |---|---|---|---|---|---|---|---|---|
+| **-3.5** | 1 | 0.8171 | 0.7221 | +0.0949 | [+0.0949, +0.0949] | -1.00 | -100.00% [-100.0%, -100.0%] | **LOSES TO CLOSING** |
+| **-3.0** | 2 | 0.2914 | 0.6559 | -0.3646 | [-0.5667, -0.1624] | +1.68 | +84.00% [+79.0%, +89.0%] | **BEATS CLOSING** |
+| **-2.75** | 8 | 0.8750 | 0.7137 | +0.1613 | [-0.1436, +0.5348] | -2.28 | -28.50% [-77.4%, +43.1%] | **MATCHES CLOSING** |
 | **-2.5** | 25 | 0.6691 | 0.6804 | -0.0113 | [-0.1421, +0.1273] | +2.98 | +11.92% [-25.3%, +48.1%] | **MATCHES CLOSING** |
 | **-2.25** | 24 | 0.7594 | 0.6911 | +0.0683 | [-0.1334, +0.2792] | +6.34 | +26.42% [-12.6%, +64.3%] | **MATCHES CLOSING** |
 | **-2.0** | 44 | 0.8944 | 0.6976 | +0.1968 | [+0.0379, +0.3766] | -4.08 | -9.27% [-36.7%, +20.1%] | **LOSES TO CLOSING** |
@@ -46,14 +49,20 @@ Every market was evaluated against consensus closing odds on identical matches w
 | **-0.75** | 644 | 0.7751 | 0.6918 | +0.0833 | [+0.0567, +0.1124] | -88.07 | -13.68% [-21.0%, -6.5%] | **LOSES TO CLOSING** |
 | **-0.5** | 998 | 0.7651 | 0.6927 | +0.0724 | [+0.0491, +0.0954] | -55.41 | -5.55% [-11.5%, +0.2%] | **LOSES TO CLOSING** |
 | **-0.25** | 1,310 | 0.7362 | 0.6900 | +0.0462 | [+0.0222, +0.0711] | +79.62 | +6.08% [+1.1%, +11.1%] | **LOSES TO CLOSING** |
-| **0.0** | 662 | 0.7515 | 0.6913 | +0.0602 | [+0.0316, +0.0896] | -21.34 | -3.22% [-9.5%, +3.1%] | **LOSES TO CLOSING** |
-| **+0.25** | 759 | 0.7287 | 0.6933 | +0.0354 | [+0.0156, +0.0562] | -15.82 | -2.08% [-8.3%, +4.1%] | **LOSES TO CLOSING** |
-| **+0.5** | 445 | 0.7229 | 0.6973 | +0.0256 | [-0.0033, +0.0556] | -10.92 | -2.45% [-10.8%, +5.9%] | **MATCHES CLOSING** |
-| **+0.75** | 250 | 0.7501 | 0.6920 | +0.0581 | [+0.0138, +0.1038] | -22.45 | -8.98% [-19.8%, +1.8%] | **LOSES TO CLOSING** |
-| **+1.0** | 98 | 0.7883 | 0.6944 | +0.0939 | [+0.0119, +0.1699] | -11.02 | -11.24% [-26.4%, +3.9%] | **LOSES TO CLOSING** |
-| **+1.25** | 75 | 0.7055 | 0.6893 | +0.0161 | [-0.0603, +0.0991] | +2.12 | +2.83% [-18.7%, +24.4%] | **MATCHES CLOSING** |
-| **+1.5** | 46 | 0.7676 | 0.6931 | +0.0744 | [-0.0440, +0.2003] | -3.85 | -8.37% [-33.1%, +16.4%] | **MATCHES CLOSING** |
-| **+1.75** | 25 | 0.8698 | 0.6971 | +0.1728 | [-0.0045, +0.3704] | -0.12 | -0.48% [-34.2%, +33.2%] | **MATCHES CLOSING** |
+| **0.0** | 662 | 0.7515 | 0.6913 | +0.0602 | [+0.0316, +0.0896] | -19.47 | -2.94% [-10.1%, +4.3%] | **LOSES TO CLOSING** |
+| **+0.25** | 759 | 0.7287 | 0.6933 | +0.0354 | [+0.0156, +0.0562] | -19.16 | -2.52% [-9.2%, +4.1%] | **LOSES TO CLOSING** |
+| **+0.5** | 445 | 0.7229 | 0.6973 | +0.0256 | [-0.0033, +0.0556] | -6.18 | -1.39% [-10.3%, +7.2%] | **MATCHES CLOSING** |
+| **+0.75** | 250 | 0.7501 | 0.6920 | +0.0581 | [+0.0138, +0.1038] | -4.29 | -1.72% [-13.8%, +11.2%] | **LOSES TO CLOSING** |
+| **+1.0** | 98 | 0.7883 | 0.6944 | +0.0939 | [+0.0119, +0.1699] | -10.49 | -10.70% [-29.7%, +8.6%] | **LOSES TO CLOSING** |
+| **+1.25** | 75 | 0.7055 | 0.6893 | +0.0161 | [-0.0603, +0.0991] | +5.00 | +6.67% [-14.9%, +28.2%] | **MATCHES CLOSING** |
+| **+1.5** | 46 | 0.7676 | 0.6931 | +0.0744 | [-0.0440, +0.2003] | +1.58 | +3.43% [-24.4%, +28.8%] | **MATCHES CLOSING** |
+| **+1.75** | 25 | 0.8698 | 0.6971 | +0.1728 | [-0.0045, +0.3704] | -7.90 | -31.60% [-62.8%, +5.3%] | **MATCHES CLOSING** |
+| **+2.0** | 7 | 0.9654 | 0.6673 | +0.2981 | [-0.0573, +0.5892] | -3.19 | -45.57% [-100.0%, +35.0%] | **MATCHES CLOSING** |
+| **+2.25** | 2 | 0.3216 | 0.6958 | -0.3742 | [-0.3812, -0.3673] | +1.77 | +88.50% [+88.0%, +89.0%] | **BEATS CLOSING** |
+| **+2.5** | 1 | 0.2962 | 0.7301 | -0.4339 | [-0.4339, -0.4339] | +1.00 | +100.00% [+100.0%, +100.0%] | **BEATS CLOSING** |
+| **Total / Reconciled** | **6,273** | **0.7505** | **0.6921** | **+0.0584** | **[+0.0488, +0.0680]** | **-113.12** | **-1.80% [-4.2%, +0.3%]** | **LOSES TO CLOSING** |
+
+*Asian Handicap Reconciliation Proof:* Sum of all 24 individual handicap line samples = 1 + 2 + 8 + 25 + 24 + 44 + 94 + 178 + 269 + 306 + 644 + 998 + 1,310 + 662 + 759 + 445 + 250 + 98 + 75 + 46 + 25 + 7 + 2 + 1 = **6,273**, exactly matching the pooled sample count of 6,273. The previously noted difference of 21 was due to filtering lines with <10 samples (1 + 2 + 8 + 7 + 2 + 1 = 21). Both sets are now fully reconciled.
 
 ---
 

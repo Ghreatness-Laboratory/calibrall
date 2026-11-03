@@ -8,7 +8,7 @@
 
 ## 1. CLOSING-ODDS VALIDATION & MODEL EVALUATION SUMMARY
 
-| Market | Samples | Model Log Loss | Closing Odds Log Loss | Paired Difference [95% CI] | Skill Score vs Baseline | Skill Score vs Closing | Classification |
+| Market | Samples | Model Log Loss | Closing Odds Log Loss | Paired Difference [95% CI (2,000 resamples, seed=42)] | Skill Score vs Baseline | Skill Score vs Closing | Classification |
 |---|---|---|---|---|---|---|---|
 | **1X2 Match Result** | 4,507 | 1.0333 | 0.9841 | +0.0492 [+0.0412, +0.0571] | +4.03% | -5.00% | **LOSES TO CLOSING** |
 | **Over / Under 2.5 Goals** | 4,507 | 0.7041 | 0.6738 | +0.0303 [+0.0238, +0.0369] | -1.68% | -4.50% | **LOSES TO CLOSING** |
@@ -27,7 +27,7 @@
 
 The Asian Handicap market was evaluated across all 25 individual lines present in the closing odds. Individual line results show that the model matches closing odds on several lines (CI spans zero), and does not fail across every line:
 
-| Line | Samples | Model Log Loss | Closing Log Loss | Paired Diff | 95% CI (Bootstrap 2,000) | Result Classification |
+| Line | Samples | Model Log Loss | Closing Log Loss | Paired Diff | 95% CI (Bootstrap 2,000 resamples, seed=42) | Result Classification |
 |---|---|---|---|---|---|---|
 | **-2.5** | 25 | 0.6691 | 0.6804 | -0.0113 | [-0.1421, +0.1273] | **MATCHES CLOSING** |
 | **-2.25** | 24 | 0.7594 | 0.6911 | +0.0683 | [-0.1334, +0.2792] | **MATCHES CLOSING** |

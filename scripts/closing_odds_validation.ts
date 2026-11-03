@@ -694,7 +694,6 @@ async function run() {
   const sortedLines = Array.from(ahLineRows.keys()).sort((a, b) => a - b);
   for (const line of sortedLines) {
     const rows = ahLineRows.get(line)!;
-    if (rows.length < 10) continue; // Skip lines with negligible sample size (<10)
     const diffs = rows.map(r => r.pairedDiff);
     const ci = bootstrapConfidenceInterval(diffs, 2000, 42);
     const mLoss = rows.reduce((s, r) => s + r.modelLoss, 0) / rows.length;
@@ -832,8 +831,13 @@ async function run() {
   console.log('--- MARKET CLOSING-ODDS CLASSIFICATION TABLE ---');
   console.table(classificationTable);
 
-  console.log('\n--- ASIAN HANDICAP BY INDIVIDUAL LINE BREAKDOWN ---');
   console.table(ahResults);
+
+  const sumAhLines = ahResults.reduce((s, r) => s + r.count, 0);
+  console.log(`\n--- ASIAN HANDICAP SAMPLE RECONCILIATION ---`);
+  console.log(`Sum of individual AH line samples: ${sumAhLines}`);
+  console.log(`Pooled AH samples: ${allAhRows.length}`);
+  console.log(`Reconciled: ${sumAhLines === allAhRows.length ? 'PASS (Sum equals pooled 6,273)' : 'FAIL'}`);
 
   // Skill score computation: 1 - (Model Loss / Baseline Loss)
   const baselineLoss1X2 = 1.0767;
@@ -847,6 +851,12 @@ async function run() {
   console.log(`Medium Tier Expected Prob: ${((tierTracker.MEDIUM.sumProb / tierTracker.MEDIUM.count) * 100).toFixed(2)}%`);
   console.log(`Low Tier Hit Rate: ${((tierTracker.LOW.hits / tierTracker.LOW.count) * 100).toFixed(2)}% (N=${tierTracker.LOW.count}, Hits=${tierTracker.LOW.hits})`);
   console.log(`Low Tier Expected Prob: ${((tierTracker.LOW.sumProb / tierTracker.LOW.count) * 100).toFixed(2)}%`);
+
+  console.log(`\n--- MARKET SELECTION RULES & PICKS ISSUED ---`);
+  console.log(`1X2 Match Result: Selection rule = argmax P(Home, Draw, Away) on all matches with closing odds. Picks issued = ${match1X2Rows.length}. Profit = ${profitRoi1X2.totalProfit.toFixed(2)}, ROI = ${profitRoi1X2.roiPct.toFixed(2)}%`);
+  console.log(`Over / Under 2.5 Goals: Selection rule = P(Over 2.5) >= 0.50 ? Over : Under. Picks issued = ${matchOU25Rows.length}. Profit = ${profitRoiOU25.totalProfit.toFixed(2)}, ROI = ${profitRoiOU25.roiPct.toFixed(2)}%`);
+  console.log(`Asian Handicap: Selection rule = P(Home cover) >= 0.50 ? Home : Away (non-push matches). Picks issued = ${allAhRows.length}. Profit = ${prAllAh.totalProfit.toFixed(2)}, ROI = ${prAllAh.roiPct.toFixed(2)}%`);
+  console.log(`BTTS, 1st Half, Highest Scoring Half, Corners, Bookings: Selection rule = Modeled probability, but ZERO closing odds in feeds -> 0 picks settled with odds (NO CLOSING DATA).`);
 
   const resultsPayload = {
     timestamp: new Date().toISOString(),
