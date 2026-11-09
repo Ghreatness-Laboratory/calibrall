@@ -34,6 +34,7 @@ interface Props {
   topPickSelection?: string;
   topPickProbability?: number;
   marketCode?: string;
+  initialTab?: TabType;
 }
 
 type TabType = 'form' | 'tactics' | 'weather' | 'odds';
@@ -46,9 +47,10 @@ export default function QuantitativeFactorsAuditPanel({
   topPickOdds = 1.95,
   topPickSelection = 'Home Win',
   topPickProbability = 0.54,
-  marketCode = 'MATCH_RESULT_HOME'
+  marketCode = 'MATCH_RESULT_HOME',
+  initialTab = 'form',
 }: Props) {
-  const [activeTab, setActiveTab] = useState<TabType>('form');
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [weather, setWeather] = useState<WeatherCondition | null>(null);
   const [loadingWeather, setLoadingWeather] = useState<boolean>(true);
   const [formData, setFormData] = useState<{

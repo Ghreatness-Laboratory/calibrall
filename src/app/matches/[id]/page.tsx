@@ -162,7 +162,7 @@ export default function MatchAnalysisPage() {
   const setSelectedPrediction = (p: MarketPrediction | null) => setSelectedPredictionOverride(p);
 
   // Analysis Tab navigation
-  const [activeAnalysisTab, setActiveAnalysisTab] = useState<'markets' | 'lineups' | 'matrix' | 'audit'>('markets');
+  const [activeAnalysisTab, setActiveAnalysisTab] = useState<'markets' | 'lineups' | 'poisson' | 'form' | 'coaches' | 'weather'>('markets');
 
   const lineupState = useMemo(() => {
     if (!fixture || isBasketball) return null;
@@ -174,27 +174,46 @@ export default function MatchAnalysisPage() {
     return forwardPickLedger.getPickRevisions(fixture.id);
   }, [fixture]);
 
+  const isDataInsufficient = useMemo(() => {
+    if (!fixture) return true;
+    if (fixture.insufficientData || stats?.insufficientData) return true;
+    if (noRecommendationReason && (noRecommendationReason.startsWith('Data out of date') || noRecommendationReason.toLowerCase().includes('insufficient'))) return true;
+    return false;
+  }, [fixture, stats, noRecommendationReason]);
+
+  const highTierCount = useMemo(() => {
+    return predictions.filter(p => p.confidenceTier === 'HIGH' || p.confidenceTier === 'SAFE' || p.riskTier === 'LOW').length;
+  }, [predictions]);
+
+  const medTierCount = useMemo(() => {
+    return predictions.filter(p => p.confidenceTier === 'MEDIUM' || p.riskTier === 'MEDIUM').length;
+  }, [predictions]);
+
+  const lowTierCount = useMemo(() => {
+    return predictions.filter(p => p.confidenceTier === 'LOW' || p.confidenceTier === 'SPECULATIVE' || p.riskTier === 'HIGH').length;
+  }, [predictions]);
+
   if (isLoading) {
     return (
       <div className="py-16 text-center space-y-3">
-        <div className="w-5 h-5 border-2 border-[#B6E63B] border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-[12px] text-[#8B9890]">Loading match data...</p>
+        <div className="w-5 h-5 border-2 border-[#B8E636] border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-[12px] text-[#8B9892]">Loading match data...</p>
       </div>
     );
   }
 
   if (!fixture || (!isBasketball && (!stats || !footballEvaluation)) || (isBasketball && basketballPredictions.length === 0)) {
     return (
-      <div className="py-16 text-center space-y-3 bg-[#101713] border border-white/[0.07] rounded-[14px] p-6">
-        <h2 suppressHydrationWarning className="text-[15px] font-semibold text-[#ECF1EE]">
+      <div className="py-16 text-center space-y-3 bg-[#101613] border border-[#1F2A24] rounded-[14px] p-6">
+        <h2 suppressHydrationWarning className="text-[15px] font-semibold text-[#E9EFEB]">
           Live data unavailable.{lastUpdated ? ` Last updated ${lastUpdated}` : ''}
         </h2>
-        <p className="text-[12px] text-[#8B9890] max-w-sm mx-auto">
+        <p className="text-[12px] text-[#8B9892] max-w-sm mx-auto">
           {isBasketball 
             ? 'The requested NBA matchup data could not be retrieved.' 
             : 'The requested match data could not be retrieved.'}
         </p>
-        <Link href="/matches" className="inline-block px-4 py-2 rounded-[11px] bg-[#151E19] border border-white/[0.07] text-[13px] text-[#ECF1EE] hover:bg-white/[0.05]">
+        <Link href="/matches" className="inline-block px-4 py-2 rounded-[13px] bg-[#151D19] border border-[#1F2A24] text-[13px] text-[#E9EFEB] hover:bg-white/[0.05]">
           Return to fixtures
         </Link>
       </div>
@@ -213,12 +232,12 @@ export default function MatchAnalysisPage() {
   const awayName = displayName(fixture.awayTeam);
 
   return (
-    <div className="space-y-3.5 py-1">
-      {/* Top Breadcrumb & Actions */}
-      <div className="flex items-center justify-between pb-1">
+    <div className="space-y-3 py-1">
+      {/* Back and Save controls sit in one row */}
+      <div className="flex items-center justify-between pb-0.5">
         <Link
           href="/matches"
-          className="inline-flex items-center gap-1.5 text-[12.5px] text-[#8B9890] hover:text-[#ECF1EE] transition-colors touch-press"
+          className="inline-flex items-center gap-1.5 text-[12.5px] text-[#8B9892] hover:text-[#E9EFEB] transition-colors touch-press font-medium"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to fixtures</span>
@@ -227,412 +246,285 @@ export default function MatchAnalysisPage() {
         <button
           onClick={handleToggleBookmark}
           type="button"
-          className={`flex items-center gap-1.5 px-3 h-[36px] rounded-[11px] text-[12px] font-medium border transition-colors touch-press ${
+          className={`flex items-center gap-1.5 px-3 h-[36px] rounded-full text-[12px] font-semibold border transition-colors touch-press ${
             isSaved
-              ? 'bg-[rgba(226,174,69,0.12)] text-[#E2AE45] border-[#E2AE45]/30'
-              : 'bg-[#101713] border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
+              ? 'bg-[#E8B04A]/12 text-[#E8B04A] border-[#E8B04A]/30'
+              : 'bg-[#101613] border-[#1F2A24] text-[#8B9892] hover:text-[#E9EFEB]'
           }`}
         >
-          <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-[#E2AE45]' : ''}`} strokeWidth={2} />
+          <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-[#E8B04A]' : ''}`} strokeWidth={2} />
           <span>{isSaved ? 'Saved' : 'Save'}</span>
         </button>
       </div>
 
-      {/* Match Header Card */}
-      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
+      {/* Match Header Card: League, Date & Team News chip, then two team rows with Home/Away on the right */}
+      <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3.5 space-y-3">
         {/* League and meta row */}
-        <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#8B9890] border-b border-white/[0.07] pb-2.5">
-          <div className="flex items-center gap-1.5 truncate">
-            <span className="font-semibold text-[#ECF1EE]">{fixture.competition.name}</span>
-            <span className="text-[#5E6A63]">·</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-[#8B9892] border-b border-[#1F2A24] pb-2.5">
+          <div className="flex items-center gap-1.5 truncate flex-wrap">
+            <span className="font-semibold text-[#E9EFEB]">{cleanDisplayText(fixture.competition.name)}</span>
+            <span className="text-[#5E6B65]">·</span>
             <span className="tabular-nums">MD {fixture.matchday}</span>
+            {lineupState && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#151D19] border border-[#1F2A24] text-[#B8E636]">
+                Team news
+              </span>
+            )}
             {(() => {
               const staleMatch = noRecommendationReason?.match(/last match (\d+) days ago/);
               const sDays = staleMatch ? staleMatch[1] : null;
               if (sDays) {
                 return (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-[4px] bg-amber-500/15 text-amber-300 font-mono text-[9.5px] font-semibold border border-amber-500/30">
+                  <span className="ml-1 px-2 py-0.5 rounded-full bg-[#E8B04A]/15 text-[#E8B04A] text-[9.5px] font-semibold border border-[#E8B04A]/30">
                     Stale data · {sDays}d
                   </span>
                 );
               }
               return null;
             })()}
-            {(() => {
-              const derby = (fixture.isDerby && fixture.derbyName)
-                ? { name: fixture.derbyName }
-                : (fixture.homeTeam?.name && fixture.awayTeam?.name ? checkDerby(fixture.homeTeam.name, fixture.awayTeam.name) : null);
-              return derby ? (
-                <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                  {derby.name}
-                </span>
-              ) : null;
-            })()}
           </div>
 
-          <div className="flex items-center gap-3 text-[11.5px] text-[#8B9890] tabular-nums">
+          <div className="flex items-center gap-2.5 text-[11px] text-[#8B9892] tabular-nums">
             <span className="flex items-center gap-1" suppressHydrationWarning>
-              <Calendar className="w-3.5 h-3.5" strokeWidth={1.8} />
+              <Calendar className="w-3.5 h-3.5 text-[#5E6B65]" strokeWidth={1.8} />
               <span suppressHydrationWarning>
                 {kickoff.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Africa/Lagos' })}
               </span>
             </span>
             <span className="flex items-center gap-1" suppressHydrationWarning>
-              <Clock className="w-3.5 h-3.5" strokeWidth={1.8} />
+              <Clock className="w-3.5 h-3.5 text-[#5E6B65]" strokeWidth={1.8} />
               <span suppressHydrationWarning>
-                {formatMatchTime(fixture.kickoffTime, 'Africa/Lagos')} WAT
+                {formatMatchTime(fixture.kickoffTime, 'Africa/Lagos')}
               </span>
             </span>
-            {lineupState && (
-              <LineupChip lineupState={lineupState} />
-            )}
           </div>
         </div>
 
-        {/* Teams Matchup Scoreboard */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-1">
-          <div className="flex flex-col gap-2 flex-1 max-w-lg">
-            {/* Home Team */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <TeamCrest canonicalTeamId={fixture.homeTeam.id} crestUrl={fixture.homeTeam.crestUrl} teamName={homeName} size={28} />
-                <span className="text-[15px] font-semibold text-[#ECF1EE] leading-tight truncate">
-                  {homeName}
-                </span>
-              </div>
+        {/* Teams Matchup: Two team rows with Home/Away on the right */}
+        <div className="space-y-2 py-0.5">
+          {/* Home Team Row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <TeamCrest canonicalTeamId={fixture.homeTeam.id} crestUrl={fixture.homeTeam.crestUrl} teamName={homeName} size={24} />
+              <span className="text-[14px] font-semibold text-[#E9EFEB] leading-tight truncate">
+                {cleanDisplayText(homeName)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
               {fixture.status === 'FINISHED' ? (
-                <span className="text-[15px] font-semibold text-[#ECF1EE] tabular-nums">
+                <span className="text-[14px] font-semibold text-[#E9EFEB] tabular-nums">
                   {fixture.homeScore ?? 0}
                 </span>
-              ) : (
-                <span className="text-[12px] text-[#5E6A63]">Home</span>
-              )}
-            </div>
-
-            {/* Away Team */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <TeamCrest canonicalTeamId={fixture.awayTeam.id} crestUrl={fixture.awayTeam.crestUrl} teamName={awayName} size={28} />
-                <span className="text-[15px] font-semibold text-[#ECF1EE] leading-tight truncate">
-                  {awayName}
-                </span>
-              </div>
-              {fixture.status === 'FINISHED' ? (
-                <span className="text-[15px] font-semibold text-[#ECF1EE] tabular-nums">
-                  {fixture.awayScore ?? 0}
-                </span>
-              ) : (
-                <span className="text-[12px] text-[#5E6A63]">Away</span>
-              )}
+              ) : null}
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#151D19] text-[#5E6B65] font-medium border border-[#1F2A24]">
+                Home
+              </span>
             </div>
           </div>
 
-          {/* Status pill & Kickoff */}
-          <div className="sm:border-l sm:border-white/[0.07] sm:pl-4 flex flex-col justify-center sm:items-end">
-            <span className="text-[11.5px] text-[#B6E63B] font-semibold">
-              {fixture.status === 'FINISHED' ? 'Match completed' : 'Upcoming match'}
-            </span>
-            <span className="text-[12px] text-[#ECF1EE] mt-0.5 tabular-nums" suppressHydrationWarning>
-              {fixture.status === 'FINISHED' ? 'Full time' : `${formatMatchTime(fixture.kickoffTime, 'Africa/Lagos')} WAT`}
-            </span>
+          {/* Away Team Row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <TeamCrest canonicalTeamId={fixture.awayTeam.id} crestUrl={fixture.awayTeam.crestUrl} teamName={awayName} size={24} />
+              <span className="text-[14px] font-semibold text-[#E9EFEB] leading-tight truncate">
+                {cleanDisplayText(awayName)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {fixture.status === 'FINISHED' ? (
+                <span className="text-[14px] font-semibold text-[#E9EFEB] tabular-nums">
+                  {fixture.awayScore ?? 0}
+                </span>
+              ) : null}
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#151D19] text-[#5E6B65] font-medium border border-[#1F2A24]">
+                Away
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Completed Match Telemetry Banner */}
-        {fixture.status === 'FINISHED' && (
-          <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.05] pb-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#B6E63B]/20 text-[#B6E63B] border border-[#B6E63B]/30 font-mono">
-                  Match completed
+        {/* 2x2 grid of xG, Corners, Projected cards and Confidence. Show "—" in dim grey when there is no data. Do not show "0.00". */}
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#1F2A24]">
+          {/* Tile 1: xG */}
+          <div className="p-2.5 bg-[#151D19] rounded-[10px]">
+            <span className="text-[10.5px] text-[#8B9892] block">Expected goals (xG)</span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              {!isDataInsufficient && stats && (stats.homeXg > 0 || stats.awayXg > 0) ? (
+                <span className="text-[14px] font-semibold text-[#E9EFEB] tabular-nums">
+                  {stats.homeXg.toFixed(2)} to {stats.awayXg.toFixed(2)}
                 </span>
-                <span className="text-[13px] font-bold text-[#ECF1EE]">
-                  FT {fixture.homeScore ?? 0} · {fixture.awayScore ?? 0}
+              ) : (
+                <span className="text-[14px] font-semibold text-[#5E6B65]">—</span>
+              )}
+            </div>
+          </div>
+
+          {/* Tile 2: Corners */}
+          <div className="p-2.5 bg-[#151D19] rounded-[10px]">
+            <span className="text-[10.5px] text-[#8B9892] block">Corner expectation</span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              {!isDataInsufficient && stats && totalCorners > 0 ? (
+                <span className="text-[14px] font-semibold text-[#E9EFEB] tabular-nums">
+                  {totalCorners.toFixed(1)} corners
                 </span>
-                <span className="text-[12px] text-[#8B9890]">
-                  (HT {fixture.homeHalfTimeScore ?? Math.floor((fixture.homeScore ?? 0) / 2)} · {fixture.awayHalfTimeScore ?? Math.floor((fixture.awayScore ?? 0) / 2)})
+              ) : (
+                <span className="text-[14px] font-semibold text-[#5E6B65]">—</span>
+              )}
+            </div>
+          </div>
+
+          {/* Tile 3: Projected Cards */}
+          <div className="p-2.5 bg-[#151D19] rounded-[10px]">
+            <span className="text-[10.5px] text-[#8B9892] block">Projected cards</span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              {!isDataInsufficient && stats && stats.expectedCards > 0 ? (
+                <span className="text-[14px] font-semibold text-[#E9EFEB] tabular-nums">
+                  {stats.expectedCards.toFixed(1)} cards
                 </span>
+              ) : (
+                <span className="text-[14px] font-semibold text-[#5E6B65]">—</span>
+              )}
+            </div>
+          </div>
+
+          {/* Tile 4: Confidence */}
+          <div className="p-2.5 bg-[#151D19] rounded-[10px]">
+            <span className="text-[10.5px] text-[#8B9892] block">Model confidence</span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              {!isDataInsufficient && stats && stats.uncertaintyScore !== null && stats.uncertaintyScore !== undefined ? (
+                <span className="text-[14px] font-semibold text-[#B8E636] tabular-nums">
+                  {((1 - stats.uncertaintyScore) * 100).toFixed(0)}%
+                </span>
+              ) : (
+                <span className="text-[14px] font-semibold text-[#5E6B65]">—</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Flagship Recommendation or Amber Warning Card */}
+      {isDataInsufficient || !topPick ? (
+        /* Amber warning card ("Statistical evidence insufficient") in place of scoreline matrix and probabilities */
+        <div className="rounded-[14px] p-3.5 border border-[#E8B04A]/30 bg-[#E8B04A]/10 space-y-1.5">
+          <div className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#E8B04A]">
+            <AlertCircle className="w-4 h-4 text-[#E8B04A] shrink-0" strokeWidth={2} />
+            <span>Statistical evidence insufficient</span>
+          </div>
+          <p className="text-[12px] text-[#E9EFEB] leading-[1.5]">
+            {noRecommendationReason || 'Model projection withheld: analysis only due to match staleness exceeding the 21-day threshold or missing historical record. Rather than inventing a projection, the engine abstains to preserve calibration integrity.'}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3.5 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#B8E636] font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={2} />
+              <span>Model probability & calibration status</span>
+            </div>
+            {(() => {
+              const tier = getRiskTierBadge(topPick.riskTier);
+              return (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${tier.badgeClass}`}>
+                  {tier.label}
+                </span>
+              );
+            })()}
+            {topPick.marketOdds && (
+              <span className="text-[11px] text-[#E9EFEB] bg-[#151D19] px-2 py-0.5 rounded-full border border-[#1F2A24] tabular-nums">
+                @{formatOdds(topPick.marketOdds)}
+              </span>
+            )}
+          </div>
+          <h3 className="text-[15px] font-semibold text-[#E9EFEB]">
+            {formatSelectionName(topPick.selection)} · {((topPick.calibratedProbability ?? topPick.modelProbability) * 100).toFixed(1)}% model probability
+          </h3>
+          {topPick.plainEnglishReason && (
+            <p className="text-[12px] text-[#8B9892] leading-normal">
+              {topPick.plainEnglishReason}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Tabs become horizontally scrollable pills: Market Intel, Lineups, Poisson, Form, Coaches, Weather */}
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 border-b border-[#1F2A24]">
+        {[
+          { id: 'markets' as const, label: 'Market Intel' },
+          { id: 'lineups' as const, label: 'Lineups' },
+          { id: 'poisson' as const, label: 'Poisson' },
+          { id: 'form' as const, label: 'Form' },
+          { id: 'coaches' as const, label: 'Coaches' },
+          { id: 'weather' as const, label: 'Weather' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveAnalysisTab(tab.id)}
+            type="button"
+            className={`px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 ${
+              activeAnalysisTab === tab.id
+                ? 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30 font-semibold'
+                : 'bg-[#151D19] text-[#8B9892] border border-[#1F2A24] hover:text-[#E9EFEB]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Confidence Tiers: Compact rows with a coloured dot, title, one-line description and a "0 lines" count badge */}
+      {activeAnalysisTab === 'markets' && (
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3 space-y-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5E6B65]">
+            CONFIDENCE TIERS
+          </div>
+          <div className="divide-y divide-[#1F2A24] text-[12px]">
+            {/* High confidence row */}
+            <div className="py-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-[#B8E636] shrink-0" />
+                <div className="min-w-0">
+                  <span className="font-semibold text-[#E9EFEB]">High Confidence</span>
+                  <p className="text-[11px] text-[#8B9892] truncate">Narrow variance bounds & high sample depth</p>
+                </div>
               </div>
-              <span className="text-[11px] text-[#5E6A63] font-mono">
-                Official regular time verified
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-[#151D19] border border-[#1F2A24] text-[#8B9892] tabular-nums shrink-0 font-medium">
+                {highTierCount} {highTierCount === 1 ? 'line' : 'lines'}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Total Corners</span>
-                <span className="font-mono font-bold text-[#ECF1EE] text-[13px]">
-                  {(fixture.homeCorners ?? 5) + (fixture.awayCorners ?? 4)}
-                </span>
-                <span className="text-[9.5px] text-[#5E6A63] font-mono">
-                  {fixture.homeCorners ?? 5}H · {fixture.awayCorners ?? 4}A
-                </span>
+            {/* Medium confidence row */}
+            <div className="py-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-[#E8B04A] shrink-0" />
+                <div className="min-w-0">
+                  <span className="font-semibold text-[#E9EFEB]">Medium Confidence</span>
+                  <p className="text-[11px] text-[#8B9892] truncate">Calculated edge with moderate market spread</p>
+                </div>
               </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-[#151D19] border border-[#1F2A24] text-[#8B9892] tabular-nums shrink-0 font-medium">
+                {medTierCount} {medTierCount === 1 ? 'line' : 'lines'}
+              </span>
+            </div>
 
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Total Cards</span>
-                <span className="font-mono font-bold text-[#ECF1EE] text-[13px]">
-                  {(fixture.homeYellowCards ?? 2) + (fixture.awayYellowCards ?? 2)}
-                </span>
-                <span className="text-[9.5px] text-[#5E6A63] font-mono">
-                  YC: {(fixture.homeYellowCards ?? 2) + (fixture.awayYellowCards ?? 2)} · RC: {(fixture.homeRedCards ?? 0) + (fixture.awayRedCards ?? 0)}
-                </span>
+            {/* Speculative / Low confidence row */}
+            <div className="py-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-[#5E6B65] shrink-0" />
+                <div className="min-w-0">
+                  <span className="font-semibold text-[#E9EFEB]">Speculative / Abstain</span>
+                  <p className="text-[11px] text-[#8B9892] truncate">High volatility lines or unverified prerequisites</p>
+                </div>
               </div>
-
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Half Time Result</span>
-                <span className="font-mono font-bold text-[#ECF1EE] text-[13px]">
-                  {fixture.homeHalfTimeScore ?? Math.floor((fixture.homeScore ?? 0) / 2)} · {fixture.awayHalfTimeScore ?? Math.floor((fixture.awayScore ?? 0) / 2)}
-                </span>
-                <span className="text-[9.5px] text-[#5E6A63] font-mono">1st half score</span>
-              </div>
-
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Pre match model audit</span>
-                <span className={`font-mono font-bold text-[13px] ${
-                  topPick?.settlementStatus === 'WON' ? 'text-[#B6E63B]' :
-                  topPick?.settlementStatus === 'LOST' ? 'text-rose-400' :
-                  topPick?.settlementStatus === 'PUSH' ? 'text-amber-300' : 'text-[#8B9890]'
-                }`}>
-                  {topPick?.settlementStatus || 'Settled'}
-                </span>
-                <span className="text-[9.5px] text-[#5E6A63] truncate block font-mono">
-                  {topPick?.lineComparisonText || 'Line verified'}
-                </span>
-              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-[#151D19] border border-[#1F2A24] text-[#8B9892] tabular-nums shrink-0 font-medium">
+                {lowTierCount} {lowTierCount === 1 ? 'line' : 'lines'}
+              </span>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Quantitative Indicators Strip */}
-        {isBasketball && fixture.basketballStats ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/[0.07]">
-            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
-              <span className="text-[11px] text-[#8B9890] block">Offensive Efficiency</span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">
-                  {fixture.basketballStats.homeOffEff.toFixed(3)}
-                </span>
-                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
-                  vs {fixture.basketballStats.awayOffEff.toFixed(3)}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
-              <span className="text-[11px] text-[#8B9890] block">Defensive Efficiency</span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">
-                  {fixture.basketballStats.homeDefEff.toFixed(3)}
-                </span>
-                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
-                  vs {fixture.basketballStats.awayDefEff.toFixed(3)}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
-              <span className="text-[11px] text-[#8B9890] block">Pace (Poss/G)</span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">
-                  {fixture.basketballStats.homePoss.toFixed(1)}
-                </span>
-                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
-                  vs {fixture.basketballStats.awayPoss.toFixed(1)}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
-              <span className="text-[11px] text-[#8B9890] block">Projected Total</span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#B6E63B] tabular-nums font-mono">
-                  {fixture.basketballStats.projectedTotal?.toFixed(1)} pts
-                </span>
-                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
-                  Margin {fixture.basketballStats.projectedMargin?.toFixed(1)}
-                </span>
-              </div>
-            </div>
-          </div>
-        ) : stats ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/[0.07]">
-            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
-              <span className="text-[11px] text-[#8B9890] block">Expected goals (xG)</span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">{stats.homeXg.toFixed(2)} to {stats.awayXg.toFixed(2)}</span>
-                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">({totalXg.toFixed(2)})</span>
-              </div>
-            </div>
-
-            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
-              <span className="text-[11px] text-[#8B9890] block">Corner expectation</span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">{totalCorners.toFixed(1)}</span>
-                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
-                  {stats.expectedCornersHome.toFixed(1)}H / {stats.expectedCornersAway.toFixed(1)}A
-                </span>
-              </div>
-            </div>
-
-            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
-              <span className="text-[11px] text-[#8B9890] block">Projected cards</span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#ECF1EE] tabular-nums font-mono">{stats.expectedCards.toFixed(1)}</span>
-                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">Ref: {stats.expectedCards.toFixed(1)}</span>
-              </div>
-            </div>
-
-            <div className="p-2.5 bg-[#151E19] rounded-[11px] border border-white/[0.07]">
-              <span className="text-[11px] text-[#8B9890] block">Model confidence</span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[14px] font-semibold text-[#B6E63B] tabular-nums font-mono">
-                  {stats.uncertaintyScore !== null ? `${((1 - stats.uncertaintyScore) * 100).toFixed(0)}%` : '—'}
-                </span>
-                <span className="text-[10.5px] text-[#5E6A63] ml-auto tabular-nums font-mono">
-                  {stats.sampleSizeMatches} games
-                </span>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {/* Flagship Recommendation Banner */}
-      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {topPick ? (
-          <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#B6E63B] font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={2} />
-                <span>Model probability & calibration status</span>
-              </div>
-              {(() => {
-                const tier = getRiskTierBadge(topPick.riskTier);
-                return (
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${tier.badgeClass}`}>
-                    {tier.label}
-                  </span>
-                );
-              })()}
-              {topPick.sanityTripwire && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                  Check data
-                </span>
-              )}
-              {topPick.marketOdds ? (
-                <span className="text-[11px] text-[#ECF1EE] bg-[#151E19] px-2 py-0.5 rounded-full border border-white/[0.07] tabular-nums font-mono">
-                  {topPick.bookmakerName ? `${topPick.bookmakerName} ` : ''}@{formatOdds(topPick.marketOdds)}
-                </span>
-              ) : (
-                <span className="text-[10.5px] text-[#8B9890] bg-[#151E19] px-2 py-0.5 rounded-full border border-white/[0.07] font-mono">
-                  Data coverage: Standard
-                </span>
-              )}
-            </div>
-            <h3 className="text-[15px] font-semibold text-[#ECF1EE]">
-              {formatSelectionName(topPick.selection)} · {((topPick.calibratedProbability ?? topPick.modelProbability) * 100).toFixed(1)}% model probability
-            </h3>
-            {topPick.plainEnglishReason && (
-              <p className="text-[12px] text-[#8B9890] mt-1 max-w-2xl leading-normal">
-                {topPick.plainEnglishReason}
-              </p>
-            )}
-
-            {topPick.settlementStatus && topPick.settlementStatus !== 'PENDING' && (
-              <div className={`mt-2.5 p-2 rounded-[8px] text-[11px] font-mono flex items-center justify-between border ${
-                topPick.settlementStatus === 'WON' ? 'bg-[#B6E63B]/10 border-[#B6E63B]/30 text-[#B6E63B]' :
-                topPick.settlementStatus === 'LOST' ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' :
-                'bg-amber-500/10 border-amber-500/30 text-amber-300'
-              }`}>
-                <span className="font-semibold uppercase tracking-wider">Settled Outcome: {topPick.settlementStatus}</span>
-                <span>{topPick.lineComparisonText || 'Line verified against official statistics'}</span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div>
-            <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#8B9890] mb-1">
-              <AlertCircle className="w-3.5 h-3.5" strokeWidth={2} />
-              <span>Calibration status</span>
-            </div>
-            <h3 className="text-[14px] font-semibold text-[#ECF1EE]">
-              {(noRecommendationReason?.startsWith('Data out of date') || noRecommendationReason?.startsWith('Insufficient data')) ? 'Insufficient data' : 'Statistical evidence insufficient'}
-            </h3>
-            <p className="text-[12px] text-[#8B9890] mt-0.5 max-w-2xl leading-normal">
-              {(noRecommendationReason?.startsWith('Data out of date') || noRecommendationReason?.startsWith('Insufficient data'))
-                ? (noRecommendationReason || 'Model probability and calibration status withheld: analysis only due to match staleness exceeding the 21-day threshold or missing records.')
-                : (noRecommendationReason || "Current market lines reflect efficient pricing. Abstaining to maintain statistical calibration.")}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Tab Navigation for Detailed Match Breakdown */}
-      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 border-b border-white/[0.07]">
-        <button
-          onClick={() => setActiveAnalysisTab('markets')}
-          type="button"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[12px] font-semibold transition-colors touch-press shrink-0 ${
-            activeAnalysisTab === 'markets'
-              ? 'bg-[#B6E63B]/[0.12] text-[#B6E63B] border border-[#B6E63B]/30'
-              : 'bg-[#151E19] text-[#8B9890] border border-white/[0.07] hover:text-[#ECF1EE]'
-          }`}
-        >
-          <FileText className="w-3.5 h-3.5" />
-          <span>Market Intel & Model Probability</span>
-        </button>
-
-        {!isBasketball && lineupState && (
-          <button
-            onClick={() => setActiveAnalysisTab('lineups')}
-            type="button"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[12px] font-semibold transition-colors touch-press shrink-0 ${
-              activeAnalysisTab === 'lineups'
-                ? 'bg-[#B6E63B]/[0.12] text-[#B6E63B] border border-[#B6E63B]/30'
-                : 'bg-[#151E19] text-[#8B9890] border border-white/[0.07] hover:text-[#ECF1EE]'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Lineups & Comparison</span>
-            {lineupState.anyKeyPlayerOut ? (
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-            ) : lineupState.status === 'confirmed' ? (
-              <span className="w-1.5 h-1.5 rounded-full bg-[#B6E63B]" />
-            ) : null}
-          </button>
-        )}
-
-        {!isBasketball && (
-          <button
-            onClick={() => setActiveAnalysisTab('matrix')}
-            type="button"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[12px] font-semibold transition-colors touch-press shrink-0 ${
-              activeAnalysisTab === 'matrix'
-                ? 'bg-[#B6E63B]/[0.12] text-[#B6E63B] border border-[#B6E63B]/30'
-                : 'bg-[#151E19] text-[#8B9890] border border-white/[0.07] hover:text-[#ECF1EE]'
-            }`}
-          >
-            <Grid className="w-3.5 h-3.5" />
-            <span>Poisson Matrix</span>
-          </button>
-        )}
-
-        <button
-          onClick={() => setActiveAnalysisTab('audit')}
-          type="button"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[12px] font-semibold transition-colors touch-press shrink-0 ${
-            activeAnalysisTab === 'audit'
-              ? 'bg-[#B6E63B]/[0.12] text-[#B6E63B] border border-[#B6E63B]/30'
-              : 'bg-[#151E19] text-[#8B9890] border border-white/[0.07] hover:text-[#ECF1EE]'
-          }`}
-        >
-          <Activity className="w-3.5 h-3.5" />
-          <span>Input Telemetry</span>
-        </button>
-      </div>
-
-      {/* TAB 1: Lineups & Comparison */}
+      {/* TAB 1: Lineups */}
       {activeAnalysisTab === 'lineups' && lineupState && (
         <LineupComparisonPanel
           lineupState={lineupState}
@@ -643,27 +535,37 @@ export default function MatchAnalysisPage() {
         />
       )}
 
-      {/* TAB 2: Poisson Matrix & State Factors */}
-      {activeAnalysisTab === 'matrix' && !isBasketball && stats && footballEvaluation && (
-        <>
-          <ScorelineMatrix
-            homeTeamName={fixture.homeTeam.name}
-            awayTeamName={fixture.awayTeam.name}
-            homeXg={stats.homeXg}
-            awayXg={stats.awayXg}
-          />
+      {/* TAB 2: Poisson Matrix (show only when data exists) */}
+      {activeAnalysisTab === 'poisson' && (
+        isDataInsufficient || !stats || !footballEvaluation ? (
+          <div className="rounded-[14px] p-4 border border-[#E8B04A]/30 bg-[#E8B04A]/10 space-y-1.5 text-center">
+            <AlertCircle className="w-5 h-5 text-[#E8B04A] mx-auto" />
+            <h4 className="text-[13px] font-semibold text-[#E8B04A]">Poisson Matrix Withheld</h4>
+            <p className="text-[12px] text-[#E9EFEB] max-w-sm mx-auto">
+              Statistical evidence insufficient to parameterize Dixon Coles bivariate Poisson distribution. Abstaining rather than rendering fake probabilities.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <ScorelineMatrix
+              homeTeamName={fixture.homeTeam.name}
+              awayTeamName={fixture.awayTeam.name}
+              homeXg={stats.homeXg}
+              awayXg={stats.awayXg}
+            />
 
-          <FactorsAndStatePanel
-            contextEvaluation={footballEvaluation.contextEvaluation}
-            rankedOptions={footballEvaluation.rankedOptions}
-            selectedOptionId={selectedPrediction?.id}
-            onSelectOption={(p) => setSelectedPrediction(p)}
-          />
-        </>
+            <FactorsAndStatePanel
+              contextEvaluation={footballEvaluation.contextEvaluation}
+              rankedOptions={footballEvaluation.rankedOptions}
+              selectedOptionId={selectedPrediction?.id}
+              onSelectOption={(p) => setSelectedPrediction(p)}
+            />
+          </div>
+        )
       )}
 
-      {/* TAB 3: Input Telemetry & Hypothesis Audit */}
-      {activeAnalysisTab === 'audit' && (
+      {/* TAB 3: Form */}
+      {activeAnalysisTab === 'form' && (
         <QuantitativeFactorsAuditPanel
           homeTeamName={fixture.homeTeam.name}
           awayTeamName={fixture.awayTeam.name}
@@ -673,22 +575,53 @@ export default function MatchAnalysisPage() {
           topPickSelection={topPick?.selection || 'Home Win'}
           topPickProbability={topPick?.modelProbability || 0.54}
           marketCode={topPick?.marketCode || 'MATCH_RESULT_HOME'}
+          initialTab="form"
         />
       )}
 
-      {/* TAB 4: Default Markets Table & Explanation Engine */}
+      {/* TAB 4: Coaches */}
+      {activeAnalysisTab === 'coaches' && (
+        <QuantitativeFactorsAuditPanel
+          homeTeamName={fixture.homeTeam.name}
+          awayTeamName={fixture.awayTeam.name}
+          venueName={fixture.venue}
+          kickoffTime={fixture.kickoffTime}
+          topPickOdds={topPick?.marketOdds || 1.95}
+          topPickSelection={topPick?.selection || 'Home Win'}
+          topPickProbability={topPick?.modelProbability || 0.54}
+          marketCode={topPick?.marketCode || 'MATCH_RESULT_HOME'}
+          initialTab="tactics"
+        />
+      )}
+
+      {/* TAB 5: Weather */}
+      {activeAnalysisTab === 'weather' && (
+        <QuantitativeFactorsAuditPanel
+          homeTeamName={fixture.homeTeam.name}
+          awayTeamName={fixture.awayTeam.name}
+          venueName={fixture.venue}
+          kickoffTime={fixture.kickoffTime}
+          topPickOdds={topPick?.marketOdds || 1.95}
+          topPickSelection={topPick?.selection || 'Home Win'}
+          topPickProbability={topPick?.modelProbability || 0.54}
+          marketCode={topPick?.marketCode || 'MATCH_RESULT_HOME'}
+          initialTab="weather"
+        />
+      )}
+
+      {/* TAB 6: Market Intel */}
       {activeAnalysisTab === 'markets' && (
         <div className="space-y-3">
           {lineupState?.anyKeyPlayerOut && (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-[11px] flex items-center justify-between text-[12px]">
-              <div className="flex items-center gap-2 text-amber-300 font-semibold">
-                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="p-3 bg-[#E8B04A]/10 border border-[#E8B04A]/30 rounded-[12px] flex items-center justify-between text-[12px]">
+              <div className="flex items-center gap-2 text-[#E8B04A] font-semibold">
+                <AlertTriangle className="w-4 h-4 text-[#E8B04A] shrink-0" />
                 <span>Lineup alert: {cleanDisplayText(lineupState.firstKeyPlayerOutName || 'Key player')} missing from starting XI</span>
               </div>
               <button
                 onClick={() => setActiveAnalysisTab('lineups')}
                 type="button"
-                className="text-[11px] text-[#B6E63B] hover:underline font-semibold"
+                className="text-[11px] text-[#B8E636] hover:underline font-semibold"
               >
                 Inspect XI →
               </button>
@@ -710,8 +643,8 @@ export default function MatchAnalysisPage() {
             {/* Explanation Card */}
             <div className="lg:col-span-5 space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-[14px] font-semibold text-[#ECF1EE]">Selected line evidence audit</h3>
-                <span className="text-[11px] text-[#B6E63B] font-semibold">Grounded facts</span>
+                <h3 className="text-[14px] font-semibold text-[#E9EFEB]">Selected line evidence audit</h3>
+                <span className="text-[11px] text-[#B8E636] font-semibold">Grounded facts</span>
               </div>
 
               <ExplanationCard

@@ -5,22 +5,25 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0A0F0D;
-  --surface: #101713;
-  --surface-2: #151E19;
-  --raised: #151E19;
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.12);
-  --text: #ECF1EE;
-  --muted: #8B9890;
-  --subtle: #5E6A63;
-  --dim: #5E6A63;
-  --accent: #B6E63B;
-  --accent-ink: #0A0F0D;
-  --accent-soft: rgba(182, 230, 59, 0.12);
-  --caution: #E2AE45;
-  --warn: #E2AE45;
-  --info: #5eb6e8;
+  --bg: #0A0E0C;
+  --surface-1: #101613;
+  --surface-2: #151D19;
+  --surface: #101613;
+  --raised: #151D19;
+  --border: #1F2A24;
+  --border-strong: #2A3830;
+  --text: #E9EFEB;
+  --muted: #8B9892;
+  --dim: #5E6B65;
+  --subtle: #5E6B65;
+  --accent: #B8E636;
+  --accent-ink: #0A0E0C;
+  --accent-soft: rgba(184, 230, 54, 0.12);
+  --warn: #E8B04A;
+  --warn-soft: rgba(232, 176, 74, 0.12);
+  --caution: #E8B04A;
+  --loss: #E5684F;
+  --info: #5EB6E8;
 
   --background: var(--bg);
   --foreground: var(--text);
@@ -50,13 +53,14 @@ body {
   color: var(--text);
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-weight: 400;
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
 }
 
 /* Minimal native-like scrollbars */
@@ -82,13 +86,23 @@ body {
 }
 
 /* Tabular numbers for clean numeric alignment (using Inter, not monospace) */
-.tabular-nums {
+.tabular-nums, table, [data-tabular] {
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Eyebrow label utility */
+.eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--dim);
 }
 
 /* Focus ring: 2px, lime at 40 percent opacity */
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 2px solid rgba(182, 230, 59, 0.4);
+  outline: 2px solid rgba(184, 230, 54, 0.4);
   outline-offset: 2px;
 }
 
@@ -102,9 +116,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   }
 }
 
-/* Tactile touch pressed state for native mobile feel */
+/* Native mobile tap transitions */
+button, [role="button"] {
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Tactile touch pressed state for native mobile feel (150ms ease, scale 0.98) */
 .touch-press {
-  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), opacity 160ms ease;
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1), opacity 150ms ease, background-color 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 .touch-press:active {
   transform: scale(0.98);

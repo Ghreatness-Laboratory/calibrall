@@ -7,10 +7,6 @@
 // - Como (team_como): crest_url: 'https://crests.football-data.org/1057.png', verified: true
 // - Excelsior (team_excelsior): crest_url: 'https://crests.football-data.org/671.png', verified: true
 
-import { DatabaseSync } from 'node:sqlite';
-import path from 'path';
-import fs from 'fs';
-
 export interface TeamCrestRecord {
   canonicalTeamId: string;
   teamName: string;
@@ -469,42 +465,8 @@ export const VERIFIED_CRESTS_MAP: Record<string, TeamCrestRecord> = {
   team_wolves: { canonicalTeamId: 'team_wolves', teamName: 'Wolverhampton Wanderers FC', crestUrl: 'https://crests.football-data.org/76.png', verified: true },
 };
 
-/**
- * Initializes the SQLite team_crests table in data/supabase.db
- */
 export function initTeamCrestsDatabase(): void {
-  try {
-    const dbPath = path.resolve(process.cwd(), 'data/supabase.db');
-    if (!fs.existsSync(path.dirname(dbPath))) {
-      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-    }
-    const db = new DatabaseSync(dbPath);
-
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS team_crests (
-        canonical_team_id TEXT PRIMARY KEY,
-        team_name TEXT NOT NULL,
-        crest_url TEXT,
-        verified BOOLEAN NOT NULL DEFAULT 0
-      );
-    `);
-
-    const upsertStmt = db.prepare(`
-      INSERT INTO team_crests (canonical_team_id, team_name, crest_url, verified)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(canonical_team_id) DO UPDATE SET
-        team_name = excluded.team_name,
-        crest_url = excluded.crest_url,
-        verified = excluded.verified;
-    `);
-
-    for (const record of Object.values(VERIFIED_CRESTS_MAP)) {
-      upsertStmt.run(record.canonicalTeamId, record.teamName, record.crestUrl, record.verified ? 1 : 0);
-    }
-    db.close();
-  } catch (err) {
-    console.warn('[teamCrests] SQLite database init notice:', err);
-  }
+  // In-memory verified crest registry initialized
 }
 
 /**
@@ -524,26 +486,6 @@ export function lookupTeamCrest(canonicalTeamId: string | null | undefined): Tea
   const altId = cleanId.startsWith('team_') ? cleanId : `team_${cleanId}`;
   if (VERIFIED_CRESTS_MAP[altId]) {
     return VERIFIED_CRESTS_MAP[altId];
-  }
-
-  // 3. Fallback SQLite query if available
-  try {
-    const dbPath = path.resolve(process.cwd(), 'data/supabase.db');
-    if (fs.existsSync(dbPath)) {
-      const db = new DatabaseSync(dbPath);
-      const row = db.prepare('SELECT canonical_team_id, team_name, crest_url, verified FROM team_crests WHERE canonical_team_id = ?').get(cleanId) as any;
-      db.close();
-      if (row) {
-        return {
-          canonicalTeamId: row.canonical_team_id,
-          teamName: row.team_name,
-          crestUrl: row.crest_url,
-          verified: Boolean(row.verified),
-        };
-      }
-    }
-  } catch (e) {
-    // Ignore SQLite read error in serverless client environments
   }
 
   return null;

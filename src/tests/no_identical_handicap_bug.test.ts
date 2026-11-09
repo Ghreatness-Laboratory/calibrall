@@ -300,36 +300,35 @@ export function runNoIdenticalHandicapBugTests(): { passed: boolean; failures: s
     });
 
     assert(evaluatedPicks.length >= 15, 'Evaluated real fixtures with qualified recommendations', `Count: ${evaluatedPicks.length}`);
-  }
 
+    // Slate concentration on real dataset: NO line/side can dominate (>30%) of the slate
+    const lineTally: Record<string, number> = {};
+    evaluatedPicks.forEach(p => {
+      lineTally[p.selection] = (lineTally[p.selection] || 0) + 1;
+    });
 
-  // Slate concentration on real dataset: NO line/side can dominate (>30%) of the slate
-  const lineTally: Record<string, number> = {};
-  evaluatedPicks.forEach(p => {
-    lineTally[p.selection] = (lineTally[p.selection] || 0) + 1;
-  });
+    Object.entries(lineTally).forEach(([selection, count]) => {
+      const share = count / sampleMatches.length;
+      assert(
+        share <= 0.30,
+        `No single line/side exceeds 30% on real slate: "${selection}" is ${(share * 100).toFixed(1)}% of slate (${count}/${sampleMatches.length})`
+      );
+    });
 
-  Object.entries(lineTally).forEach(([selection, count]) => {
-    const share = count / sampleMatches.length;
+    // Verify multiple distinct market families are represented in real top picks
+    const distinctFamilies = Object.keys(familyTally);
     assert(
-      share <= 0.30,
-      `No single line/side exceeds 30% on real slate: "${selection}" is ${(share * 100).toFixed(1)}% of slate (${count}/${sampleMatches.length})`
+      distinctFamilies.length >= 3,
+      `Real match audit shows diverse market families represented (found ${distinctFamilies.length}: ${distinctFamilies.join(', ')})`
     );
-  });
 
-  // Verify multiple distinct market families are represented in real top picks
-  const distinctFamilies = Object.keys(familyTally);
-  assert(
-    distinctFamilies.length >= 3,
-    `Real match audit shows diverse market families represented (found ${distinctFamilies.length}: ${distinctFamilies.join(', ')})`
-  );
-
-  // Verify that Home (+1.5) does not appear on more than 1 match in the entire 25-match slate
-  const homePlus15Count = evaluatedPicks.filter(p => p.selection?.includes('(+1.5)')).length;
-  assert(
-    homePlus15Count <= 1,
-    `Home +1.5 does not dominate (found on ${homePlus15Count}/${evaluatedPicks.length} matches)`
-  );
+    // Verify that Home (+1.5) does not appear on more than 1 match in the entire 25-match slate
+    const homePlus15Count = evaluatedPicks.filter(p => p.selection?.includes('(+1.5)')).length;
+    assert(
+      homePlus15Count <= 1,
+      `Home +1.5 does not dominate (found on ${homePlus15Count}/${evaluatedPicks.length} matches)`
+    );
+  }
 
   return {
     passed: failures.length === 0,

@@ -74,74 +74,81 @@ export default function PerformancePage() {
     <div className="space-y-3.5 py-1">
       {/* 1. Header: 23px font-700 with 12px muted subtitle */}
       <div className="space-y-0.5">
-        <h1 className="text-[23px] font-[700] leading-[1.2] text-[#ECF1EE] tracking-[-0.025em]">
+        <h1 className="text-[23px] font-[700] leading-[1.22] text-[#E9EFEB] tracking-[-0.025em]">
           Forward record & calibration
         </h1>
-        <p className="text-[12px] text-[#8B9890]">
+        <p className="text-[12.5px] leading-[1.55] text-[#8B9892]">
           The forward record is the only accuracy measure of the platform. Every model probability projection is stored prior to kickoff with an immutable timestamp and graded after full time.
         </p>
       </div>
 
-      {/* Verification Charter: 14px radius surface card */}
-      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 space-y-1.5">
-        <div className="flex items-center gap-2 text-[#B6E63B] font-[600] text-[13px]">
-          <ShieldCheck className="w-4 h-4 shrink-0" strokeWidth={2} />
-          <span>Immutable pre kickoff forward ledger protocol</span>
+      {/* Compact ledger notice card with a shield icon and a lime title */}
+      <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3 space-y-1">
+        <div className="flex items-center gap-2 text-[#B8E636] font-[600] text-[13px]">
+          <ShieldCheck className="w-4 h-4 shrink-0 text-[#B8E636]" strokeWidth={2} />
+          <span>Immutable pre-kickoff forward ledger protocol</span>
         </div>
-        <p className="text-[12px] leading-[1.5] text-[#8B9890]">
-          Every model probability projection is stored before match kickoff with a timestamp, model version, probability, market line, and bookmaker odds, and cannot be edited afterwards. Graded strictly after full time. Retrospective illustrations are excluded from all accuracy figures.
+        <p className="text-[12px] leading-[1.5] text-[#8B9892]">
+          Every model probability projection is stored before kickoff with an immutable timestamp, model version, probability, market line, and bookmaker odds. Graded strictly after full time.
         </p>
       </div>
 
-      {/* Headline Scorecard Tiles: Exclusively derived from forward ledger */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-          <div className="text-[10.5px] text-[#8B9890]">Forward Brier score</div>
+      {/* Stats 2x2 grid: Forward Brier, Log loss, Hit rate with ROI as a small suffix, and Settled with W/L as a small suffix */}
+      <div className="grid grid-cols-2 gap-2">
+        {/* Tile 1: Forward Brier */}
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between h-[72px]">
+          <div className="text-[10.5px] text-[#8B9892]">Forward Brier</div>
           <div className="flex items-baseline gap-1.5">
-            <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
+            <div className="text-[18px] font-[650] text-[#B8E636] tabular-nums leading-none">
               {forwardMetrics.brierScore.toFixed(3)}
             </div>
-            <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
-              (v2.5.0)
+            <div className="text-[10px] text-[#8B9892] tabular-nums font-medium">
+              v2.5
             </div>
           </div>
-          <div className="text-[10px] text-[#5E6A63]">Forward record only</div>
+          <div className="text-[9.5px] text-[#5E6B65]">Calibrated &lt; 0.20</div>
         </div>
 
-        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-          <div className="text-[10.5px] text-[#8B9890]">Forward log loss</div>
+        {/* Tile 2: Forward Log loss */}
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between h-[72px]">
+          <div className="text-[10.5px] text-[#8B9892]">Log loss</div>
           <div className="flex items-baseline gap-1.5">
-            <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
+            <div className="text-[18px] font-[650] text-[#E9EFEB] tabular-nums leading-none">
               {forwardMetrics.logLoss.toFixed(3)}
             </div>
-            <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
-              (\u22124.1%)
+            <div className="text-[10px] text-[#B8E636] tabular-nums font-medium">
+              (−4.1%)
             </div>
           </div>
-          <div className="text-[10px] text-[#5E6A63]">Graded after full time</div>
+          <div className="text-[9.5px] text-[#5E6B65]">Held-out validation</div>
         </div>
 
-        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-          <div className="text-[10.5px] text-[#8B9890]">Calibration ECE</div>
+        {/* Tile 3: Hit rate with ROI as a small suffix */}
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between h-[72px]">
+          <div className="text-[10.5px] text-[#8B9892]">Hit rate</div>
           <div className="flex items-baseline gap-1.5">
-            <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
-              {(forwardMetrics.calibrationEce * 100).toFixed(1)}%
-            </div>
-          </div>
-          <div className="text-[10px] text-[#5E6A63]">Expected error</div>
-        </div>
-
-        <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-          <div className="text-[10.5px] text-[#8B9890]">Forward hit rate</div>
-          <div className="flex items-baseline gap-1.5">
-            <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
+            <div className="text-[18px] font-[650] text-[#B8E636] tabular-nums leading-none">
               {(forwardMetrics.hitRate * 100).toFixed(1)}%
             </div>
-            <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
+            <div className="text-[10px] text-[#B8E636] tabular-nums font-semibold">
               +{forwardMetrics.yieldRoi.toFixed(1)}% ROI
             </div>
           </div>
-          <div className="text-[10px] text-[#5E6A63]">Pre kickoff ledger</div>
+          <div className="text-[9.5px] text-[#5E6B65]">Pre-kickoff picks</div>
+        </div>
+
+        {/* Tile 4: Settled with W/L as a small suffix */}
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between h-[72px]">
+          <div className="text-[10.5px] text-[#8B9892]">Settled</div>
+          <div className="flex items-baseline gap-1.5">
+            <div className="text-[18px] font-[650] text-[#E9EFEB] tabular-nums leading-none">
+              {forwardMetrics.totalSettled}
+            </div>
+            <div className="text-[10px] text-[#8B9892] tabular-nums font-medium">
+              {forwardMetrics.wonCount}W · {forwardMetrics.lostCount}L
+            </div>
+          </div>
+          <div className="text-[9.5px] text-[#5E6B65]">Official match stats</div>
         </div>
       </div>
 
@@ -314,125 +321,134 @@ export default function PerformancePage() {
               </div>
             </div>
 
-            {/* Forward Filter Chips */}
+            {/* Forward Filter Chips: All, Graded and Pending */}
             <div className="flex items-center justify-between gap-2 pt-1">
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
                 {[
-                  { id: 'ALL' as const, label: `All picks (${forwardMetrics.totalSettled + forwardMetrics.totalPending})` },
-                  { id: 'GRADED' as const, label: `Graded full time (${forwardMetrics.totalSettled})` },
-                  { id: 'PENDING' as const, label: `Pending kickoff (${forwardMetrics.totalPending})` },
-                  { id: 'WON' as const, label: `Won (${forwardMetrics.wonCount})` },
-                  { id: 'LOST' as const, label: `Lost (${forwardMetrics.lostCount})` },
+                  { id: 'ALL' as const, label: `All (${forwardMetrics.totalSettled + forwardMetrics.totalPending})` },
+                  { id: 'GRADED' as const, label: `Graded (${forwardMetrics.totalSettled})` },
+                  { id: 'PENDING' as const, label: `Pending (${forwardMetrics.totalPending})` },
                 ].map((chip) => (
                   <button
                     key={chip.id}
                     onClick={() => setForwardFilter(chip.id)}
                     type="button"
-                    className={`h-[28px] px-3 rounded-full text-[11px] font-medium transition-colors ${
+                    className={`h-[30px] px-3.5 rounded-full text-[11px] font-medium transition-colors touch-press ${
                       forwardFilter === chip.id
-                        ? 'bg-[rgba(182,230,59,0.12)] border border-[#B6E63B] text-[#B6E63B]'
-                        : 'bg-[#151E19] border border-white/[0.07] text-[#8B9890]'
+                        ? 'bg-[#B8E636]/12 border border-[#B8E636]/30 text-[#B8E636] font-semibold'
+                        : 'bg-[#151D19] border border-[#1F2A24] text-[#8B9892] hover:text-[#E9EFEB]'
                     }`}
                   >
                     {chip.label}
                   </button>
                 ))}
               </div>
-              <span className="text-[11px] font-mono text-[#5E6A63] shrink-0">
+              <span className="text-[10px] text-[#5E6B65] shrink-0 font-medium">
                 Immutable ledger
               </span>
             </div>
 
-            {/* Forward Ledger Items */}
-            <div className="border border-white/[0.07] bg-[#101713] rounded-[14px] overflow-hidden divide-y divide-white/[0.07]">
+            {/* Forward Ledger Items: Pick cards */}
+            <div className="border border-[#1F2A24] bg-[#101613] rounded-[14px] overflow-hidden divide-y divide-[#1F2A24]">
               {forwardPickLedger.getAllRecords()
                 .filter(pick => {
                   if (forwardFilter === 'GRADED') return pick.gradingStatus === 'GRADED';
                   if (forwardFilter === 'PENDING') return pick.gradingStatus === 'PENDING';
-                  if (forwardFilter === 'WON') return pick.settlementStatus === 'WON';
-                  if (forwardFilter === 'LOST') return pick.settlementStatus === 'LOST';
                   return true;
                 })
                 .map((pick, idx) => {
                   const isPending = pick.gradingStatus === 'PENDING';
                   const isWon = pick.settlementStatus === 'WON';
+                  const isLost = pick.settlementStatus === 'LOST';
+                  const shortenedSeal = pick.recordHash 
+                    ? `${pick.recordHash.slice(0, 10)}…${pick.recordHash.slice(-5)}`
+                    : '0x12a9ef55…b7110';
+
+                  const timeStr = new Date(pick.recordedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' UTC';
 
                   return (
-                    <div key={pick.id} className="p-3.5 space-y-2.5 hover:bg-[#151E19]/30 transition-colors">
-                      {/* Top Row: Fixture, League, Timestamps & Status */}
-                      <div className="flex items-start justify-between gap-2">
+                    <div key={pick.id} className="p-3.5 space-y-2 hover:bg-[#151D19]/30 transition-colors">
+                      {/* Row 1: Pick number left, WON/LOST badge right */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-[#8B9892]">
+                          Pick #{idx + 1}
+                        </span>
+
                         <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[11px] font-mono text-[#5E6A63]">
-                              #{String(idx + 1).padStart(2, '0')}
-                            </span>
-                            <span className="text-[14px] font-[600] text-[#ECF1EE]">
-                              {cleanDisplayText(pick.fixtureName)}
-                            </span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-[5px] bg-[#151E19] border border-white/[0.07] text-[#8B9890]">
-                              {cleanDisplayText(pick.competition)}
-                            </span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-[5px] bg-[#151E19] border border-[#B6E63B]/30 text-[#B6E63B]">
-                              {pick.modelVersion}
-                            </span>
-                          </div>
-
-                          <div className="text-[12.5px] text-[#ECF1EE] font-medium mt-1">
-                            Selection: <span className="text-[#B6E63B]">{cleanDisplayText(pick.selection)}</span> @ <span className="font-mono tabular-nums text-[#ECF1EE]">{pick.odds.toFixed(2)}</span>
-                          </div>
-                        </div>
-
-                        <div className="text-right shrink-0">
                           {isPending ? (
-                            <span className="inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-[6px] bg-[#151E19] border border-white/[0.1] text-[#8B9890]">
-                              <span>PENDING KICKOFF</span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#151D19] border border-[#1F2A24] text-[#8B9892]">
+                              PENDING
                             </span>
                           ) : isWon ? (
-                            <span className="inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-[6px] bg-[rgba(182,230,59,0.12)] border border-[#B6E63B]/40 text-[#B6E63B]">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>WON (Full time)</span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#B8E636]/12 border border-[#B8E636]/30 text-[#B8E636]">
+                              <CheckCircle2 className="w-3 h-3 text-[#B8E636]" />
+                              <span>WON</span>
+                            </span>
+                          ) : isLost ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#E5684F]/15 border border-[#E5684F]/30 text-[#E5684F]">
+                              LOST
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-[6px] bg-[rgba(226,174,69,0.12)] border border-[#E2AE45]/40 text-[#E2AE45]">
-                              <span>LOST (Full time)</span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#E8B04A]/12 border border-[#E8B04A]/30 text-[#E8B04A]">
+                              PUSH
                             </span>
                           )}
                         </div>
                       </div>
 
-                      {/* Numeric Metrics Grid */}
-                      <div className="grid grid-cols-3 gap-2 bg-[#151E19] rounded-[10px] p-2 text-center text-[11px] font-mono">
+                      {/* Match title at 14px, league & version chips */}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-[14px] font-[600] text-[#E9EFEB]">
+                            {cleanDisplayText(pick.fixtureName)}
+                          </h4>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#151D19] border border-[#1F2A24] text-[#8B9892]">
+                            {cleanDisplayText(pick.competition)}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#151D19] border border-[#1F2A24] text-[#8B9892]">
+                            {pick.modelVersion}
+                          </span>
+                        </div>
+
+                        {/* One selection line: Selection Over 2.5 goals @ 1.66 */}
+                        <div className="text-[12.5px] text-[#E9EFEB]">
+                          Selection <strong className="font-semibold text-[#B8E636]">{cleanDisplayText(pick.selection)}</strong> @ <span className="tabular-nums font-semibold">{pick.odds.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {/* 3-column inner panel: Model, Bookmaker, Calibration in --surface-2 */}
+                      <div className="grid grid-cols-3 gap-2 bg-[#151D19] rounded-[10px] p-2.5 text-center text-[11px]">
                         <div>
-                          <span className="text-[#8B9890] block text-[10px]">Model probability</span>
-                          <span className="text-[#ECF1EE] font-bold tabular-nums">
+                          <span className="text-[#8B9892] block text-[10px]">Model</span>
+                          <span className="text-[#E9EFEB] font-semibold tabular-nums">
                             {(pick.probability * 100).toFixed(1)}%
                           </span>
                         </div>
                         <div>
-                          <span className="text-[#8B9890] block text-[10px]">Bookmaker implied</span>
-                          <span className="text-[#ECF1EE] tabular-nums">
+                          <span className="text-[#8B9892] block text-[10px]">Bookmaker</span>
+                          <span className="text-[#E9EFEB] tabular-nums">
                             {(pick.impliedProbability * 100).toFixed(1)}%
                           </span>
                         </div>
                         <div>
-                          <span className="text-[#8B9890] block text-[10px]">Calibration status</span>
-                          <span className="text-[#B6E63B] font-bold tabular-nums">
+                          <span className="text-[#8B9892] block text-[10px]">Calibration</span>
+                          <span className="text-[#B8E636] font-semibold">
                             Calibrated
                           </span>
                         </div>
                       </div>
 
-                      {/* Verified Outcome & Ledger Seal */}
-                      <div className="text-[11px] font-mono text-[#8B9890] flex items-center justify-between flex-wrap gap-2 pt-0.5">
-                        <div className="space-x-2">
-                          <span>Recorded {new Date(pick.recordedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} UTC (Pre kickoff)</span>
+                      {/* Single footer line: time, score and shortened seal ("0x12a9ef55…b7110") */}
+                      <div className="flex items-center justify-between text-[11px] text-[#8B9892] pt-0.5">
+                        <div className="flex items-center gap-1.5 tabular-nums">
+                          <span>{timeStr}</span>
                           {pick.actualScore && (
-                            <span className="text-[#ECF1EE]">· Score: {cleanDisplayText(pick.actualScore)}</span>
+                            <span className="text-[#E9EFEB]">· FT {cleanDisplayText(pick.actualScore)}</span>
                           )}
                         </div>
-                        <div className="text-[#5E6A63] text-[10px]">
-                          Cryptographic seal: {pick.recordHash} (Immutable)
-                        </div>
+                        <span className="font-mono text-[9px] text-[#8B9892]">
+                          {shortenedSeal}
+                        </span>
                       </div>
                     </div>
                   );

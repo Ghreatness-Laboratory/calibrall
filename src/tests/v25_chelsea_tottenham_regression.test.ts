@@ -14,12 +14,32 @@ import { isDixonColesV25Active, setDixonColesV25Active } from '../lib/prediction
 import { ConfidenceEngine } from '../lib/prediction/v25/confidenceEngine';
 import { FeatureLayerEngine } from '../lib/prediction/v25/featureLayer';
 import { DixonColesV25Evaluator } from '../lib/prediction/v25/v25Evaluator';
+import { matchesStore } from '../lib/data/matchesStore';
 
 export function runChelseaTottenhamRegressionTest(): { passed: boolean; details: string[] } {
   const details: string[] = [];
 
   // Ensure v2.5 is active for this test
   setDixonColesV25Active(true);
+
+  // Seed the previous venue meeting where Tottenham won 2-0 at home (2023-02-26)
+  matchesStore.upsertMatches([
+    {
+      id: 'pl_2223_tot_che_prev',
+      provider_id: 'pl_2223_tot_che_prev',
+      competition_code: 'PL',
+      season: '2022/2023',
+      home_team_id: 'team_tottenham',
+      away_team_id: 'team_chelsea',
+      home_team_name: 'Tottenham Hotspur',
+      away_team_name: 'Chelsea',
+      kickoff_time: '2023-02-26T13:30:00Z',
+      status: 'FINISHED',
+      home_score: 2,
+      away_score: 0,
+      source: 'canonical',
+    } as any,
+  ]);
 
   const fixtureContext = {
     fixtureId: 'pl_2324_tot_che',

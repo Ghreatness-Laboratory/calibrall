@@ -91,13 +91,13 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Primary navigation"
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#0A0F0D]/90 backdrop-blur-md border-t border-white/[0.07] flex flex-col justify-between"
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#0A0E0C]/90 backdrop-blur-md border-t border-[#1F2A24] flex flex-col justify-between"
       style={{
         height: 'calc(64px + env(safe-area-inset-bottom, 0px))',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <div className="grid grid-cols-5 w-full h-[64px] items-center px-1">
+      <div className="grid grid-cols-5 w-full h-[64px] items-center px-1 max-w-[430px] mx-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -108,21 +108,21 @@ export default function BottomNav() {
               className="min-h-[44px] flex flex-col items-center justify-center transition-all duration-150 touch-press select-none py-1"
             >
               <div
-                className={`w-[44px] h-[26px] rounded-[8px] flex items-center justify-center transition-colors ${
-                  tab.isActive ? 'bg-[#B6E63B]/[0.12]' : 'bg-transparent'
+                className={`w-[40px] h-[26px] rounded-[8px] flex items-center justify-center transition-colors ${
+                  tab.isActive ? 'bg-[#B8E636]/12' : 'bg-transparent'
                 }`}
               >
                 <Icon
                   className={`w-5 h-5 transition-colors ${
-                    tab.isActive ? 'text-[#B6E63B]' : 'text-[#8B9890]'
+                    tab.isActive ? 'text-[#B8E636]' : 'text-[#8B9892]'
                   }`}
                   strokeWidth={2}
                 />
               </div>
 
               <span
-                className={`text-[10px] font-medium leading-none mt-1 whitespace-nowrap transition-colors ${
-                  tab.isActive ? 'text-[#B6E63B] font-semibold' : 'text-[#8B9890]'
+                className={`text-[9.5px] leading-tight mt-1 whitespace-nowrap transition-colors ${
+                  tab.isActive ? 'text-[#B8E636] font-semibold' : 'text-[#8B9892] font-medium'
                 }`}
               >
                 {tab.label}
