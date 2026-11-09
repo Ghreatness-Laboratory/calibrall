@@ -3,6 +3,8 @@
 // Eliminates artificial 1.30/0.75 fallback priors. If a team is truly missing from this knowledge base,
 // the system strictly returns insufficientData: true instead of manufacturing fake predictions.
 
+import manualOverrides from './teamNameOverrides.json';
+
 export interface TeamStrengthRecord {
   id: string;
   name: string;
@@ -17,6 +19,9 @@ export interface TeamStrengthRecord {
   recentForm: ('W' | 'D' | 'L')[];
   sampleMatches: number;
   aliases: string[];
+  isPromoted?: boolean;
+  rawAttackRating?: number;
+  rawDefenseRating?: number;
 }
 
 export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
@@ -52,6 +57,96 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     recentForm: ['W', 'W', 'D', 'W', 'D'],
     sampleMatches: 24,
     aliases: ['bayer 04 leverkusen', 'bayer leverkusen', 'leverkusen', 'b04'],
+  },
+  koln: {
+    id: 'team_koln',
+    name: '1. FC Köln',
+    shortName: 'FC Köln',
+    tla: 'KOE',
+    crestUrl: 'https://crests.football-data.org/1.png',
+    competitionCode: 'BL1',
+    attackRating: 1.08,
+    defenseRating: 1.22,
+    cornerAttackRating: 1.05,
+    disciplineRating: 0.95,
+    recentForm: ['W', 'D', 'W', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['fc koln', 'fc cologne', '1. fc koln', '1. fc köln', 'cologne', 'koln', 'köln', '1 fc koln'],
+  },
+  hamburg: {
+    id: 'team_hamburg',
+    name: 'Hamburger SV',
+    shortName: 'Hamburg',
+    tla: 'HSV',
+    crestUrl: 'https://crests.football-data.org/42.png',
+    competitionCode: 'D2',
+    attackRating: 1.15,
+    defenseRating: 1.10,
+    cornerAttackRating: 1.12,
+    disciplineRating: 0.90,
+    recentForm: ['W', 'W', 'D', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['hamburger sv', 'hamburg', 'hsv'],
+  },
+  hertha: {
+    id: 'team_hertha',
+    name: 'Hertha BSC',
+    shortName: 'Hertha',
+    tla: 'BSC',
+    crestUrl: 'https://crests.football-data.org/9.png',
+    competitionCode: 'D2',
+    attackRating: 1.10,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.08,
+    disciplineRating: 0.92,
+    recentForm: ['D', 'W', 'L', 'W', 'D'],
+    sampleMatches: 22,
+    aliases: ['hertha bsc', 'hertha', 'hertha berlin', 'bsc'],
+  },
+  darmstadt: {
+    id: 'team_darmstadt',
+    name: 'SV Darmstadt 98',
+    shortName: 'Darmstadt',
+    tla: 'D98',
+    crestUrl: 'https://crests.football-data.org/21.png',
+    competitionCode: 'D2',
+    attackRating: 1.02,
+    defenseRating: 1.25,
+    cornerAttackRating: 0.95,
+    disciplineRating: 1.05,
+    recentForm: ['L', 'D', 'W', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['sv darmstadt 98', 'darmstadt', 'darmstadt 98'],
+  },
+  nurnberg: {
+    id: 'team_nurnberg',
+    name: '1. FC Nürnberg',
+    shortName: 'Nürnberg',
+    tla: 'FCN',
+    crestUrl: 'https://crests.football-data.org/24.png',
+    competitionCode: 'D2',
+    attackRating: 1.05,
+    defenseRating: 1.18,
+    cornerAttackRating: 1.00,
+    disciplineRating: 0.98,
+    recentForm: ['W', 'L', 'D', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['1. fc nürnberg', '1. fc nurnberg', 'nurnberg', 'nürnberg', 'fcn'],
+  },
+  karlsruhe: {
+    id: 'team_karlsruhe',
+    name: 'Karlsruher SC',
+    shortName: 'Karlsruhe',
+    tla: 'KSC',
+    crestUrl: 'https://crests.football-data.org/27.png',
+    competitionCode: 'D2',
+    attackRating: 1.12,
+    defenseRating: 1.12,
+    cornerAttackRating: 1.06,
+    disciplineRating: 0.95,
+    recentForm: ['W', 'D', 'D', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['karlsruher sc', 'karlsruhe', 'ksc'],
   },
   hoffenheim: {
     id: 'team_hoffenheim',
@@ -269,7 +364,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'St. Pauli',
     tla: 'STP',
     crestUrl: 'https://crests.football-data.org/17.png',
-    competitionCode: 'BL1',
+    competitionCode: 'BL1',\n    isPromoted: true,\n    rawAttackRating: 0.88,\n    rawDefenseRating: 1.15,
     attackRating: 0.88,
     defenseRating: 1.15,
     cornerAttackRating: 0.90,
@@ -314,7 +409,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Kiel',
     tla: 'KSV',
     crestUrl: 'https://crests.football-data.org/720.png',
-    competitionCode: 'BL1',
+    competitionCode: 'BL1',\n    isPromoted: true,\n    rawAttackRating: 0.9,\n    rawDefenseRating: 1.48,
     attackRating: 0.90,
     defenseRating: 1.48,
     cornerAttackRating: 0.85,
@@ -431,6 +526,162 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     recentForm: ['W', 'W', 'W', 'D', 'W'],
     sampleMatches: 22,
     aliases: ['afc ajax', 'ajax', 'aja'],
+  },
+  twente: {
+    id: 'team_twente',
+    name: 'FC Twente',
+    shortName: 'Twente',
+    tla: 'TWE',
+    crestUrl: 'https://crests.football-data.org/666.png',
+    competitionCode: 'DED',
+    attackRating: 1.25,
+    defenseRating: 0.95,
+    cornerAttackRating: 1.20,
+    disciplineRating: 0.90,
+    recentForm: ['W', 'D', 'W', 'W', 'D'],
+    sampleMatches: 22,
+    aliases: ['fc twente', 'twente', 'twe'],
+  },
+  az: {
+    id: 'team_az',
+    name: 'AZ Alkmaar',
+    shortName: 'AZ',
+    tla: 'AZ',
+    crestUrl: 'https://crests.football-data.org/682.png',
+    competitionCode: 'DED',
+    attackRating: 1.28,
+    defenseRating: 0.92,
+    cornerAttackRating: 1.25,
+    disciplineRating: 0.92,
+    recentForm: ['W', 'W', 'D', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['az alkmaar', 'az', 'alkmaar'],
+  },
+  utrecht: {
+    id: 'team_utrecht',
+    name: 'FC Utrecht',
+    shortName: 'Utrecht',
+    tla: 'UTR',
+    crestUrl: 'https://crests.football-data.org/676.png',
+    competitionCode: 'DED',
+    attackRating: 1.18,
+    defenseRating: 1.05,
+    cornerAttackRating: 1.15,
+    disciplineRating: 0.95,
+    recentForm: ['W', 'W', 'W', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['fc utrecht', 'utrecht', 'utr'],
+  },
+  heerenveen: {
+    id: 'team_heerenveen',
+    name: 'SC Heerenveen',
+    shortName: 'Heerenveen',
+    tla: 'HEE',
+    crestUrl: 'https://crests.football-data.org/673.png',
+    competitionCode: 'DED',
+    attackRating: 1.08,
+    defenseRating: 1.18,
+    cornerAttackRating: 1.05,
+    disciplineRating: 1.00,
+    recentForm: ['L', 'W', 'D', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['sc heerenveen', 'heerenveen', 'hee'],
+  },
+  goaheadeagles: {
+    id: 'team_goaheadeagles',
+    name: 'Go Ahead Eagles',
+    shortName: 'Go Ahead',
+    tla: 'GAE',
+    crestUrl: 'https://crests.football-data.org/718.png',
+    competitionCode: 'DED',
+    attackRating: 1.10,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.08,
+    disciplineRating: 0.98,
+    recentForm: ['W', 'D', 'L', 'W', 'D'],
+    sampleMatches: 22,
+    aliases: ['go ahead eagles', 'go ahead', 'gae'],
+  },
+  spartarotterdam: {
+    id: 'team_spartarotterdam',
+    name: 'Sparta Rotterdam',
+    shortName: 'Sparta',
+    tla: 'SPA',
+    crestUrl: 'https://crests.football-data.org/680.png',
+    competitionCode: 'DED',
+    attackRating: 1.02,
+    defenseRating: 1.18,
+    cornerAttackRating: 1.00,
+    disciplineRating: 1.02,
+    recentForm: ['D', 'L', 'W', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['sparta rotterdam', 'sparta', 'spa'],
+  },
+  zwolle: {
+    id: 'team_zwolle',
+    name: 'PEC Zwolle',
+    shortName: 'Zwolle',
+    tla: 'ZWO',
+    crestUrl: 'https://crests.football-data.org/684.png',
+    competitionCode: 'DED',
+    attackRating: 0.98,
+    defenseRating: 1.25,
+    cornerAttackRating: 0.95,
+    disciplineRating: 1.05,
+    recentForm: ['L', 'D', 'L', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['pec zwolle', 'zwolle', 'zwo'],
+  },
+  heracles: {
+    id: 'team_heracles',
+    name: 'Heracles Almelo',
+    shortName: 'Heracles',
+    tla: 'HER',
+    crestUrl: 'https://crests.football-data.org/671.png',
+    competitionCode: 'DED',
+    attackRating: 0.95,
+    defenseRating: 1.28,
+    cornerAttackRating: 0.92,
+    disciplineRating: 1.08,
+    recentForm: ['L', 'L', 'W', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['heracles almelo', 'heracles', 'her'],
+  },
+  nacbreda: {
+    id: 'team_nacbreda',
+    name: 'NAC Breda',
+    shortName: 'NAC Breda',
+    tla: 'NAC',
+    crestUrl: 'https://crests.football-data.org/681.png',
+    competitionCode: 'DED',
+    isPromoted: true,
+    rawAttackRating: 0.95,
+    rawDefenseRating: 1.30,
+    attackRating: 0.97,
+    defenseRating: 1.16,
+    cornerAttackRating: 0.95,
+    disciplineRating: 1.05,
+    recentForm: ['W', 'L', 'L', 'W', 'L'],
+    sampleMatches: 20,
+    aliases: ['nac breda', 'nac'],
+  },
+  willemii: {
+    id: 'team_willemii',
+    name: 'Willem II',
+    shortName: 'Willem II',
+    tla: 'WIL',
+    crestUrl: 'https://crests.football-data.org/672.png',
+    competitionCode: 'DED',
+    isPromoted: true,
+    rawAttackRating: 0.92,
+    rawDefenseRating: 1.28,
+    attackRating: 0.96,
+    defenseRating: 1.15,
+    cornerAttackRating: 0.95,
+    disciplineRating: 1.02,
+    recentForm: ['L', 'W', 'D', 'L', 'L'],
+    sampleMatches: 20,
+    aliases: ['willem ii', 'wil'],
   },
 
   // ==========================================
@@ -667,7 +918,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Auxerre',
     tla: 'AJA',
     crestUrl: 'https://crests.football-data.org/519.png',
-    competitionCode: 'FL1',
+    competitionCode: 'FL1',\n    isPromoted: true,\n    rawAttackRating: 1.05,\n    rawDefenseRating: 1.28,
     attackRating: 1.05,
     defenseRating: 1.28,
     cornerAttackRating: 1.00,
@@ -682,7 +933,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Angers',
     tla: 'SCO',
     crestUrl: 'https://crests.football-data.org/532.png',
-    competitionCode: 'FL1',
+    competitionCode: 'FL1',\n    isPromoted: true,\n    rawAttackRating: 0.98,\n    rawDefenseRating: 1.3,
     attackRating: 0.98,
     defenseRating: 1.30,
     cornerAttackRating: 0.95,
@@ -697,7 +948,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Saint-Étienne',
     tla: 'ASSE',
     crestUrl: 'https://crests.football-data.org/527.png',
-    competitionCode: 'FL1',
+    competitionCode: 'FL1',\n    isPromoted: true,\n    rawAttackRating: 0.95,\n    rawDefenseRating: 1.38,
     attackRating: 0.95,
     defenseRating: 1.38,
     cornerAttackRating: 0.95,
@@ -986,7 +1237,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Leicester',
     tla: 'LEI',
     crestUrl: 'https://crests.football-data.org/338.png',
-    competitionCode: 'PL',
+    competitionCode: 'PL',\n    isPromoted: true,\n    rawAttackRating: 1.08,\n    rawDefenseRating: 1.28,
     attackRating: 1.08,
     defenseRating: 1.28,
     cornerAttackRating: 1.05,
@@ -1001,7 +1252,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Ipswich',
     tla: 'IPS',
     crestUrl: 'https://crests.football-data.org/349.png',
-    competitionCode: 'PL',
+    competitionCode: 'PL',\n    isPromoted: true,\n    rawAttackRating: 1.02,\n    rawDefenseRating: 1.35,
     attackRating: 1.02,
     defenseRating: 1.35,
     cornerAttackRating: 1.02,
@@ -1016,7 +1267,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Southampton',
     tla: 'SOU',
     crestUrl: 'https://crests.football-data.org/340.png',
-    competitionCode: 'PL',
+    competitionCode: 'PL',\n    isPromoted: true,\n    rawAttackRating: 0.98,\n    rawDefenseRating: 1.38,
     attackRating: 0.98,
     defenseRating: 1.38,
     cornerAttackRating: 1.08,
@@ -1335,7 +1586,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Portsmouth',
     tla: 'POR',
     crestUrl: 'https://crests.football-data.org/325.png',
-    competitionCode: 'ELC',
+    competitionCode: 'ELC',\n    isPromoted: true,\n    rawAttackRating: 1.02,\n    rawDefenseRating: 1.22,
     attackRating: 1.02,
     defenseRating: 1.22,
     cornerAttackRating: 1.08,
@@ -1350,7 +1601,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Derby',
     tla: 'DER',
     crestUrl: 'https://crests.football-data.org/342.png',
-    competitionCode: 'ELC',
+    competitionCode: 'ELC',\n    isPromoted: true,\n    rawAttackRating: 1.05,\n    rawDefenseRating: 1.1,
     attackRating: 1.05,
     defenseRating: 1.10,
     cornerAttackRating: 1.06,
@@ -1365,7 +1616,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Oxford Utd',
     tla: 'OXF',
     crestUrl: 'https://crests.football-data.org/1082.png',
-    competitionCode: 'ELC',
+    competitionCode: 'ELC',\n    isPromoted: true,\n    rawAttackRating: 1.04,\n    rawDefenseRating: 1.15,
     attackRating: 1.04,
     defenseRating: 1.15,
     cornerAttackRating: 1.04,
@@ -1553,7 +1804,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Venezia',
     tla: 'VEN',
     crestUrl: 'https://crests.football-data.org/454.png',
-    competitionCode: 'SA',
+    competitionCode: 'SA',\n    isPromoted: true,\n    rawAttackRating: 0.86,\n    rawDefenseRating: 1.32,
     attackRating: 0.86,
     defenseRating: 1.32,
     cornerAttackRating: 0.90,
@@ -1719,13 +1970,91 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     tla: 'COM',
     crestUrl: 'https://crests.football-data.org/1057.png',
     competitionCode: 'SA',
-    attackRating: 0.00,
-    defenseRating: 0.00,
-    cornerAttackRating: 0.90,
+    isPromoted: true,
+    rawAttackRating: 1.15,
+    rawDefenseRating: 1.25,
+    attackRating: 1.08,
+    defenseRating: 1.14,
+    cornerAttackRating: 0.95,
     disciplineRating: 1.00,
     recentForm: ['D', 'L', 'W', 'L', 'D'],
-    sampleMatches: 0,
+    sampleMatches: 22,
     aliases: ['como 1907', 'como', 'com'],
+  },
+  sampdoria: {
+    id: 'team_sampdoria',
+    name: 'UC Sampdoria',
+    shortName: 'Sampdoria',
+    tla: 'SAM',
+    crestUrl: 'https://crests.football-data.org/584.png',
+    competitionCode: 'I2',
+    attackRating: 1.08,
+    defenseRating: 1.14,
+    cornerAttackRating: 1.02,
+    disciplineRating: 1.05,
+    recentForm: ['W', 'D', 'L', 'W', 'D'],
+    sampleMatches: 22,
+    aliases: ['uc sampdoria', 'sampdoria', 'sam'],
+  },
+  palermo: {
+    id: 'team_palermo',
+    name: 'Palermo FC',
+    shortName: 'Palermo',
+    tla: 'PAL',
+    crestUrl: 'https://crests.football-data.org/589.png',
+    competitionCode: 'I2',
+    attackRating: 1.10,
+    defenseRating: 1.12,
+    cornerAttackRating: 1.05,
+    disciplineRating: 1.02,
+    recentForm: ['W', 'W', 'L', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['palermo fc', 'palermo'],
+  },
+  bari: {
+    id: 'team_bari',
+    name: 'SSC Bari',
+    shortName: 'Bari',
+    tla: 'BAR',
+    crestUrl: 'https://crests.football-data.org/588.png',
+    competitionCode: 'I2',
+    attackRating: 0.98,
+    defenseRating: 1.15,
+    cornerAttackRating: 0.95,
+    disciplineRating: 1.08,
+    recentForm: ['D', 'D', 'W', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['ssc bari', 'bari'],
+  },
+  cremonese: {
+    id: 'team_cremonese',
+    name: 'US Cremonese',
+    shortName: 'Cremonese',
+    tla: 'CRE',
+    crestUrl: 'https://crests.football-data.org/594.png',
+    competitionCode: 'I2',
+    attackRating: 1.12,
+    defenseRating: 1.08,
+    cornerAttackRating: 1.08,
+    disciplineRating: 1.00,
+    recentForm: ['W', 'D', 'W', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['us cremonese', 'cremonese'],
+  },
+  pisa: {
+    id: 'team_pisa',
+    name: 'Pisa SC',
+    shortName: 'Pisa',
+    tla: 'PIS',
+    crestUrl: 'https://crests.football-data.org/597.png',
+    competitionCode: 'I2',
+    attackRating: 1.15,
+    defenseRating: 1.05,
+    cornerAttackRating: 1.10,
+    disciplineRating: 0.98,
+    recentForm: ['W', 'W', 'W', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['pisa sc', 'pisa'],
   },
   bologna: {
     id: 'team_bologna',
@@ -1778,7 +2107,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Parma',
     tla: 'PAR',
     crestUrl: 'https://crests.football-data.org/112.png',
-    competitionCode: 'SA',
+    competitionCode: 'SA',\n    isPromoted: true,\n    rawAttackRating: 1.18,\n    rawDefenseRating: 1.28,
     attackRating: 0.00,
     defenseRating: 0.00,
     cornerAttackRating: 0.95,
@@ -1918,13 +2247,31 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     tla: 'ESP',
     crestUrl: 'https://crests.football-data.org/80.png',
     competitionCode: 'PD',
-    attackRating: 1.02,
-    defenseRating: 1.28,
+    isPromoted: true,
+    rawAttackRating: 1.02,
+    rawDefenseRating: 1.28,
+    attackRating: 1.01,
+    defenseRating: 1.15,
     cornerAttackRating: 1.05,
     disciplineRating: 1.15,
     recentForm: ['L', 'W', 'L', 'L', 'D'],
     sampleMatches: 22,
-    aliases: ['rcd espanyol de barcelona', 'rcd espanyol', 'espanyol', 'esp'],
+    aliases: ['rcd espanyol de barcelona', 'rcd espanyol', 'espanyol', 'espanol', 'esp'],
+  },
+  elche: {
+    id: 'team_elche',
+    name: 'Elche CF',
+    shortName: 'Elche',
+    tla: 'ELC',
+    crestUrl: 'https://crests.football-data.org/285.png',
+    competitionCode: 'PD',
+    attackRating: 1.05,
+    defenseRating: 1.12,
+    cornerAttackRating: 1.00,
+    disciplineRating: 1.02,
+    recentForm: ['W', 'W', 'D', 'L', 'W'],
+    sampleMatches: 24,
+    aliases: ['elche cf', 'elche', 'elc'],
   },
   athletic: {
     id: 'team_athletic',
@@ -1939,7 +2286,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     disciplineRating: 1.08,
     recentForm: ['W', 'D', 'W', 'W', 'L'],
     sampleMatches: 24,
-    aliases: ['athletic club', 'athletic bilbao', 'athletic', 'ath'],
+    aliases: ['athletic club', 'athletic bilbao', 'ath bilbao', 'athletic', 'ath'],
   },
   realsociedad: {
     id: 'team_realsociedad',
@@ -1954,7 +2301,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     disciplineRating: 1.05,
     recentForm: ['D', 'W', 'L', 'W', 'D'],
     sampleMatches: 24,
-    aliases: ['real sociedad de futbol', 'real sociedad', 'rso', 'la real'],
+    aliases: ['real sociedad de futbol', 'real sociedad de fútbol', 'real sociedad', 'sociedad', 'rso', 'la real'],
   },
   betis: {
     id: 'team_betis',
@@ -2127,7 +2474,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Leganés',
     tla: 'LEG',
     crestUrl: 'https://crests.football-data.org/745.png',
-    competitionCode: 'PD',
+    competitionCode: 'PD',\n    isPromoted: true,\n    rawAttackRating: 0.95,\n    rawDefenseRating: 1.15,
     attackRating: 0.95,
     defenseRating: 1.15,
     cornerAttackRating: 0.98,
@@ -2142,7 +2489,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     shortName: 'Valladolid',
     tla: 'VLL',
     crestUrl: 'https://crests.football-data.org/250.png',
-    competitionCode: 'PD',
+    competitionCode: 'PD',\n    isPromoted: true,\n    rawAttackRating: 0.92,\n    rawDefenseRating: 1.35,
     attackRating: 0.92,
     defenseRating: 1.35,
     cornerAttackRating: 0.95,
@@ -2628,7 +2975,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     name: 'Le Mans FC',
     shortName: 'Le Mans',
     tla: 'LEM',
-    crestUrl: 'https://crests.football-data.org/532.png',
+    crestUrl: '',
     competitionCode: 'FL1',
     attackRating: 0.98,
     defenseRating: 1.22,
@@ -2637,6 +2984,81 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     recentForm: ['L', 'D', 'L', 'D', 'W'],
     sampleMatches: 20,
     aliases: ['le mans fc', 'le mans', 'lemans', 'lem'],
+  },
+  lorient: {
+    id: 'team_lorient',
+    name: 'FC Lorient',
+    shortName: 'Lorient',
+    tla: 'FCL',
+    crestUrl: 'https://crests.football-data.org/525.png',
+    competitionCode: 'FL1',
+    attackRating: 1.05,
+    defenseRating: 1.20,
+    cornerAttackRating: 1.02,
+    disciplineRating: 0.95,
+    recentForm: ['W', 'D', 'W', 'L', 'W'],
+    sampleMatches: 22,
+    aliases: ['fc lorient', 'lorient', 'fcl'],
+  },
+  paris_fc: {
+    id: 'team_paris_fc',
+    name: 'Paris FC',
+    shortName: 'Paris FC',
+    tla: 'PFC',
+    crestUrl: 'https://crests.football-data.org/535.png',
+    competitionCode: 'FL1',
+    attackRating: 1.02,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.00,
+    disciplineRating: 0.98,
+    recentForm: ['W', 'W', 'D', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['paris fc', 'pfc'],
+  },
+  metz: {
+    id: 'team_metz',
+    name: 'FC Metz',
+    shortName: 'Metz',
+    tla: 'FCM',
+    crestUrl: 'https://crests.football-data.org/545.png',
+    competitionCode: 'F2',
+    attackRating: 1.08,
+    defenseRating: 1.12,
+    cornerAttackRating: 1.02,
+    disciplineRating: 0.96,
+    recentForm: ['W', 'D', 'W', 'W', 'L'],
+    sampleMatches: 22,
+    aliases: ['fc metz', 'metz', 'fcm'],
+  },
+  clermont: {
+    id: 'team_clermont',
+    name: 'Clermont Foot 63',
+    shortName: 'Clermont',
+    tla: 'CF6',
+    crestUrl: 'https://crests.football-data.org/541.png',
+    competitionCode: 'F2',
+    attackRating: 0.98,
+    defenseRating: 1.20,
+    cornerAttackRating: 0.95,
+    disciplineRating: 1.02,
+    recentForm: ['L', 'D', 'W', 'L', 'D'],
+    sampleMatches: 22,
+    aliases: ['clermont foot 63', 'clermont foot', 'clermont'],
+  },
+  guingamp: {
+    id: 'team_guingamp',
+    name: 'EA Guingamp',
+    shortName: 'Guingamp',
+    tla: 'EAG',
+    crestUrl: 'https://crests.football-data.org/538.png',
+    competitionCode: 'F2',
+    attackRating: 1.05,
+    defenseRating: 1.15,
+    cornerAttackRating: 1.00,
+    disciplineRating: 0.98,
+    recentForm: ['W', 'W', 'L', 'D', 'W'],
+    sampleMatches: 22,
+    aliases: ['ea guingamp', 'guingamp', 'eag'],
   },
 };
 
@@ -2745,6 +3167,24 @@ export function normalizeTeamLookupKey(raw: string): string {
     .replace(/[^a-z0-9]/g, '');      // strip non-alphanumeric characters (spaces, punctuation)
 }
 
+function applyPromotedShrinkage(record: TeamStrengthRecord): TeamStrengthRecord {
+  if (!record.isPromoted) return record;
+  const rawAtt = record.rawAttackRating ?? record.attackRating;
+  const rawDef = record.rawDefenseRating ?? record.defenseRating;
+  const N = record.sampleMatches || 20;
+  const K0 = 18; // Promoted shrinkage constant
+  const prior = 1.00; // League average
+  const shrunkAtt = Number(((N * rawAtt + K0 * prior) / (N + K0)).toFixed(2));
+  const shrunkDef = Number(((N * rawDef + K0 * prior) / (N + K0)).toFixed(2));
+  return {
+    ...record,
+    rawAttackRating: rawAtt,
+    rawDefenseRating: rawDef,
+    attackRating: shrunkAtt,
+    defenseRating: shrunkDef,
+  };
+}
+
 /**
  * Exact, normalized team strength lookup.
  * NO prefix stripping, NO substring / "includes" matching, NO blind TLA matching.
@@ -2765,14 +3205,30 @@ export function lookupTeamStrength(
     ? String(teamIdentifier.id)
     : '';
 
+  // 0. Exact alias from manual overrides (teamNameOverrides.json)
+  const manualMap = manualOverrides as Record<string, string>;
+  const rawClean = rawName.trim();
+  const overrideId = manualMap[rawClean] || manualMap[rawClean.toLowerCase()];
+  if (overrideId) {
+    const cleanOverride = overrideId.replace(/^team_/, '').toLowerCase();
+    if (TEAM_STRENGTH_DATABASE[cleanOverride]) {
+      return { found: true, data: applyPromotedShrinkage(TEAM_STRENGTH_DATABASE[cleanOverride]) };
+    }
+    for (const record of Object.values(TEAM_STRENGTH_DATABASE)) {
+      if (record.id === overrideId || record.id.toLowerCase() === `team_${cleanOverride}`) {
+        return { found: true, data: applyPromotedShrinkage(record) };
+      }
+    }
+  }
+
   // 1. Exact ID match
   const cleanId = rawId.replace(/^team_/, '').toLowerCase();
   if (cleanId && TEAM_STRENGTH_DATABASE[cleanId]) {
-    return { found: true, data: TEAM_STRENGTH_DATABASE[cleanId] };
+    return { found: true, data: applyPromotedShrinkage(TEAM_STRENGTH_DATABASE[cleanId]) };
   }
   for (const record of Object.values(TEAM_STRENGTH_DATABASE)) {
     if (record.id === rawId || record.id.toLowerCase() === `team_${cleanId}`) {
-      return { found: true, data: record };
+      return { found: true, data: applyPromotedShrinkage(record) };
     }
   }
 
@@ -2786,13 +3242,13 @@ export function lookupTeamStrength(
 
   for (const record of Object.values(TEAM_STRENGTH_DATABASE)) {
     if (record.name.toLowerCase().trim() === targetLower || record.shortName.toLowerCase().trim() === targetLower) {
-      return { found: true, data: record };
+      return { found: true, data: applyPromotedShrinkage(record) };
     }
     if (normalizeTeamLookupKey(record.name) === targetNorm || normalizeTeamLookupKey(record.shortName) === targetNorm) {
-      return { found: true, data: record };
+      return { found: true, data: applyPromotedShrinkage(record) };
     }
     if (record.aliases.some(a => a.toLowerCase().trim() === targetLower || normalizeTeamLookupKey(a) === targetNorm)) {
-      return { found: true, data: record };
+      return { found: true, data: applyPromotedShrinkage(record) };
     }
   }
 

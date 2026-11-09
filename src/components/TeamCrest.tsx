@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { lookupTeamCrest } from '@/lib/data/teamCrests';
 
 interface TeamCrestProps {
   crestUrl?: string | null;
   teamName: string;
+  canonicalTeamId?: string;
   size?: number; // size in px, defaults to 28
   className?: string;
 }
@@ -41,10 +43,23 @@ function getBadgeBg(name: string): string {
 export default function TeamCrest({
   crestUrl,
   teamName,
+  canonicalTeamId,
   size = 28,
   className = '',
 }: TeamCrestProps) {
   const [hasError, setHasError] = useState(false);
+
+  // Look up crest in team_crests table by canonical team id
+  const effectiveCrestUrl = useMemo(() => {
+    if (canonicalTeamId) {
+      const record = lookupTeamCrest(canonicalTeamId);
+      if (record) {
+        // Strict requirement: No verified crest = initials badge (null)
+        return record.verified && record.crestUrl ? record.crestUrl : null;
+      }
+    }
+    return crestUrl || null;
+  }, [canonicalTeamId, crestUrl]);
 
   const styleDimension = {
     width: `${size}px`,
@@ -55,8 +70,8 @@ export default function TeamCrest({
     maxHeight: `${size}px`,
   };
 
-  // If the image fails to load or no URL is provided, display circular badge with team initials
-  if (!crestUrl || hasError) {
+  // If unverified, no URL is provided, or image fails to load, display circular badge with team initials
+  if (!effectiveCrestUrl || hasError) {
     const initials = getTeamInitials(teamName);
     return (
       <div
@@ -80,7 +95,7 @@ export default function TeamCrest({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={crestUrl}
+        src={effectiveCrestUrl}
         alt={`${teamName} crest`}
         loading="lazy"
         className="w-full h-full object-contain p-0.5"

@@ -1293,6 +1293,7 @@ export const CANONICAL_TEAMS: Record<string, CanonicalTeam> = {
 };
 
 import manualOverrides from './teamNameOverrides.json';
+import { lookupTeamStrength } from './teamDatabase';
 
 // Normalize team lookup string
 export function normalizeLookupKey(name: string): string {
@@ -1318,12 +1319,32 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
 
   // 1. Direct manual override (exact and lowercase trimmed)
   const manualMap = manualOverrides as Record<string, string>;
-  if (manualMap[input] && CANONICAL_TEAMS[manualMap[input]]) {
-    return CANONICAL_TEAMS[manualMap[input]];
+  let overrideId = manualMap[input];
+  if (!overrideId) {
+    for (const [k, v] of Object.entries(manualMap)) {
+      if (k.toLowerCase() === input.toLowerCase()) {
+        overrideId = v;
+        break;
+      }
+    }
   }
-  for (const [k, v] of Object.entries(manualMap)) {
-    if (k.toLowerCase() === input.toLowerCase() && CANONICAL_TEAMS[v]) {
-      return CANONICAL_TEAMS[v];
+
+  if (overrideId) {
+    if (CANONICAL_TEAMS[overrideId]) {
+      return CANONICAL_TEAMS[overrideId];
+    }
+    const strengthRes = lookupTeamStrength(overrideId);
+    if (strengthRes.found && strengthRes.data) {
+      return {
+        canonicalId: strengthRes.data.id,
+        canonicalName: strengthRes.data.name,
+        shortName: strengthRes.data.shortName,
+        tla: strengthRes.data.tla,
+        competitionCode: strengthRes.data.competitionCode,
+        crestUrl: strengthRes.data.crestUrl,
+        aliases: strengthRes.data.aliases,
+        providerIds: { footballDataCoUk: input },
+      };
     }
   }
 
@@ -1384,6 +1405,21 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
   }
   if (matchesCount === 1 && foundMatch) {
     return foundMatch;
+  }
+
+  // 6. Check team strength database
+  const strengthRes = lookupTeamStrength(input);
+  if (strengthRes.found && strengthRes.data) {
+    return {
+      canonicalId: strengthRes.data.id,
+      canonicalName: strengthRes.data.name,
+      shortName: strengthRes.data.shortName,
+      tla: strengthRes.data.tla,
+      competitionCode: strengthRes.data.competitionCode,
+      crestUrl: strengthRes.data.crestUrl,
+      aliases: strengthRes.data.aliases,
+      providerIds: { footballDataCoUk: input },
+    };
   }
 
   // Log unmatched name (never guess randomly)

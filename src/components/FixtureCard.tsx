@@ -82,9 +82,11 @@ export default function FixtureCard({
     if (isFinished) return 'FT';
     if (isPaused) return 'HT';
     if (isPostponed) return 'Postponed';
-    if (isInPlay) return `LIVE ${displayMinute}'`;
+    // When in-play, the left badge renders the red LIVE minute pill.
+    // Display kickoffFormatted on the right so 'LIVE 82\'' is rendered once, not twice.
+    if (isInPlay) return kickoffFormatted;
     return kickoffFormatted;
-  }, [isFinished, isPaused, isPostponed, isInPlay, displayMinute, kickoffFormatted]);
+  }, [isFinished, isPaused, isPostponed, isInPlay, kickoffFormatted]);
 
   const homeName = displayName(fixture.homeTeam);
   const awayName = displayName(fixture.awayTeam);
@@ -209,6 +211,7 @@ export default function FixtureCard({
             {/* Home team row */}
             <div className="flex items-center gap-2 min-w-0">
               <TeamCrest
+                canonicalTeamId={fixture.homeTeam.id}
                 crestUrl={fixture.homeTeam.crestUrl}
                 teamName={cleanDisplayText(homeName)}
                 size={28}
@@ -226,6 +229,7 @@ export default function FixtureCard({
             {/* Away team row */}
             <div className="flex items-center gap-2 min-w-0">
               <TeamCrest
+                canonicalTeamId={fixture.awayTeam.id}
                 crestUrl={fixture.awayTeam.crestUrl}
                 teamName={cleanDisplayText(awayName)}
                 size={28}

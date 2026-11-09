@@ -295,7 +295,7 @@ export default function MatchAnalysisPage() {
             {/* Home Team */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <TeamCrest crestUrl={fixture.homeTeam.crestUrl} teamName={homeName} size={28} />
+                <TeamCrest canonicalTeamId={fixture.homeTeam.id} crestUrl={fixture.homeTeam.crestUrl} teamName={homeName} size={28} />
                 <span className="text-[15px] font-semibold text-[#ECF1EE] leading-tight truncate">
                   {homeName}
                 </span>
@@ -312,7 +312,7 @@ export default function MatchAnalysisPage() {
             {/* Away Team */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <TeamCrest crestUrl={fixture.awayTeam.crestUrl} teamName={awayName} size={28} />
+                <TeamCrest canonicalTeamId={fixture.awayTeam.id} crestUrl={fixture.awayTeam.crestUrl} teamName={awayName} size={28} />
                 <span className="text-[15px] font-semibold text-[#ECF1EE] leading-tight truncate">
                   {awayName}
                 </span>

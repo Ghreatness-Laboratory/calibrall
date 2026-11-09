@@ -468,7 +468,7 @@ export default function PredictionsPage() {
                       className="flex items-center gap-2 min-w-0 flex-1 hover:text-[#B6E63B] transition-colors"
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <TeamCrest crestUrl={group.homeTeam.crestUrl} teamName={homeName} size={20} />
+                        <TeamCrest canonicalTeamId={group.homeTeam.id} crestUrl={group.homeTeam.crestUrl} teamName={homeName} size={20} />
                         <span className="text-[13px] font-semibold text-[#ECF1EE] truncate">
                           {homeName}
                         </span>
@@ -478,7 +478,7 @@ export default function PredictionsPage() {
                       </div>
                       <span className="text-[#5E6A63] text-[11px] shrink-0">vs</span>
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <TeamCrest crestUrl={group.awayTeam.crestUrl} teamName={awayName} size={20} />
+                        <TeamCrest canonicalTeamId={group.awayTeam.id} crestUrl={group.awayTeam.crestUrl} teamName={awayName} size={20} />
                         <span className="text-[13px] font-semibold text-[#ECF1EE] truncate">
                           {awayName}
                         </span>

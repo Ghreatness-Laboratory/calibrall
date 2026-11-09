@@ -320,13 +320,18 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const homeNeeds = !homeStrength || homeMatches === 0;
   const awayNeeds = !awayStrength || awayMatches === 0;
 
+  const homeTeamDisplayName = displayName(fixture.homeTeam);
+  const awayTeamDisplayName = displayName(fixture.awayTeam);
+  const homeStoredCount = matchesStore.getTeamMatchCount(fixture.homeTeam.id || fixture.homeTeam.name);
+  const awayStoredCount = matchesStore.getTeamMatchCount(fixture.awayTeam.id || fixture.awayTeam.name);
+
   let reason = 'Not enough data';
   if (homeNeeds && awayNeeds) {
-    reason = `Needs history: ${displayName(fixture.homeTeam)} (${homeMatches} matches), ${displayName(fixture.awayTeam)} (${awayMatches})`;
+    reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored, ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`;
   } else if (homeNeeds) {
-    reason = `Needs history: ${displayName(fixture.homeTeam)} (${homeMatches} matches)`;
+    reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored in database (needs history backfill)`;
   } else if (awayNeeds) {
-    reason = `Needs history: ${displayName(fixture.awayTeam)} (${awayMatches} matches)`;
+    reason = `Insufficient data: ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`;
   }
 
   // HARD RULE: If a fixture has no real team-strength input, do not return a pick.
@@ -362,10 +367,10 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
 
   if (isHomeStale) {
     const reason = (homeLastMatch.days === null || homeLastMatch.lastMatchDate === null)
-      ? 'Insufficient data: no match records stored for this team'
+      ? `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored in database (needs history backfill)`
       : ((homeLastMatch.days !== null && homeLastMatch.days > 21)
-          ? `Data out of date: last match ${homeLastMatch.days} days ago`
-          : `Data out of date: only ${homeLastMatch.matchesInLast120Days} matches in last 120 days (min 5 required)`);
+          ? `Data out of date: ${homeTeamDisplayName} last match was ${homeLastMatch.days} days ago (${homeStoredCount} matches stored)`
+          : `Data out of date: ${homeTeamDisplayName} has only ${homeLastMatch.matchesInLast120Days} matches in last 120 days (${homeStoredCount} matches stored, min 5 required)`);
     return {
       homeXg: 0,
       awayXg: 0,
@@ -386,10 +391,10 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
 
   if (isAwayStale) {
     const reason = (awayLastMatch.days === null || awayLastMatch.lastMatchDate === null)
-      ? 'Insufficient data: no match records stored for this team'
+      ? `Insufficient data: ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`
       : ((awayLastMatch.days !== null && awayLastMatch.days > 21)
-          ? `Data out of date: last match ${awayLastMatch.days} days ago`
-          : `Data out of date: only ${awayLastMatch.matchesInLast120Days} matches in last 120 days (min 5 required)`);
+          ? `Data out of date: ${awayTeamDisplayName} last match was ${awayLastMatch.days} days ago (${awayStoredCount} matches stored)`
+          : `Data out of date: ${awayTeamDisplayName} has only ${awayLastMatch.matchesInLast120Days} matches in last 120 days (${awayStoredCount} matches stored, min 5 required)`);
     return {
       homeXg: 0,
       awayXg: 0,
