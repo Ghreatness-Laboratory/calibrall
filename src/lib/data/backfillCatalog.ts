@@ -3,9 +3,20 @@ import { lookupTeamStrength } from './teamDatabase';
 // CALIBRALL: Backfill Catalog, Timezone Parser & Idempotent ID Utility
 
 export const DIVISION_MAP: Record<string, string> = {
+  // First tiers
+  E0: 'E0',
+  E1: 'E1',
+  I1: 'I1',
+  D1: 'D1',
+  F1: 'F1',
+  // Second tiers
+  E2: 'E2',
+  I2: 'I2',
+  D2: 'D2',
+  F2: 'F2',
+  // Standard aliases
   PL: 'E0',
   ELC: 'E1',
-  E2: 'E2',
   PD: 'SP1',
   BL1: 'D1',
   SA: 'I1',
@@ -43,9 +54,17 @@ export interface LeagueMetadata {
 }
 
 export const LEAGUE_METADATA: Record<string, LeagueMetadata> = {
+  E0: { code: 'E0', name: 'Premier League', country: 'England', divisionCode: 'E0', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
+  E1: { code: 'E1', name: 'Championship', country: 'England', divisionCode: 'E1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN', coverageNotes: 'Full match stats + corners + cards' },
+  E2: { code: 'E2', name: 'League One', country: 'England', divisionCode: 'E2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
+  I1: { code: 'I1', name: 'Serie A', country: 'Italy', divisionCode: 'I1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
+  I2: { code: 'I2', name: 'Serie B', country: 'Italy', divisionCode: 'I2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
+  D1: { code: 'D1', name: 'Bundesliga', country: 'Germany', divisionCode: 'D1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
+  D2: { code: 'D2', name: '2. Bundesliga', country: 'Germany', divisionCode: 'D2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
+  F1: { code: 'F1', name: 'Ligue 1', country: 'France', divisionCode: 'F1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
+  F2: { code: 'F2', name: 'Ligue 2', country: 'France', divisionCode: 'F2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
   PL: { code: 'PL', name: 'Premier League', country: 'England', divisionCode: 'E0', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
   ELC: { code: 'ELC', name: 'Championship', country: 'England', divisionCode: 'E1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN', coverageNotes: 'Full match stats + corners + cards' },
-  E2: { code: 'E2', name: 'League One', country: 'England', divisionCode: 'E2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
   PD: { code: 'PD', name: 'La Liga', country: 'Spain', divisionCode: 'SP1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
   BL1: { code: 'BL1', name: 'Bundesliga', country: 'Germany', divisionCode: 'D1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
   SA: { code: 'SA', name: 'Serie A', country: 'Italy', divisionCode: 'I1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },

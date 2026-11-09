@@ -3,16 +3,19 @@ import { marketMonitor } from '@/lib/prediction/marketMonitor';
 import { FAMILY_VALIDATION_REGISTRY } from '@/lib/prediction/marketGating';
 import { generateMissAnalysisReport, SettledPredictionRecord } from '@/lib/prediction/missAnalysis';
 import { getTeamStyle } from '@/lib/prediction/situationalContext';
-import { REAL_250_MATCHES } from '@/lib/data/realMatchArchive';
+import { matchesStore } from '@/lib/data/matchesStore';
 
 export async function GET() {
   const report = marketMonitor.getReport(100, 0.40);
 
-  // Generate real match settled records for miss clustering
-  const settledRecords: SettledPredictionRecord[] = REAL_250_MATCHES.slice(0, 100).map(m => {
-    const isOver25Hit = (m.actual.homeGoals + m.actual.awayGoals) > 2.5;
-    const isHomeWinHit = m.actual.homeGoals > m.actual.awayGoals;
-    const outcome = isOver25Hit ? 'WON' : 'LOST';
+  // Generate real match settled records from Supabase/matchesStore
+  const storedMatches = await matchesStore.getMatches();
+  const settledRecords: SettledPredictionRecord[] = storedMatches
+    .filter(m => m.home_score !== null && m.away_score !== null)
+    .slice(0, 100)
+    .map(m => {
+      const isOver25Hit = (m.home_score! + m.away_score!) > 2.5;
+      const outcome = isOver25Hit ? 'WON' : 'LOST';
 
     return {
       prediction: {
@@ -34,18 +37,18 @@ export async function GET() {
         evidenceTier: 'Tier 1',
         dataQualityScore: 0.95,
         isProbabilityBasedAnalysis: false,
-        stateTags: m.context.stateTags || [],
+        stateTags: [],
         lineupStatus: 'confirmed',
         topFactorContributions: []
       },
-      competitionCode: m.competitionCode,
-      matchweek: m.context.sampleSizeMatches,
-      homeTeam: m.homeTeam,
-      awayTeam: m.awayTeam,
-      homeStyle: getTeamStyle(m.homeTeam),
-      awayStyle: getTeamStyle(m.awayTeam),
+      competitionCode: m.competition_code,
+      matchweek: m.matchday || 1,
+      homeTeam: m.home_team_name,
+      awayTeam: m.away_team_name,
+      homeStyle: getTeamStyle(m.home_team_name),
+      awayStyle: getTeamStyle(m.away_team_name),
       actualOutcome: outcome,
-      stateTags: m.context.stateTags || [],
+      stateTags: [],
       modelProbability: 0.58,
       marketFamily: 'goals_over_under',
       marketCode: 'TOTAL_GOALS_O25'

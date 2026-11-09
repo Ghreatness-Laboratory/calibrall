@@ -301,30 +301,11 @@ export interface FixtureStatisticalContext {
   noRecommendationReason?: string;
 }
 
-import { REAL_250_MATCHES } from './realMatchArchive';
 import { lookupTeamStrength } from './teamDatabase';
 import { displayName } from '../utils/formatText';
 import { matchesStore } from './matchesStore';
 
 export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContext {
-  const realMatch = REAL_250_MATCHES.find(m => m.id === fixture.id);
-  if (realMatch) {
-    return {
-      homeXg: realMatch.context.homeXg,
-      awayXg: realMatch.context.awayXg,
-      expectedCornersHome: realMatch.context.expectedCornersHome,
-      expectedCornersAway: realMatch.context.expectedCornersAway,
-      expectedCards: realMatch.context.expectedCards,
-      uncertaintyScore: realMatch.context.uncertaintyScore,
-      dataCoverageScore: realMatch.context.dataCoverageScore,
-      sampleSizeMatches: realMatch.context.sampleSizeMatches,
-      hasRealTeamStrength: true,
-      insufficientData: false,
-      stateTags: realMatch.context.stateTags || [],
-      lineupConfirmed: realMatch.context.lineupConfirmed ?? true,
-      verifiedOdds: realMatch.context.verifiedOdds,
-    };
-  }
 
   // Look up genuine team strength parameters in team database
   const homeLookup = lookupTeamStrength(fixture.homeTeam);

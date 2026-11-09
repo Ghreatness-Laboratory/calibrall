@@ -195,6 +195,10 @@ export async function POST(req: NextRequest) {
           away_shots: row['AS'] !== undefined && !isNaN(parseInt(row['AS'], 10)) ? parseInt(row['AS'], 10) : null,
           home_shots_on_target: row['HST'] !== undefined && !isNaN(parseInt(row['HST'], 10)) ? parseInt(row['HST'], 10) : null,
           away_shots_on_target: row['AST'] !== undefined && !isNaN(parseInt(row['AST'], 10)) ? parseInt(row['AST'], 10) : null,
+          home_fouls: row['HF'] !== undefined && !isNaN(parseInt(row['HF'], 10)) ? parseInt(row['HF'], 10) : null,
+          away_fouls: row['AF'] !== undefined && !isNaN(parseInt(row['AF'], 10)) ? parseInt(row['AF'], 10) : null,
+          referee: row['Referee'] ? row['Referee'].trim() : null,
+          result: row['FTR'] ? row['FTR'].trim() : (isFinished ? (hg > ag ? 'H' : hg === ag ? 'D' : 'A') : null),
           source: `football-data.co.uk:${extraFileCode.toLowerCase()}`,
         });
 
@@ -390,6 +394,10 @@ export async function POST(req: NextRequest) {
           away_shots: row['AS'] !== undefined && !isNaN(parseInt(row['AS'], 10)) ? parseInt(row['AS'], 10) : null,
           home_shots_on_target: row['HST'] !== undefined && !isNaN(parseInt(row['HST'], 10)) ? parseInt(row['HST'], 10) : null,
           away_shots_on_target: row['AST'] !== undefined && !isNaN(parseInt(row['AST'], 10)) ? parseInt(row['AST'], 10) : null,
+          home_fouls: row['HF'] !== undefined && !isNaN(parseInt(row['HF'], 10)) ? parseInt(row['HF'], 10) : null,
+          away_fouls: row['AF'] !== undefined && !isNaN(parseInt(row['AF'], 10)) ? parseInt(row['AF'], 10) : null,
+          referee: row['Referee'] ? row['Referee'].trim() : null,
+          result: row['FTR'] ? row['FTR'].trim() : (isFinished ? (fthg > ftag ? 'H' : fthg === ftag ? 'D' : 'A') : null),
           source: `football-data.co.uk:${divCode}`,
         });
 

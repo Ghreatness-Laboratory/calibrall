@@ -7,9 +7,6 @@
 
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { TEAM_STRENGTH_DATABASE, lookupTeamStrength, normalizeTeamLookupKey } from './teamDatabase';
-import { CHAMPIONSHIP_HISTORICAL_MATCHES } from './championshipMatchArchive';
-import { REAL_250_MATCHES } from './realMatchArchive';
-import FREE_SOURCES_MATCHES from './free_sources_matches.json';
 import { COMPETITIONS } from './seedData';
 import { displayName } from '@/lib/utils/formatText';
 import { lookupCanonicalTeam } from './canonicalTeams';
@@ -98,6 +95,10 @@ export interface StoredMatch {
   away_shots?: number | null;
   home_shots_on_target?: number | null;
   away_shots_on_target?: number | null;
+  home_fouls?: number | null;
+  away_fouls?: number | null;
+  referee?: string | null;
+  result?: string | null;
   source: string;
   created_at?: string;
   updated_at?: string;
@@ -165,95 +166,10 @@ export interface DataStatusReport {
   persistenceMode: 'SUPABASE_PRODUCTION' | 'IN_MEMORY_SANDBOX';
 }
 
-// In-Memory store across the runtime session (shared on globalThis)
+// In-Memory cache across the runtime session (shared on globalThis)
 const getGlobalMatches = (): Map<string, StoredMatch> => {
   if (!(globalThis as any).__calibrall_matches_map) {
-    const map = new Map<string, StoredMatch>();
-
-    // 1. Primary Free Sources matches (football-data.co.uk genuine 3+ seasons & active season)
-    if (Array.isArray(FREE_SOURCES_MATCHES)) {
-      for (const m of (FREE_SOURCES_MATCHES as any[])) {
-        map.set(m.id, {
-          id: m.id,
-          provider_id: m.provider_id,
-          competition_code: m.competition_code,
-          season: m.season,
-          matchday: null,
-          home_team_id: m.home_team_id,
-          away_team_id: m.away_team_id,
-          home_team_name: m.home_team_name,
-          away_team_name: m.away_team_name,
-          kickoff_time: m.kickoff_time,
-          status: m.status as any,
-          home_score: m.home_score,
-          away_score: m.away_score,
-          home_half_time_score: m.home_half_time_score,
-          away_half_time_score: m.away_half_time_score,
-          home_corners: m.home_corners,
-          away_corners: m.away_corners,
-          home_first_half_corners: null,
-          away_first_half_corners: null,
-          home_yellow_cards: m.home_yellow_cards,
-          away_yellow_cards: m.away_yellow_cards,
-          home_red_cards: m.home_red_cards,
-          away_red_cards: m.away_red_cards,
-          home_shots: m.home_shots,
-          away_shots: m.away_shots,
-          home_shots_on_target: m.home_shots_on_target,
-          away_shots_on_target: m.away_shots_on_target,
-          source: m.source || 'football-data.co.uk:free',
-        });
-      }
-    }
-
-    // 2. Championship archive (fallback only)
-    for (const m of CHAMPIONSHIP_HISTORICAL_MATCHES) {
-      if (!map.has(m.provider_id)) {
-        map.set(m.provider_id, {
-          ...m,
-          source: 'championshipMatchArchive:historical',
-        });
-      }
-    }
-
-    // 3. Historical real archive
-    for (const rm of REAL_250_MATCHES) {
-      if (!map.has(rm.id)) {
-        const homeLookup = lookupTeamStrength(rm.homeTeam);
-        const awayLookup = lookupTeamStrength(rm.awayTeam);
-        map.set(rm.id, {
-          id: rm.id,
-          provider_id: rm.id,
-          competition_code: rm.competitionCode,
-          season: rm.date.startsWith('2024') ? '2324' : rm.date.startsWith('2025') || rm.date.startsWith('2026') ? '2425' : rm.date.startsWith('2023') ? '2223' : '2122',
-          matchday: null,
-          home_team_id: homeLookup?.data?.id || `team_${normalizeTeamLookupKey(rm.homeTeam)}`,
-          away_team_id: awayLookup?.data?.id || `team_${normalizeTeamLookupKey(rm.awayTeam)}`,
-          home_team_name: rm.homeTeam,
-          away_team_name: rm.awayTeam,
-          kickoff_time: new Date(rm.date).toISOString(),
-          status: 'FINISHED',
-          home_score: rm.actual.homeGoals,
-          away_score: rm.actual.awayGoals,
-          home_half_time_score: rm.actual.firstHalfHomeGoals ?? null,
-          away_half_time_score: rm.actual.firstHalfAwayGoals ?? null,
-          home_corners: rm.actual.homeCorners ?? null,
-          away_corners: rm.actual.awayCorners ?? null,
-          home_first_half_corners: null,
-          away_first_half_corners: null,
-          home_yellow_cards: rm.actual.cards ? Math.floor(rm.actual.cards / 2) : null,
-          away_yellow_cards: rm.actual.cards ? Math.ceil(rm.actual.cards / 2) : null,
-          home_red_cards: 0,
-          away_red_cards: 0,
-          home_shots: rm.context?.homeXg ? Math.round(rm.context.homeXg * 8.5) : null,
-          away_shots: rm.context?.awayXg ? Math.round(rm.context.awayXg * 8.5) : null,
-          home_shots_on_target: rm.context?.homeXg ? Math.round(rm.context.homeXg * 3.5) : null,
-          away_shots_on_target: rm.context?.awayXg ? Math.round(rm.context.awayXg * 3.5) : null,
-          source: 'realMatchArchive:verified',
-        });
-      }
-    }
-    (globalThis as any).__calibrall_matches_map = map;
+    (globalThis as any).__calibrall_matches_map = new Map<string, StoredMatch>();
   }
   return (globalThis as any).__calibrall_matches_map;
 };
@@ -261,75 +177,7 @@ const getGlobalMatches = (): Map<string, StoredMatch> => {
 // Map keyed by `${match_id}:${bookmaker}:${market_code}:${source}` for idempotent upserts
 const getGlobalOddsMap = (): Map<string, StoredOddsSnapshot> => {
   if (!(globalThis as any).__calibrall_odds_unique_map) {
-    const oMap = new Map<string, StoredOddsSnapshot>();
-    // Seed verified closing odds from free sources
-    if (Array.isArray(FREE_SOURCES_MATCHES)) {
-      for (const m of (FREE_SOURCES_MATCHES as any[])) {
-        if (m.closing_odds) {
-          if (m.closing_odds.homeWin) {
-            oMap.set(`${m.id}:ClosingConsensus:1X2_HOME:football-data.co.uk`, {
-              match_id: m.id,
-              bookmaker: 'ClosingConsensus',
-              market_code: '1X2_HOME',
-              selection: `${m.home_team_name} to win`,
-              decimal_odds: m.closing_odds.homeWin,
-              observed_at: null,
-              snapshot_type: 'csv_closing',
-              source: 'football-data.co.uk:free',
-            });
-          }
-          if (m.closing_odds.draw) {
-            oMap.set(`${m.id}:ClosingConsensus:1X2_DRAW:football-data.co.uk`, {
-              match_id: m.id,
-              bookmaker: 'ClosingConsensus',
-              market_code: '1X2_DRAW',
-              selection: 'Draw',
-              decimal_odds: m.closing_odds.draw,
-              observed_at: null,
-              snapshot_type: 'csv_closing',
-              source: 'football-data.co.uk:free',
-            });
-          }
-          if (m.closing_odds.awayWin) {
-            oMap.set(`${m.id}:ClosingConsensus:1X2_AWAY:football-data.co.uk`, {
-              match_id: m.id,
-              bookmaker: 'ClosingConsensus',
-              market_code: '1X2_AWAY',
-              selection: `${m.away_team_name} to win`,
-              decimal_odds: m.closing_odds.awayWin,
-              observed_at: null,
-              snapshot_type: 'csv_closing',
-              source: 'football-data.co.uk:free',
-            });
-          }
-          if (m.closing_odds.over25) {
-            oMap.set(`${m.id}:ClosingConsensus:TOTAL_GOALS_O25:football-data.co.uk`, {
-              match_id: m.id,
-              bookmaker: 'ClosingConsensus',
-              market_code: 'TOTAL_GOALS_O25',
-              selection: 'Over 2.5 Goals',
-              decimal_odds: m.closing_odds.over25,
-              observed_at: null,
-              snapshot_type: 'csv_closing',
-              source: 'football-data.co.uk:free',
-            });
-          }
-          if (m.closing_odds.under25) {
-            oMap.set(`${m.id}:ClosingConsensus:TOTAL_GOALS_U25:football-data.co.uk`, {
-              match_id: m.id,
-              bookmaker: 'ClosingConsensus',
-              market_code: 'TOTAL_GOALS_U25',
-              selection: 'Under 2.5 Goals',
-              decimal_odds: m.closing_odds.under25,
-              observed_at: null,
-              snapshot_type: 'csv_closing',
-              source: 'football-data.co.uk:free',
-            });
-          }
-        }
-      }
-    }
-    (globalThis as any).__calibrall_odds_unique_map = oMap;
+    (globalThis as any).__calibrall_odds_unique_map = new Map<string, StoredOddsSnapshot>();
   }
   return (globalThis as any).__calibrall_odds_unique_map;
 };
@@ -1285,7 +1133,7 @@ class MatchesStore {
           }
           console.warn('[MatchesStore] Could not read teams from Supabase:', teamErr.message);
         } else if (teamData && teamData.length > 0) {
-          registeredTeams = teamData.map(t => ({
+          registeredTeams = teamData.map((t: any) => ({
             id: t.id,
             name: t.name,
             shortName: t.short_name,
@@ -1323,6 +1171,15 @@ class MatchesStore {
     const teamFinishedCounts = new Map<string, number>();
 
     const KNOWN_LEAGUES: { code: string; name: string }[] = [
+      { code: 'E0', name: 'Premier League (England)' },
+      { code: 'E1', name: 'Championship (England)' },
+      { code: 'E2', name: 'League One (England)' },
+      { code: 'I1', name: 'Serie A (Italy)' },
+      { code: 'I2', name: 'Serie B (Italy)' },
+      { code: 'D1', name: 'Bundesliga (Germany)' },
+      { code: 'D2', name: '2. Bundesliga (Germany)' },
+      { code: 'F1', name: 'Ligue 1 (France)' },
+      { code: 'F2', name: 'Ligue 2 (France)' },
       { code: 'PL', name: 'Premier League (England)' },
       { code: 'ELC', name: 'Championship (England)' },
       { code: 'PD', name: 'La Liga (Spain)' },
@@ -1399,8 +1256,18 @@ class MatchesStore {
     const STALE_THRESHOLD_DAYS = 21; // Matchmind standard staleness threshold
 
     const leagueLatestDates: LeagueLatestDateInfo[] = KNOWN_LEAGUES.map((l) => {
-      // Also check alternative codes if applicable (e.g. P1 vs PPL, T1 vs TSL, SC0 vs SP)
+      // Also check alternative codes if applicable
       const altCodes = [l.code];
+      if (l.code === 'E0') altCodes.push('PL');
+      if (l.code === 'PL') altCodes.push('E0');
+      if (l.code === 'E1') altCodes.push('ELC');
+      if (l.code === 'ELC') altCodes.push('E1');
+      if (l.code === 'I1') altCodes.push('SA');
+      if (l.code === 'SA') altCodes.push('I1');
+      if (l.code === 'D1') altCodes.push('BL1');
+      if (l.code === 'BL1') altCodes.push('D1');
+      if (l.code === 'F1') altCodes.push('FL1');
+      if (l.code === 'FL1') altCodes.push('F1');
       if (l.code === 'P1') altCodes.push('PPL');
       if (l.code === 'T1') altCodes.push('TSL');
       if (l.code === 'SC0') altCodes.push('SP');

@@ -14,7 +14,6 @@ import { evaluateFixtureMarkets } from '../prediction/marketSelection';
 import { computeRequestDateWindow } from '../utils/dateWindow';
 import { serverCache } from '../cache/serverCache';
 import { checkAndLogStartupEnv } from '../config/envAudit';
-import { REAL_250_MATCHES, RealHistoricalMatch } from './realMatchArchive';
 import { lookupTeamStrength } from './teamDatabase';
 import { displayName, getTeamAbbreviation } from '../utils/formatText';
 import { validateFixtureIntegrity } from './fixtureIntegrity';
@@ -823,57 +822,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     // 8. OPTIONAL DEMO DATA (Requirement 1: Strictly gated behind USE_DEMO_DATA=true)
     // =========================================================================
     if (process.env.USE_DEMO_DATA === 'true') {
-      console.warn('[FootballDataProvider] USE_DEMO_DATA=true flag active: Loading historical benchmark dataset for development.');
-      let sourceMatches = REAL_250_MATCHES;
-      if (params?.competitionCode && params.competitionCode !== 'ALL') {
-        sourceMatches = sourceMatches.filter(m => m.competitionCode === params.competitionCode);
-      }
-      const demoFixtures: Fixture[] = sourceMatches.slice(0, 10).map((m) => ({
-        id: `demo_${m.id}`,
-        providerId: `demo_${m.id}`,
-        providerName: 'Historical Benchmark (Demo)',
-        fetchTime,
-        source: 'demo:historical_benchmark',
-        competitionId: `comp_${m.competitionCode.toLowerCase()}`,
-        competition: COMPETITIONS.find(c => c.code === m.competitionCode) || COMPETITIONS[0],
-        seasonYear: '2024/2025',
-        homeTeam: {
-          id: `team_${m.homeTeam.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-          name: m.homeTeam,
-          shortName: m.homeTeam,
-          tla: m.homeTeam.slice(0, 3).toUpperCase(),
-          crestUrl: `https://crests.football-data.org/65.png`,
-          attackRating: m.context.homeAttackRating,
-          defenseRating: m.context.homeDefenseRating,
-          hasRealTeamStrength: true,
-        },
-        awayTeam: {
-          id: `team_${m.awayTeam.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-          name: m.awayTeam,
-          shortName: m.awayTeam,
-          tla: m.awayTeam.slice(0, 3).toUpperCase(),
-          crestUrl: `https://crests.football-data.org/57.png`,
-          attackRating: m.context.awayAttackRating,
-          defenseRating: m.context.awayDefenseRating,
-          hasRealTeamStrength: true,
-        },
-        kickoffTime: `${dateFrom}T15:00:00Z`,
-        matchday: 9,
-        status: 'TIMED',
-        homeScore: null,
-        awayScore: null,
-        venue: 'European Stadium',
-        dataFreshness: fetchTime,
-        isDemo: true,
-      }));
-
-      return {
-        fixtures: demoFixtures,
-        liveDataAvailable: true,
-        lastUpdated: lastUpdatedFormatted,
-        providerUsed: 'Historical Benchmark (USE_DEMO_DATA=true)',
-        dateRange: { dateFrom, dateTo },
-      };
+      console.warn('[FootballDataProvider] USE_DEMO_DATA=true flag active: No synthetic demo data bundled. Production reads from Supabase.');
     }
 
     // Required Error State (Requirement 4): Never generate substitute data!
@@ -893,47 +842,6 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     const result = await this.getLiveFixtures();
     const found = result.fixtures.find(f => f.id === id || f.providerId === id);
     if (found) return found;
-
-    if (process.env.USE_DEMO_DATA === 'true') {
-      const historical = REAL_250_MATCHES.find(m => m.id === id);
-      if (historical) {
-        return {
-          id: historical.id,
-          providerId: historical.id,
-          providerName: 'Historical Benchmark (Demo)',
-          source: 'demo:historical_benchmark',
-          competitionId: `comp_${historical.competitionCode.toLowerCase()}`,
-          competition: COMPETITIONS.find(c => c.code === historical.competitionCode) || COMPETITIONS[0],
-          seasonYear: '2024/2025',
-          homeTeam: {
-            id: `team_${historical.homeTeam.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-            name: historical.homeTeam,
-            shortName: historical.homeTeam,
-            tla: historical.homeTeam.slice(0, 3).toUpperCase(),
-            crestUrl: 'https://crests.football-data.org/65.png',
-            attackRating: historical.context.homeAttackRating,
-            defenseRating: historical.context.homeDefenseRating,
-            hasRealTeamStrength: true,
-          },
-          awayTeam: {
-            id: `team_${historical.awayTeam.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-            name: historical.awayTeam,
-            shortName: historical.awayTeam,
-            tla: historical.awayTeam.slice(0, 3).toUpperCase(),
-            crestUrl: 'https://crests.football-data.org/57.png',
-            attackRating: historical.context.awayAttackRating,
-            defenseRating: historical.context.awayDefenseRating,
-            hasRealTeamStrength: true,
-          },
-          kickoffTime: new Date().toISOString(),
-          matchday: 9,
-          status: 'TIMED',
-          dataFreshness: new Date().toISOString(),
-          isDemo: true,
-        };
-      }
-    }
-
     return null;
   }
 
