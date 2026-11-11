@@ -182,15 +182,15 @@ export default function MatchAnalysisPage() {
   }, [fixture, stats, noRecommendationReason]);
 
   const highTierCount = useMemo(() => {
-    return predictions.filter(p => p.confidenceTier === 'HIGH' || p.confidenceTier === 'SAFE' || p.riskTier === 'LOW').length;
+    return predictions.filter(p => p.confidenceTier === 'HIGH' || p.riskTier === 'SAFE' || p.riskTier === 'LOW').length;
   }, [predictions]);
 
   const medTierCount = useMemo(() => {
-    return predictions.filter(p => p.confidenceTier === 'MEDIUM' || p.riskTier === 'MEDIUM').length;
+    return predictions.filter(p => p.confidenceTier === 'MEDIUM' || p.riskTier === 'MEDIUM' || p.riskTier === 'MODERATE').length;
   }, [predictions]);
 
   const lowTierCount = useMemo(() => {
-    return predictions.filter(p => p.confidenceTier === 'LOW' || p.confidenceTier === 'SPECULATIVE' || p.riskTier === 'HIGH').length;
+    return predictions.filter(p => p.confidenceTier === 'LOW' || p.riskTier === 'RISKY' || p.riskTier === 'LONGSHOT').length;
   }, [predictions]);
 
   if (isLoading) {
