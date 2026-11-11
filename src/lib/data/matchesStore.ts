@@ -9,7 +9,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { TEAM_STRENGTH_DATABASE, lookupTeamStrength, normalizeTeamLookupKey } from './teamDatabase';
 import { COMPETITIONS } from './seedData';
 import { displayName } from '@/lib/utils/formatText';
-import { lookupCanonicalTeam } from './canonicalTeams';
+import { lookupCanonicalTeam, getUnresolvedTeamsLog, recordUnresolvedTeam, clearUnresolvedTeamsLog, UnresolvedTeamLogEntry } from './canonicalTeams';
 
 export interface FormMatchRecord {
   id: string;
@@ -160,6 +160,8 @@ export interface DataStatusReport {
   }[];
   unmatchedNamesCount: number;
   unmatchedNames: string[];
+  unresolvedTeamsCount: number;
+  unresolvedTeams: UnresolvedTeamLogEntry[];
   unmappedFixtureNamesCount: number;
   unmappedFixtureNames: { name: string; provider: string }[];
   storeUsed: 'supabase' | 'in-memory';
@@ -264,6 +266,31 @@ class MatchesStore {
 
   clearUnmappedFixtureNames() {
     this.unmappedFixtureNamesMap.clear();
+  }
+
+  recordUnresolvedTeam(rawName: string, provider: string = 'matches-store') {
+    recordUnresolvedTeam(rawName, provider);
+  }
+
+  getUnresolvedTeams(): UnresolvedTeamLogEntry[] {
+    return getUnresolvedTeamsLog();
+  }
+
+  clearUnresolvedTeams() {
+    clearUnresolvedTeamsLog();
+  }
+
+  getTeamMatchCountSync(teamIdOrName: string): number {
+    const canon = lookupCanonicalTeam(teamIdOrName);
+    const canonicalId = canon ? canon.canonicalId : (typeof teamIdOrName === 'string' && teamIdOrName.startsWith('team_') ? teamIdOrName : `team_${normalizeTeamLookupKey(teamIdOrName)}`);
+    const memCount = this.teamMatchCounts.get(canonicalId);
+    if (typeof memCount === 'number' && memCount > 0) return memCount;
+
+    const lookup = lookupTeamStrength(teamIdOrName);
+    if (lookup?.data && typeof lookup.data.sampleMatches === 'number') {
+      return lookup.data.sampleMatches;
+    }
+    return 0;
   }
 
   /**
@@ -1346,6 +1373,7 @@ class MatchesStore {
 
     const unmatched = this.getUnmatchedNames();
     const unmappedFixtures = this.getUnmappedFixtureNames();
+    const unresolvedTeams = getUnresolvedTeamsLog();
 
     return {
       totalMatches: allMatches.length,
@@ -1369,6 +1397,8 @@ class MatchesStore {
       ),
       unmatchedNamesCount: unmatched.length,
       unmatchedNames: unmatched,
+      unresolvedTeamsCount: unresolvedTeams.length,
+      unresolvedTeams,
       unmappedFixtureNamesCount: unmappedFixtures.length,
       unmappedFixtureNames: unmappedFixtures,
       storeUsed,

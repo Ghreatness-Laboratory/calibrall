@@ -575,7 +575,7 @@ export default function MarketComparisonTable({
               <div className="p-4 rounded-[8px] bg-[#101713] border border-white/[0.07] text-center text-[12px] text-[#8B9890] space-y-1">
                 <AlertTriangle className="w-4 h-4 text-[#E2AE45] mx-auto" />
                 <p className="font-semibold text-[#ECF1EE]">Insufficient Half Split Data</p>
-                <p>First half and second half goal records not available. Engine abstains to prevent fabricated projections.</p>
+                <p>First half and second half goal records for {homeTeamName} and {awayTeamName} not available in stored matches. Engine abstains to prevent fabricated projections.</p>
               </div>
             )}
           </div>

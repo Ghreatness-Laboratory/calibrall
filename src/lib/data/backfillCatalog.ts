@@ -1,4 +1,5 @@
 import { lookupTeamStrength } from './teamDatabase';
+import { lookupCanonicalTeam, recordUnresolvedTeam } from './canonicalTeams';
 
 // CALIBRALL: Backfill Catalog, Timezone Parser & Idempotent ID Utility
 
@@ -279,6 +280,15 @@ export function parseBrazilCsvDate(dateStr: string): string | null {
 
 export function getCanonicalTeamForCsv(league: string, rawCsvName: string) {
   const cleanName = rawCsvName.trim();
+  const canon = lookupCanonicalTeam(cleanName);
+  if (canon) {
+    return {
+      id: canon.canonicalId,
+      name: canon.canonicalName,
+      shortName: canon.shortName,
+      competitionCode: canon.competitionCode !== 'GENERIC' ? canon.competitionCode : league,
+    };
+  }
   const lookup = lookupTeamStrength(cleanName);
   if (lookup.found && lookup.data) {
     return {
@@ -288,6 +298,9 @@ export function getCanonicalTeamForCsv(league: string, rawCsvName: string) {
       competitionCode: league,
     };
   }
+  // Record in unresolved_teams log
+  recordUnresolvedTeam(cleanName, `football-data.co.uk:${league}`);
+
   const sanitized = sanitizeRawTeamForId(cleanName);
   // Shared team identity without division prefix so promoted/relegated clubs share match history
   const canonicalId = `team_${sanitized}`;

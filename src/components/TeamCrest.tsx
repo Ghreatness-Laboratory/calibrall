@@ -51,15 +51,15 @@ export default function TeamCrest({
 
   // Look up crest in team_crests table by canonical team id
   const effectiveCrestUrl = useMemo(() => {
-    if (canonicalTeamId) {
-      const record = lookupTeamCrest(canonicalTeamId);
-      if (record) {
-        // Strict requirement: No verified crest = initials badge (null)
-        return record.verified && record.crestUrl ? record.crestUrl : null;
-      }
+    const targetId = canonicalTeamId || teamName;
+    const record = lookupTeamCrest(targetId);
+    if (record) {
+      // Strict requirement: No verified crest = initials badge (null)
+      return record.verified && record.crestUrl ? record.crestUrl : null;
     }
-    return crestUrl || null;
-  }, [canonicalTeamId, crestUrl]);
+    // No verified record found in team_crests table -> initials badge
+    return null;
+  }, [canonicalTeamId, teamName]);
 
   const styleDimension = {
     width: `${size}px`,

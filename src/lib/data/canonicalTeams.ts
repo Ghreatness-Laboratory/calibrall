@@ -1113,6 +1113,17 @@ export const CANONICAL_TEAMS: Record<string, CanonicalTeam> = {
   // ==========================================
   // BUNDESLIGA (BL1)
   // ==========================================
+  team_koln: {
+    canonicalId: 'team_koln',
+    canonicalName: '1. FC Köln',
+    shortName: 'FC Köln',
+    tla: 'KOE',
+    competitionCode: 'BL1',
+    crestUrl: 'https://crests.football-data.org/1.png',
+    venueName: 'RheinEnergieStadion',
+    aliases: ['fc koln', 'fc cologne', '1. fc koln', '1. fc köln', 'cologne', 'koln', 'köln', '1 fc koln', 'team_koln'],
+    providerIds: { footballDataCoUk: 'FC Koln', footballDataOrg: '1', espn: '122', theSportsDb: '133653', elvidge: 'FC Koln' }
+  },
   team_bayern: {
     canonicalId: 'team_bayern',
     canonicalName: 'FC Bayern München',
@@ -1312,6 +1323,46 @@ export function normalizeLookupKey(name: string): string {
 // Registry lookup with alias & strict normalization
 const UNMATCHED_NAMES_LOG = new Set<string>();
 
+export interface UnresolvedTeamLogEntry {
+  sourceName: string;
+  sourceProvider: string;
+  count: number;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+const UNRESOLVED_TEAMS_MAP = new Map<string, UnresolvedTeamLogEntry>();
+
+export function recordUnresolvedTeam(sourceName: string, provider: string = 'football-data.co.uk'): void {
+  if (!sourceName || !sourceName.trim()) return;
+  const name = sourceName.trim();
+  const key = `${name.toLowerCase()}:${provider.toLowerCase()}`;
+  const now = new Date().toISOString();
+  const existing = UNRESOLVED_TEAMS_MAP.get(key);
+  if (existing) {
+    existing.count++;
+    existing.lastSeen = now;
+  } else {
+    UNRESOLVED_TEAMS_MAP.set(key, {
+      sourceName: name,
+      sourceProvider: provider,
+      count: 1,
+      firstSeen: now,
+      lastSeen: now,
+    });
+  }
+}
+
+export function getUnresolvedTeamsLog(): UnresolvedTeamLogEntry[] {
+  return Array.from(UNRESOLVED_TEAMS_MAP.values()).sort(
+    (a, b) => b.count - a.count || a.sourceName.localeCompare(b.sourceName)
+  );
+}
+
+export function clearUnresolvedTeamsLog(): void {
+  UNRESOLVED_TEAMS_MAP.clear();
+}
+
 export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | null {
   if (!rawNameOrId) return null;
   const input = typeof rawNameOrId === 'string' ? rawNameOrId.trim() : (rawNameOrId.name || rawNameOrId.shortName || rawNameOrId.id || '').toString().trim();
@@ -1346,6 +1397,19 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
         providerIds: { footballDataCoUk: input },
       };
     }
+    // Synthesize canonical team from exact registered override
+    const cleanRaw = overrideId.replace(/^team_/, '');
+    const titleCase = cleanRaw.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return {
+      canonicalId: overrideId,
+      canonicalName: titleCase,
+      shortName: titleCase,
+      tla: cleanRaw.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'FC',
+      competitionCode: 'GENERIC',
+      crestUrl: '',
+      aliases: [input.toLowerCase(), overrideId],
+      providerIds: { footballDataCoUk: input },
+    };
   }
 
   // 2. Direct ID match
@@ -1422,8 +1486,9 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
     };
   }
 
-  // Log unmatched name (never guess randomly)
+  // Log unmatched name into both UNMATCHED_NAMES_LOG and UNRESOLVED_TEAMS_MAP (never guess randomly)
   UNMATCHED_NAMES_LOG.add(input);
+  recordUnresolvedTeam(input, 'canonical-lookup');
   return null;
 }
 

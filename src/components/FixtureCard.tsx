@@ -12,6 +12,7 @@ import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds 
 import { cleanDisplayText, displayName, formatMatchTime } from '@/lib/utils/formatText';
 import { settleMarketPrediction, extractMatchStats } from '@/lib/prediction/settlementEngine';
 import { isTeamNewsEnabled } from '@/lib/prediction/featureFlags';
+import { matchesStore } from '@/lib/data/matchesStore';
 
 interface Props {
   fixture: Fixture;
@@ -336,13 +337,13 @@ export default function FixtureCard({
             <div className="bg-[#151D19] rounded-[10px] px-2.5 py-2 flex items-center justify-between text-[11px] text-[#8B9892]">
               <span className="truncate leading-tight">
                 {cleanDisplayText(
-                  noRecommendationReason && noRecommendationReason.startsWith('Data out of date')
-                    ? 'Insufficient data · Analysis only'
-                    : (noRecommendationReason && noRecommendationReason !== 'Not enough data'
-                        ? noRecommendationReason
-                        : (fixture.insufficientData
-                            ? 'Statistical evidence insufficient · Analysis only'
-                            : 'Withheld: analysis only'))
+                  noRecommendationReason && noRecommendationReason !== 'Not enough data'
+                    ? noRecommendationReason
+                    : (() => {
+                        const hCount = matchesStore.getTeamMatchCountSync(fixture.homeTeam.id || fixture.homeTeam.name);
+                        const aCount = matchesStore.getTeamMatchCountSync(fixture.awayTeam.id || fixture.awayTeam.name);
+                        return `Abstained: ${homeName} (${hCount} matches) & ${awayName} (${aCount} matches) lack qualifying predictive edge.`;
+                      })()
                 )}
               </span>
             </div>

@@ -322,8 +322,8 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
 
   const homeTeamDisplayName = displayName(fixture.homeTeam);
   const awayTeamDisplayName = displayName(fixture.awayTeam);
-  const homeStoredCount = matchesStore.getTeamMatchCount(fixture.homeTeam.id || fixture.homeTeam.name);
-  const awayStoredCount = matchesStore.getTeamMatchCount(fixture.awayTeam.id || fixture.awayTeam.name);
+  const homeStoredCount = matchesStore.getTeamMatchCountSync(fixture.homeTeam.id || fixture.homeTeam.name);
+  const awayStoredCount = matchesStore.getTeamMatchCountSync(fixture.awayTeam.id || fixture.awayTeam.name);
 
   let reason = 'Not enough data';
   if (homeNeeds && awayNeeds) {
