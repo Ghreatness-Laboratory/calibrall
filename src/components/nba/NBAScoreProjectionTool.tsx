@@ -333,7 +333,7 @@ export default function NBAScoreProjectionTool() {
             <select
               value={teamA.teamAbbr}
               onChange={(e) => handleSelectTeamA(e.target.value)}
-              className="w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-[10px] text-[12.5px] text-[var(--text)] focus:outline-hidden focus:border-[var(--accent)] font-medium"
+              className="h-[40px] w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden focus:border-[var(--accent)] font-medium"
             >
               {allTeams.map((t) => (
                 <option key={t.abbreviation} value={t.abbreviation} className="bg-[var(--bg)] text-[var(--text)]">
@@ -349,10 +349,10 @@ export default function NBAScoreProjectionTool() {
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
                 <span className="text-[var(--text-3)]">Offensive Efficiency (Pts / Poss)</span>
-                <span className={`px-1.5 py-0.2 rounded-[5px] text-[10px] font-mono ${
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
                   teamA.isOffEffManual 
                     ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30'
+                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
                 }`}>
                   {teamA.isOffEffManual ? 'Manual' : 'Auto (ORtg/100)'}
                 </span>
@@ -364,7 +364,7 @@ export default function NBAScoreProjectionTool() {
                 max={EFFICIENCY_MAX}
                 value={teamA.offEff}
                 onChange={(e) => setTeamA(prev => ({ ...prev, offEff: e.target.value, isOffEffManual: true }))}
-                className={`w-full bg-[var(--surface-2)] border px-3 py-1.5 rounded-[10px] text-[12.5px] font-mono text-[var(--text)] focus:outline-hidden ${
+                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
                   validation.errors.teamA?.offEff ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--accent)]'
                 }`}
               />
@@ -377,10 +377,10 @@ export default function NBAScoreProjectionTool() {
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
                 <span className="text-[var(--text-3)]">Defensive Efficiency (Pts allowed / Poss)</span>
-                <span className={`px-1.5 py-0.2 rounded-[5px] text-[10px] font-mono ${
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
                   teamA.isDefEffManual 
                     ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30'
+                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
                 }`}>
                   {teamA.isDefEffManual ? 'Manual' : 'Auto (DRtg/100)'}
                 </span>
@@ -392,7 +392,7 @@ export default function NBAScoreProjectionTool() {
                 max={EFFICIENCY_MAX}
                 value={teamA.defEff}
                 onChange={(e) => setTeamA(prev => ({ ...prev, defEff: e.target.value, isDefEffManual: true }))}
-                className={`w-full bg-[var(--surface-2)] border px-3 py-1.5 rounded-[10px] text-[12.5px] font-mono text-[var(--text)] focus:outline-hidden ${
+                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
                   validation.errors.teamA?.defEff ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--accent)]'
                 }`}
               />
@@ -405,10 +405,10 @@ export default function NBAScoreProjectionTool() {
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
                 <span className="text-[var(--text-3)]">Possessions Per Game (PACE)</span>
-                <span className={`px-1.5 py-0.2 rounded-[5px] text-[10px] font-mono ${
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
                   teamA.isPossManual 
                     ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30'
+                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
                 }`}>
                   {teamA.isPossManual ? 'Manual' : 'Auto (PACE)'}
                 </span>
@@ -420,7 +420,7 @@ export default function NBAScoreProjectionTool() {
                 max={POSSESSIONS_MAX}
                 value={teamA.poss}
                 onChange={(e) => setTeamA(prev => ({ ...prev, poss: e.target.value, isPossManual: true }))}
-                className={`w-full bg-[var(--surface-2)] border px-3 py-1.5 rounded-[10px] text-[12.5px] font-mono text-[var(--text)] focus:outline-hidden ${
+                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
                   validation.errors.teamA?.poss ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--accent)]'
                 }`}
               />
@@ -467,7 +467,7 @@ export default function NBAScoreProjectionTool() {
             <select
               value={teamB.teamAbbr}
               onChange={(e) => handleSelectTeamB(e.target.value)}
-              className="w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-[10px] text-[12.5px] text-[var(--text)] focus:outline-hidden focus:border-[var(--info)] font-medium"
+              className="h-[40px] w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden focus:border-[var(--info)] font-medium"
             >
               {allTeams.map((t) => (
                 <option key={t.abbreviation} value={t.abbreviation} className="bg-[var(--bg)] text-[var(--text)]">
@@ -483,10 +483,10 @@ export default function NBAScoreProjectionTool() {
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
                 <span className="text-[var(--text-3)]">Offensive Efficiency (Pts / Poss)</span>
-                <span className={`px-1.5 py-0.2 rounded-[5px] text-[10px] font-mono ${
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
                   teamB.isOffEffManual 
                     ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[var(--info)]/15 text-[var(--info)] border border-[var(--info)]/30'
+                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
                 }`}>
                   {teamB.isOffEffManual ? 'Manual' : 'Auto (ORtg/100)'}
                 </span>
@@ -498,7 +498,7 @@ export default function NBAScoreProjectionTool() {
                 max={EFFICIENCY_MAX}
                 value={teamB.offEff}
                 onChange={(e) => setTeamB(prev => ({ ...prev, offEff: e.target.value, isOffEffManual: true }))}
-                className={`w-full bg-[var(--surface-2)] border px-3 py-1.5 rounded-[10px] text-[12.5px] font-mono text-[var(--text)] focus:outline-hidden ${
+                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
                   validation.errors.teamB?.offEff ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--info)]'
                 }`}
               />
@@ -511,10 +511,10 @@ export default function NBAScoreProjectionTool() {
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
                 <span className="text-[var(--text-3)]">Defensive Efficiency (Pts allowed / Poss)</span>
-                <span className={`px-1.5 py-0.2 rounded-[5px] text-[10px] font-mono ${
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
                   teamB.isDefEffManual 
                     ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[var(--info)]/15 text-[var(--info)] border border-[var(--info)]/30'
+                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
                 }`}>
                   {teamB.isDefEffManual ? 'Manual' : 'Auto (DRtg/100)'}
                 </span>
@@ -526,7 +526,7 @@ export default function NBAScoreProjectionTool() {
                 max={EFFICIENCY_MAX}
                 value={teamB.defEff}
                 onChange={(e) => setTeamB(prev => ({ ...prev, defEff: e.target.value, isDefEffManual: true }))}
-                className={`w-full bg-[var(--surface-2)] border px-3 py-1.5 rounded-[10px] text-[12.5px] font-mono text-[var(--text)] focus:outline-hidden ${
+                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
                   validation.errors.teamB?.defEff ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--info)]'
                 }`}
               />
@@ -539,10 +539,10 @@ export default function NBAScoreProjectionTool() {
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
                 <span className="text-[var(--text-3)]">Possessions Per Game (PACE)</span>
-                <span className={`px-1.5 py-0.2 rounded-[5px] text-[10px] font-mono ${
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
                   teamB.isPossManual 
                     ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[var(--info)]/15 text-[var(--info)] border border-[var(--info)]/30'
+                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
                 }`}>
                   {teamB.isPossManual ? 'Manual' : 'Auto (PACE)'}
                 </span>
@@ -554,7 +554,7 @@ export default function NBAScoreProjectionTool() {
                 max={POSSESSIONS_MAX}
                 value={teamB.poss}
                 onChange={(e) => setTeamB(prev => ({ ...prev, poss: e.target.value, isPossManual: true }))}
-                className={`w-full bg-[var(--surface-2)] border px-3 py-1.5 rounded-[10px] text-[12.5px] font-mono text-[var(--text)] focus:outline-hidden ${
+                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
                   validation.errors.teamB?.poss ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--info)]'
                 }`}
               />
@@ -577,14 +577,14 @@ export default function NBAScoreProjectionTool() {
         <button
           onClick={handleSwapTeams}
           type="button"
-          className="h-[38px] px-3.5 rounded-[10px] bg-[var(--surface)] hover:bg-[var(--surface-2)] border border-[var(--border)] text-[12.5px] font-medium text-[var(--text)] flex items-center gap-2 transition-colors touch-manipulation"
+          className="h-[40px] px-3.5 rounded-[12px] bg-[var(--surface)] hover:bg-[var(--surface-2)] border border-[var(--border)] text-[12.5px] font-medium text-[var(--text)] flex items-center gap-2 transition-colors touch-manipulation active:scale-[0.98]"
         >
           <ArrowLeftRight className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
           <span>Swap teams</span>
         </button>
 
         {/* Sportsbook Line Inputs (Optional) */}
-        <div className="flex items-center gap-2.5 bg-[var(--surface)] border border-[var(--border)] px-3 py-1.5 rounded-[10px] text-[11.5px]">
+        <div className="flex items-center gap-2.5 bg-[var(--surface)] border border-[var(--border)] px-3 py-1.5 rounded-[12px] text-[11.5px]">
           <div className="flex items-center gap-1.5">
             <span className="text-[var(--text-3)]">Total Line:</span>
             <input
@@ -593,11 +593,11 @@ export default function NBAScoreProjectionTool() {
               placeholder="e.g. 224.5"
               value={sportsbookTotal}
               onChange={(e) => setSportsbookTotal(e.target.value)}
-              className="w-16 bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 rounded-[6px] text-center text-[var(--text)] font-mono text-[11.5px]"
+              className="h-[40px] w-20 bg-[var(--surface-2)] border border-[var(--border)] px-2.5 rounded-[12px] text-center text-[var(--text)] text-[13px] tabular-nums"
             />
           </div>
 
-          <div className="h-3.5 w-px bg-[var(--border)]" />
+          <div className="h-5 w-px bg-[var(--border)]" />
 
           <div className="flex items-center gap-1.5">
             <span className="text-[var(--text-3)]">{teamA.name.split(' ').pop()} Spread:</span>
@@ -607,7 +607,7 @@ export default function NBAScoreProjectionTool() {
               placeholder="e.g. −5.5"
               value={sportsbookSpreadTeamA}
               onChange={(e) => setSportsbookSpreadTeamA(e.target.value)}
-              className="w-16 bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 rounded-[6px] text-center text-[var(--text)] font-mono text-[11.5px]"
+              className="h-[40px] w-20 bg-[var(--surface-2)] border border-[var(--border)] px-2.5 rounded-[12px] text-center text-[var(--text)] text-[13px] tabular-nums"
             />
           </div>
         </div>
@@ -693,23 +693,23 @@ export default function NBAScoreProjectionTool() {
               <span>Exact Step by Step Mathematical Calculation</span>
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-[11.5px] font-mono">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[12px] font-sans">
               {/* Step 1: Offense */}
-              <div className="p-3 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1.5">
-                <div className="text-[11px] text-[var(--accent)] font-sans font-semibold">
+              <div className="p-2.5 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1">
+                <div className="text-[11px] text-[var(--accent)] font-semibold">
                   Step 1: Offense Calculation
                 </div>
-                <div className="text-[var(--text-3)] text-[10.5px]">
+                <div className="text-[var(--muted)] text-[12px]">
                   Formula: Offensive Efficiency × Possessions
                 </div>
-                <div className="text-[var(--text)] pt-1 space-y-1">
+                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums text-[12px]">
                   <div>
-                    <span className="text-[var(--text-3)]">A offense ({teamA.name.split(' ').pop()}): </span>
+                    <span className="text-[var(--muted)]">A offense ({teamA.name.split(' ').pop()}): </span>
                     <span>{inputA.offensiveEfficiency.toFixed(3)} × {inputA.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--accent)] font-semibold">{calculationResult.aOff.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-3)]">B offense ({teamB.name.split(' ').pop()}): </span>
+                    <span className="text-[var(--muted)]">B offense ({teamB.name.split(' ').pop()}): </span>
                     <span>{inputB.offensiveEfficiency.toFixed(3)} × {inputB.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--info)] font-semibold">{calculationResult.bOff.toFixed(2)}</span>
                   </div>
@@ -717,21 +717,21 @@ export default function NBAScoreProjectionTool() {
               </div>
 
               {/* Step 2: Defense */}
-              <div className="p-3 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1.5">
-                <div className="text-[11px] text-[var(--accent)] font-sans font-semibold">
+              <div className="p-2.5 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1">
+                <div className="text-[11px] text-[var(--accent)] font-semibold">
                   Step 2: Defense (Opponent Possessions)
                 </div>
-                <div className="text-[var(--text-3)] text-[10.5px]">
+                <div className="text-[var(--muted)] text-[12px]">
                   Formula: Defensive Efficiency × Opponent Possessions
                 </div>
-                <div className="text-[var(--text)] pt-1 space-y-1">
+                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums text-[12px]">
                   <div>
-                    <span className="text-[var(--text-3)]">A defense (allows vs B): </span>
+                    <span className="text-[var(--muted)]">A defense (allows vs B): </span>
                     <span>{inputA.defensiveEfficiency.toFixed(3)} × {inputB.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--accent)] font-semibold">{calculationResult.aDef.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-3)]">B defense (allows vs A): </span>
+                    <span className="text-[var(--muted)]">B defense (allows vs A): </span>
                     <span>{inputB.defensiveEfficiency.toFixed(3)} × {inputA.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--info)] font-semibold">{calculationResult.bDef.toFixed(2)}</span>
                   </div>
@@ -739,21 +739,21 @@ export default function NBAScoreProjectionTool() {
               </div>
 
               {/* Step 3: Projected Score */}
-              <div className="p-3 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1.5">
-                <div className="text-[11px] text-[var(--accent)] font-sans font-semibold">
+              <div className="p-2.5 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1">
+                <div className="text-[11px] text-[var(--accent)] font-semibold">
                   Step 3: Projected Score (Averaging)
                 </div>
-                <div className="text-[var(--text-3)] text-[10.5px]">
+                <div className="text-[var(--muted)] text-[12px]">
                   Formula: (Team Offense + Opponent Allowed Defense) / 2
                 </div>
-                <div className="text-[var(--text)] pt-1 space-y-1">
+                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums text-[12px]">
                   <div>
-                    <span className="text-[var(--text-3)]">A projected: </span>
+                    <span className="text-[var(--muted)]">A projected: </span>
                     <span>({calculationResult.aOff.toFixed(2)} + {calculationResult.bDef.toFixed(2)}) / 2 = </span>
                     <span className="text-[var(--accent)] font-semibold text-[13px]">{calculationResult.aProjected.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-3)]">B projected: </span>
+                    <span className="text-[var(--muted)]">B projected: </span>
                     <span>({calculationResult.bOff.toFixed(2)} + {calculationResult.aDef.toFixed(2)}) / 2 = </span>
                     <span className="text-[var(--info)] font-semibold text-[13px]">{calculationResult.bProjected.toFixed(2)}</span>
                   </div>
@@ -761,22 +761,22 @@ export default function NBAScoreProjectionTool() {
               </div>
 
               {/* Step 4: Total & Margin */}
-              <div className="p-3 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1.5">
-                <div className="text-[11px] text-[var(--accent)] font-sans font-semibold">
+              <div className="p-2.5 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1">
+                <div className="text-[11px] text-[var(--accent)] font-semibold">
                   Step 4: Total, Margin & Winner
                 </div>
-                <div className="text-[var(--text-3)] text-[10.5px]">
-                  Formula: Projected Total = A proj + B proj; Margin = |A \u2212 B|
+                <div className="text-[var(--muted)] text-[12px]">
+                  Formula: Projected Total = A proj + B proj; Margin = |A − B|
                 </div>
-                <div className="text-[var(--text)] pt-1 space-y-1">
+                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums text-[12px]">
                   <div>
-                    <span className="text-[var(--text-3)]">Projected Total: </span>
+                    <span className="text-[var(--muted)]">Projected Total: </span>
                     <span>{calculationResult.aProjected.toFixed(2)} + {calculationResult.bProjected.toFixed(2)} = </span>
                     <span className="text-[var(--accent)] font-semibold text-[13px]">{calculationResult.total.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-3)]">Spread Margin: </span>
-                    <span>|{calculationResult.aProjected.toFixed(2)} \u2212 {calculationResult.bProjected.toFixed(2)}| = </span>
+                    <span className="text-[var(--muted)]">Spread Margin: </span>
+                    <span>|{calculationResult.aProjected.toFixed(2)} − {calculationResult.bProjected.toFixed(2)}| = </span>
                     <span className="text-[var(--text)] font-semibold">{calculationResult.margin.toFixed(2)} pts</span>
                   </div>
                 </div>

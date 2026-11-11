@@ -191,14 +191,14 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
         )}
         {/* LOWER VARIANCE SUBSTITUTE BOX (if Fragility Triggered or Substitute exists) */}
         {substituteOption && (
-          <div className="bg-[#151E19] border border-[#B6E63B]/40 rounded-[11px] p-3 space-y-2">
+          <div className="bg-[#151D19] border border-[#B8E636]/30 rounded-[11px] p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono tracking-wider uppercase text-[#B6E63B] font-semibold flex items-center gap-1.5">
+              <span className="text-[10px] font-mono tracking-wider uppercase text-[#B8E636] font-semibold flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5" strokeWidth={2} />
                 <span>Alternative Line Projection</span>
               </span>
-              <span className="px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-mono bg-[rgba(182,230,59,0.12)] text-[#B6E63B] border border-[#B6E63B]/30 font-semibold">
-                &#8722;{substituteOption.varianceReductionPct}% variance
+              <span className="px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-mono bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30 font-semibold">
+                −{substituteOption.varianceReductionPct}% variance
               </span>
             </div>
 

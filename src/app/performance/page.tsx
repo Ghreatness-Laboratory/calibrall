@@ -261,63 +261,63 @@ export default function PerformancePage() {
         {/* SECTION: VERIFIED FORWARD RECORD & PRE-KICKOFF LEDGER */}
         {sectionTab === 'forward_record' && (
           <div className="space-y-3">
-            {/* Ledger Policy Charter */}
-            <div className="bg-[#151E19] border border-[#B6E63B]/40 rounded-[14px] p-3.5 space-y-2">
-              <div className="flex items-center gap-2 text-[#B6E63B] font-[600] text-[13px]">
+            {/* Compact ledger notice card with shield icon and lime title */}
+            <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-[#B8E636] font-semibold text-[13px]">
                 <ShieldCheck className="w-4 h-4 shrink-0" strokeWidth={2} />
-                <span>Pre kickoff ledger protocol · The platform only accuracy measure</span>
+                <span>Pre-kickoff ledger protocol</span>
               </div>
-              <p className="text-[12px] leading-[1.55] text-[#8B9890]">
-                Every model projection from model deployment onwards is logged prior to kickoff with an immutable timestamp, model version, probability, market line, and bookmaker odds. Entries are sealed with a cryptographic hash and cannot be altered or backfilled. Grading occurs strictly after full time against official match results.
+              <p className="text-[12px] leading-[1.55] text-[#8B9892]">
+                Every model projection is logged prior to kickoff with an immutable timestamp, probability, market line, and bookmaker odds. Entries are sealed with a cryptographic hash and cannot be altered or backfilled.
               </p>
             </div>
 
-            {/* Forward Ledger KPI Summary Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-                <div className="text-[10.5px] text-[#8B9890]">Total forward calls</div>
-                <div className="flex items-baseline gap-1.5">
-                  <div className="text-[17px] font-[650] text-[#ECF1EE] font-mono tabular-nums">
-                    {forwardMetrics.totalSettled + forwardMetrics.totalPending}
-                  </div>
-                  <div className="text-[10.5px] text-[#8B9890] tabular-nums font-mono">
-                    picks
-                  </div>
+            {/* Stats 2x2 grid: Forward Brier, Log loss, Hit rate with ROI suffix, Settled with W/L suffix */}
+            <div className="grid grid-cols-2 gap-2">
+              {/* Stat 1: Forward Brier */}
+              <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3 flex flex-col justify-between">
+                <div className="text-[10.5px] text-[#8B9892] font-medium">Forward Brier</div>
+                <div className="text-[18px] font-[650] text-[#B8E636] tabular-nums mt-1">
+                  {forwardMetrics.brierScore.toFixed(3)}
                 </div>
-                <div className="text-[10px] text-[#5E6A63]">{forwardMetrics.totalPending} pending kickoff</div>
+                <div className="text-[10px] text-[#5E6B65] mt-0.5">Strict probability calibration</div>
               </div>
 
-              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-                <div className="text-[10.5px] text-[#8B9890]">Graded full time</div>
-                <div className="flex items-baseline gap-1.5">
-                  <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
-                    {forwardMetrics.totalSettled}
-                  </div>
-                  <div className="text-[10.5px] text-[#B6E63B] tabular-nums font-mono">
-                    settled
-                  </div>
+              {/* Stat 2: Log loss */}
+              <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3 flex flex-col justify-between">
+                <div className="text-[10.5px] text-[#8B9892] font-medium">Log loss</div>
+                <div className="text-[18px] font-[650] text-[#E9EFEB] tabular-nums mt-1">
+                  {forwardMetrics.logLoss.toFixed(3)}
                 </div>
-                <div className="text-[10px] text-[#5E6A63]">{forwardMetrics.wonCount} won · {forwardMetrics.lostCount} lost</div>
+                <div className="text-[10px] text-[#5E6B65] mt-0.5">Out-of-sample entropy</div>
               </div>
 
-              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-                <div className="text-[10.5px] text-[#8B9890]">Forward hit rate</div>
-                <div className="flex items-baseline gap-1.5">
-                  <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
+              {/* Stat 3: Hit rate with ROI as a small suffix */}
+              <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3 flex flex-col justify-between">
+                <div className="text-[10.5px] text-[#8B9892] font-medium">Hit rate</div>
+                <div className="flex items-baseline gap-1.5 mt-1">
+                  <span className="text-[18px] font-[650] text-[#B8E636] tabular-nums">
                     {(forwardMetrics.hitRate * 100).toFixed(1)}%
-                  </div>
+                  </span>
+                  <span className="text-[10.5px] text-[#8B9892] tabular-nums font-medium">
+                    +{forwardMetrics.yieldRoi.toFixed(1)}% ROI
+                  </span>
                 </div>
-                <div className="text-[10px] text-[#5E6A63]">+{forwardMetrics.yieldRoi.toFixed(1)}% unit yield</div>
+                <div className="text-[10px] text-[#5E6B65] mt-0.5">Unit yield on flat stakes</div>
               </div>
 
-              <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-2.5 flex flex-col justify-between h-[76px]">
-                <div className="text-[10.5px] text-[#8B9890]">Forward Brier score</div>
-                <div className="flex items-baseline gap-1.5">
-                  <div className="text-[17px] font-[650] text-[#B6E63B] font-mono tabular-nums">
-                    {forwardMetrics.brierScore.toFixed(3)}
-                  </div>
+              {/* Stat 4: Settled with W/L as a small suffix */}
+              <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3 flex flex-col justify-between">
+                <div className="text-[10.5px] text-[#8B9892] font-medium">Settled</div>
+                <div className="flex items-baseline gap-1.5 mt-1">
+                  <span className="text-[18px] font-[650] text-[#E9EFEB] tabular-nums">
+                    {forwardMetrics.totalSettled}
+                  </span>
+                  <span className="text-[10.5px] text-[#8B9892] tabular-nums font-medium">
+                    {forwardMetrics.wonCount}W · {forwardMetrics.lostCount}L
+                  </span>
                 </div>
-                <div className="text-[10px] text-[#5E6A63]">Log loss {forwardMetrics.logLoss.toFixed(3)}</div>
+                <div className="text-[10px] text-[#5E6B65] mt-0.5">{forwardMetrics.totalPending} pending kickoff</div>
               </div>
             </div>
 
@@ -803,12 +803,12 @@ export default function PerformancePage() {
                   </div>
                 </div>
 
-                <div className="bg-[#151E19] p-2.5 rounded-[10px] space-y-1 border border-[#B6E63B]/30">
-                  <span className="text-[10px] font-mono uppercase text-[#B6E63B] block">Challenger (Promoted)</span>
-                  <div className="text-[12.5px] font-bold text-[#ECF1EE]">{cleanDisplayText(researchAudit.championChallenger.challengerModelName)}</div>
-                  <div className="text-[11px] font-mono text-[#8B9890]">Version: {cleanDisplayText(researchAudit.championChallenger.challengerVersion)}</div>
-                  <div className="text-[12px] font-mono text-[#B6E63B] pt-1">
-                    Brier: <span className="font-bold tabular-nums">{researchAudit.championChallenger.challengerBrierScore.toFixed(3)}</span> (\u221212.1%)
+                <div className="bg-[#151E19] p-2.5 rounded-[10px] space-y-1 border border-[#B8E636]/30">
+                  <span className="text-[10px] font-mono uppercase text-[#B8E636] block">Challenger (Promoted)</span>
+                  <div className="text-[12.5px] font-bold text-[#E9EFEB]">{cleanDisplayText(researchAudit.championChallenger.challengerModelName)}</div>
+                  <div className="text-[11px] font-mono text-[#8B9892]">Version: {cleanDisplayText(researchAudit.championChallenger.challengerVersion)}</div>
+                  <div className="text-[12px] font-mono text-[#B8E636] pt-1">
+                    Brier: <span className="font-bold tabular-nums">{researchAudit.championChallenger.challengerBrierScore.toFixed(3)}</span> (−12.1%)
                   </div>
                 </div>
               </div>

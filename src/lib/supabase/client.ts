@@ -339,6 +339,10 @@ function getLocalDatabase(): any {
         kickoff_time TEXT,
         status TEXT,
         competition_code TEXT,
+        competition_id TEXT,
+        home_score INTEGER,
+        away_score INTEGER,
+        venue TEXT,
         source TEXT,
         is_demo BOOLEAN,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -361,6 +365,11 @@ function getLocalDatabase(): any {
     try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN result TEXT;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN home_fouls INTEGER;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN away_fouls INTEGER;'); } catch (_) {}
+    try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN competition_id TEXT;'); } catch (_) {}
+    try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN home_score INTEGER;'); } catch (_) {}
+    try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN away_score INTEGER;'); } catch (_) {}
+    try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN venue TEXT;'); } catch (_) {}
+    try { localDbInstance.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_fixtures_provider_id ON fixtures(provider_id);'); } catch (_) {}
   }
   return localDbInstance;
 }

@@ -340,9 +340,16 @@ export default function QuantitativeFactorsAuditPanel({
       {activeTab === 'weather' && (
         <div className="space-y-3">
           {loadingWeather ? (
-            <div className="py-8 text-center text-[12px] text-[#8B9890]">
-              <div className="w-4 h-4 border-2 border-[#B6E63B] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              Ingesting stadium coordinates and meteorological forecast...
+            <div className="p-3.5 bg-[#101613] border border-[#1F2A24] rounded-[14px] space-y-2.5 animate-pulse">
+              <div className="h-4 w-44 bg-[#151D19] rounded-[4px]" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="p-2 bg-[#151D19] rounded-[8px] space-y-1.5">
+                    <div className="h-2.5 w-16 bg-[#101613] rounded-[4px]" />
+                    <div className="h-4 w-12 bg-[#101613] rounded-[4px]" />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : weather ? (
             <div className="space-y-3">
@@ -425,9 +432,10 @@ export default function QuantitativeFactorsAuditPanel({
       {activeTab === 'form' && (
         <div className="space-y-4">
           {loadingForm ? (
-            <div className="py-8 text-center text-[12px] text-[#8B9890] bg-[#151E19] rounded-[11px] border border-white/[0.07]">
-              <div className="w-4 h-4 border-2 border-[#B6E63B] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              Computing team form, rolling splits, and time-decayed ratings from stored matches...
+            <div className="p-3.5 bg-[#101613] border border-[#1F2A24] rounded-[14px] space-y-2.5 animate-pulse">
+              <div className="h-4 w-52 bg-[#151D19] rounded-[4px]" />
+              <div className="h-16 w-full bg-[#151D19] rounded-[10px]" />
+              <div className="h-16 w-full bg-[#151D19] rounded-[10px]" />
             </div>
           ) : formData ? (
             <>

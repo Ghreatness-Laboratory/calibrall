@@ -196,9 +196,41 @@ export default function MatchAnalysisPage() {
 
   if (isLoading) {
     return (
-      <div className="py-16 text-center space-y-3">
-        <div className="w-5 h-5 border-2 border-[#B8E636] border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-[12px] text-[#8B9892]">Loading match data...</p>
+      <div className="space-y-3 py-1 animate-pulse">
+        <div className="flex items-center justify-between pb-0.5">
+          <div className="h-4 w-28 bg-[#151D19] rounded-[8px]" />
+          <div className="h-[36px] w-20 bg-[#151D19] rounded-full" />
+        </div>
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3.5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-32 bg-[#151D19] rounded-[4px]" />
+            <div className="h-3 w-16 bg-[#151D19] rounded-[4px]" />
+          </div>
+          <div className="space-y-2 py-0.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-full bg-[#151D19]" />
+                <div className="h-4 w-32 bg-[#151D19] rounded-[4px]" />
+              </div>
+              <div className="h-5 w-12 bg-[#151D19] rounded-full" />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-full bg-[#151D19]" />
+                <div className="h-4 w-28 bg-[#151D19] rounded-[4px]" />
+              </div>
+              <div className="h-5 w-12 bg-[#151D19] rounded-full" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#1F2A24]">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="p-2.5 bg-[#151D19] rounded-[10px] space-y-1.5">
+                <div className="h-2.5 w-20 bg-[#101613] rounded-[4px]" />
+                <div className="h-4 w-14 bg-[#101613] rounded-[4px]" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

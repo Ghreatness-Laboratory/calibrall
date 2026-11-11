@@ -275,21 +275,21 @@ export default function PredictionsPage() {
 
   const getTierBadgeStyle = (tier?: string) => {
     if (tier === 'HIGH' || tier === 'SAFE') {
-      return 'text-[#B6E63B] bg-[#B6E63B]/[0.12] border-[#B6E63B]/40';
+      return 'text-[#B8E636] bg-[#B8E636]/12 border-[#B8E636]/30';
     }
     if (tier === 'MEDIUM' || tier === 'MODERATE') {
-      return 'text-[#E2AE45] bg-[#E2AE45]/[0.12] border-[#E2AE45]/40';
+      return 'text-[#E8B04A] bg-[#E8B04A]/12 border-[#E8B04A]/30';
     }
-    return 'text-[#8B9890] bg-[#151E19] border border-white/[0.07]';
+    return 'text-[#8B9892] bg-[#151D19] border border-[#1F2A24]';
   };
 
   if (isSwitching) {
     return (
       <div className="space-y-3 py-2 animate-pulse">
-        <div className="h-6 w-36 bg-[#101713] rounded-[8px]" />
-        <div className="h-4 w-44 bg-[#101713] rounded-[8px]" />
-        <div className="h-24 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
-        <div className="h-44 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
+        <div className="h-6 w-36 bg-[#151D19] rounded-[8px]" />
+        <div className="h-4 w-44 bg-[#151D19] rounded-[8px]" />
+        <div className="h-24 bg-[#101613] rounded-[14px] border border-[#1F2A24]" />
+        <div className="h-44 bg-[#101613] rounded-[14px] border border-[#1F2A24]" />
       </div>
     );
   }
@@ -298,10 +298,10 @@ export default function PredictionsPage() {
     <div className="space-y-3.5 py-1">
       {/* Title with WAT timezone indicator and Last updated */}
       <div className="space-y-0.5">
-        <h1 className="text-[23px] font-[700] leading-[1.2] text-[#ECF1EE] tracking-[-0.025em]">
+        <h1 className="text-[20px] font-[700] leading-[1.22] text-[#E9EFEB] tracking-[-0.025em]">
           Market intelligence
         </h1>
-        <p className="text-[12px] text-[#8B9890]">
+        <p className="text-[12px] text-[#8B9892]">
           {isBasketball
             ? 'NBA possessions, defensive ratings and model probability projections · All times WAT'
             : 'Pre-kickoff probability models and statistical evaluations · All times WAT'}
@@ -319,22 +319,22 @@ export default function PredictionsPage() {
 
       {/* Odds connection status */}
       {fixtures.some(f => Boolean(f.verifiedOdds)) ? (
-        <div className="p-2.5 rounded-[10px] bg-[#B6E63B]/[0.08] border border-[#B6E63B]/20 text-[#B6E63B] text-[11.5px] flex items-center gap-2 font-mono">
-          <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
+        <div className="p-2.5 rounded-[10px] bg-[#B8E636]/[0.08] border border-[#B8E636]/20 text-[#B8E636] text-[11.5px] flex items-center gap-2 font-mono">
+          <Info className="w-3.5 h-3.5 text-[#B8E636] shrink-0" />
           <span>Real bookmaker odds active (DraftKings sportsbook lines). Unquoted lines show &quot;—&quot;.</span>
         </div>
       ) : (
-        <div className="p-2.5 rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-[#8B9890] text-[11.5px] flex items-center gap-2">
-          <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
+        <div className="p-2.5 rounded-[10px] bg-[#151D19] border border-[#1F2A24] text-[#8B9892] text-[11.5px] flex items-center gap-2">
+          <Info className="w-3.5 h-3.5 text-[#B8E636] shrink-0" />
           <span>Odds not connected. Unquoted markets show &quot;—&quot;. Showing probability analysis only.</span>
         </div>
       )}
 
       {/* Bug 7: Filters Card placed FIRST so filters sit above the fold */}
-      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3 space-y-2.5">
+      <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3 space-y-2.5">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-[#B6E63B]" strokeWidth={2} />
-          <h3 className="text-[13px] font-[600] text-[#ECF1EE]">Filters</h3>
+          <SlidersHorizontal className="w-3.5 h-3.5 text-[#B8E636]" strokeWidth={2} />
+          <h3 className="text-[13px] font-[600] text-[#E9EFEB]">Filters</h3>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

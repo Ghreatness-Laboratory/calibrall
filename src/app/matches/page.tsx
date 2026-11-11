@@ -189,13 +189,13 @@ export default function MatchesPage() {
         <SportSwitcher />
       </div>
 
-      {/* Header: H2 "Fixtures and markets" at 19px with one line subtitle, and 34px square outlined refresh icon button on right */}
+      {/* Header: H2 "Fixtures and markets" at 20px with one line subtitle, and 34px square outlined refresh icon button on right */}
       <div className="flex items-center justify-between pt-1">
         <div className="space-y-0.5">
-          <h2 className="text-[19px] font-[700] leading-[1.25] text-[#ECF1EE] tracking-[-0.02em]">
+          <h2 className="text-[20px] font-[700] leading-[1.22] text-[#E9EFEB] tracking-[-0.025em]">
             Fixtures and markets
           </h2>
-          <p className="text-[12px] text-[#8B9890] leading-tight">
+          <p className="text-[12px] text-[#8B9892] leading-tight">
             {scheduledCount} · Active matchday pipelines · All kickoff times WAT {lastUpdated ? `· Last updated ${lastUpdated}` : ''}
           </p>
         </div>
@@ -204,11 +204,11 @@ export default function MatchesPage() {
           onClick={handleRefresh}
           type="button"
           disabled={isRefreshing}
-          className="w-[34px] h-[34px] min-w-[34px] min-h-[34px] rounded-[10px] border border-white/[0.07] bg-[#101713] hover:bg-[#151E19] text-[#8B9890] hover:text-[#ECF1EE] flex items-center justify-center transition-colors touch-press"
+          className="w-[34px] h-[34px] min-w-[34px] min-h-[34px] rounded-[10px] border border-[#1F2A24] bg-[#101613] hover:bg-[#151D19] text-[#8B9892] hover:text-[#E9EFEB] flex items-center justify-center transition-colors touch-press"
           title="Refresh fixtures"
           aria-label="Refresh fixtures"
         >
-          <RotateCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#B6E63B]' : ''}`} strokeWidth={2} />
+          <RotateCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#B8E636]' : ''}`} strokeWidth={2} />
         </button>
       </div>
 
@@ -231,7 +231,7 @@ export default function MatchesPage() {
 
       {/* Notice if sync is delayed by more than 2 hours or snapshot older than 30 minutes */}
       {isDelayed && (
-        <div className="p-2.5 rounded-[10px] bg-[#E2AE45]/10 border border-[#E2AE45]/30 text-[#E2AE45] text-[11.5px] flex items-center gap-2">
+        <div className="p-2.5 rounded-[10px] bg-[#E8B04A]/10 border border-[#E8B04A]/30 text-[#E8B04A] text-[11.5px] flex items-center gap-2">
           <Info className="w-3.5 h-3.5 shrink-0" />
           <span>Data may be out of date (snapshot is older than 30 minutes).</span>
         </div>
@@ -239,21 +239,21 @@ export default function MatchesPage() {
 
       {/* Verified odds vs unquoted snapshot status */}
       {fixtures.some(f => Boolean(f.verifiedOdds)) ? (
-        <div className="p-2.5 rounded-[10px] bg-[#B6E63B]/[0.08] border border-[#B6E63B]/20 text-[#B6E63B] text-[11.5px] flex items-center gap-2 font-mono">
-          <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
+        <div className="p-2.5 rounded-[10px] bg-[#B8E636]/[0.08] border border-[#B8E636]/20 text-[#B8E636] text-[11.5px] flex items-center gap-2 font-mono">
+          <Info className="w-3.5 h-3.5 text-[#B8E636] shrink-0" />
           <span>Real bookmaker odds active (DraftKings sportsbook lines). Unquoted lines show &quot;—&quot;.</span>
         </div>
       ) : (
-        <div className="p-2.5 rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-[#8B9890] text-[11.5px] flex items-center gap-2">
-          <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" />
+        <div className="p-2.5 rounded-[10px] bg-[#151D19] border border-[#1F2A24] text-[#8B9892] text-[11.5px] flex items-center gap-2">
+          <Info className="w-3.5 h-3.5 text-[#B8E636] shrink-0" />
           <span>Odds not connected. Unquoted markets show &quot;—&quot;. Showing probability analysis only.</span>
         </div>
       )}
 
       {/* Slim info note: 11.5px text, 2px lime left border, small info icon */}
-      <div className="border-l-2 border-[#B6E63B] bg-[#101713] rounded-r-[10px] px-3 py-2 flex items-center gap-2">
-        <Info className="w-3.5 h-3.5 text-[#B6E63B] shrink-0" strokeWidth={2} />
-        <span className="text-[11.5px] leading-[16px] text-[#8B9890]">
+      <div className="border-l-2 border-[#B8E636] bg-[#101613] rounded-r-[10px] px-3 py-2 flex items-center gap-2">
+        <Info className="w-3.5 h-3.5 text-[#B8E636] shrink-0" strokeWidth={2} />
+        <span className="text-[11.5px] leading-[16px] text-[#8B9892]">
           Live probabilities recalibrate on fixture ticks. Models abstain when data depth is insufficient.
         </span>
       </div>
@@ -268,13 +268,13 @@ export default function MatchesPage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search club name"
-          className="w-full h-10 pl-9 pr-8 rounded-[11px] bg-[#101713] border border-white/[0.07] text-[13px] text-[#ECF1EE] placeholder:text-[#5E6A63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B6E63B]/40 transition-all"
+          className="w-full h-10 pl-9 pr-8 rounded-[12px] bg-[#101613] border border-[#1F2A24] text-[13px] text-[#E9EFEB] placeholder:text-[#5E6B65] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#B8E636] transition-all"
         />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
             type="button"
-            className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-[#8B9890] hover:text-[#ECF1EE]"
+            className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-[#8B9892] hover:text-[#E9EFEB]"
             aria-label="Clear search"
           >
             <X className="w-3.5 h-3.5" strokeWidth={2} />
@@ -286,13 +286,13 @@ export default function MatchesPage() {
       {!isBasketball && (
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-[11px] text-[#8B9890] font-normal mb-1 block">
+            <label className="text-[11px] text-[#8B9892] font-normal mb-1 block">
               Competition
             </label>
             <select
               value={selectedComp}
               onChange={(e) => setSelectedComp(e.target.value)}
-              className="w-full h-10 px-3 rounded-[11px] bg-[#101713] border border-white/[0.07] text-[13px] text-[#ECF1EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B6E63B]/40 appearance-none cursor-pointer"
+              className="w-full h-10 px-3 rounded-[12px] bg-[#101613] border border-[#1F2A24] text-[13px] text-[#E9EFEB] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#B8E636] appearance-none cursor-pointer"
             >
               <option value="ALL">All competitions</option>
               {COMPETITIONS.map(comp => (
@@ -304,13 +304,13 @@ export default function MatchesPage() {
           </div>
 
           <div>
-            <label className="text-[11px] text-[#8B9890] font-normal mb-1 block">
+            <label className="text-[11px] text-[#8B9892] font-normal mb-1 block">
               Status
             </label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full h-10 px-3 rounded-[11px] bg-[#101713] border border-white/[0.07] text-[13px] text-[#ECF1EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B6E63B]/40 appearance-none cursor-pointer"
+              className="w-full h-10 px-3 rounded-[12px] bg-[#101613] border border-[#1F2A24] text-[13px] text-[#E9EFEB] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#B8E636] appearance-none cursor-pointer"
             >
               <option value="ALL">All fixtures</option>
               <option value="TIMED">Upcoming</option>
@@ -331,10 +331,10 @@ export default function MatchesPage() {
                 key={tab.id}
                 onClick={() => setSelectedFootballGroup(tab.id)}
                 type="button"
-                className={`h-[30px] px-3.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
+                className={`h-[30px] px-3.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
                   isActive
-                    ? 'bg-[#B6E63B]/[0.12] border-[#B6E63B] text-[#B6E63B] font-semibold'
-                    : 'bg-transparent border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
+                    ? 'bg-[#B8E636]/12 border-[#B8E636]/30 text-[#B8E636] font-semibold'
+                    : 'bg-[#151D19] border-[#1F2A24] text-[#8B9892] hover:text-[#E9EFEB]'
                 }`}
               >
                 {tab.label}
@@ -345,7 +345,7 @@ export default function MatchesPage() {
       ) : (
         <div className="pt-0.5">
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5">
-            <span className="h-[30px] px-3.5 rounded-full text-[12px] font-semibold bg-[#B6E63B]/[0.12] border border-[#B6E63B] text-[#B6E63B] flex items-center">
+            <span className="h-[30px] px-3.5 rounded-full text-[11px] font-semibold bg-[#B8E636]/12 border border-[#B8E636]/30 text-[#B8E636] flex items-center">
               NBA Lines & Spreads
             </span>
           </div>

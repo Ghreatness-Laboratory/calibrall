@@ -344,8 +344,8 @@ export default function FactorsAndStatePanel({
                       <td className="py-2 px-3 font-mono text-[#ECF1EE] tabular-nums">
                         {(f.shrinkageApplied * 100).toFixed(0)}%
                       </td>
-                      <td className="py-2 px-3 font-mono text-[#B6E63B] tabular-nums">
-                        &#8722;{def?.ablationGainBrier.toFixed(4)}
+                      <td className="py-2 px-3 font-mono text-[#B8E636] tabular-nums">
+                        −{def?.ablationGainBrier.toFixed(4)}
                       </td>
                     </tr>
                   );
