@@ -349,42 +349,34 @@ export interface FixtureStatisticalContext {
   noRecommendationReason?: string;
 }
 
-import { lookupTeamStrength } from './teamDatabase';
 import { displayName } from '../utils/formatText';
 import { matchesStore } from './matchesStore';
 
 export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContext {
-
-  // Look up genuine team strength parameters in team database
-  const homeLookup = lookupTeamStrength(fixture.homeTeam);
-  const awayLookup = lookupTeamStrength(fixture.awayTeam);
-
-  const homeStrength = homeLookup.found ? homeLookup.data : (fixture.homeTeam.hasRealTeamStrength ? fixture.homeTeam : null);
-  const awayStrength = awayLookup.found ? awayLookup.data : (fixture.awayTeam.hasRealTeamStrength ? fixture.awayTeam : null);
-
-  const homeMatches = (homeStrength as any)?.sampleMatches ?? 0;
-  const awayMatches = (awayStrength as any)?.sampleMatches ?? 0;
-
-  const homeNeeds = !homeStrength || homeMatches === 0;
-  const awayNeeds = !awayStrength || awayMatches === 0;
+  // On client-side browser hydration, use the server-computed DB stats attached to the fixture
+  if (typeof window !== 'undefined' && fixture.serverStats) {
+    return fixture.serverStats as FixtureStatisticalContext;
+  }
 
   const homeTeamDisplayName = displayName(fixture.homeTeam);
   const awayTeamDisplayName = displayName(fixture.awayTeam);
-  const homeStoredCount = matchesStore.getTeamMatchCountSync(fixture.homeTeam.id || fixture.homeTeam.name);
-  const awayStoredCount = matchesStore.getTeamMatchCountSync(fixture.awayTeam.id || fixture.awayTeam.name);
 
-  let reason = `Insufficient data: ${homeTeamDisplayName} (${homeStoredCount} matches stored) and ${awayTeamDisplayName} (${awayStoredCount} matches stored) have unverified team parameters`;
-  if (homeNeeds && awayNeeds) {
-    reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored, ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`;
-  } else if (homeNeeds) {
-    reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored in database (needs history backfill)`;
-  } else if (awayNeeds) {
-    reason = `Insufficient data: ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`;
-  }
+  const homeDb = matchesStore.getTeamStatsSync(fixture.homeTeam, fixture.kickoffTime);
+  const awayDb = matchesStore.getTeamStatsSync(fixture.awayTeam, fixture.kickoffTime);
 
-  // HARD RULE: If a fixture has no real team-strength input, do not return a pick.
-  // Return status: "insufficient_data", null data coverage and uncertainty.
-  if (!homeStrength || !awayStrength || (homeStrength as any).sampleMatches === 0 || (awayStrength as any).sampleMatches === 0) {
+  const homeStoredCount = homeDb.storedMatchCount;
+  const awayStoredCount = awayDb.storedMatchCount;
+
+  const homeNeeds = homeStoredCount === 0;
+  const awayNeeds = awayStoredCount === 0;
+
+  if (homeNeeds || awayNeeds) {
+    let reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored, ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`;
+    if (homeNeeds && !awayNeeds) {
+      reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored in database (needs history backfill)`;
+    } else if (!homeNeeds && awayNeeds) {
+      reason = `Insufficient data: ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`;
+    }
     return {
       homeXg: 0,
       awayXg: 0,
@@ -393,7 +385,7 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       expectedCards: 0,
       uncertaintyScore: null,
       dataCoverageScore: null,
-      sampleSizeMatches: 0,
+      sampleSizeMatches: Math.min(homeStoredCount, awayStoredCount),
       hasRealTeamStrength: false,
       insufficientData: true,
       stateTags: [] as StateTag[],
@@ -407,18 +399,15 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   // If either team's newest match is older than 21 days in season,
   // or has fewer than 5 matches in the last 120 days:
   // Show "Insufficient data" with no pick, tier or EV.
-  const homeLastMatch = matchesStore.getTeamDaysSinceLastMatch(fixture.homeTeam.id || fixture.homeTeam.name, fixture.kickoffTime);
-  const awayLastMatch = matchesStore.getTeamDaysSinceLastMatch(fixture.awayTeam.id || fixture.awayTeam.name, fixture.kickoffTime);
-
-  const isHomeStale = homeLastMatch.days === null || homeLastMatch.days > 21 || homeLastMatch.matchesInLast120Days < 5;
-  const isAwayStale = awayLastMatch.days === null || awayLastMatch.days > 21 || awayLastMatch.matchesInLast120Days < 5;
+  const isHomeStale = homeDb.daysSinceLastMatch === null || homeDb.daysSinceLastMatch > 21 || homeDb.matchesInLast120Days < 5;
+  const isAwayStale = awayDb.daysSinceLastMatch === null || awayDb.daysSinceLastMatch > 21 || awayDb.matchesInLast120Days < 5;
 
   if (isHomeStale) {
-    const reason = (homeLastMatch.days === null || homeLastMatch.lastMatchDate === null)
+    const reason = (homeDb.daysSinceLastMatch === null || homeDb.lastMatchDate === null)
       ? `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored in database (needs history backfill)`
-      : ((homeLastMatch.days !== null && homeLastMatch.days > 21)
-          ? `Data out of date: ${homeTeamDisplayName} last match was ${homeLastMatch.days} days ago (${homeStoredCount} matches stored)`
-          : `Data out of date: ${homeTeamDisplayName} has only ${homeLastMatch.matchesInLast120Days} matches in last 120 days (${homeStoredCount} matches stored, min 5 required)`);
+      : (homeDb.daysSinceLastMatch > 21
+          ? `Data out of date: ${homeTeamDisplayName} last match was ${homeDb.daysSinceLastMatch} days ago (${homeStoredCount} matches stored)`
+          : `Data out of date: ${homeTeamDisplayName} has only ${homeDb.matchesInLast120Days} matches in last 120 days (${homeStoredCount} matches stored, min 5 required)`);
     return {
       homeXg: 0,
       awayXg: 0,
@@ -427,7 +416,7 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       expectedCards: 0,
       uncertaintyScore: null,
       dataCoverageScore: null,
-      sampleSizeMatches: homeMatches,
+      sampleSizeMatches: homeStoredCount,
       hasRealTeamStrength: true,
       insufficientData: true,
       stateTags: ['low-sample'] as StateTag[],
@@ -438,11 +427,11 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   }
 
   if (isAwayStale) {
-    const reason = (awayLastMatch.days === null || awayLastMatch.lastMatchDate === null)
+    const reason = (awayDb.daysSinceLastMatch === null || awayDb.lastMatchDate === null)
       ? `Insufficient data: ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`
-      : ((awayLastMatch.days !== null && awayLastMatch.days > 21)
-          ? `Data out of date: ${awayTeamDisplayName} last match was ${awayLastMatch.days} days ago (${awayStoredCount} matches stored)`
-          : `Data out of date: ${awayTeamDisplayName} has only ${awayLastMatch.matchesInLast120Days} matches in last 120 days (${awayStoredCount} matches stored, min 5 required)`);
+      : (awayDb.daysSinceLastMatch > 21
+          ? `Data out of date: ${awayTeamDisplayName} last match was ${awayDb.daysSinceLastMatch} days ago (${awayStoredCount} matches stored)`
+          : `Data out of date: ${awayTeamDisplayName} has only ${awayDb.matchesInLast120Days} matches in last 120 days (${awayStoredCount} matches stored, min 5 required)`);
     return {
       homeXg: 0,
       awayXg: 0,
@@ -451,7 +440,7 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       expectedCards: 0,
       uncertaintyScore: null,
       dataCoverageScore: null,
-      sampleSizeMatches: awayMatches,
+      sampleSizeMatches: awayStoredCount,
       hasRealTeamStrength: true,
       insufficientData: true,
       stateTags: ['low-sample'] as StateTag[],
@@ -463,29 +452,29 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
 
   // Ratings rule: When fewer than 10 recent matches, use the league prior (1.00)
   // with a wide uncertainty (±35%).
-  const isHomeLowSample = homeMatches < 10;
-  const isAwayLowSample = awayMatches < 10;
+  const isHomeLowSample = homeStoredCount < 10;
+  const isAwayLowSample = awayStoredCount < 10;
   const isLowSample = isHomeLowSample || isAwayLowSample;
 
   const comp = fixture.competition;
-  const homeAttack = isHomeLowSample ? 1.00 : (homeStrength.attackRating || 1.00);
-  const homeDefense = isHomeLowSample ? 1.00 : (homeStrength.defenseRating || 1.00);
-  const awayAttack = isAwayLowSample ? 1.00 : (awayStrength.attackRating || 1.00);
-  const awayDefense = isAwayLowSample ? 1.00 : (awayStrength.defenseRating || 1.00);
+  const homeAttack = isHomeLowSample ? 1.00 : homeDb.attackRating;
+  const homeDefense = isHomeLowSample ? 1.00 : homeDb.defenseRating;
+  const awayAttack = isAwayLowSample ? 1.00 : awayDb.attackRating;
+  const awayDefense = isAwayLowSample ? 1.00 : awayDb.defenseRating;
 
   const baseGoals = (comp.avgGoalsPerGame || 2.80) / 2;
   const homeXg = Number((homeAttack * awayDefense * baseGoals * 1.08).toFixed(2));
   const awayXg = Number((awayAttack * homeDefense * baseGoals * 0.92).toFixed(2));
 
   const baseCorners = (comp.avgCornersPerGame || 10.0) / 2;
-  const expectedCornersHome = Number(((homeStrength.cornerAttackRating || 1.15) * baseCorners * 1.05).toFixed(1));
-  const expectedCornersAway = Number(((awayStrength.cornerAttackRating || 1.05) * baseCorners * 0.95).toFixed(1));
+  const expectedCornersHome = Number((homeDb.cornerAttackRating * baseCorners * 1.05).toFixed(1));
+  const expectedCornersAway = Number((awayDb.cornerAttackRating * baseCorners * 0.95).toFixed(1));
 
   const baseCards = comp.avgCardsPerGame || 4.2;
-  const expectedCards = Number((baseCards * (((homeStrength.disciplineRating || 1.0) + (awayStrength.disciplineRating || 1.0)) / 2)).toFixed(1));
+  const expectedCards = Number((baseCards * ((homeDb.disciplineRating + awayDb.disciplineRating) / 2)).toFixed(1));
 
-  const sampleMatches = ((homeStrength as any).sampleMatches || 20) + ((awayStrength as any).sampleMatches || 20);
-  
+  const sampleMatches = homeStoredCount + awayStoredCount;
+
   // Computed (non-constant) data coverage score
   const sampleCoverage = Math.min(0.78, (sampleMatches / 44) * 0.78);
   const refereeBonus = fixture.referee ? 0.07 : 0.02;
@@ -496,7 +485,8 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
 
   // Computed uncertainty score: wide uncertainty (0.35) when fewer than 10 recent matches
   const attackDiffSpread = Math.abs(homeAttack - awayAttack) * 0.025;
-  const standardUncertainty = Number(Math.max(0.042, Math.min(0.125, 0.045 + (1 - dataCoverage) * 0.12 + attackDiffSpread)).toFixed(3));
+  const promotedSpread = (homeDb.isPromoted || awayDb.isPromoted) ? 0.035 : 0;
+  const standardUncertainty = Number(Math.max(0.042, Math.min(0.160, 0.045 + (1 - dataCoverage) * 0.12 + attackDiffSpread + promotedSpread)).toFixed(3));
   const uncertainty = isLowSample ? 0.350 : standardUncertainty;
 
   const stateTags: StateTag[] = [];

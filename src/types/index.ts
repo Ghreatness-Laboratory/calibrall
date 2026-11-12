@@ -262,6 +262,22 @@ export interface Fixture {
   derbyName?: string;
   insufficientData?: boolean;
   hasRealTeamStrength?: boolean;
+  serverStats?: {
+    homeXg: number;
+    awayXg: number;
+    expectedCornersHome: number;
+    expectedCornersAway: number;
+    expectedCards: number;
+    uncertaintyScore: number | null;
+    dataCoverageScore: number | null;
+    sampleSizeMatches: number;
+    hasRealTeamStrength?: boolean;
+    insufficientData?: boolean;
+    stateTags?: StateTag[];
+    lineupConfirmed?: boolean;
+    verifiedOdds?: VerifiedMatchOdds;
+    noRecommendationReason?: string;
+  };
   verifiedOdds?: VerifiedMatchOdds;
   hasCoachChange?: boolean;
   coachChangeNote?: string;

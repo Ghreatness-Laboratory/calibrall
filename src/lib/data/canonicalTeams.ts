@@ -1305,6 +1305,7 @@ export const CANONICAL_TEAMS: Record<string, CanonicalTeam> = {
 
 import manualOverrides from './teamNameOverrides.json';
 import { TEAM_STRENGTH_DATABASE, lookupTeamStrength } from './teamDatabase';
+import { getLocalDatabase } from '../supabase/client';
 
 export const CANONICAL_ID_ALIASES: Record<string, string> = {
   team_mancity: 'team_man_city',
@@ -1330,6 +1331,13 @@ export const CANONICAL_ID_ALIASES: Record<string, string> = {
   team_lincolncity: 'team_lincoln',
   team_prestonnorthend: 'team_preston',
   team_norwichcity: 'team_norwich',
+  team_leh: 'team_lehavre',
+  team_nic: 'team_nice',
+  team_ren: 'team_rennes',
+  team_lil: 'team_lille',
+  team_len: 'team_lens',
+  team_tro: 'team_troyes',
+  team_lem: 'team_lemans',
 };
 
 for (const rec of Object.values(TEAM_STRENGTH_DATABASE)) {
@@ -1389,16 +1397,96 @@ export function recordUnresolvedTeam(sourceName: string, provider: string = 'foo
       lastSeen: now,
     });
   }
+
+  if (typeof window === 'undefined') {
+    try {
+      const db = getLocalDatabase();
+      if (db) {
+        const id = `unres:${key}`;
+        db.prepare(`
+          INSERT INTO unresolved_teams (id, source_name, source_provider, count, first_seen, last_seen, resolved)
+          VALUES (?, ?, ?, 1, ?, ?, 0)
+          ON CONFLICT(source_name, source_provider) DO UPDATE SET
+            count = count + 1,
+            last_seen = excluded.last_seen,
+            resolved = 0
+        `).run(id, name, provider, now, now);
+      }
+    } catch (_) {}
+  }
+}
+
+export function markUnresolvedTeamResolved(sourceName: string): void {
+  if (!sourceName || !sourceName.trim()) return;
+  const targetLower = sourceName.trim().toLowerCase();
+  for (const [k, entry] of Array.from(UNRESOLVED_TEAMS_MAP.entries())) {
+    if (entry.sourceName.toLowerCase() === targetLower) {
+      UNRESOLVED_TEAMS_MAP.delete(k);
+    }
+  }
+  UNMATCHED_NAMES_LOG.delete(sourceName.trim());
+
+  if (typeof window === 'undefined') {
+    try {
+      const db = getLocalDatabase();
+      if (db) {
+        db.prepare(`UPDATE unresolved_teams SET resolved = 1 WHERE lower(source_name) = ?`).run(targetLower);
+      }
+    } catch (_) {}
+  }
 }
 
 export function getUnresolvedTeamsLog(): UnresolvedTeamLogEntry[] {
-  return Array.from(UNRESOLVED_TEAMS_MAP.values()).sort(
+  const merged = new Map<string, UnresolvedTeamLogEntry>();
+  for (const [k, entry] of Array.from(UNRESOLVED_TEAMS_MAP.entries())) {
+    merged.set(k, { ...entry });
+  }
+
+  if (typeof window === 'undefined') {
+    try {
+      const db = getLocalDatabase();
+      if (db) {
+        const rows = db.prepare(
+          `SELECT source_name, source_provider, count, first_seen, last_seen FROM unresolved_teams WHERE resolved = 0`
+        ).all() as Array<{
+          source_name: string;
+          source_provider: string;
+          count: number;
+          first_seen: string;
+          last_seen: string;
+        }>;
+        for (const r of rows) {
+          const key = `${r.source_name.toLowerCase()}:${r.source_provider.toLowerCase()}`;
+          const prev = merged.get(key);
+          if (!prev || r.count >= prev.count) {
+            merged.set(key, {
+              sourceName: r.source_name,
+              sourceProvider: r.source_provider,
+              count: r.count,
+              firstSeen: r.first_seen,
+              lastSeen: r.last_seen,
+            });
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  return Array.from(merged.values()).sort(
     (a, b) => b.count - a.count || a.sourceName.localeCompare(b.sourceName)
   );
 }
 
 export function clearUnresolvedTeamsLog(): void {
   UNRESOLVED_TEAMS_MAP.clear();
+  if (typeof window === 'undefined') {
+    try {
+      const db = getLocalDatabase();
+      if (db) {
+        db.prepare(`DELETE FROM unresolved_teams`).run();
+      }
+    } catch (_) {}
+  }
 }
 
 export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | null {

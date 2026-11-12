@@ -156,6 +156,10 @@ export async function POST(req: NextRequest) {
 
         const homeResolved = getCanonicalTeamForCsv(league, rawHome);
         const awayResolved = getCanonicalTeamForCsv(league, rawAway);
+        if (!homeResolved || !awayResolved) {
+          rowsSkipped++;
+          continue;
+        }
 
         const hg = parseInt(row['HG'], 10);
         const ag = parseInt(row['AG'], 10);
@@ -352,6 +356,10 @@ export async function POST(req: NextRequest) {
         // Never skips matches due to unknown team!
         const homeResolved = getCanonicalTeamForCsv(league, rawHome);
         const awayResolved = getCanonicalTeamForCsv(league, rawAway);
+        if (!homeResolved || !awayResolved) {
+          rowsSkipped++;
+          continue;
+        }
 
         const fthg = parseInt(row['FTHG'], 10);
         const ftag = parseInt(row['FTAG'], 10);

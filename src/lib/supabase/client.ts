@@ -161,30 +161,40 @@ class LocalSupabaseQueryBuilder {
 
       const onConflictCols = options?.onConflict ? options.onConflict.split(',').map(c => c.trim()) : ['id'];
 
-      for (const row of rows) {
-        const keys = Object.keys(row);
-        if (keys.length === 0) continue;
+      const useTx = rows.length > 1;
+      if (useTx) this.db.exec('BEGIN');
+      try {
+        for (const row of rows) {
+          const keys = Object.keys(row);
+          if (keys.length === 0) continue;
 
-        const quotedKeys = keys.map(k => `"${k}"`).join(', ');
-        const placeholders = keys.map(() => '?').join(', ');
-        const updateClauses = keys
-          .filter(k => !onConflictCols.includes(k))
-          .map(k => `"${k}" = excluded."${k}"`)
-          .join(', ');
+          const quotedKeys = keys.map(k => `"${k}"`).join(', ');
+          const placeholders = keys.map(() => '?').join(', ');
+          const updateClauses = keys
+            .filter(k => !onConflictCols.includes(k))
+            .map(k => `"${k}" = excluded."${k}"`)
+            .join(', ');
 
-        const conflictClause = onConflictCols.map(c => `"${c}"`).join(', ');
-        const doUpdate = updateClauses.length > 0 ? `DO UPDATE SET ${updateClauses}` : 'DO NOTHING';
+          const conflictClause = onConflictCols.map(c => `"${c}"`).join(', ');
+          const doUpdate = updateClauses.length > 0 ? `DO UPDATE SET ${updateClauses}` : 'DO NOTHING';
 
-        const sql = `INSERT INTO "${this.table}" (${quotedKeys}) VALUES (${placeholders}) ON CONFLICT (${conflictClause}) ${doUpdate}`;
-        const values = keys.map(k => {
-          const val = row[k];
-          if (val === undefined) return null;
-          if (typeof val === 'boolean') return val ? 1 : 0;
-          return val;
-        });
+          const sql = `INSERT INTO "${this.table}" (${quotedKeys}) VALUES (${placeholders}) ON CONFLICT (${conflictClause}) ${doUpdate}`;
+          const values = keys.map(k => {
+            const val = row[k];
+            if (val === undefined) return null;
+            if (typeof val === 'boolean') return val ? 1 : 0;
+            return val;
+          });
 
-        const stmt = this.db.prepare(sql);
-        stmt.run(...values);
+          const stmt = this.db.prepare(sql);
+          stmt.run(...values);
+        }
+        if (useTx) this.db.exec('COMMIT');
+      } catch (txErr) {
+        if (useTx) {
+          try { this.db.exec('ROLLBACK'); } catch (_) {}
+        }
+        throw txErr;
       }
 
       return { data: rows, error: null };

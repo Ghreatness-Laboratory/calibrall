@@ -8,6 +8,7 @@
 import { Fixture, MatchStatus } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { lookupTeamStrength } from './teamDatabase';
+import { lookupCanonicalTeam } from './canonicalTeams';
 import { getCanonicalCompetition, isCanonicalCompetitionId } from './canonicalCompetitions';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 
@@ -66,15 +67,17 @@ export function mapDbRowToFixture(row: any): Fixture | null {
     return null;
   }
 
+  const homeCanon = lookupCanonicalTeam(row.home_team_id) || lookupCanonicalTeam(row.home_team_name);
+  const awayCanon = lookupCanonicalTeam(row.away_team_id) || lookupCanonicalTeam(row.away_team_name);
   const homeLookup = lookupTeamStrength(row.home_team_name || row.home_team_id);
   const awayLookup = lookupTeamStrength(row.away_team_name || row.away_team_id);
 
   const homeTeam = {
-    id: homeLookup.data?.id || row.home_team_id || `team_${(row.home_team_name || 'home').toLowerCase().replace(/\s+/g, '_')}`,
-    name: row.home_team_name || homeLookup.data?.name || 'Home Team',
-    shortName: homeLookup.data?.shortName || cleanDisplayText(row.home_team_name || 'Home'),
-    tla: homeLookup.data?.tla || (row.home_team_name || 'HOM').slice(0, 3).toUpperCase(),
-    crestUrl: homeLookup.data?.crestUrl || 'https://crests.football-data.org/65.png',
+    id: homeCanon?.canonicalId || homeLookup.data?.id || row.home_team_id || `team_${(row.home_team_name || 'home').toLowerCase().replace(/\s+/g, '_')}`,
+    name: row.home_team_name || homeCanon?.canonicalName || homeLookup.data?.name || 'Home Team',
+    shortName: homeCanon?.shortName || homeLookup.data?.shortName || cleanDisplayText(row.home_team_name || 'Home'),
+    tla: homeCanon?.tla || homeLookup.data?.tla || (row.home_team_name || 'HOM').slice(0, 3).toUpperCase(),
+    crestUrl: homeCanon?.crestUrl || homeLookup.data?.crestUrl || '',
     attackRating: homeLookup.data?.attackRating,
     defenseRating: homeLookup.data?.defenseRating,
     cornerAttackRating: homeLookup.data?.cornerAttackRating,
@@ -84,11 +87,11 @@ export function mapDbRowToFixture(row: any): Fixture | null {
   };
 
   const awayTeam = {
-    id: awayLookup.data?.id || row.away_team_id || `team_${(row.away_team_name || 'away').toLowerCase().replace(/\s+/g, '_')}`,
-    name: row.away_team_name || awayLookup.data?.name || 'Away Team',
-    shortName: awayLookup.data?.shortName || cleanDisplayText(row.away_team_name || 'Away'),
-    tla: awayLookup.data?.tla || (row.away_team_name || 'AWY').slice(0, 3).toUpperCase(),
-    crestUrl: awayLookup.data?.crestUrl || 'https://crests.football-data.org/57.png',
+    id: awayCanon?.canonicalId || awayLookup.data?.id || row.away_team_id || `team_${(row.away_team_name || 'away').toLowerCase().replace(/\s+/g, '_')}`,
+    name: row.away_team_name || awayCanon?.canonicalName || awayLookup.data?.name || 'Away Team',
+    shortName: awayCanon?.shortName || awayLookup.data?.shortName || cleanDisplayText(row.away_team_name || 'Away'),
+    tla: awayCanon?.tla || awayLookup.data?.tla || (row.away_team_name || 'AWY').slice(0, 3).toUpperCase(),
+    crestUrl: awayCanon?.crestUrl || awayLookup.data?.crestUrl || '',
     attackRating: awayLookup.data?.attackRating,
     defenseRating: awayLookup.data?.defenseRating,
     cornerAttackRating: awayLookup.data?.cornerAttackRating,
