@@ -592,6 +592,12 @@ class MatchesStore {
    * Reads from Supabase if configured, falling back to in-memory store in sandbox mode.
    */
   async getMatches(competitionCode?: string, season?: string): Promise<StoredMatch[]> {
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production';
+
+    if (isProduction && (!isSupabaseConfigured || !supabase)) {
+      throw new Error('[MatchesStore] Fatal: Supabase persistence is strictly required in production.');
+    }
+
     if (isSupabaseConfigured && supabase) {
       try {
         let query = supabase.from('matches').select('*').order('kickoff_time', { ascending: false });
@@ -602,15 +608,23 @@ class MatchesStore {
           query = query.eq('season', season);
         }
         const { data, error } = await query;
-        if (!error && data && data.length > 0) {
-          return data as StoredMatch[];
+        if (error) {
+          if (isProduction) {
+            throw new Error(`[MatchesStore] Fatal: Failed to read matches from Supabase in production: ${error.message}`);
+          }
+          console.error('[MatchesStore] Failed to read from Supabase matches:', error.message);
+        } else if (data) {
+          if (isProduction || data.length > 0) {
+            return data as StoredMatch[];
+          }
         }
       } catch (e: any) {
+        if (isProduction) throw e;
         console.error('[MatchesStore] Failed to read from Supabase matches:', e?.message || e);
       }
     }
 
-    // In-memory fallback
+    // Non-production sandbox fallback only
     let results = Array.from(this.inMemoryMatches.values());
     if (competitionCode && competitionCode !== 'ALL') {
       results = results.filter(m => m.competition_code.toUpperCase() === competitionCode.toUpperCase());
@@ -1315,6 +1329,12 @@ class MatchesStore {
    * (snapshot_type === 'csv_pre_match' or 'live_pre_kickoff'), strictly excluding closing odds.
    */
   async getOdds(matchId: string, preKickoffOnly: boolean = false): Promise<StoredOddsSnapshot[]> {
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production';
+
+    if (isProduction && (!isSupabaseConfigured || !supabase)) {
+      throw new Error('[MatchesStore] Fatal: Supabase persistence is strictly required in production.');
+    }
+
     if (isSupabaseConfigured && supabase) {
       try {
         let query = supabase.from('odds_snapshots').select('*').eq('match_id', matchId);
@@ -1322,15 +1342,21 @@ class MatchesStore {
           query = query.in('snapshot_type', ['csv_pre_match', 'live_pre_kickoff']);
         }
         const { data, error } = await query;
-        if (!error && data) {
+        if (error) {
+          if (isProduction) {
+            throw new Error(`[MatchesStore] Fatal: Failed to read odds from Supabase in production: ${error.message}`);
+          }
+          console.warn('[MatchesStore] Supabase getOdds error:', error.message);
+        } else if (data) {
           return data as StoredOddsSnapshot[];
         }
       } catch (e) {
+        if (isProduction) throw e;
         console.warn('[MatchesStore] Supabase getOdds error:', e);
       }
     }
 
-    // In-memory fallback
+    // Non-production sandbox fallback only
     const all = Array.from(this.inMemoryOdds.values()).filter(o => o.match_id === matchId);
     if (preKickoffOnly) {
       return all.filter(o => o.snapshot_type === 'csv_pre_match' || o.snapshot_type === 'live_pre_kickoff');
@@ -1408,14 +1434,14 @@ class MatchesStore {
       }
     }
 
-    // In-memory fallback when Supabase has no records or is unconfigured in development
-    if (allMatches.length === 0) {
+    // In-memory fallback ONLY in non-production when Supabase did not answer
+    if (!isProduction && storeUsed !== 'supabase' && allMatches.length === 0) {
       allMatches = Array.from(this.inMemoryMatches.values());
       storeUsed = 'in-memory';
     }
 
-    // If teams table was empty, populate with zero counts from canonical database (never fake sampleMatches)
-    if (registeredTeams.length === 0) {
+    // Only populate teams list from static registry in non-production sandbox if teams table is empty
+    if (!isProduction && registeredTeams.length === 0 && storeUsed !== 'supabase') {
       registeredTeams = Object.values(TEAM_STRENGTH_DATABASE).map(t => ({
         id: this.canonicalizeTeamId(t.id),
         name: t.name,
@@ -1615,7 +1641,37 @@ class MatchesStore {
 
     const unmatched = this.getUnmatchedNames();
     const unmappedFixtures = this.getUnmappedFixtureNames();
-    const unresolvedTeams = getUnresolvedTeamsLog();
+    let unresolvedTeams = getUnresolvedTeamsLog();
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: unresRows } = await supabase
+          .from('unresolved_teams')
+          .select('source_name, source_provider, count, first_seen, last_seen')
+          .eq('resolved', 0);
+        if (unresRows && unresRows.length > 0) {
+          const mergedMap = new Map<string, UnresolvedTeamLogEntry>();
+          for (const e of unresolvedTeams) {
+            mergedMap.set(`${e.sourceName.toLowerCase()}:${e.sourceProvider.toLowerCase()}`, e);
+          }
+          for (const r of unresRows as any[]) {
+            const key = `${String(r.source_name).toLowerCase()}:${String(r.source_provider).toLowerCase()}`;
+            if (!mergedMap.has(key)) {
+              mergedMap.set(key, {
+                sourceName: r.source_name,
+                sourceProvider: r.source_provider,
+                count: r.count,
+                firstSeen: r.first_seen,
+                lastSeen: r.last_seen,
+              });
+            }
+          }
+          unresolvedTeams = Array.from(mergedMap.values()).sort(
+            (a, b) => b.count - a.count || a.sourceName.localeCompare(b.sourceName)
+          );
+        }
+      } catch (_) {}
+    }
 
     return {
       totalMatches: allMatches.length,

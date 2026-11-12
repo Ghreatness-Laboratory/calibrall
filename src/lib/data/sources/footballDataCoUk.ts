@@ -4,7 +4,7 @@
 // Licence: Free for academic, research, personal and statistical analysis with attribution.
 
 import { canonicalMatchStore, CanonicalMatch } from '../canonicalMatches';
-import { lookupCanonicalTeam } from '../canonicalTeams';
+import { lookupCanonicalTeam, recordUnresolvedTeam } from '../canonicalTeams';
 
 export interface IngestionResult {
   division: string;
@@ -136,11 +136,20 @@ export class FootballDataCoUkService {
       const homeCanon = lookupCanonicalTeam(rawHome);
       const awayCanon = lookupCanonicalTeam(rawAway);
 
-      if (!homeCanon) unmatched.add(rawHome);
-      if (!awayCanon) unmatched.add(rawAway);
+      if (!homeCanon) {
+        unmatched.add(rawHome);
+        recordUnresolvedTeam(rawHome, 'football-data.co.uk');
+      }
+      if (!awayCanon) {
+        unmatched.add(rawAway);
+        recordUnresolvedTeam(rawAway, 'football-data.co.uk');
+      }
+      if (!homeCanon || !awayCanon) {
+        continue;
+      }
 
-      const homeId = homeCanon ? homeCanon.canonicalId : `team_${rawHome.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-      const awayId = awayCanon ? awayCanon.canonicalId : `team_${rawAway.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+      const homeId = homeCanon.canonicalId;
+      const awayId = awayCanon.canonicalId;
 
       const fthg = parseInt(row[idxFTHG], 10);
       const ftag = parseInt(row[idxFTAG], 10);

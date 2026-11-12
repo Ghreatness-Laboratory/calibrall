@@ -78,7 +78,7 @@ export function checkAndLogStartupEnv(): void {
 
   if (missingRequired.length > 0) {
     console.info(
-      `[Startup Check] Football API keys in standby (${missingRequired.join(', ')}). Serving verified European statistical match archive.`
+      `[Startup Check] Football API keys in standby (${missingRequired.join(', ')}). Serving stored Supabase match history and ESPN scoreboard.`
     );
   }
 }

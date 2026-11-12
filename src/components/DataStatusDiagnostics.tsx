@@ -28,6 +28,7 @@ interface LeagueLatestDate {
   latestDate: string | null;
   daysAgo: number | null;
   isStale: boolean;
+  isStale7d?: boolean;
 }
 
 interface TeamLatestDate {
@@ -305,7 +306,7 @@ export default function DataStatusDiagnostics() {
           )}
 
           {/* Unresolved Teams Log */}
-          {data.unresolvedTeams && data.unresolvedTeams.length > 0 && (
+          {data.unresolvedTeams && data.unresolvedTeams.length > 0 ? (
             <div className="p-3 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11.5px] font-semibold text-[#E2AE45] flex items-center gap-1.5">
@@ -333,6 +334,14 @@ export default function DataStatusDiagnostics() {
                   ))}
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="p-2.5 rounded-[10px] bg-[#151E19] border border-white/[0.07] text-[11.5px] text-[#B6E63B] flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Unresolved Teams Log: 0 unresolved source names (all clubs resolved via exact aliases).</span>
+              </span>
+              <span className="text-[10px] font-mono text-[#5E6A63]">unresolved_teams</span>
             </div>
           )}
 
@@ -402,6 +411,10 @@ export default function DataStatusDiagnostics() {
                         {l.isStale ? (
                           <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">
                             {l.daysAgo !== null ? `Stale (${l.daysAgo}d ago)` : 'No Data'}
+                          </span>
+                        ) : l.isStale7d ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-[#E2AE45]/15 text-[#E2AE45] border border-[#E2AE45]/30">
+                            {`>7d (${l.daysAgo}d ago)`}
                           </span>
                         ) : (
                           <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-[#B6E63B]/10 text-[#B6E63B] border border-[#B6E63B]/30">
