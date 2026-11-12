@@ -325,7 +325,7 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const homeStoredCount = matchesStore.getTeamMatchCountSync(fixture.homeTeam.id || fixture.homeTeam.name);
   const awayStoredCount = matchesStore.getTeamMatchCountSync(fixture.awayTeam.id || fixture.awayTeam.name);
 
-  let reason = 'Not enough data';
+  let reason = `Insufficient data: ${homeTeamDisplayName} (${homeStoredCount} matches stored) and ${awayTeamDisplayName} (${awayStoredCount} matches stored) have unverified team parameters`;
   if (homeNeeds && awayNeeds) {
     reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored, ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`;
   } else if (homeNeeds) {

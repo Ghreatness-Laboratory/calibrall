@@ -13,8 +13,6 @@
 2. Install dependencies:
    ```bash
    npm install
-   # or
-   bun install
    ```
 
 3. Environment Configuration:
@@ -25,7 +23,7 @@
 
 4. Run statistical test suite:
    ```bash
-   bun run src/tests/engine.test.ts
+   npm test
    ```
 
 5. Start the development server on port 3000:

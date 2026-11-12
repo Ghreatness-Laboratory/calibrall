@@ -675,11 +675,11 @@ class MatchesStore {
       daysSinceLastMatch = Math.max(0, Math.round((refTime - matchTime) / (1000 * 60 * 60 * 24)));
       if (daysSinceLastMatch > 21) {
         isStale = true;
-        staleReason = `Data out of date: last match ${daysSinceLastMatch} days ago`;
+        staleReason = `Data out of date: ${teamName} last match was ${daysSinceLastMatch} days ago (${formMatches.length} matches stored)`;
       }
     } else {
       isStale = true;
-      staleReason = 'Data out of date: no recent matches stored in database';
+      staleReason = `Data out of date: ${teamName} has 0 matches stored in database (needs history backfill)`;
     }
 
     // Ratings & Uncertainty:

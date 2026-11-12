@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getMatchesStore } from '@/lib/data/matchesStore';
-import { getUnmatchedNames, CANONICAL_TEAMS } from '@/lib/data/canonicalTeams';
+import { getUnmatchedNames, getUnresolvedTeamsLog, CANONICAL_TEAMS } from '@/lib/data/canonicalTeams';
 import { getMissingBadges } from '@/lib/data/sources/theSportsDb';
 import { isTeamNewsEnabled } from '@/lib/prediction/featureFlags';
 
@@ -141,6 +141,10 @@ export async function GET() {
     unmatchedTeams: {
       count: unmatchedTeams.length,
       teams: unmatchedTeams,
+    },
+    unresolvedTeams: {
+      count: getUnresolvedTeamsLog().length,
+      log: getUnresolvedTeamsLog(),
     },
     completenessDistribution,
   });

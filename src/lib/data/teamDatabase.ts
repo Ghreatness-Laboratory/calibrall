@@ -3248,7 +3248,7 @@ export function lookupTeamStrength(
     : String(teamIdentifier.name || teamIdentifier.shortName || '');
   const rawId = typeof teamIdentifier === 'object' && teamIdentifier.id !== undefined && teamIdentifier.id !== null
     ? String(teamIdentifier.id)
-    : '';
+    : (typeof teamIdentifier === 'string' && (teamIdentifier.startsWith('team_') || TEAM_STRENGTH_DATABASE[teamIdentifier.toLowerCase()]) ? teamIdentifier : '');
 
   // 0. Exact alias from manual overrides (teamNameOverrides.json)
   const manualMap = manualOverrides as Record<string, string>;

@@ -141,7 +141,7 @@ export function evaluateFixtureMarkets(
       predictions: [],
       rankedOptions: [],
       topPick: null,
-      noRecommendationReason: context.noRecommendationReason || 'Not enough data',
+      noRecommendationReason: context.noRecommendationReason || `Insufficient data: ${context.homeTeamName} (${context.sampleSizeMatches ?? 0} matches stored) and ${context.awayTeamName} have insufficient verified historical data for reliable projection`,
       contextEvaluation: {
         stateTags: context.stateTags || [],
         lineupStatus: 'confirmed',
@@ -1686,10 +1686,10 @@ export function evaluateFixtureMarkets(
         topPick.selection
       );
     } else {
-      noRecommendationReason = "No strong recommendation: available statistical evidence and current market lines do not meet the configured minimum edge, gating validation, or uncertainty thresholds.";
+      noRecommendationReason = `No strong recommendation for ${context.homeTeamName} vs ${context.awayTeamName} (${context.sampleSizeMatches ?? 0} matches stored): available statistical evidence and current market lines do not meet configured minimum edge, gating validation, or uncertainty thresholds.`;
     }
   } else {
-    noRecommendationReason = "No strong recommendation: all market families failed minimum data completeness or edge thresholds for this fixture.";
+    noRecommendationReason = `No strong recommendation for ${context.homeTeamName} vs ${context.awayTeamName} (${context.sampleSizeMatches ?? 0} matches stored): all market families failed minimum data completeness or edge thresholds.`;
   }
 
   // Also evaluate substitutes for other ranked options that exhibit fragility

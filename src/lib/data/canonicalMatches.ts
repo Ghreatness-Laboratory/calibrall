@@ -216,7 +216,7 @@ export class CanonicalMatchStore {
         daysSinceLastMatch: null,
         matchesInLast120Days: 0,
         isStale: true,
-        staleReason: 'Insufficient data: no match records stored in database',
+        staleReason: `Insufficient data: ${teamName} has 0 matches stored in database (needs history backfill)`,
       };
     }
 
@@ -240,12 +240,12 @@ export class CanonicalMatchStore {
     // RULE 1: More than 21 days in season
     if (daysSince > 21) {
       isStale = true;
-      staleReason = `Data out of date: last match ${daysSince} days ago`;
+      staleReason = `Data out of date: ${teamName || teamId} last match was ${daysSince} days ago (${dates.length} matches stored)`;
     } 
     // RULE 2: Fewer than 5 matches in the last 120 days
     else if (matchesIn120 < 5) {
       isStale = true;
-      staleReason = `Data out of date: only ${matchesIn120} matches in last 120 days (min 5 required)`;
+      staleReason = `Data out of date: ${teamName || teamId} has only ${matchesIn120} matches in last 120 days (${dates.length} matches stored, min 5 required)`;
     }
 
     return {
