@@ -12,7 +12,7 @@ import {
   getStoredPreferences, 
   setStoredPreferences 
 } from '@/lib/supabase/client';
-import { COMPETITIONS } from '@/lib/data/seedData';
+import { CANONICAL_COMPETITIONS } from '@/lib/data/canonicalCompetitions';
 import { 
   CheckCircle2, 
   Contrast, 
@@ -210,7 +210,9 @@ export default function SettingsPage() {
             <div className="p-3 space-y-2">
               <h3 className="text-[13px] font-[600] text-[#ECF1EE]">Active competition scopes</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {COMPETITIONS.map(c => {
+                {Object.values(CANONICAL_COMPETITIONS)
+                  .filter(c => c.id !== 'comp_nba')
+                  .map(c => {
                   const active = prefs.preferredCompetitions.includes(c.code);
                   return (
                     <button

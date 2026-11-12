@@ -35,19 +35,27 @@ export default function MatchesPage() {
   const [selectedFootballGroup, setSelectedFootballGroup] = useState<FootballMarketGroup>('ALL');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [compGroups, setCompGroups] = useState<CountryCompetitionGroup[]>([]);
+  const [totalCompetitionsFixtures, setTotalCompetitionsFixtures] = useState<number>(0);
 
-  // Fetch active competitions dynamically from the database
-  useEffect(() => {
+  const loadCompetitions = React.useCallback(() => {
     if (isBasketball) return;
-    fetch('/api/v1/competitions?sport=football')
+    fetch('/api/v1/competitions?sport=football', { cache: 'no-store' })
       .then(res => res.json())
       .then(json => {
         if (json.groupedByCountry && Array.isArray(json.groupedByCountry)) {
           setCompGroups(json.groupedByCountry);
         }
+        if (typeof json.totalFixtures === 'number') {
+          setTotalCompetitionsFixtures(json.totalFixtures);
+        }
       })
       .catch(err => console.error('[MatchesPage] Error fetching active competitions:', err));
   }, [isBasketball]);
+
+  // Fetch active competitions dynamically from the database
+  useEffect(() => {
+    loadCompetitions();
+  }, [loadCompetitions]);
 
   const { 
     fixtures, 
@@ -68,6 +76,7 @@ export default function MatchesPage() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
+    loadCompetitions();
     if (refetch) {
       await refetch();
     }
@@ -331,7 +340,7 @@ export default function MatchesPage() {
             selectedCompetitionId={selectedCompId}
             onSelectCompetitionId={setSelectedCompId}
             groups={compGroups}
-            totalFixturesCount={fixtures.length}
+            totalFixturesCount={totalCompetitionsFixtures || fixtures.length}
           />
 
           <div>

@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { COMPETITIONS, getFixtureStatistics } from '@/lib/data/seedData';
+import { getFixtureStatistics } from '@/lib/data/seedData';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { MarketPrediction, Team } from '@/types';
+import CompetitionFilter from '@/components/CompetitionFilter';
+import { CountryCompetitionGroup } from '@/lib/data/canonicalCompetitions';
+import { DayFilterType } from '@/lib/utils/dateWindow';
 import { 
   SlidersHorizontal,
   AlertCircle,
@@ -35,16 +38,35 @@ export default function PredictionsPage() {
   const { sport, isSwitching } = useSport();
   const isBasketball = sport === 'basketball';
 
-  const [selectedComp, setSelectedComp] = useState<string>('ALL');
+  const [selectedCompId, setSelectedCompId] = useState<string>('ALL');
+  const [selectedDay, setSelectedDay] = useState<DayFilterType>('ALL');
   const [selectedRiskTier, setSelectedRiskTier] = useState<string>('ALL');
   const [selectedMarketGroup, setSelectedMarketGroup] = useState<MarketGroupFilter>('ALL');
   const [onlyValuePicks, setOnlyValuePicks] = useState<boolean>(false);
   const [minProb, setMinProb] = useState<number>(0.50);
+  const [compGroups, setCompGroups] = useState<CountryCompetitionGroup[]>([]);
+  const [totalCompFixtures, setTotalCompFixtures] = useState<number>(0);
+
+  useEffect(() => {
+    if (isBasketball) return;
+    fetch('/api/v1/competitions?sport=football', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(json => {
+        if (json.groupedByCountry && Array.isArray(json.groupedByCountry)) {
+          setCompGroups(json.groupedByCountry);
+        }
+        if (typeof json.totalFixtures === 'number') {
+          setTotalCompFixtures(json.totalFixtures);
+        }
+      })
+      .catch(err => console.error('[PredictionsPage] Error fetching active competitions:', err));
+  }, [isBasketball]);
 
   const { fixtures, isLoading, liveDataAvailable, lastUpdated, isDelayed } = useLiveFixtures(
-    isBasketball ? 'NBA' : selectedComp,
+    isBasketball ? 'comp_nba' : selectedCompId,
     'ALL',
-    sport
+    sport,
+    isBasketball ? 'ALL' : selectedDay
   );
 
   // Generate qualified and probability-based market candidates across upcoming fixtures
@@ -56,6 +78,7 @@ export default function PredictionsPage() {
       fixtureName: string;
       homeTeam: Team;
       awayTeam: Team;
+      compId: string;
       compCode: string;
       compName: string;
       kickoff: string;
@@ -80,6 +103,7 @@ export default function PredictionsPage() {
             fixtureName: `${displayName(fixture.homeTeam)} vs ${displayName(fixture.awayTeam)}`,
             homeTeam: fixture.homeTeam,
             awayTeam: fixture.awayTeam,
+            compId: 'comp_nba',
             compCode: 'NBA',
             compName: 'NBA',
             kickoff: fixture.kickoffTime,
@@ -131,6 +155,7 @@ export default function PredictionsPage() {
           fixtureName: `${displayName(fixture.homeTeam)} vs ${displayName(fixture.awayTeam)}`,
           homeTeam: fixture.homeTeam,
           awayTeam: fixture.awayTeam,
+          compId: fixture.competitionId || fixture.competition.id,
           compCode: fixture.competition.code,
           compName: fixture.competition.name,
           kickoff: fixture.kickoffTime,
@@ -180,11 +205,11 @@ export default function PredictionsPage() {
     return true;
   };
 
-  // Filtered raw predictions
+  // Filtered raw predictions by competition_id ONLY
   const filtered = useMemo(() => {
     return allPredictions.filter(item => {
       const p = item.prediction;
-      if (selectedComp !== 'ALL' && item.compCode !== selectedComp) {
+      if (!isBasketball && selectedCompId !== 'ALL' && item.compId !== selectedCompId) {
         return false;
       }
       if (selectedRiskTier !== 'ALL') {
@@ -210,7 +235,7 @@ export default function PredictionsPage() {
       const probB = b.prediction.calibratedProbability ?? b.prediction.modelProbability;
       return probB - probA;
     });
-  }, [allPredictions, selectedComp, selectedRiskTier, selectedMarketGroup, onlyValuePicks, minProb]);
+  }, [allPredictions, isBasketball, selectedCompId, selectedRiskTier, selectedMarketGroup, onlyValuePicks, minProb]);
 
   // Bug 7: Group options for one match into one card so overlapping selections are presented together
   const groupedMatches = useMemo(() => {
@@ -338,35 +363,31 @@ export default function PredictionsPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div>
-            <label className="block text-[#8B9890] mb-1 text-[11px] font-normal">Competition</label>
-            {isBasketball ? (
+          {isBasketball ? (
+            <div>
+              <label className="block text-[#8B9890] mb-1 text-[11px] font-normal">Competition</label>
               <select
                 disabled
                 className="w-full h-[38px] bg-[#151E19] border border-white/[0.07] px-3 rounded-[11px] text-[12.5px] text-[#ECF1EE] opacity-90 cursor-default"
               >
-                <option value="NBA">NBA</option>
+                <option value="comp_nba">NBA</option>
               </select>
-            ) : (
-              <select
-                value={selectedComp}
-                onChange={(e) => setSelectedComp(e.target.value)}
-                className="w-full h-[38px] bg-[#151E19] border border-white/[0.07] px-3 rounded-[11px] text-[12.5px] text-[#ECF1EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B6E63B]/40"
-              >
-                <option value="ALL">All competitions</option>
-                {COMPETITIONS.map(c => (
-                  <option key={c.code} value={c.code}>{cleanDisplayText(c.name)}</option>
-                ))}
-              </select>
-            )}
-          </div>
+            </div>
+          ) : (
+            <CompetitionFilter
+              selectedCompetitionId={selectedCompId}
+              onSelectCompetitionId={setSelectedCompId}
+              groups={compGroups}
+              totalFixturesCount={totalCompFixtures || fixtures.length}
+            />
+          )}
 
           <div>
             <label className="block text-[#8B9890] mb-1 text-[11px] font-normal">Confidence</label>
             <select
               value={selectedRiskTier}
               onChange={(e) => setSelectedRiskTier(e.target.value)}
-              className="w-full h-[38px] bg-[#151E19] border border-white/[0.07] px-3 rounded-[11px] text-[12.5px] text-[#ECF1EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B6E63B]/40"
+              className="w-full h-10 bg-[#151E19] border border-white/[0.07] px-3 rounded-[12px] text-[12.5px] text-[#ECF1EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B6E63B]/40"
             >
               <option value="ALL">All</option>
               <option value="HIGH">High (≥60%)</option>
@@ -375,6 +396,29 @@ export default function PredictionsPage() {
             </select>
           </div>
         </div>
+
+        {!isBasketball && (
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+            {(['ALL', 'today', 'tomorrow', 'weekend'] as const).map(day => {
+              const isActive = selectedDay === day;
+              const label = day === 'ALL' ? 'All days' : day === 'today' ? 'Today' : day === 'tomorrow' ? 'Tomorrow' : 'Weekend';
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => setSelectedDay(day)}
+                  className={`h-7 px-3 rounded-[9px] text-[11px] font-medium transition-colors shrink-0 border ${
+                    isActive
+                      ? 'bg-[#B8E636]/15 border-[#B8E636]/40 text-[#B8E636] font-semibold'
+                      : 'bg-[#101613] border-[#1F2A24] text-[#8B9892] hover:text-[#E9EFEB]'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Min probability */}
         <div className="space-y-1 pt-0.5">

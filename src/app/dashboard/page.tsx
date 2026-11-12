@@ -1,11 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { 
-  COMPETITIONS, 
-  getFixtureStatistics, 
-} from '@/lib/data/seedData';
+import { getFixtureStatistics } from '@/lib/data/seedData';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
@@ -13,6 +10,9 @@ import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import NBAScoreProjectionTool from '@/components/nba/NBAScoreProjectionTool';
 import TeamCrest from '@/components/TeamCrest';
+import CompetitionFilter from '@/components/CompetitionFilter';
+import { CountryCompetitionGroup } from '@/lib/data/canonicalCompetitions';
+import { matchesDayFilter } from '@/lib/utils/dateWindow';
 import { 
   Search, 
   Zap, 
@@ -32,14 +32,32 @@ export default function DashboardPage() {
   const { sport, isSwitching } = useSport();
   const isBasketball = sport === 'basketball';
 
-  const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
+  const [selectedCompId, setSelectedCompId] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'completed'>('today');
+  const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'completed'>('upcoming');
+  const [compGroups, setCompGroups] = useState<CountryCompetitionGroup[]>([]);
+  const [totalCompFixtures, setTotalCompFixtures] = useState<number>(0);
+
+  useEffect(() => {
+    if (isBasketball) return;
+    fetch('/api/v1/competitions?sport=football', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(json => {
+        if (json.groupedByCountry && Array.isArray(json.groupedByCountry)) {
+          setCompGroups(json.groupedByCountry);
+        }
+        if (typeof json.totalFixtures === 'number') {
+          setTotalCompFixtures(json.totalFixtures);
+        }
+      })
+      .catch(err => console.error('[DashboardPage] Error fetching active competitions:', err));
+  }, [isBasketball]);
 
   const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(
-    isBasketball ? 'NBA' : selectedLeague,
+    isBasketball ? 'comp_nba' : selectedCompId,
     'ALL',
-    sport
+    sport,
+    !isBasketball && activeTab === 'today' ? 'today' : 'ALL'
   );
 
   const savedFixtureIds = useMemo(() => getStoredSavedFixtures(), []);
@@ -85,11 +103,11 @@ export default function DashboardPage() {
     });
   }, [fixtures, isBasketball]);
 
-  // Filter football fixtures
+  // Filter football fixtures by competition_id ONLY + tab day/status
   const filteredList = useMemo(() => {
     if (isBasketball) return [];
     return evaluatedFixtures.filter(({ fixture }) => {
-      if (selectedLeague !== 'ALL' && fixture.competition.code !== selectedLeague) {
+      if (selectedCompId !== 'ALL' && (fixture.competitionId || fixture.competition.id) !== selectedCompId) {
         return false;
       }
       if (searchQuery.trim()) {
@@ -102,11 +120,11 @@ export default function DashboardPage() {
       if (activeTab === 'completed') {
         return fixture.status === 'FINISHED';
       } else if (activeTab === 'today') {
-        return fixture.status !== 'FINISHED';
+        return fixture.status !== 'FINISHED' && matchesDayFilter(fixture.kickoffTime, 'today');
       }
-      return true;
+      return fixture.status !== 'FINISHED';
     });
-  }, [evaluatedFixtures, selectedLeague, searchQuery, activeTab, isBasketball]);
+  }, [evaluatedFixtures, selectedCompId, searchQuery, activeTab, isBasketball]);
 
   // Basketball filtered fixtures
   const filteredBasketball = useMemo(() => {
@@ -298,34 +316,15 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* League selector for Football only */}
+        {/* Database-driven competition selector for Football only */}
         {!isBasketball && (
-          <div className="flex items-center gap-1 overflow-x-auto text-[11px] pb-1 [scrollbar-width:none]">
-            <button
-              onClick={() => setSelectedLeague('ALL')}
-              type="button"
-              className={`px-2 py-0.5 rounded-[5px] whitespace-nowrap transition-colors ${
-                selectedLeague === 'ALL'
-                  ? 'bg-[var(--surface-2)] text-[var(--text)] font-semibold border border-[var(--border-strong)]'
-                  : 'text-[var(--text-3)] hover:text-[var(--text)]'
-              }`}
-            >
-              All leagues
-            </button>
-            {COMPETITIONS.map(c => (
-              <button
-                key={c.code}
-                onClick={() => setSelectedLeague(c.code)}
-                type="button"
-                className={`px-2 py-0.5 rounded-[5px] whitespace-nowrap transition-colors ${
-                  selectedLeague === c.code
-                    ? 'bg-[var(--surface-2)] text-[var(--text)] font-semibold border border-[var(--border-strong)]'
-                    : 'text-[var(--text-3)] hover:text-[var(--text)]'
-                }`}
-              >
-                {c.code}
-              </button>
-            ))}
+          <div className="w-full sm:w-72">
+            <CompetitionFilter
+              selectedCompetitionId={selectedCompId}
+              onSelectCompetitionId={setSelectedCompId}
+              groups={compGroups}
+              totalFixturesCount={totalCompFixtures || fixtures.length}
+            />
           </div>
         )}
       </div>

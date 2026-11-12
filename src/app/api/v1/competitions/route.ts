@@ -4,29 +4,40 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCompetitionsFromDatabase } from '@/lib/data/canonicalCompetitions';
+import { getFootballDataProvider } from '@/lib/data/provider';
 import { Sport } from '@/types';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 60;
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const sport = (searchParams.get('sport') as Sport | 'all') || 'football';
+  const day = searchParams.get('day') || undefined;
 
-  const { competitions, groupedByCountry, total } = await getCompetitionsFromDatabase(sport);
+  if (sport === 'football' || sport === 'all') {
+    await getFootballDataProvider().ensureSynced();
+  }
+
+  const { competitions, groupedByCountry, total, totalFixtures } = await getCompetitionsFromDatabase(
+    sport,
+    day ? { day } : undefined
+  );
 
   return NextResponse.json(
     {
       data: competitions,
       groupedByCountry,
       total,
+      totalFixtures,
       sport,
+      day: day || 'ALL',
       source: 'database:fixtures',
       timestamp: new Date().toISOString(),
     },
     {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30',
+        'Cache-Control': 'no-store, max-age=0',
       },
     }
   );

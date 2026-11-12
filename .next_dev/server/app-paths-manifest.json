@@ -1,3 +1,6 @@
 {
-  "/api/v1/fixtures/[id]/form/route": "app/api/v1/fixtures/[id]/form/route.js"
+  "/api/health/route": "app/api/health/route.js",
+  "/api/v1/competitions/route": "app/api/v1/competitions/route.js",
+  "/matches/page": "app/matches/page.js",
+  "/api/v1/fixtures/route": "app/api/v1/fixtures/route.js"
 }

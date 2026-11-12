@@ -2603,9 +2603,6 @@ video {
 .duration-300{
   transition-duration: 300ms;
 }
-.\[scrollbar-width\:none\]{
-  scrollbar-width: none;
-}
 
 :root {
   --bg: #0A0E0C;
@@ -3096,6 +3093,10 @@ html.monochrome img {
 
   .sm\:w-64{
     width: 16rem;
+  }
+
+  .sm\:w-72{
+    width: 18rem;
   }
 
   .sm\:max-w-md{

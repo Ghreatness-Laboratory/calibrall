@@ -8,6 +8,7 @@
 
 import { Fixture } from '@/types';
 import { lookupTeamStrength, normalizeTeamLookupKey, COMPETITION_CLUBS, COMPETITION_COUNTRY_MAP } from './teamDatabase';
+import { isCanonicalCompetitionId, logCompetitionIntegrityError } from './canonicalCompetitions';
 
 export interface IntegrityValidationReport {
   isValid: boolean;
@@ -64,18 +65,9 @@ export function validateFixtureIntegrity(
     // Rule 1b: Canonical competition_id check (Mandatory: Every fixture must have a canonical competition_id)
     // A fixture with none is logged as an error and never shown under a fallback.
     const compId = f.competitionId || f.competition?.id;
-    const isValidCanonicalCompId = 
-      typeof compId === 'string' && 
-      compId.startsWith('comp_') && 
-      compId !== 'comp_league' && 
-      compId !== 'comp_sm_league' && 
-      compId !== 'fallback' && 
-      compId.trim().length >= 6;
-
-    if (!isValidCanonicalCompId) {
-      const msg = `[Integrity Error] Fixture "${f.id}" has no canonical competition_id (received: "${compId}"). Rejecting; never shown under fallback.`;
-      console.error(msg);
-      violations.push(msg);
+    if (!isCanonicalCompetitionId(compId)) {
+      logCompetitionIntegrityError(String(f.id || f.providerId || 'unknown'), compId, f.source || 'validateFixtureIntegrity');
+      violations.push(`[Integrity Error] Fixture "${f.id}" has no canonical competition_id (received: "${compId}").`);
       rejectedFixtures.push({ fixtureId: f.id, reason: 'Missing canonical competition_id' });
       continue;
     }
@@ -279,6 +271,7 @@ export function validateFixtureIntegrity(
       if (interval === lastInterval && interval > 0 && interval % 3600000 === 0) {
         identicalIntervalCount++;
       } else {
+        identicalIntervalCount = 0;
         lastInterval = interval;
       }
     }

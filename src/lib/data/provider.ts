@@ -9,17 +9,27 @@
 // - Demo data is strictly gated behind process.env.USE_DEMO_DATA === 'true' (defaults to false).
 
 import { Competition, Fixture, FixtureContext, Team, VerifiedMatchOdds, MatchStatus } from '@/types';
-import { COMPETITIONS, getFixtureStatistics } from './seedData';
+import { getFixtureStatistics } from './seedData';
 import { evaluateFixtureMarkets } from '../prediction/marketSelection';
 import { computeRequestDateWindow } from '../utils/dateWindow';
 import { serverCache } from '../cache/serverCache';
 import { checkAndLogStartupEnv } from '../config/envAudit';
 import { lookupTeamStrength } from './teamDatabase';
-import { displayName, getTeamAbbreviation, cleanDisplayText } from '../utils/formatText';
-import { supabase, isSupabaseConfigured, assertPersistenceConfigured } from '@/lib/supabase/client';
+import { displayName, getTeamAbbreviation } from '../utils/formatText';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { matchesStore } from './matchesStore';
-import { getCompetitionsFromDatabase, getCanonicalCompetition, isCanonicalCompetitionId } from './canonicalCompetitions';
-import { getFixturesFromDatabase, matchesDayFilter } from './fixturesDatabase';
+import {
+  CANONICAL_COMPETITIONS,
+  getCompetitionsFromDatabase,
+  getCanonicalCompetition,
+  isCanonicalCompetitionId,
+  logCompetitionIntegrityError,
+} from './canonicalCompetitions';
+import {
+  getFixturesFromDatabase,
+  syncFootballFixturesToDatabase,
+  matchesDayFilter,
+} from './fixturesDatabase';
 import { validateFixtureIntegrity } from './fixtureIntegrity';
 import { lookupCanonicalTeam, recordUnresolvedTeam } from './canonicalTeams';
 
@@ -51,7 +61,7 @@ export interface LiveFixturesResult {
 export interface FootballDataProvider {
   getHealth(): Promise<ProviderHealth>;
   getCompetitions(): Promise<Competition[]>;
-  getLiveFixtures(params?: { competitionId?: string; competitionCode?: string; status?: string; day?: string }): Promise<LiveFixturesResult>;
+  getLiveFixtures(params?: { competitionId?: string; status?: string; day?: string }): Promise<LiveFixturesResult>;
   getFixtureById(id: string): Promise<Fixture | null>;
   getFixtureContext(fixtureId: string): Promise<FixtureContext | null>;
 }
@@ -66,7 +76,7 @@ export function americanToDecimalOdds(val: string | number | undefined | null): 
   return 1.0;
 }
 
-// Mapping of supported league codes to ESPN soccer slugs
+// Mapping of supported canonical league codes to ESPN soccer slugs
 const ESPN_LEAGUE_MAP: Record<string, { slug: string; name: string; country: string; defaultMatchday: number }> = {
   PL: { slug: 'eng.1', name: 'Premier League', country: 'England', defaultMatchday: 9 },
   ELC: { slug: 'eng.2', name: 'Championship', country: 'England', defaultMatchday: 12 },
@@ -76,33 +86,26 @@ const ESPN_LEAGUE_MAP: Record<string, { slug: string; name: string; country: str
   FL1: { slug: 'fra.1', name: 'Ligue 1', country: 'France', defaultMatchday: 9 },
   DED: { slug: 'ned.1', name: 'Eredivisie', country: 'Netherlands', defaultMatchday: 10 },
   CL: { slug: 'uefa.champions', name: 'UEFA Champions League', country: 'Europe', defaultMatchday: 3 },
-  P1: { slug: 'por.1', name: 'Primeira Liga', country: 'Portugal', defaultMatchday: 9 },
   PPL: { slug: 'por.1', name: 'Primeira Liga', country: 'Portugal', defaultMatchday: 9 },
-  T1: { slug: 'tur.1', name: 'Süper Lig', country: 'Turkey', defaultMatchday: 10 },
   TSL: { slug: 'tur.1', name: 'Süper Lig', country: 'Turkey', defaultMatchday: 10 },
   SC0: { slug: 'sco.1', name: 'Scottish Premiership', country: 'Scotland', defaultMatchday: 10 },
-  SP: { slug: 'sco.1', name: 'Scottish Premiership', country: 'Scotland', defaultMatchday: 10 },
-  BSA: { slug: 'bra.1', name: 'Série A', country: 'Brazil', defaultMatchday: 30 },
-  BRA: { slug: 'bra.1', name: 'Série A', country: 'Brazil', defaultMatchday: 30 },
+  BSA: { slug: 'bra.1', name: 'Campeonato Brasileiro Série A', country: 'Brazil', defaultMatchday: 30 },
   ARG: { slug: 'arg.1', name: 'Liga Profesional', country: 'Argentina', defaultMatchday: 15 },
   JPN: { slug: 'jpn.1', name: 'J1 League', country: 'Japan', defaultMatchday: 25 },
 };
 
 // Normalize Football-Data.org fixture
-function parseFootballDataMatch(m: any, fetchTime: string): Fixture {
-  const compCode = m.competition?.code || 'PL';
-  const comp = getCanonicalCompetition(compCode) || COMPETITIONS.find(c => c.code === compCode) || {
-    id: `comp_${compCode.toLowerCase()}`,
-    code: compCode,
-    name: m.competition?.name || cleanDisplayText(compCode),
-    country: m.area?.name || 'Europe',
-    emblemUrl: m.competition?.emblem || `https://crests.football-data.org/${compCode}.png`,
-    tier: 1,
-    avgGoalsPerGame: 2.80,
-    avgCornersPerGame: 10.0,
-    avgCardsPerGame: 4.1,
-    isActive: true,
-  };
+function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
+  const rawCompCode = m.competition?.code || m.competition?.id || '';
+  const comp = getCanonicalCompetition(String(rawCompCode));
+  if (!comp || !isCanonicalCompetitionId(comp.id)) {
+    logCompetitionIntegrityError(
+      `fix_${m.id ?? 'unknown'}`,
+      rawCompCode || null,
+      'provider:football-data'
+    );
+    return null;
+  }
 
   const homeCanon = lookupCanonicalTeam(m.homeTeam?.name) || lookupCanonicalTeam(m.homeTeam?.shortName);
   const awayCanon = lookupCanonicalTeam(m.awayTeam?.name) || lookupCanonicalTeam(m.awayTeam?.shortName);
@@ -180,23 +183,21 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture {
 }
 
 // Normalize Sportmonks v3 fixture
-function parseSportmonksMatch(m: any, fetchTime: string): Fixture {
+function parseSportmonksMatch(m: any, fetchTime: string): Fixture | null {
   const participants = m.participants || [];
   const home = participants.find((p: any) => p.meta?.location === 'home') || participants[0] || {};
   const away = participants.find((p: any) => p.meta?.location === 'away') || participants[1] || {};
 
-  const comp: Competition = {
-    id: `comp_sm_${m.league_id || 'league'}`,
-    code: m.league?.short_code || 'SM',
-    name: m.league?.name || 'European League',
-    country: 'Europe',
-    emblemUrl: m.league?.image_path || 'https://crests.football-data.org/CL.png',
-    tier: 1,
-    avgGoalsPerGame: 2.75,
-    avgCornersPerGame: 9.8,
-    avgCardsPerGame: 4.0,
-    isActive: true,
-  };
+  const rawCompKey = m.league?.short_code || m.league?.name || '';
+  const comp = getCanonicalCompetition(String(rawCompKey));
+  if (!comp || !isCanonicalCompetitionId(comp.id)) {
+    logCompetitionIntegrityError(
+      `fix_sm_${m.id ?? 'unknown'}`,
+      rawCompKey || m.league_id || null,
+      'provider:sportmonks'
+    );
+    return null;
+  }
 
   const homeCanon = lookupCanonicalTeam(home.name);
   const awayCanon = lookupCanonicalTeam(away.name);
@@ -273,18 +274,15 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
   const awayComp = competitors.find((c: any) => c.homeAway === 'away');
   if (!homeComp || !awayComp) return null;
 
-  const comp = COMPETITIONS.find(c => c.code === compCode) || {
-    id: `comp_${compCode.toLowerCase()}`,
-    code: compCode,
-    name: leagueMeta.name,
-    country: leagueMeta.country,
-    emblemUrl: `https://crests.football-data.org/${compCode}.png`,
-    tier: 1,
-    avgGoalsPerGame: 2.80,
-    avgCornersPerGame: 10.0,
-    avgCardsPerGame: 4.1,
-    isActive: true,
-  };
+  const comp = getCanonicalCompetition(compCode);
+  if (!comp || !isCanonicalCompetitionId(comp.id)) {
+    logCompetitionIntegrityError(
+      `fix_espn_${ev.id ?? 'unknown'}`,
+      compCode || null,
+      'provider:espn'
+    );
+    return null;
+  }
 
   const homeCanon =
     lookupCanonicalTeam(homeComp.team?.displayName) ||
@@ -427,22 +425,20 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
   };
 }
 
-function mapDbMatchToFixture(m: any, fetchTime: string): Fixture {
+function mapDbMatchToFixture(m: any, fetchTime: string): Fixture | null {
+  const rawCompKey = m.competition_id || m.competition_code || '';
+  const comp = getCanonicalCompetition(String(rawCompKey));
+  if (!comp || !isCanonicalCompetitionId(comp.id)) {
+    logCompetitionIntegrityError(
+      String(m.id || m.provider_id || 'unknown'),
+      rawCompKey || null,
+      'db:matches'
+    );
+    return null;
+  }
+
   const homeLookup = lookupTeamStrength(m.home_team_id) || lookupTeamStrength(m.home_team_name);
   const awayLookup = lookupTeamStrength(m.away_team_id) || lookupTeamStrength(m.away_team_name);
-
-  const comp = COMPETITIONS.find(c => c.code === m.competition_code) || {
-    id: `comp_${(m.competition_code || 'league').toLowerCase()}`,
-    code: m.competition_code || 'SA',
-    name: m.competition_code || 'League',
-    country: 'Europe',
-    emblemUrl: `https://crests.football-data.org/${m.competition_code || 'SA'}.png`,
-    tier: 1,
-    avgGoalsPerGame: 2.75,
-    avgCornersPerGame: 9.8,
-    avgCardsPerGame: 4.0,
-    isActive: true,
-  };
 
   const homeTeam: Team = {
     id: m.home_team_id,
@@ -509,8 +505,18 @@ function mapDbMatchToFixture(m: any, fetchTime: string): Fixture {
 export class LiveFootballDataProvider implements FootballDataProvider {
   private lastGoodCachedFixtures: Fixture[] = [];
   private lastGoodSyncTime: string = '';
+  private lastSyncEpochMs: number = 0;
+  private lastProviderUsed: string = 'ESPN Live Scoreboard';
   private lastFailedProvider?: string;
   private lastQuotaHeaders?: Record<string, string>;
+  private activeSyncPromise: Promise<{ ok: boolean; count: number; providerUsed: string }> | null = null;
+  private liveMetaById = new Map<string, {
+    verifiedOdds?: VerifiedMatchOdds;
+    matchday?: number;
+    minute?: number;
+    statusDetail?: string;
+    providerName?: string;
+  }>();
 
   async getHealth(): Promise<ProviderHealth> {
     checkAndLogStartupEnv();
@@ -534,12 +540,14 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     // ESPN is always active as verified public live provider
     providers.push('ESPN Live Scoreboard (Public Verified)');
 
+    const footballCompCount = Object.keys(CANONICAL_COMPETITIONS).filter(id => id !== 'comp_nba').length;
+
     return {
       providerName: providers.join(' + '),
       isConfigured: true,
       status: 'ONLINE',
       lastSyncTimestamp: this.lastGoodSyncTime || new Date().toISOString(),
-      activeLeaguesCount: COMPETITIONS.length,
+      activeLeaguesCount: footballCompCount,
       message: `Live data pipelines active: ${providers.join(', ')}.`,
       missingEnvVars: missing,
       quotaHeaders: this.lastQuotaHeaders,
@@ -547,11 +555,13 @@ export class LiveFootballDataProvider implements FootballDataProvider {
   }
 
   async getCompetitions(): Promise<Competition[]> {
+    await this.ensureSynced();
     const res = await getCompetitionsFromDatabase('football');
     return res.competitions;
   }
 
   private enrichFixtureWithDbStats(fixture: Fixture): Fixture {
+    const liveMeta = this.liveMetaById.get(fixture.id);
     const homeStats = matchesStore.getTeamStatsSync(fixture.homeTeam, fixture.kickoffTime);
     const awayStats = matchesStore.getTeamStatsSync(fixture.awayTeam, fixture.kickoffTime);
 
@@ -589,6 +599,11 @@ export class LiveFootballDataProvider implements FootballDataProvider {
 
     const updatedFixture: Fixture = {
       ...fixture,
+      providerName: liveMeta?.providerName || fixture.providerName,
+      matchday: liveMeta?.matchday ?? fixture.matchday,
+      minute: liveMeta?.minute ?? fixture.minute,
+      statusDetail: liveMeta?.statusDetail ?? fixture.statusDetail,
+      verifiedOdds: fixture.verifiedOdds || liveMeta?.verifiedOdds,
       homeTeam: enrichedHome,
       awayTeam: enrichedAway,
     };
@@ -600,8 +615,17 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     return updatedFixture;
   }
 
-  private applyLiveFilters(fixtures: Fixture[], params?: { competitionId?: string; competitionCode?: string; status?: string; day?: string }): Fixture[] {
+  private applyLiveFilters(fixtures: Fixture[], params?: { competitionId?: string; status?: string; day?: string }): Fixture[] {
     let filtered = fixtures;
+    // Rule 3: Filter by competition_id ONLY
+    if (params?.competitionId && params.competitionId !== 'ALL') {
+      const targetCompId = params.competitionId.trim().toLowerCase();
+      if (!isCanonicalCompetitionId(targetCompId)) {
+        logCompetitionIntegrityError('applyLiveFilters', params.competitionId, 'provider:filter');
+        return [];
+      }
+      filtered = filtered.filter(f => (f.competitionId || '').toLowerCase() === targetCompId);
+    }
     if (params?.status && params.status !== 'ALL') {
       filtered = filtered.filter(f => f.status === params.status);
     }
@@ -611,297 +635,292 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     return filtered.map(f => this.enrichFixtureWithDbStats(f));
   }
 
-  async getLiveFixtures(params?: { competitionId?: string; competitionCode?: string; status?: string; day?: string }): Promise<LiveFixturesResult> {
-    checkAndLogStartupEnv();
+  /**
+   * Synchronizes real verified football fixtures from providers into the database `fixtures` table.
+   * Deduplicates concurrent requests and caches the active sync for 120s.
+   */
+  async ensureSynced(force = false): Promise<{ ok: boolean; count: number; providerUsed: string }> {
+    const { dateFrom, dateTo, datesList, lastUpdatedFormatted } = computeRequestDateWindow(14);
+    const syncCacheKey = serverCache.getFixtureCacheKey('SYNC_ALL', dateFrom, dateTo, 'football');
 
-    // Resolve competitionCode from competitionId if only competitionId is provided
-    let resolvedCode = params?.competitionCode;
-    if ((!resolvedCode || resolvedCode === 'ALL') && params?.competitionId && params.competitionId !== 'ALL') {
-      const compMeta = getCanonicalCompetition(params.competitionId);
-      if (compMeta?.code) {
-        resolvedCode = compMeta.code;
+    if (!force) {
+      const cachedFlag = await serverCache.get<{ count: number; providerUsed: string }>(syncCacheKey);
+      if (cachedFlag && Date.now() - this.lastSyncEpochMs < 120_000) {
+        return { ok: true, count: cachedFlag.count, providerUsed: cachedFlag.providerUsed };
       }
     }
 
-    // 1. Compute dynamic date window at request time
-    const { dateFrom, dateTo, lastUpdatedFormatted } = computeRequestDateWindow();
-    const fetchTime = new Date().toISOString();
-
-    // 2. Check server cache
-    const cacheKey = serverCache.getFixtureCacheKey(params?.competitionId || resolvedCode, dateFrom, dateTo);
-    const cached = await serverCache.get<Fixture[]>(cacheKey);
-
-    if (cached && Array.isArray(cached) && cached.length > 0) {
-      const filtered = this.applyLiveFilters(cached, params);
-      return {
-        fixtures: filtered,
-        liveDataAvailable: true,
-        lastUpdated: lastUpdatedFormatted,
-        providerUsed: filtered[0]?.providerName || cached[0]?.providerName || 'ServerCache (TTL active)',
-        dateRange: { dateFrom, dateTo },
-      };
+    if (this.activeSyncPromise) {
+      return this.activeSyncPromise;
     }
 
-    // 3. Check upcoming scheduled fixtures in Supabase matches table (if any live/upcoming stored)
-    if (isSupabaseConfigured && supabase) {
-      try {
-        let query = supabase
-          .from('matches')
-          .select('*')
-          .gte('kickoff_time', `${dateFrom}T00:00:00Z`)
-          .lte('kickoff_time', `${dateTo}T23:59:59Z`);
+    this.activeSyncPromise = (async () => {
+      const fetchTime = new Date().toISOString();
+      let ingestedFixtures: Fixture[] = [];
+      let providerNameUsed = '';
 
-        if (resolvedCode && resolvedCode !== 'ALL') {
-          query = query.eq('competition_code', resolvedCode.toUpperCase());
-        }
-        if (params?.status && params.status !== 'ALL') {
-          query = query.eq('status', params.status);
-        }
-        const { data: dbMatches, error: dbErr } = await query;
-        if (!dbErr && dbMatches && dbMatches.length > 0) {
-          const mapped = dbMatches.map((m: any) => mapDbMatchToFixture(m, fetchTime));
-          const integrityReport = validateFixtureIntegrity(mapped, { dateFrom, dateTo });
-          if (integrityReport.validFixtures.length > 0) {
-            const enriched = this.applyLiveFilters(integrityReport.validFixtures, params);
-            return {
-              fixtures: enriched,
-              liveDataAvailable: true,
-              lastUpdated: lastUpdatedFormatted,
-              providerUsed: 'Supabase PostgreSQL (Production matches table)',
-              dateRange: { dateFrom, dateTo },
-            };
+      // 1. Primary Provider: Football-Data.org (if configured)
+      const footballDataKey = process.env.FOOTBALL_DATA_API_KEY?.trim();
+      if (footballDataKey) {
+        try {
+          const url = `https://api.football-data.org/v4/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
+          const res = await fetch(url, {
+            headers: { 'X-Auth-Token': footballDataKey },
+            cache: 'no-store',
+          });
+
+          const quotaHeaders: Record<string, string> = {};
+          res.headers.forEach((v, k) => {
+            if (k.toLowerCase().includes('quota') || k.toLowerCase().includes('request') || k.toLowerCase().includes('rate')) {
+              quotaHeaders[k] = v;
+            }
+          });
+
+          if (res.ok) {
+            const json = await res.json();
+            const rawMatches = json.matches || [];
+            const parsed = rawMatches
+              .map((m: any) => parseFootballDataMatch(m, fetchTime))
+              .filter((f: Fixture | null): f is Fixture => f !== null);
+            if (parsed.length > 0) {
+              ingestedFixtures = parsed;
+              providerNameUsed = 'Football-Data.org v4';
+            }
+          } else {
+            this.lastFailedProvider = 'Football-Data.org';
+            this.lastQuotaHeaders = quotaHeaders;
+            console.warn(`[FootballDataProvider] Football-Data.org responded with HTTP ${res.status}. Quota headers:`, quotaHeaders);
           }
-        }
-      } catch (err) {
-        console.warn('[FootballDataProvider] Error reading matches from Supabase:', err);
-      }
-    }
-
-    // Array to collect live fixtures from providers
-    let ingestedFixtures: Fixture[] = [];
-    let providerNameUsed = '';
-
-    // =========================================================================
-    // 4. Primary Provider: Football-Data.org (if configured)
-    // =========================================================================
-    const footballDataKey = process.env.FOOTBALL_DATA_API_KEY?.trim();
-    if (footballDataKey) {
-      try {
-        const compFilter = resolvedCode && resolvedCode !== 'ALL'
-          ? `&competitions=${resolvedCode}`
-          : '';
-        const url = `https://api.football-data.org/v4/matches?dateFrom=${dateFrom}&dateTo=${dateTo}${compFilter}`;
-
-        const res = await fetch(url, {
-          headers: { 'X-Auth-Token': footballDataKey },
-          next: { revalidate: 120 },
-        });
-
-        const quotaHeaders: Record<string, string> = {};
-        res.headers.forEach((v, k) => {
-          if (k.toLowerCase().includes('quota') || k.toLowerCase().includes('request') || k.toLowerCase().includes('rate')) {
-            quotaHeaders[k] = v;
-          }
-        });
-
-        if (res.ok) {
-          const json = await res.json();
-          const rawMatches = json.matches || [];
-          const parsed = rawMatches.map((m: any) => parseFootballDataMatch(m, fetchTime));
-          if (parsed.length > 0) {
-            ingestedFixtures = parsed;
-            providerNameUsed = 'Football-Data.org v4';
-          }
-        } else {
+        } catch (err: any) {
           this.lastFailedProvider = 'Football-Data.org';
-          this.lastQuotaHeaders = quotaHeaders;
-          console.warn(`[FootballDataProvider] Football-Data.org responded with HTTP ${res.status}. Quota headers:`, quotaHeaders);
+          console.error('[FootballDataProvider] Error connecting to Football-Data.org:', err?.message || err);
         }
-      } catch (err: any) {
-        this.lastFailedProvider = 'Football-Data.org';
-        console.error('[FootballDataProvider] Error connecting to Football-Data.org:', err?.message || err);
       }
-    }
 
-    // =========================================================================
-    // 5. Secondary Provider: Sportmonks (if configured and primary empty)
-    // =========================================================================
-    const sportmonksToken = process.env.SPORTMONKS_API_TOKEN?.trim() || process.env.SPORTSMONK_API_KEY?.trim();
-    if (ingestedFixtures.length === 0 && sportmonksToken) {
-      try {
-        const smUrl = `https://api.sportmonks.com/v3/football/fixtures/between/${dateFrom}/${dateTo}?api_token=${sportmonksToken}&include=participants;league;round;scores`;
-        const res = await fetch(smUrl, { next: { revalidate: 120 } });
+      // 2. Secondary Provider: Sportmonks (if configured and primary empty)
+      const sportmonksToken = process.env.SPORTMONKS_API_TOKEN?.trim() || process.env.SPORTSMONK_API_KEY?.trim();
+      if (ingestedFixtures.length === 0 && sportmonksToken) {
+        try {
+          const smUrl = `https://api.sportmonks.com/v3/football/fixtures/between/${dateFrom}/${dateTo}?api_token=${sportmonksToken}&include=participants;league;round;scores`;
+          const res = await fetch(smUrl, { cache: 'no-store' });
 
-        const quotaHeaders: Record<string, string> = {};
-        res.headers.forEach((v, k) => {
-          if (k.toLowerCase().includes('rate') || k.toLowerCase().includes('limit')) {
-            quotaHeaders[k] = v;
+          const quotaHeaders: Record<string, string> = {};
+          res.headers.forEach((v, k) => {
+            if (k.toLowerCase().includes('rate') || k.toLowerCase().includes('limit')) {
+              quotaHeaders[k] = v;
+            }
+          });
+
+          if (res.ok) {
+            const json = await res.json();
+            const rawList = json.data || [];
+            const parsed = rawList
+              .map((m: any) => parseSportmonksMatch(m, fetchTime))
+              .filter((f: Fixture | null): f is Fixture => f !== null);
+            if (parsed.length > 0) {
+              ingestedFixtures = parsed;
+              providerNameUsed = 'Sportmonks v3';
+            }
+          } else {
+            this.lastFailedProvider = 'Sportmonks';
+            this.lastQuotaHeaders = quotaHeaders;
+            console.warn(`[FootballDataProvider] Sportmonks responded with HTTP ${res.status}`);
           }
-        });
-
-        if (res.ok) {
-          const json = await res.json();
-          const rawList = json.data || [];
-          const parsed = rawList.map((m: any) => parseSportmonksMatch(m, fetchTime));
-          if (parsed.length > 0) {
-            ingestedFixtures = parsed;
-            providerNameUsed = 'Sportmonks v3';
-          }
-        } else {
+        } catch (err: any) {
           this.lastFailedProvider = 'Sportmonks';
-          this.lastQuotaHeaders = quotaHeaders;
-          console.warn(`[FootballDataProvider] Sportmonks responded with HTTP ${res.status}`);
+          console.error('[FootballDataProvider] Error connecting to Sportmonks:', err?.message || err);
         }
-      } catch (err: any) {
-        this.lastFailedProvider = 'Sportmonks';
-        console.error('[FootballDataProvider] Error connecting to Sportmonks:', err?.message || err);
       }
-    }
 
-    // =========================================================================
-    // 6. Core Live Provider: ESPN Soccer Scoreboard API
-    //    Fetches BOTH current active matchweek (default scoreboard) AND today's date
-    // =========================================================================
-    if (ingestedFixtures.length === 0) {
-      try {
-        const targetLeagues = resolvedCode && resolvedCode !== 'ALL'
-          ? [resolvedCode.toUpperCase()]
-          : Object.keys(ESPN_LEAGUE_MAP);
-
-        const uniqueSlugs = new Map<string, { code: string; info: typeof ESPN_LEAGUE_MAP[string] }>();
-        for (const code of targetLeagues) {
-          const info = ESPN_LEAGUE_MAP[code];
-          if (info && !uniqueSlugs.has(info.slug)) {
-            uniqueSlugs.set(info.slug, { code, info });
-          }
-        }
-
-        const dateParam = dateFrom.replace(/-/g, '');
-        const espnPromises = Array.from(uniqueSlugs.values()).map(async ({ code, info: leagueInfo }) => {
-          try {
-            const fetchJsonWithTimeout = async (url: string) => {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 6000);
-              try {
-                const res = await fetch(url, {
-                  headers: { 'Accept': 'application/json' },
-                  signal: controller.signal,
-                  cache: 'no-store',
-                });
-                if (!res.ok) return null;
-                return await res.json();
-              } finally {
-                clearTimeout(timeoutId);
-              }
-            };
-
-            const [currentBoard, datedBoard] = await Promise.all([
-              fetchJsonWithTimeout(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueInfo.slug}/scoreboard`).catch(() => null),
-              fetchJsonWithTimeout(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueInfo.slug}/scoreboard?dates=${dateParam}`).catch(() => null),
-            ]);
-
-            const eventMap = new Map<string, any>();
-            for (const ev of (currentBoard?.events || [])) {
-              if (ev?.id) eventMap.set(String(ev.id), ev);
-            }
-            for (const ev of (datedBoard?.events || [])) {
-              if (ev?.id && !eventMap.has(String(ev.id))) {
-                eventMap.set(String(ev.id), ev);
-              }
-            }
-            const events = Array.from(eventMap.values());
-            if (events.length === 0) return [];
-
-            let leagueMatchday = leagueInfo.defaultMatchday;
+      // 3. Core Live Provider: ESPN Soccer Scoreboard API across 14-day window
+      if (ingestedFixtures.length === 0) {
+        try {
+          const fetchJsonWithTimeout = async (url: string) => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
             try {
-              const stdRes = await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${leagueInfo.slug}/standings`, {
+              const res = await fetch(url, {
                 headers: { 'Accept': 'application/json' },
+                signal: controller.signal,
                 cache: 'no-store',
               });
-              if (stdRes.ok) {
-                const stdData = await stdRes.json();
-                const gpStat = stdData.children?.[0]?.standings?.entries?.[0]?.stats?.find((s: any) => s.name === 'gamesPlayed');
-                if (gpStat && typeof gpStat.value === 'number' && gpStat.value > 0) {
-                  leagueMatchday = gpStat.value;
-                }
-              }
-            } catch {
-              // fallback to leagueInfo defaultMatchday
+              if (!res.ok) return null;
+              return await res.json();
+            } finally {
+              clearTimeout(timeoutId);
             }
+          };
 
-            const parsedMatches: Fixture[] = [];
+          const leagueEntries = Object.entries(ESPN_LEAGUE_MAP);
+          const allTasks: Array<{ code: string; leagueInfo: typeof ESPN_LEAGUE_MAP['PL']; url: string }> = [];
+          for (const [code, leagueInfo] of leagueEntries) {
+            allTasks.push({
+              code,
+              leagueInfo,
+              url: `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueInfo.slug}/scoreboard`,
+            });
+            for (const ds of datesList) {
+              allTasks.push({
+                code,
+                leagueInfo,
+                url: `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueInfo.slug}/scoreboard?dates=${ds}`,
+              });
+            }
+          }
+
+          const eventMapByCode = new Map<string, Map<string, any>>();
+          for (const [code] of leagueEntries) {
+            eventMapByCode.set(code, new Map());
+          }
+
+          // Bounded concurrency worker pool (16 workers) prevents socket starvation across 224 ESPN URLs
+          let taskIdx = 0;
+          const workerCount = Math.min(16, allTasks.length);
+          const workers = Array.from({ length: workerCount }, async () => {
+            while (taskIdx < allTasks.length) {
+              const task = allTasks[taskIdx++];
+              try {
+                const board = await fetchJsonWithTimeout(task.url);
+                const map = eventMapByCode.get(task.code)!;
+                for (const ev of (board?.events || [])) {
+                  if (ev?.id && !map.has(String(ev.id))) {
+                    map.set(String(ev.id), ev);
+                  }
+                }
+              } catch {
+                // Skip timed-out/failed individual date board
+              }
+            }
+          });
+          await Promise.all(workers);
+
+          const allParsed: Fixture[] = [];
+          for (const [code, leagueInfo] of leagueEntries) {
+            const events = Array.from(eventMapByCode.get(code)?.values() || []);
+            const leagueMatchday = leagueInfo.defaultMatchday;
             for (const ev of events) {
               const parsed = parseESPNMatch(ev, code, leagueInfo, leagueMatchday, fetchTime);
               if (parsed) {
-                parsedMatches.push(parsed);
+                allParsed.push(parsed);
               }
             }
-            return parsedMatches;
-          } catch {
-            return [];
           }
+
+          if (allParsed.length > 0) {
+            const seenKeys = new Set<string>();
+            const deduped: Fixture[] = [];
+            for (const f of allParsed) {
+              const key = f.id || `${f.providerName}_${f.providerId}`;
+              if (!seenKeys.has(key)) {
+                seenKeys.add(key);
+                deduped.push(f);
+              }
+            }
+            ingestedFixtures = deduped;
+            providerNameUsed = 'ESPN Live Scoreboard & DraftKings Lines';
+          }
+        } catch (err: any) {
+          console.error('[FootballDataProvider] Error fetching ESPN soccer scoreboard:', err?.message || err);
+        }
+      }
+
+      // 4. Validate Integrity & Persist Canonical Fixtures to Database
+      if (ingestedFixtures.length > 0) {
+        const integrityReport = validateFixtureIntegrity(ingestedFixtures, {
+          dateFrom,
+          dateTo,
         });
 
-        const results = await Promise.all(espnPromises);
-        const allParsed = results.flat();
-
-        if (allParsed.length > 0) {
-          const seenKeys = new Set<string>();
-          const deduped: Fixture[] = [];
-          for (const f of allParsed) {
-            const key = f.id || `${f.providerName}_${f.providerId}`;
-            if (!seenKeys.has(key)) {
-              seenKeys.add(key);
-              deduped.push(f);
-            }
+        if (integrityReport.validFixtures.length > 0) {
+          for (const f of integrityReport.validFixtures) {
+            this.liveMetaById.set(f.id, {
+              verifiedOdds: f.verifiedOdds,
+              matchday: f.matchday,
+              minute: f.minute,
+              statusDetail: f.statusDetail,
+              providerName: f.providerName,
+            });
           }
-          ingestedFixtures = deduped;
-          providerNameUsed = 'ESPN Live Scoreboard & DraftKings Lines';
+
+          await syncFootballFixturesToDatabase(integrityReport.validFixtures, dateFrom);
+
+          this.lastGoodCachedFixtures = integrityReport.validFixtures;
+          this.lastGoodSyncTime = lastUpdatedFormatted;
+          this.lastSyncEpochMs = Date.now();
+          this.lastProviderUsed = providerNameUsed;
+
+          const ttl = Math.min(120, serverCache.computeFixtureTTL(integrityReport.validFixtures));
+          await serverCache.set(syncCacheKey, { count: integrityReport.validFixtures.length, providerUsed: providerNameUsed }, ttl);
+
+          return { ok: true, count: integrityReport.validFixtures.length, providerUsed: providerNameUsed };
         }
-      } catch (err: any) {
-        console.error('[FootballDataProvider] Error fetching ESPN soccer scoreboard:', err?.message || err);
       }
+
+      return { ok: false, count: 0, providerUsed: this.lastProviderUsed };
+    })();
+
+    try {
+      return await this.activeSyncPromise;
+    } finally {
+      this.activeSyncPromise = null;
     }
+  }
 
-    // =========================================================================
-    // 7. STRICT INTEGRITY VALIDATION & CACHE
-    // =========================================================================
-    if (ingestedFixtures.length > 0) {
-      const integrityReport = validateFixtureIntegrity(ingestedFixtures, {
-        dateFrom,
-        dateTo,
-      });
+  async getLiveFixtures(params?: { competitionId?: string; status?: string; day?: string }): Promise<LiveFixturesResult> {
+    checkAndLogStartupEnv();
 
-      if (integrityReport.validFixtures.length > 0) {
-        const ttl = serverCache.computeFixtureTTL(integrityReport.validFixtures);
-        await serverCache.set(cacheKey, integrityReport.validFixtures, ttl);
+    const { dateFrom, dateTo, lastUpdatedFormatted } = computeRequestDateWindow(14);
 
-        this.lastGoodCachedFixtures = integrityReport.validFixtures;
-        this.lastGoodSyncTime = lastUpdatedFormatted;
-
-        const filtered = this.applyLiveFilters(integrityReport.validFixtures, params);
-
+    // Rule 1 & 3: If filtering by competition_id, validate it is canonical; never fall back.
+    if (params?.competitionId && params.competitionId !== 'ALL') {
+      if (!isCanonicalCompetitionId(params.competitionId)) {
+        logCompetitionIntegrityError('api_filter', params.competitionId, 'getLiveFixtures');
         return {
-          fixtures: filtered,
+          fixtures: [],
           liveDataAvailable: true,
-          lastUpdated: lastUpdatedFormatted,
-          providerUsed: providerNameUsed,
+          lastUpdated: this.lastGoodSyncTime || lastUpdatedFormatted,
+          providerUsed: this.lastProviderUsed,
           dateRange: { dateFrom, dateTo },
         };
       }
     }
 
-    // =========================================================================
-    // 8. FALLBACK TO VERIFIED DATABASE FIXTURES OR LAST GOOD CACHE
-    // =========================================================================
-    if (this.lastGoodCachedFixtures.length > 0) {
-      console.warn(`[FootballDataProvider] Live fetch returned 0 fixtures. Serving last good cached real data (${this.lastGoodCachedFixtures.length} matches).`);
-      let filtered = this.lastGoodCachedFixtures;
-      if (resolvedCode && resolvedCode !== 'ALL') {
-        filtered = filtered.filter(f => f.competition.code === resolvedCode);
-      }
-      filtered = this.applyLiveFilters(filtered, params);
+    const syncRes = await this.ensureSynced();
 
+    // Primary Single Source of Truth: Database `fixtures` table filtered by competition_id ONLY + day
+    if (isSupabaseConfigured && supabase) {
+      const dbFixtures = await getFixturesFromDatabase({
+        competitionId: params?.competitionId,
+        status: params?.status,
+        day: params?.day,
+        sport: 'football',
+      });
+
+      if (dbFixtures.length > 0) {
+        return {
+          fixtures: dbFixtures.map(f => this.enrichFixtureWithDbStats(f)),
+          liveDataAvailable: true,
+          lastUpdated: this.lastGoodSyncTime || lastUpdatedFormatted,
+          providerUsed: syncRes.ok ? syncRes.providerUsed : 'Database Verified Fixtures',
+          dateRange: { dateFrom, dateTo },
+        };
+      }
+
+      // Check if DB has any football fixtures at all (meaning filter simply matched 0 fixtures)
+      if (syncRes.ok || (await getFixturesFromDatabase({ sport: 'football' })).length > 0) {
+        return {
+          fixtures: [],
+          liveDataAvailable: true,
+          lastUpdated: this.lastGoodSyncTime || lastUpdatedFormatted,
+          providerUsed: syncRes.ok ? syncRes.providerUsed : 'Database Verified Fixtures',
+          dateRange: { dateFrom, dateTo },
+        };
+      }
+    }
+
+    // Fallback to lastGoodCachedFixtures only if DB was empty/offline
+    if (this.lastGoodCachedFixtures.length > 0) {
+      const filtered = this.applyLiveFilters(this.lastGoodCachedFixtures, params);
       return {
         fixtures: filtered,
         liveDataAvailable: true,
@@ -913,31 +932,6 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       };
     }
 
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const dbFixtures = await getFixturesFromDatabase({
-          competitionId: params?.competitionId,
-          status: params?.status,
-          day: params?.day,
-          sport: 'football',
-        });
-        if (dbFixtures.length > 0) {
-          const integrityReport = validateFixtureIntegrity(dbFixtures);
-          if (integrityReport.validFixtures.length > 0) {
-            return {
-              fixtures: integrityReport.validFixtures.map(f => this.enrichFixtureWithDbStats(f)),
-              liveDataAvailable: true,
-              lastUpdated: lastUpdatedFormatted,
-              providerUsed: 'Database Verified Fixtures',
-              dateRange: { dateFrom, dateTo },
-            };
-          }
-        }
-      } catch (err) {
-        console.warn('[FootballDataProvider] Error querying database fixtures:', err);
-      }
-    }
-
     // Required Error State: Never generate substitute data!
     const errorMsg = `Fixtures unavailable, last updated ${this.lastGoodSyncTime || 'never'}`;
     return {
@@ -945,19 +939,14 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       liveDataAvailable: false,
       lastUpdated: this.lastGoodSyncTime || lastUpdatedFormatted,
       error: errorMsg,
-      failedProvider: this.lastFailedProvider || 'Football-Data.org / Sportmonks',
+      failedProvider: this.lastFailedProvider || 'Football-Data.org / Sportmonks / ESPN',
       quotaHeaders: this.lastQuotaHeaders,
       dateRange: { dateFrom, dateTo },
     };
   }
 
   async getFixtureById(id: string): Promise<Fixture | null> {
-    const cachedHit = this.lastGoodCachedFixtures.find(f => f.id === id || f.providerId === id);
-    if (cachedHit) return this.enrichFixtureWithDbStats(cachedHit);
-
-    const result = await this.getLiveFixtures();
-    const found = result.fixtures.find(f => f.id === id || f.providerId === id);
-    if (found) return this.enrichFixtureWithDbStats(found);
+    await this.ensureSynced();
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -966,6 +955,9 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         if (dbMatch) return this.enrichFixtureWithDbStats(dbMatch);
       } catch (_) {}
     }
+
+    const cachedHit = this.lastGoodCachedFixtures.find(f => f.id === id || f.providerId === id);
+    if (cachedHit) return this.enrichFixtureWithDbStats(cachedHit);
 
     return null;
   }
@@ -1003,7 +995,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     };
   }
 
-  async getFixtures(params?: { competitionCode?: string; date?: string; status?: string }): Promise<Fixture[]> {
+  async getFixtures(params?: { competitionId?: string; day?: string; status?: string }): Promise<Fixture[]> {
     const res = await this.getLiveFixtures(params);
     return res.fixtures;
   }

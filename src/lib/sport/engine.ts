@@ -1,7 +1,8 @@
 // Sport Engine: Polymorphic architecture abstraction for Multi-Sport Intelligence
 import { Sport, Competition, Fixture, PerformanceReport, MarketPrediction } from '@/types';
-import { COMPETITIONS, VERIFIED_PERFORMANCE_REPORT } from '../data/seedData';
-import { NBA_COMPETITION, VERIFIED_NBA_PERFORMANCE_REPORT, getNBASeedFixtures, generateNBAPredictions } from '../data/nbaSeedData';
+import { VERIFIED_PERFORMANCE_REPORT } from '../data/seedData';
+import { getCompetitionsFromDatabase } from '../data/canonicalCompetitions';
+import { NBA_COMPETITION, VERIFIED_NBA_PERFORMANCE_REPORT, generateNBAPredictions } from '../data/nbaSeedData';
 import { getFootballDataProvider } from '../data/provider';
 import { getNBADataProvider } from '../data/nbaProvider';
 
@@ -10,7 +11,7 @@ export interface SportEngine {
   name: string;
   defaultLeague: string;
   getCompetitions(): Promise<Competition[]>;
-  getFixtures(params?: { competitionCode?: string; status?: string }): Promise<{
+  getFixtures(params?: { competitionId?: string; status?: string; day?: string }): Promise<{
     fixtures: Fixture[];
     liveDataAvailable: boolean;
     lastUpdated: string;
@@ -26,10 +27,13 @@ export class FootballSportEngine implements SportEngine {
   defaultLeague = 'ALL';
 
   async getCompetitions(): Promise<Competition[]> {
-    return COMPETITIONS;
+    const provider = getFootballDataProvider();
+    await provider.ensureSynced();
+    const res = await getCompetitionsFromDatabase('football');
+    return res.competitions;
   }
 
-  async getFixtures(params?: { competitionCode?: string; status?: string }) {
+  async getFixtures(params?: { competitionId?: string; status?: string; day?: string }) {
     const provider = getFootballDataProvider();
     const result = await provider.getLiveFixtures(params);
     return {
@@ -59,7 +63,7 @@ export class BasketballSportEngine implements SportEngine {
     return [NBA_COMPETITION];
   }
 
-  async getFixtures(params?: { competitionCode?: string; status?: string }) {
+  async getFixtures(params?: { competitionId?: string; status?: string; day?: string }) {
     const provider = getNBADataProvider();
     const result = await provider.getFixtures(params?.status);
     return {

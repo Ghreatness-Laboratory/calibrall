@@ -39,7 +39,6 @@ export function useLiveFixtures(
       query.set('sport', sport);
       if (competitionId && competitionId !== 'ALL') {
         query.set('competition_id', competitionId);
-        query.set('competition', competitionId);
       }
       if (status && status !== 'ALL') query.set('status', status);
       if (day && day !== 'ALL') query.set('day', day);
