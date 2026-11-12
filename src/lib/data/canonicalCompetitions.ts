@@ -127,6 +127,18 @@ export const CANONICAL_COMPETITIONS: Record<string, Competition> = {
     avgCardsPerGame: 3.65,
     isActive: true,
   },
+  comp_bsa: {
+    id: 'comp_bsa',
+    code: 'BSA',
+    name: 'Campeonato Brasileiro Série A',
+    country: 'Brazil',
+    emblemUrl: '',
+    tier: 1,
+    avgGoalsPerGame: 2.48,
+    avgCornersPerGame: 9.80,
+    avgCardsPerGame: 4.90,
+    isActive: true,
+  },
   comp_cl: {
     id: 'comp_cl',
     code: 'CL',
@@ -185,6 +197,13 @@ export function getCanonicalCompetition(idOrCode: string): Competition | null {
 
   // 3. Match by code uppercase (e.g. FL1, PL, PD)
   const codeUpper = idOrCode.trim().toUpperCase();
+  if (codeUpper === 'BRA') return CANONICAL_COMPETITIONS.comp_bsa;
+  if (codeUpper === 'E0') return CANONICAL_COMPETITIONS.comp_pl;
+  if (codeUpper === 'E1') return CANONICAL_COMPETITIONS.comp_elc;
+  if (codeUpper === 'SP1') return CANONICAL_COMPETITIONS.comp_pd;
+  if (codeUpper === 'I1') return CANONICAL_COMPETITIONS.comp_sa;
+  if (codeUpper === 'D1') return CANONICAL_COMPETITIONS.comp_bl1;
+  if (codeUpper === 'F1') return CANONICAL_COMPETITIONS.comp_fl1;
   const byCode = Object.values(CANONICAL_COMPETITIONS).find(c => c.code.toUpperCase() === codeUpper);
   if (byCode) {
     return byCode;

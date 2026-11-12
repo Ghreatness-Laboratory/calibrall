@@ -407,7 +407,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['vfl bochum', 'bochum', 'boc'],
   },
   kiel: {
-    id: 'team_kiel',
+    id: 'team_holstein_kiel',
     name: 'Holstein Kiel',
     shortName: 'Kiel',
     tla: 'KSV',
@@ -1037,7 +1037,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['brentford fc', 'brentford', 'bre'],
   },
   mancity: {
-    id: 'team_mancity',
+    id: 'team_man_city',
     name: 'Manchester City FC',
     shortName: 'Man City',
     tla: 'MCI',
@@ -1187,7 +1187,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['brighton & hove albion fc', 'brighton & hove albion', 'brighton and hove albion', 'brighton', 'bha'],
   },
   westham: {
-    id: 'team_westham',
+    id: 'team_west_ham',
     name: 'West Ham United FC',
     shortName: 'West Ham',
     tla: 'WHU',
@@ -1335,7 +1335,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['luton town fc', 'luton town', 'luton', 'lut'],
   },
   sheffieldunited: {
-    id: 'team_sheffieldunited',
+    id: 'team_sheffield_utd',
     name: 'Sheffield United FC',
     shortName: 'Sheffield Utd',
     tla: 'SHU',
@@ -1365,7 +1365,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['leeds united fc', 'leeds united', 'leeds', 'lee'],
   },
   westbrom: {
-    id: 'team_westbrom',
+    id: 'team_west_brom',
     name: 'West Bromwich Albion FC',
     shortName: 'West Brom',
     tla: 'WBA',
@@ -1440,7 +1440,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['preston north end fc', 'preston north end', 'preston', 'pne'],
   },
   bristolcity: {
-    id: 'team_bristolcity',
+    id: 'team_bristol_city',
     name: 'Bristol City FC',
     shortName: 'Bristol City',
     tla: 'BRC',
@@ -1530,7 +1530,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['sunderland afc', 'sunderland', 'sun'],
   },
   stokecity: {
-    id: 'team_stokecity',
+    id: 'team_stoke',
     name: 'Stoke City FC',
     shortName: 'Stoke',
     tla: 'STK',
@@ -1575,7 +1575,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['blackburn rovers fc', 'blackburn rovers', 'blackburn', 'blk', 'rov'],
   },
   sheffieldwednesday: {
-    id: 'team_sheffieldwednesday',
+    id: 'team_sheffield_wed',
     name: 'Sheffield Wednesday FC',
     shortName: 'Sheffield Weds',
     tla: 'SHW',
@@ -1641,7 +1641,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['derby county fc', 'derby county', 'derby', 'der'],
   },
   oxford: {
-    id: 'team_oxford',
+    id: 'team_oxford_utd',
     name: 'Oxford United FC',
     shortName: 'Oxford Utd',
     tla: 'OXF',
@@ -2220,7 +2220,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
   // LA LIGA (SPAIN)
   // ==========================================
   realmadrid: {
-    id: 'team_realmadrid',
+    id: 'team_real_madrid',
     name: 'Real Madrid CF',
     shortName: 'Real Madrid',
     tla: 'RMA',
@@ -2433,7 +2433,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['getafe cf', 'getafe', 'get'],
   },
   celtavigo: {
-    id: 'team_celtavigo',
+    id: 'team_celta',
     name: 'RC Celta de Vigo',
     shortName: 'Celta Vigo',
     tla: 'CEL',
@@ -2478,7 +2478,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
     aliases: ['rayo vallecano de madrid', 'rayo vallecano', 'rayo', 'ray'],
   },
   laspalmas: {
-    id: 'team_laspalmas',
+    id: 'team_las_palmas',
     name: 'UD Las Palmas',
     shortName: 'Las Palmas',
     tla: 'LPA',
@@ -3107,57 +3107,301 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
   },
 };
 
+export const PROMOTED_BRAZIL_2026_TEAM_IDS = new Set<string>([
+  'team_athleticopr',
+  'team_chapecoense',
+  'team_coritiba',
+  'team_remo',
+]);
+
+// Neutral records (sampleMatches: 0, no invented crests or non-neutral ratings)
+// ensuring every override target ID has a canonical entry & competition code.
+const NEUTRAL_EXTRA_CLUBS: [string, string, string][] = [
+  // Brazil Série A & B
+  ['team_mirassol', 'BSA', 'Mirassol'],
+  ['team_chapecoense', 'BSA', 'Chapecoense'],
+  ['team_coritiba', 'BSA', 'Coritiba'],
+  ['team_remo', 'BSA', 'Remo'],
+  ['team_america_mg', 'BSA', 'America MG'],
+  ['team_avai', 'BSA', 'Avai'],
+  ['team_ceara', 'BSA', 'Ceara'],
+  ['team_goias', 'BSA', 'Goias'],
+  ['team_sport_recife', 'BSA', 'Sport Recife'],
+  // Spain (PD / SP2)
+  ['team_oviedo', 'PD', 'Real Oviedo'],
+  ['team_deportivo', 'SP2', 'Deportivo La Coruna'],
+  ['team_racing_santander', 'SP2', 'Racing Santander'],
+  ['team_albacete', 'SP2', 'Albacete'],
+  ['team_alcorcon', 'SP2', 'Alcorcon'],
+  ['team_almeria', 'SP2', 'Almeria'],
+  ['team_amorebieta', 'SP2', 'Amorebieta'],
+  ['team_andorra', 'SP2', 'FC Andorra'],
+  ['team_burgos', 'SP2', 'Burgos'],
+  ['team_cadiz', 'SP2', 'Cadiz'],
+  ['team_cartagena', 'SP2', 'Cartagena'],
+  ['team_castellon', 'SP2', 'Castellon'],
+  ['team_celta_b', 'SP2', 'Celta B'],
+  ['team_ceuta', 'SP2', 'Ceuta'],
+  ['team_cordoba', 'SP2', 'Cordoba'],
+  ['team_cultural_leonesa', 'SP2', 'Cultural Leonesa'],
+  ['team_eibar', 'SP2', 'Eibar'],
+  ['team_eldense', 'SP2', 'Eldense'],
+  ['team_ferrol', 'SP2', 'Racing Ferrol'],
+  ['team_fuenlabrada', 'SP2', 'Fuenlabrada'],
+  ['team_granada', 'SP2', 'Granada'],
+  ['team_huesca', 'SP2', 'Huesca'],
+  ['team_ibiza', 'SP2', 'Ibiza'],
+  ['team_lugo', 'SP2', 'Lugo'],
+  ['team_mirandes', 'SP2', 'Mirandes'],
+  ['team_ponferradina', 'SP2', 'Ponferradina'],
+  ['team_sabadell', 'SP2', 'Sabadell'],
+  ['team_sociedad_b', 'SP2', 'Real Sociedad B'],
+  ['team_sporting_gijon', 'SP2', 'Sporting Gijon'],
+  ['team_tenerife', 'SP2', 'Tenerife'],
+  ['team_villarreal_b', 'SP2', 'Villarreal B'],
+  ['team_zaragoza', 'SP2', 'Real Zaragoza'],
+  // Germany (D2 / 3. Liga)
+  ['team_hannover', 'D2', 'Hannover 96'],
+  ['team_greuther_furth', 'D2', 'Greuther Furth'],
+  ['team_kaiserslautern', 'D2', 'Kaiserslautern'],
+  ['team_bielefeld', 'D2', 'Arminia Bielefeld'],
+  ['team_braunschweig', 'D2', 'Braunschweig'],
+  ['team_magdeburg', 'D2', 'Magdeburg'],
+  ['team_dresden', 'D2', 'Dynamo Dresden'],
+  ['team_dusseldorf', 'D2', 'Fortuna Dusseldorf'],
+  ['team_muenster', 'D2', 'Preussen Munster'],
+  ['team_cottbus', 'D2', 'Energie Cottbus'],
+  ['team_osnabruck', 'D2', 'VfL Osnabruck'],
+  ['team_regensburg', 'D2', 'Jahn Regensburg'],
+  ['team_ingolstadt', 'D2', 'FC Ingolstadt 04'],
+  ['team_hansa_rostock', 'D2', 'Hansa Rostock'],
+  ['team_erzgebirge_aue', 'D2', 'Erzgebirge Aue'],
+  ['team_sandhausen', 'D2', 'Sandhausen'],
+  ['team_wehen', 'D2', 'Wehen Wiesbaden'],
+  ['team_ulm', 'D2', 'SSV Ulm'],
+  // Italy (I2 / Serie B)
+  ['team_spezia', 'I2', 'Spezia'],
+  ['team_frosinone', 'I2', 'Frosinone'],
+  ['team_cesena', 'I2', 'Cesena'],
+  ['team_catanzaro', 'I2', 'Catanzaro'],
+  ['team_juve_stabia', 'I2', 'Juve Stabia'],
+  ['team_mantova', 'I2', 'Mantova'],
+  ['team_modena', 'I2', 'Modena'],
+  ['team_carrarese', 'I2', 'Carrarese'],
+  ['team_reggiana', 'I2', 'Reggiana'],
+  ['team_sudtirol', 'I2', 'Sudtirol'],
+  ['team_pescara', 'I2', 'Pescara'],
+  ['team_avellino', 'I2', 'Avellino'],
+  ['team_padova', 'I2', 'Padova'],
+  ['team_virtus_entella', 'I2', 'Virtus Entella'],
+  ['team_brescia', 'I2', 'Brescia'],
+  ['team_cosenza', 'I2', 'Cosenza'],
+  ['team_salernitana', 'I2', 'Salernitana'],
+  ['team_arezzo', 'I2', 'Arezzo'],
+  ['team_ascoli', 'I2', 'Ascoli'],
+  ['team_benevento', 'I2', 'Benevento'],
+  ['team_vicenza', 'I2', 'Vicenza'],
+  ['team_pordenone', 'I2', 'Pordenone'],
+  ['team_perugia', 'I2', 'Perugia'],
+  ['team_cittadella', 'I2', 'Cittadella'],
+  ['team_reggina', 'I2', 'Reggina'],
+  ['team_ternana', 'I2', 'Ternana'],
+  ['team_alessandria', 'I2', 'Alessandria'],
+  ['team_crotone', 'I2', 'Crotone'],
+  ['team_spal', 'I2', 'SPAL'],
+  ['team_feralpisalo', 'I2', 'FeralpiSalo'],
+  ['team_lecco', 'I2', 'Lecco'],
+  // France (F2 / Ligue 2)
+  ['team_grenoble', 'F2', 'Grenoble'],
+  ['team_amiens', 'F2', 'Amiens'],
+  ['team_bastia', 'F2', 'Bastia'],
+  ['team_laval', 'F2', 'Laval'],
+  ['team_pau', 'F2', 'Pau FC'],
+  ['team_rodez', 'F2', 'Rodez'],
+  ['team_annecy', 'F2', 'Annecy'],
+  ['team_dunkerque', 'F2', 'Dunkerque'],
+  ['team_red_star', 'F2', 'Red Star'],
+  ['team_boulogne', 'F2', 'Boulogne'],
+  ['team_nancy', 'F2', 'Nancy'],
+  ['team_dijon', 'F2', 'Dijon'],
+  ['team_sochaux', 'F2', 'Sochaux'],
+  ['team_bordeaux', 'F2', 'Bordeaux'],
+  ['team_ajaccio', 'F2', 'Ajaccio'],
+  ['team_nimes', 'F2', 'Nimes'],
+  ['team_caen', 'F2', 'Caen'],
+  ['team_quevilly_rouen', 'F2', 'Quevilly Rouen'],
+  ['team_valenciennes', 'F2', 'Valenciennes'],
+  ['team_niort', 'F2', 'Niort'],
+  ['team_concarneau', 'F2', 'Concarneau'],
+  ['team_martigues', 'F2', 'Martigues'],
+  // England (E2 / League One & League Two)
+  ['team_peterborough', 'E2', 'Peterborough'],
+  ['team_bristol_rovers', 'E2', 'Bristol Rovers'],
+  ['team_mk_dons', 'E2', 'MK Dons'],
+  ['team_crawley', 'E2', 'Crawley Town'],
+  ['team_fleetwood', 'E2', 'Fleetwood Town'],
+  ['team_newport', 'E2', 'Newport County'],
+  ['team_forest_green', 'E2', 'Forest Green'],
+  ['team_notts_county', 'E2', 'Notts County'],
+  ['team_afc_wimbledon', 'E2', 'AFC Wimbledon'],
+  ['team_accrington', 'E2', 'Accrington Stanley'],
+  ['team_barnet', 'E2', 'Barnet'],
+  ['team_barnsley', 'E2', 'Barnsley'],
+  ['team_barrow', 'E2', 'Barrow'],
+  ['team_bradford', 'E2', 'Bradford City'],
+  ['team_bromley', 'E2', 'Bromley'],
+  ['team_burton', 'E2', 'Burton Albion'],
+  ['team_cambridge', 'E2', 'Cambridge United'],
+  ['team_carlisle', 'E2', 'Carlisle United'],
+  ['team_cheltenham', 'E2', 'Cheltenham Town'],
+  ['team_chesterfield', 'E2', 'Chesterfield'],
+  ['team_colchester', 'E2', 'Colchester United'],
+  ['team_crewe', 'E2', 'Crewe Alexandra'],
+  ['team_doncaster', 'E2', 'Doncaster Rovers'],
+  ['team_exeter', 'E2', 'Exeter City'],
+  ['team_gillingham', 'E2', 'Gillingham'],
+  ['team_grimsby', 'E2', 'Grimsby Town'],
+  ['team_harrogate', 'E2', 'Harrogate Town'],
+  ['team_leyton_orient', 'E2', 'Leyton Orient'],
+  ['team_mansfield', 'E2', 'Mansfield Town'],
+  ['team_morecambe', 'E2', 'Morecambe'],
+  ['team_northampton', 'E2', 'Northampton Town'],
+  ['team_oldham', 'E2', 'Oldham Athletic'],
+  ['team_port_vale', 'E2', 'Port Vale'],
+  ['team_rochdale', 'E2', 'Rochdale'],
+  ['team_salford', 'E2', 'Salford City'],
+  ['team_shrewsbury', 'E2', 'Shrewsbury Town'],
+  ['team_stevenage', 'E2', 'Stevenage'],
+  ['team_stockport', 'E2', 'Stockport County'],
+  ['team_sutton', 'E2', 'Sutton United'],
+  ['team_swindon', 'E2', 'Swindon Town'],
+  ['team_tranmere', 'E2', 'Tranmere Rovers'],
+  ['team_walsall', 'E2', 'Walsall'],
+  ['team_wycombe', 'E2', 'Wycombe Wanderers'],
+  ['team_york', 'E2', 'York City'],
+  // Netherlands (DED)
+  ['team_volendam', 'DED', 'Volendam'],
+  ['team_cambuur', 'DED', 'Cambuur'],
+  ['team_ado_den_haag', 'DED', 'ADO Den Haag'],
+  ['team_telstar', 'DED', 'Telstar'],
+  ['team_almere', 'DED', 'Almere City'],
+  ['team_waalwijk', 'DED', 'RKC Waalwijk'],
+  // Portugal (P1)
+  ['team_rio_ave', 'P1', 'Rio Ave'],
+  ['team_santa_clara', 'P1', 'Santa Clara'],
+  ['team_moreirense', 'P1', 'Moreirense'],
+  ['team_nacional', 'P1', 'Nacional'],
+  ['team_arouca', 'P1', 'Arouca'],
+  ['team_estoril', 'P1', 'Estoril'],
+  ['team_estrela', 'P1', 'Estrela'],
+  ['team_famalicao', 'P1', 'Famalicao'],
+  ['team_gil_vicente', 'P1', 'Gil Vicente'],
+  ['team_avs', 'P1', 'AVS'],
+  ['team_alverca', 'P1', 'Alverca'],
+  ['team_tondela', 'P1', 'Tondela'],
+  ['team_maritimo', 'P1', 'Maritimo'],
+  ['team_academico_viseu', 'P1', 'Academico Viseu'],
+  ['team_boavista', 'P1', 'Boavista'],
+  ['team_farense', 'P1', 'Farense'],
+  // Scotland (SC0)
+  ['team_celtic', 'SC0', 'Celtic'],
+  ['team_rangers', 'SC0', 'Rangers'],
+  ['team_hearts', 'SC0', 'Hearts'],
+  ['team_hibernian', 'SC0', 'Hibernian'],
+  ['team_aberdeen', 'SC0', 'Aberdeen'],
+  ['team_kilmarnock', 'SC0', 'Kilmarnock'],
+  ['team_st_mirren', 'SC0', 'St Mirren'],
+  ['team_motherwell', 'SC0', 'Motherwell'],
+  ['team_dundee', 'SC0', 'Dundee'],
+  ['team_dundee_united', 'SC0', 'Dundee United'],
+  ['team_falkirk', 'SC0', 'Falkirk'],
+  ['team_livingston', 'SC0', 'Livingston'],
+  ['team_st_johnstone', 'SC0', 'St Johnstone'],
+];
+
+for (const [id, compCode, name] of NEUTRAL_EXTRA_CLUBS) {
+  const key = id.replace(/^team_/, '');
+  if (!TEAM_STRENGTH_DATABASE[key]) {
+    TEAM_STRENGTH_DATABASE[key] = {
+      id,
+      name,
+      shortName: name,
+      tla: key.replace(/[^a-z]/g, '').slice(0, 3).toUpperCase() || 'FC',
+      crestUrl: '',
+      competitionCode: compCode,
+      attackRating: 1.00,
+      defenseRating: 1.00,
+      cornerAttackRating: 1.00,
+      disciplineRating: 1.00,
+      recentForm: [],
+      sampleMatches: 0,
+      aliases: [name.toLowerCase(), id],
+      isPromoted: PROMOTED_BRAZIL_2026_TEAM_IDS.has(id),
+    };
+  }
+}
+
+for (const pid of PROMOTED_BRAZIL_2026_TEAM_IDS) {
+  const key = pid.replace(/^team_/, '');
+  if (TEAM_STRENGTH_DATABASE[key]) {
+    TEAM_STRENGTH_DATABASE[key].isPromoted = true;
+    TEAM_STRENGTH_DATABASE[key].competitionCode = 'BSA';
+  }
+}
+
 /**
  * Authoritative Registered Club Lists per League Competition
  * Used to enforce the integrity rule: both teams in a league fixture must belong to that competition's club list.
  */
 export const COMPETITION_CLUBS: Record<string, string[]> = {
   PL: [
-    'team_mancity', 'team_arsenal', 'team_liverpool', 'team_chelsea', 'team_tottenham',
-    'team_astonvilla', 'team_manunited', 'team_newcastle', 'team_brighton', 'team_westham',
-    'team_brentford', 'team_fulham', 'team_bournemouth', 'team_crystalpalace', 'team_wolves',
-    'team_everton', 'team_nottinghamforest', 'team_leicester', 'team_ipswich', 'team_southampton'
+    'team_man_city', 'team_arsenal', 'team_liverpool', 'team_chelsea', 'team_tottenham',
+    'team_aston_villa', 'team_man_united', 'team_newcastle', 'team_brighton', 'team_west_ham',
+    'team_brentford', 'team_fulham', 'team_bournemouth', 'team_crystal_palace', 'team_wolves',
+    'team_everton', 'team_nottingham_forest', 'team_leicester', 'team_ipswich', 'team_southampton',
+    'team_leeds', 'team_burnley', 'team_sunderland'
   ],
   ELC: [
-    'team_burnley', 'team_luton', 'team_sheffieldunited', 'team_leeds', 'team_westbrom',
+    'team_burnley', 'team_luton', 'team_sheffield_utd', 'team_leeds', 'team_west_brom',
     'team_norwich', 'team_hull', 'team_coventry', 'team_middlesbrough', 'team_preston',
-    'team_bristolcity', 'team_cardiff', 'team_millwall', 'team_swansea', 'team_watford',
-    'team_sunderland', 'team_stokecity', 'team_qpr', 'team_blackburn', 'team_sheffieldwednesday',
-    'team_plymouth', 'team_portsmouth', 'team_derby', 'team_oxford',
+    'team_bristol_city', 'team_cardiff', 'team_millwall', 'team_swansea', 'team_watford',
+    'team_sunderland', 'team_stoke', 'team_qpr', 'team_blackburn', 'team_sheffield_wed',
+    'team_plymouth', 'team_portsmouth', 'team_derby', 'team_oxford_utd',
     'team_birmingham', 'team_bolton', 'team_wrexham', 'team_lincoln', 'team_charlton',
     'team_rotherham', 'team_huddersfield', 'team_blackpool', 'team_wigan', 'team_reading'
   ],
   PD: [
-    'team_realmadrid', 'team_barcelona', 'team_atletico', 'team_athletic', 'team_realsociedad',
+    'team_real_madrid', 'team_barcelona', 'team_atletico', 'team_athletic', 'team_realsociedad',
     'team_betis', 'team_villarreal', 'team_valencia', 'team_sevilla', 'team_girona',
-    'team_osasuna', 'team_getafe', 'team_celtavigo', 'team_mallorca', 'team_rayovallecano',
-    'team_laspalmas', 'team_alaves', 'team_leganes', 'team_espanyol', 'team_valladolid',
-    'team_levante', 'team_malaga'
+    'team_osasuna', 'team_getafe', 'team_celta', 'team_mallorca', 'team_rayovallecano',
+    'team_las_palmas', 'team_alaves', 'team_leganes', 'team_espanyol', 'team_valladolid',
+    'team_levante', 'team_malaga', 'team_elche', 'team_oviedo'
   ],
   BL1: [
     'team_bayern', 'team_leverkusen', 'team_dortmund', 'team_leipzig', 'team_frankfurt',
     'team_stuttgart', 'team_freiburg', 'team_hoffenheim', 'team_bremen', 'team_augsburg',
-    'team_wolfsburg', 'team_mgladbach', 'team_m_gladbach', 'team_unionberlin', 'team_union_berlin',
-    'team_mainz', 'team_heidenheim', 'team_stpauli', 'team_st_pauli', 'team_kiel', 'team_bochum',
-    'team_paderborn', 'team_elversberg', 'team_schalke'
+    'team_wolfsburg', 'team_m_gladbach', 'team_union_berlin',
+    'team_mainz', 'team_heidenheim', 'team_st_pauli', 'team_holstein_kiel', 'team_bochum',
+    'team_koln', 'team_hamburg', 'team_paderborn', 'team_elversberg', 'team_schalke'
   ],
   SA: [
     'team_inter', 'team_milan', 'team_juventus', 'team_atalanta', 'team_napoli',
     'team_roma', 'team_lazio', 'team_fiorentina', 'team_bologna', 'team_torino',
     'team_genoa', 'team_monza', 'team_parma', 'team_como', 'team_cagliari',
     'team_udinese', 'team_empoli', 'team_verona', 'team_lecce', 'team_venezia',
-    'team_sassuolo'
+    'team_sassuolo', 'team_pisa', 'team_cremonese'
   ],
   FL1: [
     'team_psg', 'team_monaco', 'team_marseille', 'team_lille', 'team_lyon',
     'team_lens', 'team_rennes', 'team_nice', 'team_reims', 'team_toulouse',
     'team_strasbourg', 'team_montpellier', 'team_nantes', 'team_brest', 'team_lehavre',
-    'team_auxerre', 'team_angers', 'team_saintetienne', 'team_troyes', 'team_lemans'
+    'team_auxerre', 'team_angers', 'team_saintetienne', 'team_troyes', 'team_lemans',
+    'team_lorient', 'team_paris_fc', 'team_metz'
   ],
   DED: [
     'team_psv', 'team_feyenoord', 'team_ajax', 'team_twente', 'team_az',
     'team_utrecht', 'team_nec', 'team_heerenveen', 'team_goaheadeagles', 'team_sittard',
-    'team_spartarotterdam', 'team_zwolle', 'team_almerecity', 'team_nacbreda', 'team_willemii',
+    'team_spartarotterdam', 'team_zwolle', 'team_almere', 'team_nacbreda', 'team_willemii',
     'team_groningen', 'team_heracles', 'team_waalwijk', 'team_excelsior'
   ],
   BSA: [
@@ -3165,7 +3409,7 @@ export const COMPETITION_CLUBS: Record<string, string[]> = {
     'team_corinthians', 'team_gremio', 'team_internacional', 'team_fluminense', 'team_botafogo',
     'team_vasco', 'team_athleticopr', 'team_bragantino', 'team_fortaleza', 'team_bahia',
     'team_cuiaba', 'team_juventude', 'team_criciuma', 'team_atleticogo', 'team_vitoria',
-    'team_santos'
+    'team_santos', 'team_mirassol', 'team_chapecoense', 'team_coritiba', 'team_remo'
   ],
   P1: [
     'team_sportingcp', 'team_casapia', 'team_benfica', 'team_porto', 'team_braga', 'team_vitoriasc'
@@ -3181,10 +3425,15 @@ export const COMPETITION_CLUBS: Record<string, string[]> = {
 export const COMPETITION_COUNTRY_MAP: Record<string, string> = {
   PL: 'ENG',
   ELC: 'ENG',
+  E2: 'ENG',
   PD: 'ESP',
+  SP2: 'ESP',
   BL1: 'GER',
+  D2: 'GER',
   SA: 'ITA',
+  I2: 'ITA',
   FL1: 'FRA',
+  F2: 'FRA',
   DED: 'NED',
   P1: 'POR',
   PPL: 'POR',
@@ -3197,6 +3446,32 @@ export const COMPETITION_COUNTRY_MAP: Record<string, string> = {
   ARG: 'ARG',
   JPN: 'JPN',
   CL: 'EUR',
+};
+
+const TEAM_DB_ID_ALIASES: Record<string, string> = {
+  team_mancity: 'team_man_city',
+  team_manunited: 'team_man_united',
+  team_astonvilla: 'team_aston_villa',
+  team_nottinghamforest: 'team_nottingham_forest',
+  team_westham: 'team_west_ham',
+  team_crystalpalace: 'team_crystal_palace',
+  team_sheffieldunited: 'team_sheffield_utd',
+  team_sheffieldwednesday: 'team_sheffield_wed',
+  team_westbrom: 'team_west_brom',
+  team_bristolcity: 'team_bristol_city',
+  team_stokecity: 'team_stoke',
+  team_oxford: 'team_oxford_utd',
+  team_realmadrid: 'team_real_madrid',
+  team_kiel: 'team_holstein_kiel',
+  team_celtavigo: 'team_celta',
+  team_laspalmas: 'team_las_palmas',
+  team_mgladbach: 'team_m_gladbach',
+  team_unionberlin: 'team_union_berlin',
+  team_stpauli: 'team_st_pauli',
+  team_almerecity: 'team_almere',
+  team_lincolncity: 'team_lincoln',
+  team_prestonnorthend: 'team_preston',
+  team_norwichcity: 'team_norwich',
 };
 
 /**
@@ -3253,7 +3528,8 @@ export function lookupTeamStrength(
   // 0. Exact alias from manual overrides (teamNameOverrides.json)
   const manualMap = manualOverrides as Record<string, string>;
   const rawClean = rawName.trim();
-  const overrideId = manualMap[rawClean] || manualMap[rawClean.toLowerCase()];
+  const rawOverride = manualMap[rawClean] || manualMap[rawClean.toLowerCase()];
+  const overrideId = rawOverride ? (TEAM_DB_ID_ALIASES[rawOverride] || rawOverride) : undefined;
   if (overrideId) {
     const cleanOverride = overrideId.replace(/^team_/, '').toLowerCase();
     if (TEAM_STRENGTH_DATABASE[cleanOverride]) {
@@ -3266,13 +3542,14 @@ export function lookupTeamStrength(
     }
   }
 
-  // 1. Exact ID match
-  const cleanId = rawId.replace(/^team_/, '').toLowerCase();
+  // 1. Exact ID match (with explicit legacy ID alias mapping)
+  const mappedId = TEAM_DB_ID_ALIASES[rawId] || TEAM_DB_ID_ALIASES[rawId.toLowerCase()] || rawId;
+  const cleanId = mappedId.replace(/^team_/, '').toLowerCase();
   if (cleanId && TEAM_STRENGTH_DATABASE[cleanId]) {
     return { found: true, data: applyPromotedShrinkage(TEAM_STRENGTH_DATABASE[cleanId]) };
   }
   for (const record of Object.values(TEAM_STRENGTH_DATABASE)) {
-    if (record.id === rawId || record.id.toLowerCase() === `team_${cleanId}`) {
+    if (record.id === mappedId || record.id.toLowerCase() === `team_${cleanId}`) {
       return { found: true, data: applyPromotedShrinkage(record) };
     }
   }

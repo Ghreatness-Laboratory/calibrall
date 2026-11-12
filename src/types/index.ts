@@ -214,6 +214,11 @@ export interface Team {
   disciplineRating?: number;
   recentForm?: ('W' | 'D' | 'L')[];
   hasRealTeamStrength?: boolean;
+  storedMatchCount?: number;
+  lastMatchDate?: string | null;
+  daysSinceLastMatch?: number | null;
+  matchesInLast120Days?: number;
+  isPromoted?: boolean;
 }
 
 export interface Fixture {

@@ -225,8 +225,8 @@ export const VERIFIED_CRESTS_MAP: Record<string, TeamCrestRecord> = {
     crestUrl: 'https://crests.football-data.org/89.png',
     verified: true,
   },
-  team_rayo: {
-    canonicalTeamId: 'team_rayo',
+  team_rayovallecano: {
+    canonicalTeamId: 'team_rayovallecano',
     teamName: 'Rayo Vallecano',
     crestUrl: 'https://crests.football-data.org/87.png',
     verified: true,
@@ -367,8 +367,8 @@ export const VERIFIED_CRESTS_MAP: Record<string, TeamCrestRecord> = {
     crestUrl: 'https://crests.football-data.org/532.png',
     verified: true,
   },
-  team_saint_etienne: {
-    canonicalTeamId: 'team_saint_etienne',
+  team_saintetienne: {
+    canonicalTeamId: 'team_saintetienne',
     teamName: 'AS Saint-Étienne',
     crestUrl: 'https://crests.football-data.org/527.png',
     verified: true,
@@ -429,8 +429,8 @@ export const VERIFIED_CRESTS_MAP: Record<string, TeamCrestRecord> = {
     crestUrl: 'https://crests.football-data.org/673.png',
     verified: true,
   },
-  team_fortuna_sittard: {
-    canonicalTeamId: 'team_fortuna_sittard',
+  team_sittard: {
+    canonicalTeamId: 'team_sittard',
     teamName: 'Fortuna Sittard',
     crestUrl: 'https://crests.football-data.org/684.png',
     verified: true,
@@ -465,6 +465,18 @@ export const VERIFIED_CRESTS_MAP: Record<string, TeamCrestRecord> = {
   team_wolves: { canonicalTeamId: 'team_wolves', teamName: 'Wolverhampton Wanderers FC', crestUrl: 'https://crests.football-data.org/76.png', verified: true },
 };
 
+const CREST_ID_ALIASES: Record<string, string> = {
+  team_rayo: 'team_rayovallecano',
+  team_saint_etienne: 'team_saintetienne',
+  team_fortuna_sittard: 'team_sittard',
+  team_mancity: 'team_man_city',
+  team_manunited: 'team_man_united',
+  team_astonvilla: 'team_aston_villa',
+  team_westham: 'team_west_ham',
+  team_nottinghamforest: 'team_nottingham_forest',
+  team_realmadrid: 'team_real_madrid',
+};
+
 export function initTeamCrestsDatabase(): void {
   // In-memory verified crest registry initialized
 }
@@ -476,14 +488,15 @@ export function initTeamCrestsDatabase(): void {
 export function lookupTeamCrest(canonicalTeamId: string | null | undefined): TeamCrestRecord | null {
   if (!canonicalTeamId) return null;
   const cleanId = canonicalTeamId.trim();
+  const mapped = CREST_ID_ALIASES[cleanId] || cleanId;
 
   // 1. In-memory verified registry check
-  if (VERIFIED_CRESTS_MAP[cleanId]) {
-    return VERIFIED_CRESTS_MAP[cleanId];
+  if (VERIFIED_CRESTS_MAP[mapped]) {
+    return VERIFIED_CRESTS_MAP[mapped];
   }
 
   // 2. Direct normalized check
-  const altId = cleanId.startsWith('team_') ? cleanId : `team_${cleanId}`;
+  const altId = mapped.startsWith('team_') ? mapped : `team_${mapped}`;
   if (VERIFIED_CRESTS_MAP[altId]) {
     return VERIFIED_CRESTS_MAP[altId];
   }

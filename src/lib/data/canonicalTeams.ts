@@ -1304,23 +1304,61 @@ export const CANONICAL_TEAMS: Record<string, CanonicalTeam> = {
 };
 
 import manualOverrides from './teamNameOverrides.json';
-import { lookupTeamStrength } from './teamDatabase';
+import { TEAM_STRENGTH_DATABASE, lookupTeamStrength } from './teamDatabase';
 
-// Normalize team lookup string
+export const CANONICAL_ID_ALIASES: Record<string, string> = {
+  team_mancity: 'team_man_city',
+  team_manunited: 'team_man_united',
+  team_astonvilla: 'team_aston_villa',
+  team_nottinghamforest: 'team_nottingham_forest',
+  team_westham: 'team_west_ham',
+  team_crystalpalace: 'team_crystal_palace',
+  team_sheffieldunited: 'team_sheffield_utd',
+  team_sheffieldwednesday: 'team_sheffield_wed',
+  team_westbrom: 'team_west_brom',
+  team_bristolcity: 'team_bristol_city',
+  team_stokecity: 'team_stoke',
+  team_oxford: 'team_oxford_utd',
+  team_realmadrid: 'team_real_madrid',
+  team_kiel: 'team_holstein_kiel',
+  team_celtavigo: 'team_celta',
+  team_laspalmas: 'team_las_palmas',
+  team_mgladbach: 'team_m_gladbach',
+  team_unionberlin: 'team_union_berlin',
+  team_stpauli: 'team_st_pauli',
+  team_almerecity: 'team_almere',
+  team_lincolncity: 'team_lincoln',
+  team_prestonnorthend: 'team_preston',
+  team_norwichcity: 'team_norwich',
+};
+
+for (const rec of Object.values(TEAM_STRENGTH_DATABASE)) {
+  if (!CANONICAL_TEAMS[rec.id]) {
+    CANONICAL_TEAMS[rec.id] = {
+      canonicalId: rec.id,
+      canonicalName: rec.name,
+      shortName: rec.shortName,
+      tla: rec.tla,
+      competitionCode: rec.competitionCode,
+      crestUrl: rec.crestUrl || '',
+      aliases: rec.aliases,
+      providerIds: {},
+    };
+  }
+}
+
+// Strict team lookup string normalization (accents + case + punctuation only; no word/token stripping)
 export function normalizeLookupKey(name: string): string {
   if (!name || typeof name !== 'string') return '';
   return name
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\b(fc|afc|cf|sc|ssc|vfb|tsg|ac|as|rb|cd)\b/gi, '')
     .replace(/[^a-z0-9]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-
-// Registry lookup with alias & strict normalization
 const UNMATCHED_NAMES_LOG = new Set<string>();
 
 export interface UnresolvedTeamLogEntry {
@@ -1365,15 +1403,27 @@ export function clearUnresolvedTeamsLog(): void {
 
 export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | null {
   if (!rawNameOrId) return null;
-  const input = typeof rawNameOrId === 'string' ? rawNameOrId.trim() : (rawNameOrId.name || rawNameOrId.shortName || rawNameOrId.id || '').toString().trim();
+  const input = typeof rawNameOrId === 'string'
+    ? rawNameOrId.trim()
+    : (rawNameOrId.name || rawNameOrId.shortName || rawNameOrId.id || '').toString().trim();
   if (!input) return null;
+  const inputLower = input.toLowerCase();
 
-  // 1. Direct manual override (exact and lowercase trimmed)
+  // 1. Explicit canonical ID & legacy ID alias match
+  const aliasedInput = CANONICAL_ID_ALIASES[input] || CANONICAL_ID_ALIASES[inputLower];
+  if (aliasedInput && CANONICAL_TEAMS[aliasedInput]) {
+    return CANONICAL_TEAMS[aliasedInput];
+  }
+  if (CANONICAL_TEAMS[input]) {
+    return CANONICAL_TEAMS[input];
+  }
+
+  // 2. Direct manual override (exact and lowercase trimmed)
   const manualMap = manualOverrides as Record<string, string>;
   let overrideId = manualMap[input];
   if (!overrideId) {
     for (const [k, v] of Object.entries(manualMap)) {
-      if (k.toLowerCase() === input.toLowerCase()) {
+      if (k.toLowerCase() === inputLower) {
         overrideId = v;
         break;
       }
@@ -1381,10 +1431,11 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
   }
 
   if (overrideId) {
-    if (CANONICAL_TEAMS[overrideId]) {
-      return CANONICAL_TEAMS[overrideId];
+    const resolvedId = CANONICAL_ID_ALIASES[overrideId] || overrideId;
+    if (CANONICAL_TEAMS[resolvedId]) {
+      return CANONICAL_TEAMS[resolvedId];
     }
-    const strengthRes = lookupTeamStrength(overrideId);
+    const strengthRes = lookupTeamStrength(resolvedId);
     if (strengthRes.found && strengthRes.data) {
       return {
         canonicalId: strengthRes.data.id,
@@ -1397,81 +1448,33 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
         providerIds: { footballDataCoUk: input },
       };
     }
-    // Synthesize canonical team from exact registered override
-    const cleanRaw = overrideId.replace(/^team_/, '');
-    const titleCase = cleanRaw.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    return {
-      canonicalId: overrideId,
-      canonicalName: titleCase,
-      shortName: titleCase,
-      tla: cleanRaw.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'FC',
-      competitionCode: 'GENERIC',
-      crestUrl: '',
-      aliases: [input.toLowerCase(), overrideId],
-      providerIds: { footballDataCoUk: input },
-    };
   }
 
-  // 2. Direct ID match
-  if (CANONICAL_TEAMS[input]) return CANONICAL_TEAMS[input];
-
-  // 3. Normalized input check
+  // 3. Exact alias match across all registered clubs (no token stripping or substring matching)
   const norm = normalizeLookupKey(input);
-
-  // If input is formatted like 'team_man_united' or 'team_manunited'
-  if (input.startsWith('team_')) {
-    const stripped = input.replace(/^team_/, '').replace(/_/g, ' ');
-    const strippedNorm = normalizeLookupKey(stripped);
-    for (const team of Object.values(CANONICAL_TEAMS)) {
-      if (team.canonicalId === input) return team;
-      if (normalizeLookupKey(team.canonicalName) === strippedNorm) return team;
-      for (const a of team.aliases) {
-        if (a.toLowerCase() === input.toLowerCase() || normalizeLookupKey(a) === strippedNorm) {
-          return team;
-        }
-      }
-    }
-  }
-
-  // 4. Exact alias match across all registered clubs
   for (const team of Object.values(CANONICAL_TEAMS)) {
-    if (team.canonicalId.toLowerCase() === input.toLowerCase()) {
+    if (team.canonicalId.toLowerCase() === inputLower) {
       return team;
     }
-    if (team.canonicalName.toLowerCase() === input.toLowerCase() || normalizeLookupKey(team.canonicalName) === norm) {
+    if (team.canonicalName.toLowerCase() === inputLower || (norm && normalizeLookupKey(team.canonicalName) === norm)) {
       return team;
     }
-    if (team.shortName.toLowerCase() === input.toLowerCase() || normalizeLookupKey(team.shortName) === norm) {
+    if (team.shortName.toLowerCase() === inputLower || (norm && normalizeLookupKey(team.shortName) === norm)) {
       return team;
     }
     for (const a of team.aliases) {
-      if (a.toLowerCase() === input.toLowerCase() || normalizeLookupKey(a) === norm) {
+      if (a.toLowerCase() === inputLower || (norm && normalizeLookupKey(a) === norm)) {
         return team;
       }
     }
     for (const provId of Object.values(team.providerIds)) {
-      if (provId && (provId.toLowerCase() === input.toLowerCase() || normalizeLookupKey(provId) === norm)) {
+      if (provId && (provId.toLowerCase() === inputLower || (norm && normalizeLookupKey(provId) === norm))) {
         return team;
       }
     }
   }
 
-  // 5. Strict word boundary / token match (only if unique)
-  let foundMatch: CanonicalTeam | null = null;
-  let matchesCount = 0;
-  for (const team of Object.values(CANONICAL_TEAMS)) {
-    const teamNorm = normalizeLookupKey(team.canonicalName);
-    const shortNorm = normalizeLookupKey(team.shortName);
-    if (norm === teamNorm || norm === shortNorm) {
-      foundMatch = team;
-      matchesCount++;
-    }
-  }
-  if (matchesCount === 1 && foundMatch) {
-    return foundMatch;
-  }
-
-  // 6. Check team strength database
+  // 4. Exact alias check against team strength database
   const strengthRes = lookupTeamStrength(input);
   if (strengthRes.found && strengthRes.data) {
     return {
@@ -1486,7 +1489,7 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
     };
   }
 
-  // Log unmatched name into both UNMATCHED_NAMES_LOG and UNRESOLVED_TEAMS_MAP (never guess randomly)
+  // Log unmatched name into both UNMATCHED_NAMES_LOG and UNRESOLVED_TEAMS_MAP (never guess)
   UNMATCHED_NAMES_LOG.add(input);
   recordUnresolvedTeam(input, 'canonical-lookup');
   return null;

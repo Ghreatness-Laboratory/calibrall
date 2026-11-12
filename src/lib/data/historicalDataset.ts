@@ -115,9 +115,9 @@ export const PROVIDER_COVERAGE_AUDIT: ProviderCoverageReport[] = [
   },
 ];
 
-// Curated 320 Real Completed Matches spanning 4 seasons (2021/22 to 2024/25)
-// Real results, xG, corners, bookings, and verified closing odds.
-export const REAL_HISTORICAL_DATASET: HistoricalMatchRecord[] = [
+// Production reads historical matches exclusively from Supabase.
+export const REAL_HISTORICAL_DATASET: HistoricalMatchRecord[] = [];
+
   // --- PREMIER LEAGUE (2024-25 SEASON) ---
   {
     id: 'pl_2425_mci_ars',

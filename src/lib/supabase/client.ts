@@ -248,7 +248,7 @@ let localDbInstance: any = null;
 
 declare const __non_webpack_require__: any;
 
-function getLocalDatabase(): any {
+export function getLocalDatabase(): any {
   if (typeof window !== 'undefined') return null;
   if (!localDbInstance) {
     const nodeReq = typeof __non_webpack_require__ !== 'undefined' ? __non_webpack_require__ : eval('require');
@@ -276,6 +276,7 @@ function getLocalDatabase(): any {
         corner_attack_rating REAL,
         discipline_rating REAL,
         sample_matches INTEGER,
+        is_promoted INTEGER DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
@@ -358,9 +359,20 @@ function getLocalDatabase(): any {
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
+      CREATE TABLE IF NOT EXISTS unresolved_teams (
+        id TEXT PRIMARY KEY,
+        source_name TEXT NOT NULL,
+        source_provider TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 1,
+        first_seen TEXT NOT NULL,
+        last_seen TEXT NOT NULL,
+        resolved INTEGER DEFAULT 0,
+        UNIQUE(source_name, source_provider)
+      );
     `);
 
     // Ensure columns exist on older tables
+    try { localDbInstance.exec('ALTER TABLE teams ADD COLUMN is_promoted INTEGER DEFAULT 0;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN referee TEXT;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN result TEXT;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN home_fouls INTEGER;'); } catch (_) {}
@@ -420,8 +432,8 @@ export const DEFAULT_DEMO_USER: UserProfile = {
 
 export const DEFAULT_DEMO_PREFERENCES: UserPreferences = {
   timezone: 'UTC',
-  preferredCompetitions: ['PL', 'CL', 'PD', 'BL1', 'SA'],
-  favoriteTeams: ['team_mancity', 'team_arsenal', 'team_realmadrid'],
+  preferredCompetitions: ['BSA', 'PL', 'PD', 'SA', 'BL1', 'FL1'],
+  favoriteTeams: ['team_man_city', 'team_arsenal', 'team_real_madrid'],
   preferredMarkets: ['total_goals', 'btts', 'total_corners', 'match_result'],
   preferredOptionTypes: [
     'win',

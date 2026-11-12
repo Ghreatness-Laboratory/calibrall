@@ -7,11 +7,13 @@ export const DIVISION_MAP: Record<string, string> = {
   // First tiers
   E0: 'E0',
   E1: 'E1',
+  SP1: 'SP1',
   I1: 'I1',
   D1: 'D1',
   F1: 'F1',
   // Second tiers
   E2: 'E2',
+  SP2: 'SP2',
   I2: 'I2',
   D2: 'D2',
   F2: 'F2',
@@ -30,6 +32,14 @@ export const DIVISION_MAP: Record<string, string> = {
   SC0: 'SC0',
   SP: 'SC0',
 };
+
+// Clubs newly promoted from Brazil Série B into Brazil Série A 2026 (no free Série B CSV available)
+export const PROMOTED_BRAZIL_2026_IDS = new Set<string>([
+  'team_athleticopr',
+  'team_chapecoense',
+  'team_coritiba',
+  'team_remo',
+]);
 
 // Extra Leagues hosted as single continuous CSV files at https://football-data.co.uk/new/{CODE}.csv
 export const EXTRA_LEAGUES_MAP: Record<string, string> = {
@@ -58,6 +68,8 @@ export const LEAGUE_METADATA: Record<string, LeagueMetadata> = {
   E0: { code: 'E0', name: 'Premier League', country: 'England', divisionCode: 'E0', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
   E1: { code: 'E1', name: 'Championship', country: 'England', divisionCode: 'E1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN', coverageNotes: 'Full match stats + corners + cards' },
   E2: { code: 'E2', name: 'League One', country: 'England', divisionCode: 'E2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
+  SP1: { code: 'SP1', name: 'La Liga', country: 'Spain', divisionCode: 'SP1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
+  SP2: { code: 'SP2', name: 'Segunda División', country: 'Spain', divisionCode: 'SP2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
   I1: { code: 'I1', name: 'Serie A', country: 'Italy', divisionCode: 'I1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
   I2: { code: 'I2', name: 'Serie B', country: 'Italy', divisionCode: 'I2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
   D1: { code: 'D1', name: 'Bundesliga', country: 'Germany', divisionCode: 'D1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
@@ -75,6 +87,7 @@ export const LEAGUE_METADATA: Record<string, LeagueMetadata> = {
   T1: { code: 'T1', name: 'Süper Lig', country: 'Turkey', divisionCode: 'T1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Historical CSV has corners + cards; no live data source on standard free plan' },
   SC0: { code: 'SC0', name: 'Scottish Premiership', country: 'Scotland', divisionCode: 'SC0', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Historical CSV has corners + cards; no live data source on standard free plan' },
   BSA: { code: 'BSA', name: 'Campeonato Brasileiro Série A', country: 'Brazil', divisionCode: 'BRA', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'Football-Data.org (BSA) / ESPN', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
+  BRA: { code: 'BRA', name: 'Campeonato Brasileiro Série A', country: 'Brazil', divisionCode: 'BRA', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'Football-Data.org (BSA) / ESPN', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
   ARG: { code: 'ARG', name: 'Liga Profesional', country: 'Argentina', divisionCode: 'ARG', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
   DNK: { code: 'DNK', name: 'Superliga', country: 'Denmark', divisionCode: 'DNK', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
   NOR: { code: 'NOR', name: 'Eliteserien', country: 'Norway', divisionCode: 'NOR', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
@@ -123,6 +136,7 @@ export function generateBackfillCallList(baseUrl: string = 'https://calibrall.ve
     { code: 'ELC', name: 'English Championship', div: 'E1' },
     { code: 'E2', name: 'English League One', div: 'E2' },
     { code: 'PD', name: 'La Liga', div: 'SP1' },
+    { code: 'SP2', name: 'La Liga 2', div: 'SP2' },
     { code: 'BL1', name: 'Bundesliga', div: 'D1' },
     { code: 'SA', name: 'Serie A', div: 'I1' },
     { code: 'FL1', name: 'Ligue 1', div: 'F1' },
@@ -278,7 +292,19 @@ export function parseBrazilCsvDate(dateStr: string): string | null {
   return `${year}-${month}-${day}`;
 }
 
-export function getCanonicalTeamForCsv(league: string, rawCsvName: string) {
+export interface CanonicalCsvTeamResolution {
+  id: string;
+  name: string;
+  shortName: string;
+  competitionCode: string;
+  isPromoted: boolean;
+}
+
+/**
+ * Strict exact-alias team resolver for CSV ingestion.
+ * Never invents / auto-slugifies unresolved names: logs them in unresolved_teams and returns null.
+ */
+export function getCanonicalTeamForCsv(league: string, rawCsvName: string): CanonicalCsvTeamResolution | null {
   const cleanName = rawCsvName.trim();
   const canon = lookupCanonicalTeam(cleanName);
   if (canon) {
@@ -287,6 +313,7 @@ export function getCanonicalTeamForCsv(league: string, rawCsvName: string) {
       name: canon.canonicalName,
       shortName: canon.shortName,
       competitionCode: canon.competitionCode !== 'GENERIC' ? canon.competitionCode : league,
+      isPromoted: PROMOTED_BRAZIL_2026_IDS.has(canon.canonicalId),
     };
   }
   const lookup = lookupTeamStrength(cleanName);
@@ -296,18 +323,10 @@ export function getCanonicalTeamForCsv(league: string, rawCsvName: string) {
       name: lookup.data.name,
       shortName: lookup.data.shortName,
       competitionCode: league,
+      isPromoted: Boolean(lookup.data.isPromoted) || PROMOTED_BRAZIL_2026_IDS.has(lookup.data.id),
     };
   }
-  // Record in unresolved_teams log
+  // Exact-alias only rule: record unresolved source name and reject auto-slugification
   recordUnresolvedTeam(cleanName, `football-data.co.uk:${league}`);
-
-  const sanitized = sanitizeRawTeamForId(cleanName);
-  // Shared team identity without division prefix so promoted/relegated clubs share match history
-  const canonicalId = `team_${sanitized}`;
-  return {
-    id: canonicalId,
-    name: cleanName,
-    shortName: cleanName,
-    competitionCode: league,
-  };
+  return null;
 }
