@@ -17,9 +17,10 @@ export interface LiveFixturesHookResult {
 }
 
 export function useLiveFixtures(
-  competitionCode?: string, 
+  competitionId?: string, 
   status?: string, 
-  sport: Sport = 'football'
+  sport: Sport = 'football',
+  day?: string
 ): LiveFixturesHookResult {
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,8 +37,12 @@ export function useLiveFixtures(
       setIsLoading(true);
       const query = new URLSearchParams();
       query.set('sport', sport);
-      if (competitionCode && competitionCode !== 'ALL') query.set('competition', competitionCode);
+      if (competitionId && competitionId !== 'ALL') {
+        query.set('competition_id', competitionId);
+        query.set('competition', competitionId);
+      }
       if (status && status !== 'ALL') query.set('status', status);
+      if (day && day !== 'ALL') query.set('day', day);
 
       const res = await fetch(`/api/v1/fixtures?${query.toString()}`, {
         cache: 'no-store',
@@ -91,7 +96,7 @@ export function useLiveFixtures(
     } finally {
       setIsLoading(false);
     }
-  }, [competitionCode, status, sport]);
+  }, [competitionId, status, sport, day]);
 
   useEffect(() => {
     load();

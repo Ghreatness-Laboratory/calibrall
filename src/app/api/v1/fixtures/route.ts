@@ -9,7 +9,10 @@ export const revalidate = 120;
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const sport = (searchParams.get('sport') as Sport) || 'football';
-  const competitionCode = searchParams.get('competition') || undefined;
+  const rawComp = searchParams.get('competition_id') || searchParams.get('competition') || undefined;
+  const competitionId = rawComp && rawComp.startsWith('comp_') ? rawComp.toLowerCase() : (rawComp && rawComp !== 'ALL' ? `comp_${rawComp.toLowerCase()}` : undefined);
+  const competitionCode = rawComp && !rawComp.startsWith('comp_') ? rawComp.toUpperCase() : undefined;
+  const day = searchParams.get('day') || undefined;
   const status = searchParams.get('status') || undefined;
   const fixtureId = searchParams.get('id') || undefined;
 
@@ -39,7 +42,7 @@ export async function GET(request: Request) {
 
   // Default: Football
   const provider = getFootballDataProvider();
-  const result = await provider.getLiveFixtures({ competitionCode, status });
+  const result = await provider.getLiveFixtures({ competitionId, competitionCode, status, day });
 
   if (fixtureId) {
     const single = await provider.getFixtureById(fixtureId);

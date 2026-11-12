@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { getFixtureStatistics, COMPETITIONS } from '@/lib/data/seedData';
+import React, { useState, useMemo, useEffect } from 'react';
+import { getFixtureStatistics } from '@/lib/data/seedData';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import SportSwitcher from '@/components/SportSwitcher';
+import CompetitionFilter from '@/components/CompetitionFilter';
+import { CountryCompetitionGroup } from '@/lib/data/canonicalCompetitions';
+import { matchesDayFilter, DayFilterType } from '@/lib/data/fixturesDatabase';
 import { MarketPrediction, MatchStatus } from '@/types';
 import { 
   RotateCw, 
@@ -26,10 +29,25 @@ export default function MatchesPage() {
   const isBasketball = sport === 'basketball';
 
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedComp, setSelectedComp] = useState<string>('ALL');
+  const [selectedCompId, setSelectedCompId] = useState<string>('ALL');
+  const [selectedDay, setSelectedDay] = useState<DayFilterType>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedFootballGroup, setSelectedFootballGroup] = useState<FootballMarketGroup>('ALL');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [compGroups, setCompGroups] = useState<CountryCompetitionGroup[]>([]);
+
+  // Fetch active competitions dynamically from the database
+  useEffect(() => {
+    if (isBasketball) return;
+    fetch('/api/v1/competitions?sport=football')
+      .then(res => res.json())
+      .then(json => {
+        if (json.groupedByCountry && Array.isArray(json.groupedByCountry)) {
+          setCompGroups(json.groupedByCountry);
+        }
+      })
+      .catch(err => console.error('[MatchesPage] Error fetching active competitions:', err));
+  }, [isBasketball]);
 
   const { 
     fixtures, 
@@ -42,9 +60,10 @@ export default function MatchesPage() {
     quotaHeaders, 
     refetch 
   } = useLiveFixtures(
-    isBasketball ? 'NBA' : selectedComp, 
+    isBasketball ? 'comp_nba' : selectedCompId, 
     selectedStatus, 
-    sport
+    sport,
+    selectedDay
   );
 
   const handleRefresh = async () => {
@@ -57,7 +76,8 @@ export default function MatchesPage() {
 
   const handleClearFilters = () => {
     setSearchQuery('');
-    setSelectedComp('ALL');
+    setSelectedCompId('ALL');
+    setSelectedDay('ALL');
     setSelectedStatus('ALL');
     setSelectedFootballGroup('ALL');
   };
@@ -121,10 +141,32 @@ export default function MatchesPage() {
     return true;
   };
 
-  // Filtered fixtures by search query and market group
+  // Filtered fixtures by competition_id only, combined with day filter, search, and market group
   const filteredFootball = useMemo(() => {
     if (isBasketball) return [];
     return evaluatedFootballFixtures.filter(({ fixture, predictions }) => {
+      // Rule 3: Filter by competition_id ONLY
+      if (selectedCompId !== 'ALL') {
+        const fixtureCompId = fixture.competitionId || fixture.competition?.id;
+        if (fixtureCompId !== selectedCompId) {
+          return false;
+        }
+      }
+
+      // Rule 3: Combine with day filter
+      if (selectedDay !== 'ALL') {
+        if (!matchesDayFilter(fixture.kickoffTime, selectedDay)) {
+          return false;
+        }
+      }
+
+      // Status filter
+      if (selectedStatus !== 'ALL') {
+        if (fixture.status !== selectedStatus) {
+          return false;
+        }
+      }
+
       // Search query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -143,7 +185,7 @@ export default function MatchesPage() {
       }
       return true;
     });
-  }, [evaluatedFootballFixtures, searchQuery, selectedFootballGroup, isBasketball]);
+  }, [evaluatedFootballFixtures, selectedCompId, selectedDay, selectedStatus, searchQuery, selectedFootballGroup, isBasketball]);
 
   const filteredBasketball = useMemo(() => {
     if (!isBasketball) return [];
@@ -180,7 +222,7 @@ export default function MatchesPage() {
     ? `${fixtures.length} matchups` 
     : `${fixtures.length} scheduled`;
 
-  const hasActiveFilters = searchQuery.trim() !== '' || selectedComp !== 'ALL' || selectedStatus !== 'ALL' || selectedFootballGroup !== 'ALL';
+  const hasActiveFilters = searchQuery.trim() !== '' || selectedCompId !== 'ALL' || selectedDay !== 'ALL' || selectedStatus !== 'ALL' || selectedFootballGroup !== 'ALL';
 
   return (
     <div className="space-y-3 py-1">
@@ -282,26 +324,15 @@ export default function MatchesPage() {
         )}
       </div>
 
-      {/* Competition and Status selects: 2-column grid, small 11px label above each */}
+      {/* Competition and Status selects: 2-column grid */}
       {!isBasketball && (
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-[11px] text-[#8B9892] font-normal mb-1 block">
-              Competition
-            </label>
-            <select
-              value={selectedComp}
-              onChange={(e) => setSelectedComp(e.target.value)}
-              className="w-full h-10 px-3 rounded-[12px] bg-[#101613] border border-[#1F2A24] text-[13px] text-[#E9EFEB] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#B8E636] appearance-none cursor-pointer"
-            >
-              <option value="ALL">All competitions</option>
-              {COMPETITIONS.map(comp => (
-                <option key={comp.code} value={comp.code}>
-                  {cleanDisplayText(comp.name)}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <CompetitionFilter
+            selectedCompetitionId={selectedCompId}
+            onSelectCompetitionId={setSelectedCompId}
+            groups={compGroups}
+            totalFixturesCount={fixtures.length}
+          />
 
           <div>
             <label className="text-[11px] text-[#8B9892] font-normal mb-1 block">
@@ -318,6 +349,34 @@ export default function MatchesPage() {
               <option value="FINISHED">Completed</option>
             </select>
           </div>
+        </div>
+      )}
+
+      {/* Day Filter Controls (Today / Tomorrow / Weekend / All) */}
+      {!isBasketball && (
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1">
+          <span className="text-[11px] text-[#8B9892] mr-1 shrink-0 flex items-center gap-1">
+            <Calendar className="w-3 h-3 text-[#8B9892]" />
+            Day:
+          </span>
+          {(['ALL', 'today', 'tomorrow', 'weekend'] as const).map(day => {
+            const isActive = selectedDay === day;
+            const label = day === 'ALL' ? 'All days' : day === 'today' ? 'Today' : day === 'tomorrow' ? 'Tomorrow' : 'Weekend';
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => setSelectedDay(day)}
+                className={`h-7 px-3 rounded-[9px] text-[11px] font-medium transition-colors shrink-0 border ${
+                  isActive
+                    ? 'bg-[#B8E636]/15 border-[#B8E636]/40 text-[#B8E636] font-semibold'
+                    : 'bg-[#101613] border-[#1F2A24] text-[#8B9892] hover:text-[#E9EFEB]'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       )}
 

@@ -61,6 +61,25 @@ export function validateFixtureIntegrity(
       continue;
     }
 
+    // Rule 1b: Canonical competition_id check (Mandatory: Every fixture must have a canonical competition_id)
+    // A fixture with none is logged as an error and never shown under a fallback.
+    const compId = f.competitionId || f.competition?.id;
+    const isValidCanonicalCompId = 
+      typeof compId === 'string' && 
+      compId.startsWith('comp_') && 
+      compId !== 'comp_league' && 
+      compId !== 'comp_sm_league' && 
+      compId !== 'fallback' && 
+      compId.trim().length >= 6;
+
+    if (!isValidCanonicalCompId) {
+      const msg = `[Integrity Error] Fixture "${f.id}" has no canonical competition_id (received: "${compId}"). Rejecting; never shown under fallback.`;
+      console.error(msg);
+      violations.push(msg);
+      rejectedFixtures.push({ fixtureId: f.id, reason: 'Missing canonical competition_id' });
+      continue;
+    }
+
     // Rule 2: Must have a valid kickoffTime
     const kickoffMs = new Date(f.kickoffTime).getTime();
     if (isNaN(kickoffMs)) {

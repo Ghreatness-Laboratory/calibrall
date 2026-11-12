@@ -16,9 +16,10 @@ import { serverCache } from '../cache/serverCache';
 import { checkAndLogStartupEnv } from '../config/envAudit';
 import { lookupTeamStrength } from './teamDatabase';
 import { displayName, getTeamAbbreviation } from '../utils/formatText';
-import { validateFixtureIntegrity } from './fixtureIntegrity';
 import { supabase, isSupabaseConfigured, assertPersistenceConfigured } from '@/lib/supabase/client';
 import { matchesStore } from './matchesStore';
+import { getCompetitionsFromDatabase, getCanonicalCompetition, isCanonicalCompetitionId } from './canonicalCompetitions';
+import { getFixturesFromDatabase, matchesDayFilter } from './fixturesDatabase';
 
 export interface ProviderHealth {
   providerName: string;
@@ -48,7 +49,7 @@ export interface LiveFixturesResult {
 export interface FootballDataProvider {
   getHealth(): Promise<ProviderHealth>;
   getCompetitions(): Promise<Competition[]>;
-  getLiveFixtures(params?: { competitionCode?: string; status?: string }): Promise<LiveFixturesResult>;
+  getLiveFixtures(params?: { competitionId?: string; competitionCode?: string; status?: string; day?: string }): Promise<LiveFixturesResult>;
   getFixtureById(id: string): Promise<Fixture | null>;
   getFixtureContext(fixtureId: string): Promise<FixtureContext | null>;
 }
@@ -88,10 +89,10 @@ const ESPN_LEAGUE_MAP: Record<string, { slug: string; name: string; country: str
 // Normalize Football-Data.org fixture
 function parseFootballDataMatch(m: any, fetchTime: string): Fixture {
   const compCode = m.competition?.code || 'PL';
-  const comp = COMPETITIONS.find(c => c.code === compCode) || {
+  const comp = getCanonicalCompetition(compCode) || COMPETITIONS.find(c => c.code === compCode) || {
     id: `comp_${compCode.toLowerCase()}`,
     code: compCode,
-    name: m.competition?.name || 'Football League',
+    name: m.competition?.name || cleanDisplayText(compCode),
     country: m.area?.name || 'Europe',
     emblemUrl: m.competition?.emblem || `https://crests.football-data.org/${compCode}.png`,
     tier: 1,
@@ -526,18 +527,45 @@ export class LiveFootballDataProvider implements FootballDataProvider {
   }
 
   async getCompetitions(): Promise<Competition[]> {
-    return COMPETITIONS;
+    const res = await getCompetitionsFromDatabase('football');
+    return res.competitions;
   }
 
-  async getLiveFixtures(params?: { competitionCode?: string; status?: string }): Promise<LiveFixturesResult> {
+  async getLiveFixtures(params?: { competitionId?: string; competitionCode?: string; status?: string; day?: string }): Promise<LiveFixturesResult> {
     checkAndLogStartupEnv();
 
     // 1. Compute dynamic date window at request time
     const { dateFrom, dateTo, lastUpdatedFormatted } = computeRequestDateWindow();
     const fetchTime = new Date().toISOString();
 
+    // 0. Primary Source: Verified Database Fixtures (persisted in SQLite/Supabase fixtures table)
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const dbFixtures = await getFixturesFromDatabase({
+          competitionId: params?.competitionId,
+          status: params?.status,
+          day: params?.day,
+          sport: 'football',
+        });
+        if (dbFixtures.length > 0) {
+          const integrityReport = validateFixtureIntegrity(dbFixtures);
+          if (integrityReport.validFixtures.length > 0) {
+            return {
+              fixtures: integrityReport.validFixtures,
+              liveDataAvailable: true,
+              lastUpdated: lastUpdatedFormatted,
+              providerUsed: 'Database Verified Fixtures',
+              dateRange: { dateFrom, dateTo },
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('[FootballDataProvider] Error querying database fixtures:', err);
+      }
+    }
+
     // 2. Check server cache
-    const cacheKey = serverCache.getFixtureCacheKey(params?.competitionCode, dateFrom, dateTo);
+    const cacheKey = serverCache.getFixtureCacheKey(params?.competitionId || params?.competitionCode, dateFrom, dateTo);
     const cached = await serverCache.get<Fixture[]>(cacheKey);
 
     if (cached && Array.isArray(cached) && cached.length > 0) {
