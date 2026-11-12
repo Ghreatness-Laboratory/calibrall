@@ -15,11 +15,12 @@ import { computeRequestDateWindow } from '../utils/dateWindow';
 import { serverCache } from '../cache/serverCache';
 import { checkAndLogStartupEnv } from '../config/envAudit';
 import { lookupTeamStrength } from './teamDatabase';
-import { displayName, getTeamAbbreviation } from '../utils/formatText';
+import { displayName, getTeamAbbreviation, cleanDisplayText } from '../utils/formatText';
 import { supabase, isSupabaseConfigured, assertPersistenceConfigured } from '@/lib/supabase/client';
 import { matchesStore } from './matchesStore';
 import { getCompetitionsFromDatabase, getCanonicalCompetition, isCanonicalCompetitionId } from './canonicalCompetitions';
 import { getFixturesFromDatabase, matchesDayFilter } from './fixturesDatabase';
+import { validateFixtureIntegrity } from './fixtureIntegrity';
 
 export interface ProviderHealth {
   providerName: string;
@@ -807,7 +808,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
 
         let filtered = integrityReport.validFixtures;
         if (params?.status && params.status !== 'ALL') {
-          filtered = filtered.filter(f => f.status === params.status);
+          filtered = filtered.filter((f: Fixture) => f.status === params.status);
         }
 
         return {
