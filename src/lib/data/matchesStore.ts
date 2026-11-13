@@ -16,6 +16,7 @@ import {
   clearUnresolvedTeamsLog,
   UnresolvedTeamLogEntry,
   CANONICAL_ID_ALIASES,
+  isPlaceholderTeam,
 } from './canonicalTeams';
 import { PROMOTED_BRAZIL_2026_IDS } from './backfillCatalog';
 import { getCalibratedParams, getLeagueCalibratedConfig } from '@/lib/prediction/calibratedParams';
@@ -430,7 +431,7 @@ class MatchesStore {
   }
 
   recordUnmappedFixtureName(rawName: string, provider: string) {
-    if (rawName && typeof rawName === 'string' && rawName.trim()) {
+    if (rawName && typeof rawName === 'string' && rawName.trim() && !isPlaceholderTeam(rawName)) {
       const clean = rawName.trim();
       this.unmappedFixtureNamesMap.set(`${clean.toLowerCase()}:${provider.toLowerCase()}`, {
         name: clean,

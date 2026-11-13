@@ -31,7 +31,7 @@ import {
   matchesDayFilter,
 } from './fixturesDatabase';
 import { validateFixtureIntegrity } from './fixtureIntegrity';
-import { lookupCanonicalTeam, recordUnresolvedTeam } from './canonicalTeams';
+import { lookupCanonicalTeam, recordUnresolvedTeam, isPlaceholderTeam } from './canonicalTeams';
 
 export interface ProviderHealth {
   providerName: string;
@@ -131,6 +131,15 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
     return null;
   }
 
+  if (
+    !m.homeTeam?.name ||
+    !m.awayTeam?.name ||
+    isPlaceholderTeam(m.homeTeam.name, m.homeTeam.id) ||
+    isPlaceholderTeam(m.awayTeam.name, m.awayTeam.id)
+  ) {
+    return null;
+  }
+
   const homeCanon = lookupCanonicalTeam(m.homeTeam?.name) || lookupCanonicalTeam(m.homeTeam?.shortName);
   const awayCanon = lookupCanonicalTeam(m.awayTeam?.name) || lookupCanonicalTeam(m.awayTeam?.shortName);
   const homeLookup = lookupTeamStrength(m.homeTeam);
@@ -223,6 +232,15 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture | null {
     return null;
   }
 
+  if (
+    !home.name ||
+    !away.name ||
+    isPlaceholderTeam(home.name, home.id) ||
+    isPlaceholderTeam(away.name, away.id)
+  ) {
+    return null;
+  }
+
   const homeCanon = lookupCanonicalTeam(home.name);
   const awayCanon = lookupCanonicalTeam(away.name);
   const homeLookup = lookupTeamStrength(home);
@@ -305,6 +323,15 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
       compCode || null,
       'provider:espn'
     );
+    return null;
+  }
+
+  const homeRawName = homeComp.team?.displayName || homeComp.team?.name || homeComp.team?.shortDisplayName || '';
+  const awayRawName = awayComp.team?.displayName || awayComp.team?.name || awayComp.team?.shortDisplayName || '';
+  if (
+    isPlaceholderTeam(homeRawName, homeComp.team?.id ?? homeComp.id) ||
+    isPlaceholderTeam(awayRawName, awayComp.team?.id ?? awayComp.id)
+  ) {
     return null;
   }
 

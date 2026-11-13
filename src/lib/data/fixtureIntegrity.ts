@@ -9,6 +9,7 @@
 import { Fixture } from '@/types';
 import { lookupTeamStrength, normalizeTeamLookupKey, COMPETITION_CLUBS, COMPETITION_COUNTRY_MAP } from './teamDatabase';
 import { isCanonicalCompetitionId, logCompetitionIntegrityError } from './canonicalCompetitions';
+import { isPlaceholderTeam } from './canonicalTeams';
 
 export interface IntegrityValidationReport {
   isValid: boolean;
@@ -79,6 +80,16 @@ export function validateFixtureIntegrity(
       console.error(msg);
       violations.push(msg);
       rejectedFixtures.push({ fixtureId: f.id, reason: 'Invalid kickoffTime' });
+      continue;
+    }
+
+    // Rule 2b: Exclude unconfirmed bracket/playoff placeholder fixtures (e.g. "TBD Home", "TBD Away")
+    // cleanly before 48h team deduplication so placeholders never cause duplicate-team errors.
+    if (
+      isPlaceholderTeam(f.homeTeam?.name, f.homeTeam?.id) ||
+      isPlaceholderTeam(f.awayTeam?.name, f.awayTeam?.id)
+    ) {
+      rejectedFixtures.push({ fixtureId: f.id, reason: 'Unconfirmed placeholder team (TBD)' });
       continue;
     }
 

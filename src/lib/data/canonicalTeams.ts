@@ -1405,9 +1405,29 @@ export interface UnresolvedTeamLogEntry {
 
 const UNRESOLVED_TEAMS_MAP = new Map<string, UnresolvedTeamLogEntry>();
 
+export function isPlaceholderTeam(name?: string | null, rawId?: string | number | null): boolean {
+  if (rawId !== undefined && rawId !== null) {
+    const idStr = String(rawId).trim().toLowerCase();
+    if (/^-\d+$/.test(idStr) || idStr === '0' || /^team_-\d+$/.test(idStr)) {
+      return true;
+    }
+  }
+  if (!name || typeof name !== 'string') return false;
+  const trimmed = name.trim().toLowerCase();
+  if (!trimmed) return false;
+  return (
+    /^tbd(\b|[^a-z]|$)/i.test(trimmed) ||
+    /^to be (determined|decided|announced|confirmed)\b/i.test(trimmed) ||
+    /^(home|away)\s+team$/i.test(trimmed) ||
+    /^(winner|loser)\s+(of\s+)?/i.test(trimmed) ||
+    /^(unknown|placeholder|bye)$/i.test(trimmed)
+  );
+}
+
 export function recordUnresolvedTeam(sourceName: string, provider: string = 'football-data.co.uk'): void {
   if (!sourceName || !sourceName.trim()) return;
   const name = sourceName.trim();
+  if (isPlaceholderTeam(name)) return;
   const key = `${name.toLowerCase()}:${provider.toLowerCase()}`;
   const now = new Date().toISOString();
   const existing = UNRESOLVED_TEAMS_MAP.get(key);
@@ -1520,7 +1540,7 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
   const input = typeof rawNameOrId === 'string'
     ? rawNameOrId.trim()
     : (rawNameOrId.name || rawNameOrId.shortName || rawNameOrId.id || '').toString().trim();
-  if (!input) return null;
+  if (!input || isPlaceholderTeam(input)) return null;
   const inputLower = input.toLowerCase();
 
   // 1. Explicit canonical ID & legacy ID alias match
