@@ -2,6 +2,9 @@
 // Provides real historical competition and team-adjusted frequencies for all 10 authorized market families.
 // Used to compute true skill, edge-over-baseline, and prevent bias toward trivially high raw probabilities.
 
+import { getLeagueCalibratedConfig, resolveLeagueGoalMeans } from './calibratedParams';
+import { poissonProb } from './math';
+
 export type MarketFamily = 
   | 'result' 
   | 'draw' 
@@ -213,6 +216,47 @@ export const REAL_LEAGUE_HISTORICAL_FREQUENCIES: Record<string, {
 };
 
 /**
+ * Resolves historical competition baseline frequencies strictly from calibrated DB leagues first,
+ * falling back to REAL_LEAGUE_HISTORICAL_FREQUENCIES when unavailable.
+ */
+function resolveCompetitionFreq(competitionCode: string) {
+  const cal = getLeagueCalibratedConfig(competitionCode);
+  const fallback = REAL_LEAGUE_HISTORICAL_FREQUENCIES[competitionCode] || REAL_LEAGUE_HISTORICAL_FREQUENCIES.DEFAULT;
+  if (!cal) {
+    const gm = resolveLeagueGoalMeans(competitionCode);
+    return {
+      ...fallback,
+      avgHomeGoals: gm.avgHomeGoals,
+      avgAwayGoals: gm.avgAwayGoals,
+    };
+  }
+  return {
+    avgGoals: cal.goals.avgGoals,
+    avgHomeGoals: cal.goals.avgHomeGoals,
+    avgAwayGoals: cal.goals.avgAwayGoals,
+    avgCorners: cal.corners?.avgTotalCorners ?? fallback.avgCorners,
+    avgCards: cal.cards?.avgTotalCards ?? fallback.avgCards,
+    homeWinRate: cal.goals.homeWinRate,
+    drawRate: cal.goals.drawRate,
+    awayWinRate: cal.goals.awayWinRate,
+    o15Rate: cal.goals.o15Rate,
+    o25Rate: cal.goals.o25Rate,
+    o35Rate: cal.goals.o35Rate,
+    bttsRate: cal.goals.bttsRate,
+    fhO05Rate: cal.halves?.fhO05Rate ?? fallback.fhO05Rate,
+    fhU15Rate: cal.halves?.fhU15Rate ?? fallback.fhU15Rate,
+    hsh2ndRate: cal.halves?.hsh2ndRate ?? fallback.hsh2ndRate,
+    hsh1stRate: cal.halves?.hsh1stRate ?? fallback.hsh1stRate,
+    hshEqualRate: cal.halves?.hshEqualRate ?? fallback.hshEqualRate,
+    shHomeWinRate: cal.halves?.shHomeWinRate ?? fallback.shHomeWinRate,
+    shDrawRate: cal.halves?.shDrawRate ?? fallback.shDrawRate,
+    shAwayWinRate: cal.halves?.shAwayWinRate ?? fallback.shAwayWinRate,
+    cornersO95Rate: cal.corners?.o95Rate ?? fallback.cornersO95Rate,
+    cardsO45Rate: cal.cards?.o45Rate ?? fallback.cardsO45Rate,
+  };
+}
+
+/**
  * Returns BOTH the competition baseline and team-adjusted baseline
  * for any market line and competition.
  */
@@ -222,7 +266,7 @@ export function getMarketBaseline(
   line?: number,
   teamStats?: TeamHistoricalStats
 ): BaselineResult {
-  const comp = REAL_LEAGUE_HISTORICAL_FREQUENCIES[competitionCode] || REAL_LEAGUE_HISTORICAL_FREQUENCIES.DEFAULT;
+  const comp = resolveCompetitionFreq(competitionCode);
 
   let compRate = 0.50;
   let teamRate = 0.50;
@@ -264,6 +308,22 @@ export function getMarketBaseline(
     compRate = 1 - comp.drawRate;
     const hDraw = teamStats?.homeTeamDrawRate ?? comp.drawRate;
     teamRate = Number((1 - ((hDraw + comp.drawRate) / 2)).toFixed(3));
+  }
+
+  // 2b. Team Totals Over / Under Goals (Home or Away 0.5, 1.5, 2.5)
+  else if (marketCode.startsWith('TEAM_GOALS_HOME_') || marketCode.startsWith('TEAM_GOALS_AWAY_')) {
+    marketFamily = 'goals_over_under';
+    const isHomeTeam = marketCode.startsWith('TEAM_GOALS_HOME_');
+    const isOver = marketCode.includes('_O');
+    const l = line ?? 1.5;
+    const lambda = isHomeTeam ? comp.avgHomeGoals : comp.avgAwayGoals;
+    let underProb = 0;
+    for (let g = 0; g <= Math.floor(l); g++) {
+      underProb += poissonProb(lambda, g);
+    }
+    underProb = Math.min(0.98, Math.max(0.02, underProb));
+    compRate = Number((isOver ? (1 - underProb) : underProb).toFixed(3));
+    teamRate = compRate;
   }
 
   // 3. Over / Under Goals
@@ -391,17 +451,22 @@ export function getMarketBaseline(
     marketFamily = 'handicap';
     const isHome = marketCode.includes('_HOME');
     const l = line ?? 0.0;
-    // Empirical baseline frequencies across European leagues
     let rate = 0.50;
     if (l >= 1.5) rate = isHome ? 0.745 : 0.695;
+    else if (l >= 1.25) rate = isHome ? 0.700 : 0.640;
     else if (l >= 1.0) rate = isHome ? 0.650 : 0.590;
-    else if (l >= 0.5) rate = isHome ? 0.680 : 0.550;
-    else if (l === 0) rate = isHome ? 0.450 : 0.305;
+    else if (l >= 0.75) rate = isHome ? 0.665 : 0.570;
+    else if (l >= 0.5) rate = isHome ? Math.min(0.85, comp.homeWinRate + comp.drawRate) : Math.min(0.85, comp.awayWinRate + comp.drawRate);
+    else if (l >= 0.25) rate = isHome ? comp.homeWinRate + 0.5 * comp.drawRate : comp.awayWinRate + 0.5 * comp.drawRate;
+    else if (l === 0) rate = isHome ? comp.homeWinRate : comp.awayWinRate;
     else if (l <= -1.5) rate = isHome ? 0.240 : 0.140;
+    else if (l <= -1.25) rate = isHome ? 0.250 : 0.150;
     else if (l <= -1.0) rate = isHome ? 0.260 : 0.160;
-    else if (l <= -0.5) rate = isHome ? 0.450 : 0.305;
-    compRate = rate;
-    teamRate = rate;
+    else if (l <= -0.75) rate = isHome ? 0.340 : 0.220;
+    else if (l <= -0.5) rate = isHome ? comp.homeWinRate : comp.awayWinRate;
+    else if (l <= -0.25) rate = isHome ? comp.homeWinRate * 0.92 : comp.awayWinRate * 0.92;
+    compRate = Number(rate.toFixed(3));
+    teamRate = compRate;
   }
 
   const isTriviallySafe = compRate >= 0.85 || teamRate >= 0.85;

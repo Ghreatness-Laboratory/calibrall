@@ -360,6 +360,7 @@ export function getLocalDatabase(): any {
         home_score INTEGER,
         away_score INTEGER,
         venue TEXT,
+        referee TEXT,
         source TEXT,
         is_demo BOOLEAN,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -385,6 +386,17 @@ export function getLocalDatabase(): any {
         resolved INTEGER DEFAULT 0,
         UNIQUE(source_name, source_provider)
       );
+      CREATE TABLE IF NOT EXISTS rivalries (
+        id TEXT PRIMARY KEY,
+        team_a_id TEXT NOT NULL,
+        team_b_id TEXT NOT NULL,
+        competition_code TEXT,
+        rivalry_name TEXT NOT NULL,
+        intensity REAL NOT NULL DEFAULT 1.0,
+        source TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(team_a_id, team_b_id)
+      );
     `);
 
     // Ensure columns exist on older tables
@@ -397,7 +409,9 @@ export function getLocalDatabase(): any {
     try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN home_score INTEGER;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN away_score INTEGER;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN venue TEXT;'); } catch (_) {}
+    try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN referee TEXT;'); } catch (_) {}
     try { localDbInstance.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_fixtures_provider_id ON fixtures(provider_id);'); } catch (_) {}
+    try { localDbInstance.exec('CREATE INDEX IF NOT EXISTS idx_rivalries_pair ON rivalries(team_a_id, team_b_id);'); } catch (_) {}
   }
   return localDbInstance;
 }

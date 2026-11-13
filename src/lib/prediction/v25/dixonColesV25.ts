@@ -4,11 +4,13 @@
 
 import { 
   poissonProb, 
+  negBinomialProb,
   dixonColesTau, 
-  factorial 
+  generateHalfByHalfGoalDistribution
 } from '../math';
 import { V25FixtureFeatures } from './featureLayer';
-import { MarketCategory, SupportedOptionType } from '@/types';
+import { getCalibratedParams, getLeagueCalibratedConfig } from '../calibratedParams';
+import { MarketCategory } from '@/types';
 
 export interface V25AsianHandicapOutcome {
   line: number;
@@ -40,6 +42,10 @@ export interface V25ScorelineMatrix {
   };
   overUnderGoals: Record<number, { over: number; under: number }>;
   wholeNumberGoals: Record<number, { over: number; under: number; push: number }>;
+  teamGoalsOverUnder: {
+    home: Record<number, { over: number; under: number }>;
+    away: Record<number, { over: number; under: number }>;
+  };
   bttsYes: number;
   bttsNo: number;
   asianHandicap: {
@@ -53,6 +59,11 @@ export interface V25ScorelineMatrix {
     equal: number;
   };
   firstHalfGoals: Record<number, { over: number; under: number }>;
+  secondHalfResult: {
+    homeWin: number;
+    draw: number;
+    awayWin: number;
+  };
   goalBounds: {
     '0-1': number;
     '0-2': number;
@@ -88,8 +99,13 @@ export interface V25CalibratedPrediction {
 
 // Learned ridge regression coefficients for log-linear covariates on attack and defence
 // log(lambda) = log(baseXgHome) + w_h2h * h2h + w_home * homeAdv + w_fatigue * fatigue + w_abs * abs + w_striker * str
+const CALIBRATED_H2H_WEIGHT = (() => {
+  const h2h = getCalibratedParams().h2hAblation;
+  return h2h?.enabled ? h2h.selectedWeight : 0;
+})();
+
 export const COVARIATE_COEFFICIENTS = {
-  h2hGoalDiff: 0.082,        // Ridge fitted coefficient on recency-weighted H2H
+  h2hGoalDiff: CALIBRATED_H2H_WEIGHT, // Calibrated via held-out Brier ablation on DB matches
   teamHomeAdvantage: 0.114,  // Team specific home stadium elasticity
   formMomentum: 0.068,       // Rolling xG form momentum
   fatigueDiscount: -0.092,   // Congestion and European travel damper
@@ -166,8 +182,8 @@ export class DixonColesV25Engine {
     const homeDefAbsenceMod = c.missingDefenderLoss * (features.homeAbsences.keyCbAbsent ? 1 : 0);
     const awayStrikerMod = c.strikerFinishing * features.awayStriker.netStrikerMatchupEdge;
 
-    // Derby raises draw chance and variance by compressing rate differential toward equality
-    const derbyCompressor = features.isDerby ? 0.88 : 1.0;
+    // Derby goals & draw adjustments were non-significant in stored match tests (p >= 0.05) -> 1.0 multiplier
+    const derbyCompressor = 1.0;
 
     const logHome = Math.log(Math.max(0.2, baseHomeXg)) +
       (homeH2hMod + homeAdvMod + homeFormMod + homeFatigueMod + homeAbsenceMod + awayDefAbsenceMod + homeStrikerMod) * derbyCompressor;
@@ -186,18 +202,18 @@ export class DixonColesV25Engine {
 
   /**
    * Generates Dixon Coles joint distribution matrix with support for:
-   * 1X2, Over/Under, BTTS, Draw, Draw-or-Over-2.5, Goal Bounds, Halves,
-   * AND full Asian Handicap including quarter lines (-1.25, -0.75, +0.75, +1.25, etc.).
+   * 1X2, Over/Under, Team Totals (0.5/1.5/2.5), BTTS, Draw, Draw-or-Over-2.5, Goal Bounds,
+   * Half-time models using half-specific rates, and full Asian Handicap including quarter lines.
    */
   public static generateScorelineMatrix(
     lambda: number,
     mu: number,
     features?: V25FixtureFeatures,
     rho: number = -0.13,
-    maxGoals: number = 8
+    maxGoals: number = 8,
+    explicitHalfXg?: { h1HomeXg: number; h1AwayXg: number; h2HomeXg: number; h2AwayXg: number }
   ): V25ScorelineMatrix {
-    // If derby, adjust low score rho parameter slightly for higher draw density
-    const effectiveRho = features?.isDerby ? -0.16 : rho;
+    const effectiveRho = rho;
 
     const matrix: number[][] = [];
     let totalProb = 0;
@@ -231,11 +247,20 @@ export class DixonColesV25Engine {
 
     const goalLines = [0.5, 1.5, 2.5, 3.5, 4.5];
     const wholeLines = [1.0, 2.0, 3.0, 4.0];
+    const teamLines = [0.5, 1.5, 2.5];
     const overUnderGoals: Record<number, { over: number; under: number }> = {};
     const wholeNumberGoals: Record<number, { over: number; under: number; push: number }> = {};
+    const teamGoalsOverUnder = {
+      home: {} as Record<number, { over: number; under: number }>,
+      away: {} as Record<number, { over: number; under: number }>,
+    };
 
     goalLines.forEach(l => { overUnderGoals[l] = { over: 0, under: 0 }; });
     wholeLines.forEach(l => { wholeNumberGoals[l] = { over: 0, under: 0, push: 0 }; });
+    teamLines.forEach(l => {
+      teamGoalsOverUnder.home[l] = { over: 0, under: 0 };
+      teamGoalsOverUnder.away[l] = { over: 0, under: 0 };
+    });
 
     // Supported Asian Handicap lines including half and quarter lines
     const ahLines = [-1.5, -1.25, -1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5];
@@ -273,6 +298,15 @@ export class DixonColesV25Engine {
         goalLines.forEach(l => {
           if (totalGoals > l) overUnderGoals[l].over += p;
           else overUnderGoals[l].under += p;
+        });
+
+        // Team Total Goal lines (Home / Away 0.5, 1.5, 2.5)
+        teamLines.forEach(l => {
+          if (h > l) teamGoalsOverUnder.home[l].over += p;
+          else teamGoalsOverUnder.home[l].under += p;
+
+          if (a > l) teamGoalsOverUnder.away[l].over += p;
+          else teamGoalsOverUnder.away[l].under += p;
         });
 
         // Whole number lines
@@ -324,37 +358,17 @@ export class DixonColesV25Engine {
       away: { win: awayWin, push: draw, loss: homeWin, winProbWithoutPush: dnbDecisive > 0 ? awayWin / dnbDecisive : 0.5 },
     };
 
-    // Half by half goal distributions (Learned half split: ~43% 1st half / 57% 2nd half)
-    const firstHalfShare = 0.43;
-    const fhLambda = lambda * firstHalfShare;
-    const fhMu = mu * firstHalfShare;
-    const shLambda = lambda * (1 - firstHalfShare);
-    const shMu = mu * (1 - firstHalfShare);
-
-    let hshFirst = 0;
-    let hshSecond = 0;
-    let hshEqual = 0;
-    const firstHalfGoals: Record<number, { over: number; under: number }> = {
-      0.5: { over: 0, under: 0 },
-      1.5: { over: 0, under: 0 },
-    };
-
-    for (let fhGoals = 0; fhGoals <= 6; fhGoals++) {
-      const pFh = poissonProb(fhLambda + fhMu, fhGoals);
-      if (fhGoals > 0.5) firstHalfGoals[0.5].over += pFh;
-      else firstHalfGoals[0.5].under += pFh;
-
-      if (fhGoals > 1.5) firstHalfGoals[1.5].over += pFh;
-      else firstHalfGoals[1.5].under += pFh;
-
-      for (let shGoals = 0; shGoals <= 6; shGoals++) {
-        const pSh = poissonProb(shLambda + shMu, shGoals);
-        const jointHalf = pFh * pSh;
-        if (fhGoals > shGoals) hshFirst += jointHalf;
-        else if (shGoals > fhGoals) hshSecond += jointHalf;
-        else hshEqual += jointHalf;
-      }
-    }
+    // Half-by-half distributions computed from separate 1H/2H rates when available
+    const leagueHalvesShare = features?.competitionCode
+      ? (getLeagueCalibratedConfig(features.competitionCode)?.halves?.firstHalfGoalShare ?? 0.439)
+      : 0.439;
+    const halfDist = generateHalfByHalfGoalDistribution(
+      lambda,
+      mu,
+      leagueHalvesShare,
+      6,
+      explicitHalfXg
+    );
 
     return {
       matrix,
@@ -367,16 +381,21 @@ export class DixonColesV25Engine {
       drawNoBet,
       overUnderGoals,
       wholeNumberGoals,
+      teamGoalsOverUnder,
       bttsYes,
       bttsNo: 1.0 - bttsYes,
       asianHandicap,
       drawOrOver25,
-      highestScoringHalf: {
-        firstHalf: hshFirst,
-        secondHalf: hshSecond,
-        equal: hshEqual,
+      highestScoringHalf: halfDist.highestScoringHalf,
+      firstHalfGoals: {
+        0.5: halfDist.firstHalf.overUnderGoals[0.5],
+        1.5: halfDist.firstHalf.overUnderGoals[1.5],
       },
-      firstHalfGoals,
+      secondHalfResult: {
+        homeWin: halfDist.secondHalf.homeWin,
+        draw: halfDist.secondHalf.draw,
+        awayWin: halfDist.secondHalf.awayWin,
+      },
       goalBounds,
     };
   }
@@ -434,21 +453,27 @@ export class DixonColesV25Engine {
   }
 
   /**
-   * Negative Binomial Corners model with PPDA and weather covariates
+   * Negative Binomial Corners model using team corners FOR & AGAINST and league calibrated overdispersion alpha
    */
-  public static calculateCorners(expectedHomeCorners: number, expectedAwayCorners: number, features: V25FixtureFeatures): V25CornerDistribution {
+  public static calculateCorners(
+    expectedHomeCorners: number,
+    expectedAwayCorners: number,
+    features: V25FixtureFeatures,
+    overdispersionAlpha?: number
+  ): V25CornerDistribution {
     const weatherMult = features.weather.cornerMultiplier;
-    const totalExpected = (expectedHomeCorners + expectedAwayCorners) * weatherMult;
+    const totalExpected = Math.max(0, (expectedHomeCorners + expectedAwayCorners) * weatherMult);
+    const alpha = overdispersionAlpha ??
+      getLeagueCalibratedConfig(features.competitionCode)?.corners?.overdispersionAlpha ??
+      0.085;
 
-    // NegBinomial parameterization
     const lines = [8.5, 9.5, 10.5, 11.5];
     const overUnderLines: Record<number, { over: number; under: number }> = {};
 
     lines.forEach(l => {
-      // CDF approximation for count distribution
       let underProb = 0;
       for (let k = 0; k <= Math.floor(l); k++) {
-        underProb += poissonProb(totalExpected, k);
+        underProb += negBinomialProb(totalExpected, k, alpha);
       }
       underProb = Math.min(0.98, Math.max(0.02, underProb));
       overUnderLines[l] = {
@@ -458,23 +483,29 @@ export class DixonColesV25Engine {
     });
 
     return {
-      expectedCorners: totalExpected,
+      expectedCorners: Number(totalExpected.toFixed(2)),
       overUnderLines,
     };
   }
 
   /**
-   * Negative Binomial Bookings model with referee cards and derby tension
+   * Negative Binomial Bookings model with shrunk referee rate, derby flag, and calibrated overdispersion alpha
    */
-  public static calculateCards(features: V25FixtureFeatures): V25CardDistribution {
-    const totalExpected = features.discipline.expectedTotalBookings;
+  public static calculateCards(
+    features: V25FixtureFeatures,
+    overdispersionAlpha?: number
+  ): V25CardDistribution {
+    const totalExpected = Math.max(0, features.discipline.expectedTotalBookings);
+    const alpha = overdispersionAlpha ??
+      getLeagueCalibratedConfig(features.competitionCode)?.cards?.overdispersionAlpha ??
+      0.045;
     const lines = [3.5, 4.5, 5.5];
     const overUnderLines: Record<number, { over: number; under: number }> = {};
 
     lines.forEach(l => {
       let underProb = 0;
       for (let k = 0; k <= Math.floor(l); k++) {
-        underProb += poissonProb(totalExpected, k);
+        underProb += negBinomialProb(totalExpected, k, alpha);
       }
       underProb = Math.min(0.98, Math.max(0.02, underProb));
       overUnderLines[l] = {
@@ -484,7 +515,7 @@ export class DixonColesV25Engine {
     });
 
     return {
-      expectedCards: totalExpected,
+      expectedCards: Number(totalExpected.toFixed(2)),
       overUnderLines,
     };
   }

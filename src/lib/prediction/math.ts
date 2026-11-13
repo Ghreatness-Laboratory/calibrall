@@ -404,12 +404,13 @@ export function generateHalfByHalfGoalDistribution(
   homeXg: number,
   awayXg: number,
   halfSplitFirstHalfRatio: number = 0.445,
-  maxGoalsPerHalf: number = 6
+  maxGoalsPerHalf: number = 6,
+  explicitHalfXg?: { h1HomeXg: number; h1AwayXg: number; h2HomeXg: number; h2AwayXg: number }
 ): HalfGoalsDistributionResult {
-  const h1Xg = Math.max(0.05, homeXg * halfSplitFirstHalfRatio);
-  const a1Xg = Math.max(0.05, awayXg * halfSplitFirstHalfRatio);
-  const h2Xg = Math.max(0.05, homeXg * (1 - halfSplitFirstHalfRatio));
-  const a2Xg = Math.max(0.05, awayXg * (1 - halfSplitFirstHalfRatio));
+  const h1Xg = Math.max(0.05, explicitHalfXg ? explicitHalfXg.h1HomeXg : homeXg * halfSplitFirstHalfRatio);
+  const a1Xg = Math.max(0.05, explicitHalfXg ? explicitHalfXg.h1AwayXg : awayXg * halfSplitFirstHalfRatio);
+  const h2Xg = Math.max(0.05, explicitHalfXg ? explicitHalfXg.h2HomeXg : homeXg * (1 - halfSplitFirstHalfRatio));
+  const a2Xg = Math.max(0.05, explicitHalfXg ? explicitHalfXg.h2AwayXg : awayXg * (1 - halfSplitFirstHalfRatio));
 
   // Compute 1st half Dixon-Coles matrix
   const m1: number[][] = [];
@@ -699,12 +700,13 @@ export function calculateCornerProbabilities(
 
 /**
  * Disciplinary Bookings Model (Yellow cards = 1, Red cards = 2)
- * Includes Total Bookings and Team Bookings
+ * Uses Negative Binomial count distribution parameterized by overdispersionAlpha
  */
 export function calculateCardProbabilities(
   expectedCards: number, 
   homeCardsRatio: number = 0.48,
-  maxCards: number = 14
+  maxCards: number = 16,
+  overdispersionAlpha: number = 0.045
 ) {
   const cardLines = [2.5, 3.5, 4.5, 5.5, 6.5];
   const results: Record<number, { over: number; under: number }> = {};
@@ -713,7 +715,7 @@ export function calculateCardProbabilities(
   });
 
   for (let c = 0; c <= maxCards; c++) {
-    const p = poissonProb(expectedCards, c);
+    const p = negBinomialProb(expectedCards, c, overdispersionAlpha);
     cardLines.forEach(l => {
       if (c > l) results[l].over += p;
       else results[l].under += p;
@@ -728,7 +730,7 @@ export function calculateCardProbabilities(
     }
   });
 
-  // Team Cards
+  // Team Cards (Negative Binomial with slightly higher per-team variance)
   const homeCardsExpected = expectedCards * homeCardsRatio;
   const awayCardsExpected = expectedCards * (1 - homeCardsRatio);
   const teamLines = [1.5, 2.5, 3.5];
@@ -743,9 +745,9 @@ export function calculateCardProbabilities(
     teamCards.away[l] = { over: 0, under: 0 };
   });
 
-  for (let c = 0; c <= 10; c++) {
-    const pHome = poissonProb(homeCardsExpected, c);
-    const pAway = poissonProb(awayCardsExpected, c);
+  for (let c = 0; c <= 12; c++) {
+    const pHome = negBinomialProb(homeCardsExpected, c, overdispersionAlpha * 1.15);
+    const pAway = negBinomialProb(awayCardsExpected, c, overdispersionAlpha * 1.15);
     teamLines.forEach(l => {
       if (c > l) {
         teamCards.home[l].over += pHome;
@@ -756,6 +758,19 @@ export function calculateCardProbabilities(
       }
     });
   }
+
+  teamLines.forEach(l => {
+    const sH = teamCards.home[l].over + teamCards.home[l].under;
+    if (sH > 0) {
+      teamCards.home[l].over /= sH;
+      teamCards.home[l].under /= sH;
+    }
+    const sA = teamCards.away[l].over + teamCards.away[l].under;
+    if (sA > 0) {
+      teamCards.away[l].over /= sA;
+      teamCards.away[l].under /= sA;
+    }
+  });
 
   return {
     total: results,

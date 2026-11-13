@@ -43,7 +43,15 @@ export class WhyPanelGenerator {
       factorsFor.push(`Opposition defensive structure deep block clearances`);
       factorsFor.push(`Pre match corner generation baseline established across trailing 10 matches`);
     } else if (isCards) {
-      factorsFor.push(`Referee issuance profile averages ${features.discipline.refereeCardsPerMatch.toFixed(1)} cards per fixture`);
+      if (features.discipline.refereeAnnounced) {
+        factorsFor.push(
+          `Appointed referee ${features.discipline.refereeName} averages ${features.discipline.refereeCardsPerMatch.toFixed(2)} cards per fixture (shrunk toward ${features.discipline.refereeLeagueBaseline.toFixed(2)} league baseline)`
+        );
+      } else {
+        factorsFor.push(
+          `Referee unannounced; using league baseline of ${features.discipline.refereeLeagueBaseline.toFixed(2)} cards per fixture`
+        );
+      }
       if (features.isDerby) {
         factorsFor.push(`High intensity derby rivalry elevates duel friction and disciplinary bookings`);
       } else {

@@ -522,6 +522,7 @@ function mapDbMatchToFixture(m: any, fetchTime: string): Fixture | null {
     awayShots: m.away_shots,
     homeShotsOnTarget: m.home_shots_on_target,
     awayShotsOnTarget: m.away_shots_on_target,
+    referee: m.referee || undefined,
     dataFreshness: m.updated_at || fetchTime,
   };
 }
@@ -586,8 +587,9 @@ export class LiveFootballDataProvider implements FootballDataProvider {
 
   private enrichFixtureWithDbStats(fixture: Fixture): Fixture {
     const liveMeta = this.liveMetaById.get(fixture.id);
-    const homeStats = matchesStore.getTeamStatsSync(fixture.homeTeam, fixture.kickoffTime);
-    const awayStats = matchesStore.getTeamStatsSync(fixture.awayTeam, fixture.kickoffTime);
+    const compCode = fixture.competition?.code;
+    const homeStats = matchesStore.getTeamStatsSync(fixture.homeTeam, fixture.kickoffTime, compCode);
+    const awayStats = matchesStore.getTeamStatsSync(fixture.awayTeam, fixture.kickoffTime, compCode);
 
     const enrichedHome: Team = {
       ...fixture.homeTeam,
@@ -621,13 +623,18 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       hasRealTeamStrength: awayStats.storedMatchCount > 0,
     };
 
+    const mergedOdds = matchesStore.getVerifiedOddsSync(
+      fixture.id,
+      fixture.verifiedOdds || liveMeta?.verifiedOdds
+    );
+
     const updatedFixture: Fixture = {
       ...fixture,
       providerName: liveMeta?.providerName || fixture.providerName,
       matchday: liveMeta?.matchday ?? fixture.matchday,
       minute: liveMeta?.minute ?? fixture.minute,
       statusDetail: liveMeta?.statusDetail ?? fixture.statusDetail,
-      verifiedOdds: fixture.verifiedOdds || liveMeta?.verifiedOdds,
+      verifiedOdds: mergedOdds,
       homeTeam: enrichedHome,
       awayTeam: enrichedAway,
     };
@@ -636,6 +643,15 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     updatedFixture.serverStats = stats;
     updatedFixture.insufficientData = Boolean(stats.insufficientData);
     updatedFixture.hasRealTeamStrength = Boolean(stats.hasRealTeamStrength);
+    updatedFixture.isDerby = stats.isDerby;
+    updatedFixture.derbyName = stats.derbyName;
+    if (stats.leagueCapabilities) {
+      updatedFixture.missingDataFlags = {
+        corners: !stats.leagueCapabilities.hasCorners,
+        cards: !stats.leagueCapabilities.hasCards,
+        halves: !stats.leagueCapabilities.hasHalfTimeGoals,
+      };
+    }
     return updatedFixture;
   }
 
@@ -1013,11 +1029,38 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
       awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
       awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
+      home1HAttackRating: stats.home1HAttackRating,
+      home1HDefenseRating: stats.home1HDefenseRating,
+      away1HAttackRating: stats.away1HAttackRating,
+      away1HDefenseRating: stats.away1HDefenseRating,
+      home2HAttackRating: stats.home2HAttackRating,
+      home2HDefenseRating: stats.home2HDefenseRating,
+      away2HAttackRating: stats.away2HAttackRating,
+      away2HDefenseRating: stats.away2HDefenseRating,
+      homeCornerForRating: stats.homeCornerForRating,
+      homeCornerAgainstRating: stats.homeCornerAgainstRating,
+      awayCornerForRating: stats.awayCornerForRating,
+      awayCornerAgainstRating: stats.awayCornerAgainstRating,
+      homeCornerSampleCount: stats.homeCornerSampleCount,
+      awayCornerSampleCount: stats.awayCornerSampleCount,
+      homeCardForRating: stats.homeCardForRating,
+      awayCardForRating: stats.awayCardForRating,
+      homeCardSampleCount: stats.homeCardSampleCount,
+      awayCardSampleCount: stats.awayCardSampleCount,
       homeXg: stats.homeXg,
       awayXg: stats.awayXg,
       expectedCornersHome: stats.expectedCornersHome,
       expectedCornersAway: stats.expectedCornersAway,
       expectedCards: stats.expectedCards,
+      referee: fixture.referee || stats.referee,
+      refereeAnnounced: stats.refereeAnnounced,
+      refereeMatchCount: stats.refereeMatchCount,
+      refereeShrunkRate: stats.refereeShrunkRate,
+      refereeLeagueBaseline: stats.refereeLeagueBaseline,
+      isDerby: stats.isDerby,
+      derbyName: stats.derbyName,
+      derbySource: stats.derbySource,
+      leagueCapabilities: stats.leagueCapabilities,
       uncertaintyScore: stats.uncertaintyScore,
       dataCoverageScore: stats.dataCoverageScore,
       sampleSizeMatches: stats.sampleSizeMatches,

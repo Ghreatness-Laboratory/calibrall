@@ -5,6 +5,8 @@
 // 4. Calibration & Coherence Engine (Beta/Platt calibration with strict post-calibration coherence)
 
 import { ScorelineProbabilityMatrix } from './enhancedTeamStrength';
+import { negBinomialProb, generateHalfByHalfGoalDistribution } from './math';
+import { getCalibratedParams } from './calibratedParams';
 
 export interface JointMarketProbabilities {
   // 1X2
@@ -35,7 +37,7 @@ export interface JointMarketProbabilities {
   cornersOver95: number;
   cornersUnder95: number;
   expectedCorners: number;
-  // Cards (Hierarchical Disciplinary)
+  // Cards (Negative Binomial with derby multiplier)
   cardsOver45: number;
   cardsUnder45: number;
   expectedCards: number;
@@ -66,19 +68,26 @@ export class MarketSpecificModelsEngine {
     const o25 = Math.min(o15, matrix.over25);
     const o35 = Math.min(o25, matrix.over35);
 
-    // First half goals and second half distribution
-    const fhOver05 = Number((1 - Math.exp(-0.46 * (matrix.expectedHomeGoals + matrix.expectedAwayGoals))).toFixed(4));
-    const fhUnder15 = Number((Math.exp(-0.46 * (matrix.expectedHomeGoals + matrix.expectedAwayGoals)) * (1 + 0.46 * (matrix.expectedHomeGoals + matrix.expectedAwayGoals))).toFixed(4));
+    // Half-by-half distribution
+    const halfDist = generateHalfByHalfGoalDistribution(
+      matrix.expectedHomeGoals,
+      matrix.expectedAwayGoals,
+      0.439
+    );
+    const fhOver05 = Number(halfDist.firstHalf.overUnderGoals[0.5].over.toFixed(4));
+    const fhUnder15 = Number(halfDist.firstHalf.overUnderGoals[1.5].under.toFixed(4));
 
-    // Negative Binomial Corner Model (incorporating overdispersion alpha = 0.18)
+    // Negative Binomial Corner Model
     const totalCornersExp = homeCornersExp + awayCornersExp;
-    const cornersO95 = this.calculateNegativeBinomialOver(totalCornersExp, 9.5, 0.18);
+    const cornersO95 = this.calculateNegativeBinomialOver(totalCornersExp, 9.5, 0.085);
 
-    // Hierarchical Bookings Model (Referee strictness + derby multiplier)
-    const derbyMultiplier = isDerby ? 1.24 : 1.0;
-    const refereeMultiplier = refereeCardsPerGame / 4.25;
-    const adjustedCardsExp = 4.10 * refereeMultiplier * derbyMultiplier;
-    const cardsO45 = this.calculateHierarchicalCardsOver(adjustedCardsExp, 4.5);
+    // Negative Binomial Bookings Model (Referee rate + statistically verified derby cards multiplier)
+    const cal = getCalibratedParams();
+    const derbyMultiplier = isDerby && cal.derbySignificance.applyCardsAdjustment
+      ? cal.derbySignificance.cardsMultiplier
+      : 1.0;
+    const adjustedCardsExp = refereeCardsPerGame * derbyMultiplier;
+    const cardsO45 = this.calculateNegativeBinomialOver(adjustedCardsExp, 4.5, 0.045);
 
     return {
       homeWin: rawHomeWin,
@@ -97,9 +106,9 @@ export class MarketSpecificModelsEngine {
       bttsNo: matrix.bttsNo,
       firstHalfOver05: fhOver05,
       firstHalfUnder15: fhUnder15,
-      highestScoringHalf2nd: 0.54,
-      highestScoringHalf1st: 0.33,
-      highestScoringHalfEqual: 0.13,
+      highestScoringHalf2nd: Number(halfDist.highestScoringHalf.secondHalf.toFixed(4)),
+      highestScoringHalf1st: Number(halfDist.highestScoringHalf.firstHalf.toFixed(4)),
+      highestScoringHalfEqual: Number(halfDist.highestScoringHalf.equal.toFixed(4)),
       cornersOver95: cornersO95,
       cornersUnder95: Number((1 - cornersO95).toFixed(4)),
       expectedCorners: Number(totalCornersExp.toFixed(1)),
@@ -110,44 +119,18 @@ export class MarketSpecificModelsEngine {
   }
 
   /**
-   * Negative Binomial CDF approximation for corners:
-   * Var = mu + alpha * mu^2
+   * Exact Negative Binomial tail probability P(X > threshold)
    */
-  private static calculateNegativeBinomialOver(mu: number, threshold: number, alpha: number = 0.18): number {
-    const variance = mu + alpha * Math.pow(mu, 2);
-    const sigma = Math.sqrt(variance);
-    // Continuity correction z-score
-    const z = (threshold + 0.5 - mu) / sigma;
-    // Standard normal survival function 1 - Phi(z)
-    const pOver = 0.5 * (1 - this.approxErf(z / Math.SQRT2));
-    return Number(Math.max(0.05, Math.min(0.95, pOver)).toFixed(4));
+  private static calculateNegativeBinomialOver(mu: number, threshold: number, alpha: number = 0.085): number {
+    if (mu <= 0) return 0;
+    let underProb = 0;
+    for (let k = 0; k <= Math.floor(threshold); k++) {
+      underProb += negBinomialProb(mu, k, alpha);
+    }
+    return Number(Math.max(0.02, Math.min(0.98, 1 - underProb)).toFixed(4));
   }
 
-  /**
-   * Hierarchical Disciplinary CDF for card points
-   */
-  private static calculateHierarchicalCardsOver(mu: number, threshold: number): number {
-    const sigma = Math.sqrt(mu * 1.35); // Slight overdispersion in cards
-    const z = (threshold + 0.5 - mu) / sigma;
-    const pOver = 0.5 * (1 - this.approxErf(z / Math.SQRT2));
-    return Number(Math.max(0.05, Math.min(0.95, pOver)).toFixed(4));
-  }
 
-  private static approxErf(x: number): number {
-    // Numerical approximation of error function (Abramowitz & Stegun formula)
-    const sign = x >= 0 ? 1 : -1;
-    const absX = Math.abs(x);
-    const a1 = 0.254829592;
-    const a2 = -0.284496736;
-    const a3 = 1.421413741;
-    const a4 = -1.453152027;
-    const a5 = 1.061405429;
-    const p = 0.3275911;
-
-    const t = 1.0 / (1.0 + p * absX);
-    const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-absX * absX);
-    return sign * y;
-  }
 
   /**
    * Post-Calibration Coherence Enforcer:

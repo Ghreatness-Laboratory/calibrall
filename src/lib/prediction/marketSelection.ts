@@ -48,6 +48,7 @@ import {
 } from './baselines';
 import { checkMarketGating } from './marketGating';
 import { marketMonitor } from './marketMonitor';
+import { getCalibratedParams, getLeagueCalibratedConfig, getLeagueCapabilities } from './calibratedParams';
 import { 
   evaluateSituationalPatterns, 
   buildSimilarFixturesComparison 
@@ -172,6 +173,10 @@ export function evaluateFixtureMarkets(
       dataCoverageScore: context.dataCoverageScore ?? 0.85,
       rawStateTags: context.stateTags,
       lineupConfirmed: context.lineupConfirmed,
+      referee: context.referee,
+      refereeAnnounced: context.refereeAnnounced,
+      refereeLeagueBaseline: context.refereeLeagueBaseline,
+      leagueCapabilities: context.leagueCapabilities,
     });
     const situationalPatterns = evaluateSituationalPatterns(context);
     const fixtureProfile = classifyFixtureProfile(context);
@@ -207,6 +212,10 @@ export function evaluateFixtureMarkets(
     dataCoverageScore: context.dataCoverageScore ?? 0.85,
     rawStateTags: context.stateTags,
     lineupConfirmed: context.lineupConfirmed,
+    referee: context.referee,
+    refereeAnnounced: context.refereeAnnounced,
+    refereeLeagueBaseline: context.refereeLeagueBaseline,
+    leagueCapabilities: context.leagueCapabilities,
   });
 
   const { stateTags, lineupStatus, compositeUncertaintyMultiplier, dataQualityScore, factorContributionsByMarket } = contextEval;
@@ -245,28 +254,68 @@ export function evaluateFixtureMarkets(
     effectiveHomeXg = Number((effectiveHomeXg * lineupImpact.awayDefensePenalty).toFixed(2));
   }
 
-  if (stateTags.includes('derby') || stateTags.includes('high-stakes')) {
-    effectiveCards = Number((context.expectedCards * (stateTags.includes('derby') ? 1.18 : 1.10)).toFixed(1));
+  const calParams = getCalibratedParams();
+  const leagueCfg = getLeagueCalibratedConfig(context.competitionCode);
+  const cap = context.leagueCapabilities || getLeagueCapabilities(context.competitionCode);
+
+  if (stateTags.includes('derby') && context.isDerby === undefined && calParams.derbySignificance.applyCardsAdjustment) {
+    effectiveCards = Number((context.expectedCards * calParams.derbySignificance.cardsMultiplier).toFixed(2));
+  } else if (stateTags.includes('high-stakes')) {
+    effectiveCards = Number((context.expectedCards * 1.10).toFixed(2));
   }
 
   const isDeadRubber = stateTags.includes('dead-rubber');
-  const isDerby = stateTags.includes('derby');
+  const isDerby = Boolean(context.isDerby || stateTags.includes('derby'));
   const effectiveUncertainty = (context.uncertaintyScore ?? 0.15) * compositeUncertaintyMultiplier * lineupImpact.uncertaintyExpansion;
 
   // 3. Mathematical Models Execution
-  // A. Joint Full-Match Goals Model (Dixon-Coles)
-  const goalDist = generateScorelineDistribution(effectiveHomeXg, effectiveAwayXg);
+  // A. Joint Full-Match Goals Model (Dixon-Coles with league calibrated rho)
+  const goalDist = generateScorelineDistribution(
+    effectiveHomeXg,
+    effectiveAwayXg,
+    8,
+    leagueCfg?.goals.dixonColesRho ?? -0.05
+  );
 
-  // B. Joint Half-by-Half Goals Model (First-Half Goals, Second-Half Result, Highest Scoring Half)
-  const halfDist = generateHalfByHalfGoalDistribution(effectiveHomeXg, effectiveAwayXg);
+  // B. Joint Half-by-Half Goals Model using separate half-specific goal rates
+  let explicitHalfXg: { h1HomeXg: number; h1AwayXg: number; h2HomeXg: number; h2AwayXg: number } | undefined = undefined;
+  if (cap.hasHalfTimeGoals && leagueCfg?.halves) {
+    const hv = leagueCfg.halves;
+    const hScale = effectiveHomeXg / Math.max(0.2, context.homeXg || effectiveHomeXg);
+    const aScale = effectiveAwayXg / Math.max(0.2, context.awayXg || effectiveAwayXg);
+    explicitHalfXg = {
+      h1HomeXg: Math.max(0.08, hv.avgHome1HGoals * (context.home1HAttackRating ?? 1.0) * (context.away1HDefenseRating ?? 1.0) * hScale),
+      h1AwayXg: Math.max(0.08, hv.avgAway1HGoals * (context.away1HAttackRating ?? 1.0) * (context.home1HDefenseRating ?? 1.0) * aScale),
+      h2HomeXg: Math.max(0.08, hv.avgHome2HGoals * (context.home2HAttackRating ?? 1.0) * (context.away2HDefenseRating ?? 1.0) * hScale),
+      h2AwayXg: Math.max(0.08, hv.avgAway2HGoals * (context.away2HAttackRating ?? 1.0) * (context.home2HDefenseRating ?? 1.0) * aScale),
+    };
+  }
+  const halfDist = generateHalfByHalfGoalDistribution(
+    effectiveHomeXg,
+    effectiveAwayXg,
+    leagueCfg?.halves?.firstHalfGoalShare ?? 0.439,
+    6,
+    explicitHalfXg
+  );
 
-  // C. Corners Model (Total & Team)
+  // C. Corners Model (Negative Binomial with calibrated league alpha)
   const totalCornersX = effectiveCornersHome + effectiveCornersAway;
   const homeCornerRatio = totalCornersX > 0 ? (effectiveCornersHome / totalCornersX) : 0.55;
-  const cornerDist = calculateCornerProbabilities(totalCornersX, homeCornerRatio, 24, 0.12, effectiveUncertainty);
+  const cornerDist = calculateCornerProbabilities(
+    totalCornersX,
+    homeCornerRatio,
+    24,
+    leagueCfg?.corners?.overdispersionAlpha ?? 0.085,
+    effectiveUncertainty
+  );
 
-  // D. Disciplinary Bookings Model (Total & Team)
-  const cardDist = calculateCardProbabilities(effectiveCards, 0.48);
+  // D. Disciplinary Bookings Model (Negative Binomial with calibrated league alpha)
+  const cardDist = calculateCardProbabilities(
+    effectiveCards,
+    0.48,
+    16,
+    leagueCfg?.cards?.overdispersionAlpha ?? 0.045
+  );
 
   // Determine base model confidence
   let baseConfidence: ModelConfidence = 'HIGH';
@@ -282,10 +331,13 @@ export function evaluateFixtureMarkets(
     baseConfidence = 'HIGH';
   }
 
-  // Data completeness check flags (Missing data rules - Requirement 14)
-  const hasAdequateHalfData = context.sampleSizeMatches >= 10 && dataQualityScore >= 0.82;
-  const hasAdequateCornerData = context.sampleSizeMatches >= 8 && dataQualityScore >= 0.78 && totalCornersX > 0;
-  const hasAdequateDisciplinaryData = context.sampleSizeMatches >= 8 && dataQualityScore >= 0.78 && effectiveCards > 0;
+  // Data completeness & league column gating flags
+  const hasCornerSample =
+    (context.homeCornerSampleCount === undefined || context.homeCornerSampleCount >= 6) &&
+    (context.awayCornerSampleCount === undefined || context.awayCornerSampleCount >= 6);
+  const hasAdequateHalfData = cap.hasHalfTimeGoals && context.sampleSizeMatches >= 8;
+  const hasAdequateCornerData = cap.hasCorners && hasCornerSample && context.sampleSizeMatches >= 8 && totalCornersX > 0;
+  const hasAdequateDisciplinaryData = cap.hasCards && context.sampleSizeMatches >= 8 && effectiveCards > 0;
 
   // Build raw candidates strictly within all supported markets
   const rawCandidates: RawCandidateConfig[] = [];
@@ -572,12 +624,79 @@ export function evaluateFixtureMarkets(
       selection: 'Over 2.0 Goals (Push at 2)',
       line: 2.0,
       period: 'REGULAR_TIME',
-      settlementRule: 'Over wins on 3+ goals; Push on exactly 2; Loss on 0-1.',
+      settlementRule: 'Over wins on 3+ goals; Push on exactly 2; Loss on 0 to 1.',
       modelProbability: goalDist.wholeNumberGoals[2.0].over,
       pushProbability: goalDist.wholeNumberGoals[2.0].push,
       confidence: baseConfidence,
       plainEnglishReason: `Over 2.0 goals offers ${(goalDist.wholeNumberGoals[2.0].over * 100).toFixed(0)}% win rate with ${(goalDist.wholeNumberGoals[2.0].push * 100).toFixed(0)}% push refund buffer.`,
       dataPoints: [{ metricName: 'Win (Over 2)', value: `${(goalDist.wholeNumberGoals[2.0].over * 100).toFixed(1)}%` }]
+    });
+
+    // Team Totals Over / Under (0.5, 1.5, 2.5)
+    [0.5, 1.5, 2.5].forEach(line => {
+      const codeSuffix = String(line).replace('.', '');
+      const hTeam = goalDist.teamGoalsOverUnder.home[line];
+      const aTeam = goalDist.teamGoalsOverUnder.away[line];
+      if (hTeam) {
+        rawCandidates.push({
+          marketCode: `TEAM_GOALS_HOME_O${codeSuffix}`,
+          optionType: 'over_under_goals',
+          marketCategory: 'team_goals',
+          marketName: `${homeDisplay} Team Total Goals`,
+          selection: `${homeDisplay} Over ${line} goals`,
+          line,
+          period: 'REGULAR_TIME',
+          settlementRule: `${homeDisplay} regular time goals > ${line}.`,
+          modelProbability: hTeam.over,
+          confidence: baseConfidence,
+          plainEnglishReason: `${homeDisplay} projects ${effectiveHomeXg.toFixed(2)} xG in joint distribution.`,
+          dataPoints: [{ metricName: 'Home Team xG', value: effectiveHomeXg.toFixed(2) }]
+        });
+        rawCandidates.push({
+          marketCode: `TEAM_GOALS_HOME_U${codeSuffix}`,
+          optionType: 'over_under_goals',
+          marketCategory: 'team_goals',
+          marketName: `${homeDisplay} Team Total Goals`,
+          selection: `${homeDisplay} Under ${line} goals`,
+          line,
+          period: 'REGULAR_TIME',
+          settlementRule: `${homeDisplay} regular time goals < ${line}.`,
+          modelProbability: hTeam.under,
+          confidence: baseConfidence,
+          plainEnglishReason: `${homeDisplay} projects ${effectiveHomeXg.toFixed(2)} xG in joint distribution.`,
+          dataPoints: [{ metricName: 'Home Team xG', value: effectiveHomeXg.toFixed(2) }]
+        });
+      }
+      if (aTeam) {
+        rawCandidates.push({
+          marketCode: `TEAM_GOALS_AWAY_O${codeSuffix}`,
+          optionType: 'over_under_goals',
+          marketCategory: 'team_goals',
+          marketName: `${awayDisplay} Team Total Goals`,
+          selection: `${awayDisplay} Over ${line} goals`,
+          line,
+          period: 'REGULAR_TIME',
+          settlementRule: `${awayDisplay} regular time goals > ${line}.`,
+          modelProbability: aTeam.over,
+          confidence: baseConfidence,
+          plainEnglishReason: `${awayDisplay} projects ${effectiveAwayXg.toFixed(2)} xG in joint distribution.`,
+          dataPoints: [{ metricName: 'Away Team xG', value: effectiveAwayXg.toFixed(2) }]
+        });
+        rawCandidates.push({
+          marketCode: `TEAM_GOALS_AWAY_U${codeSuffix}`,
+          optionType: 'over_under_goals',
+          marketCategory: 'team_goals',
+          marketName: `${awayDisplay} Team Total Goals`,
+          selection: `${awayDisplay} Under ${line} goals`,
+          line,
+          period: 'REGULAR_TIME',
+          settlementRule: `${awayDisplay} regular time goals < ${line}.`,
+          modelProbability: aTeam.under,
+          confidence: baseConfidence,
+          plainEnglishReason: `${awayDisplay} projects ${effectiveAwayXg.toFixed(2)} xG in joint distribution.`,
+          dataPoints: [{ metricName: 'Away Team xG', value: effectiveAwayXg.toFixed(2) }]
+        });
+      }
     });
   }
 
@@ -591,7 +710,7 @@ export function evaluateFixtureMarkets(
       optionType: 'both_teams_to_score',
       marketCategory: 'btts',
       marketName: meta.title,
-      selection: 'BTTS - Yes',
+      selection: 'BTTS: Yes',
       period: 'REGULAR_TIME',
       settlementRule: meta.settlementRule,
       modelProbability: goalDist.bttsYes,
@@ -609,13 +728,13 @@ export function evaluateFixtureMarkets(
       optionType: 'both_teams_to_score',
       marketCategory: 'btts',
       marketName: meta.title,
-      selection: 'BTTS - No',
+      selection: 'BTTS: No',
       period: 'REGULAR_TIME',
       settlementRule: meta.settlementRule,
       modelProbability: goalDist.bttsNo,
       odds: context.verifiedOdds?.bttsNo,
       confidence: baseConfidence,
-      plainEnglishReason: `Strong clean-sheet probability for defensive unit (${(goalDist.bttsNo * 100).toFixed(0)}% chance at least one fails to score).`,
+      plainEnglishReason: `Strong clean sheet probability for defensive unit (${(goalDist.bttsNo * 100).toFixed(0)}% chance at least one fails to score).`,
       dataPoints: [
         { metricName: 'BTTS No Prob', value: `${(goalDist.bttsNo * 100).toFixed(1)}%` }
       ]
@@ -1095,6 +1214,9 @@ export function evaluateFixtureMarkets(
   // =========================================================================
   if (isOptionTypeEnabled('bookings') && hasAdequateDisciplinaryData) {
     const meta = SUPPORTED_OPTIONS_CATALOGUE.bookings;
+    const refBasisText = context.refereeAnnounced && context.referee
+      ? `Appointed referee ${context.referee} shrunk toward league baseline (${effectiveCards.toFixed(2)} exp cards)`
+      : `No referee announced; using league baseline (${(context.refereeLeagueBaseline ?? effectiveCards).toFixed(2)} cards per fixture)`;
 
     [2.5, 3.5, 4.5, 5.5].forEach(line => {
       if (cardDist.total[line]) {
@@ -1111,7 +1233,7 @@ export function evaluateFixtureMarkets(
           odds: line === 4.5 ? context.verifiedOdds?.over45Cards : undefined,
           confidence: isDerby ? 'HIGH' : baseConfidence,
           requiresDisciplinaryData: true,
-          plainEnglishReason: `Referee averages ${effectiveCards.toFixed(1)} cards/game; ${isDerby ? 'derby tension adds +18% cards' : 'steady disciplinary pace'}.`,
+          plainEnglishReason: `Negative Binomial cards model (${effectiveCards.toFixed(2)} exp): ${refBasisText}${isDerby ? ' plus verified derby uplift' : ''}.`,
           dataPoints: [{ metricName: 'Expected Total Cards', value: effectiveCards.toFixed(2) }]
         });
       }
@@ -1132,7 +1254,7 @@ export function evaluateFixtureMarkets(
         odds: context.verifiedOdds?.under45Cards,
         confidence: isDerby ? 'LOW' : baseConfidence,
         requiresDisciplinaryData: true,
-        plainEnglishReason: `Referee lenient threshold maintains booking count under 4.5 in ${(cardDist.total[4.5].under * 100).toFixed(0)}% of simulations.`,
+        plainEnglishReason: `Negative Binomial cards model projects ${(cardDist.total[4.5].under * 100).toFixed(0)}% chance under 4.5 (${refBasisText}).`,
         dataPoints: [{ metricName: 'Expected Total Cards', value: effectiveCards.toFixed(2) }]
       });
     }

@@ -18,6 +18,8 @@ import {
   CANONICAL_ID_ALIASES,
 } from './canonicalTeams';
 import { PROMOTED_BRAZIL_2026_IDS } from './backfillCatalog';
+import { getCalibratedParams, getLeagueCalibratedConfig } from '@/lib/prediction/calibratedParams';
+import type { VerifiedMatchOdds } from '@/types';
 
 export interface FormMatchRecord {
   id: string;
@@ -152,6 +154,7 @@ export interface LeagueLatestDateInfo {
 export interface DbTeamStatsSummary {
   teamId: string;
   teamName: string;
+  competitionCode?: string;
   storedMatchCount: number;
   lastMatchDate: string | null;
   daysSinceLastMatch: number | null;
@@ -161,9 +164,39 @@ export interface DbTeamStatsSummary {
   uncertaintyScore: number;
   attackRating: number;
   defenseRating: number;
+  h1AttackRating: number;
+  h1DefenseRating: number;
+  h2AttackRating: number;
+  h2DefenseRating: number;
+  halfTimeSampleCount: number;
   cornerAttackRating: number;
+  cornerForRating: number;
+  cornerAgainstRating: number;
+  cornersSampleCount: number;
   disciplineRating: number;
+  cardForRating: number;
+  cardAgainstRating: number;
+  cardsSampleCount: number;
   recentForm: ('W' | 'D' | 'L')[];
+}
+
+export interface ShrunkRefereeProfile {
+  refereeName?: string;
+  announced: boolean;
+  hasRefereeDataInLeague: boolean;
+  sampleSize: number;
+  rawAvgCards: number | null;
+  shrunkRate: number;
+  leagueBaseline: number;
+  shrinkageK: number;
+  explanation: string;
+}
+
+export interface RivalryLookupResult {
+  isDerby: boolean;
+  derbyName?: string;
+  source?: string;
+  intensity?: number;
 }
 
 export interface TeamLatestDateInfo {
@@ -844,7 +877,9 @@ class MatchesStore {
     // Ratings & Uncertainty:
     // Rule: Remove hard clamps (0.60 and 0.65) or report when a rating is clamped,
     // and use the league prior with a wide uncertainty when there are fewer than 10 recent matches.
-    const baseGoalsPerMatch = 1.35;
+    const primaryCompCode = formMatches[0]?.competitionCode;
+    const compCfg = getLeagueCalibratedConfig(primaryCompCode);
+    const baseGoalsPerMatch = compCfg ? compCfg.goals.avgGoals / 2 : 1.29;
     let timeDecayedAttackRating: number;
     let timeDecayedDefenseRating: number;
     let isRatingClamped = false;
@@ -929,7 +964,11 @@ class MatchesStore {
    * - < 10 matches: league prior (1.00) with wide uncertainty (0.35).
    * - Promoted clubs (e.g. Brazil Série B 2026 promotees): Bayesian shrinkage toward 1.00 (K0=18).
    */
-  getTeamStatsSync(teamIdOrName: string | { id?: string; name?: string }, asOfDate?: string): DbTeamStatsSummary {
+  getTeamStatsSync(
+    teamIdOrName: string | { id?: string; name?: string },
+    asOfDate?: string,
+    competitionCodeHint?: string
+  ): DbTeamStatsSummary {
     this.ensureHydratedFromDbSync();
     const { canonicalId, teamName, normName, idVariants } = this.resolveCanonicalAndAliases(teamIdOrName);
     const isPromoted = PROMOTED_BRAZIL_2026_IDS.has(canonicalId) || this.promotedTeamIds.has(canonicalId);
@@ -943,11 +982,15 @@ class MatchesStore {
       })
       .sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
 
+    const inferredCompCode = competitionCodeHint || matches[0]?.competition_code;
+    const compCfg = getLeagueCalibratedConfig(inferredCompCode);
+
     const storedMatchCount = matches.length;
     if (storedMatchCount === 0) {
       return {
         teamId: canonicalId,
         teamName,
+        competitionCode: inferredCompCode,
         storedMatchCount: 0,
         lastMatchDate: null,
         daysSinceLastMatch: null,
@@ -957,8 +1000,19 @@ class MatchesStore {
         uncertaintyScore: 0.35,
         attackRating: 1.00,
         defenseRating: 1.00,
-        cornerAttackRating: 1.10,
+        h1AttackRating: 1.00,
+        h1DefenseRating: 1.00,
+        h2AttackRating: 1.00,
+        h2DefenseRating: 1.00,
+        halfTimeSampleCount: 0,
+        cornerAttackRating: 1.00,
+        cornerForRating: 1.00,
+        cornerAgainstRating: 1.00,
+        cornersSampleCount: 0,
         disciplineRating: 1.00,
+        cardForRating: 1.00,
+        cardAgainstRating: 1.00,
+        cardsSampleCount: 0,
         recentForm: [],
       };
     }
@@ -983,6 +1037,7 @@ class MatchesStore {
       return {
         teamId: canonicalId,
         teamName,
+        competitionCode: inferredCompCode,
         storedMatchCount,
         lastMatchDate,
         daysSinceLastMatch,
@@ -992,20 +1047,55 @@ class MatchesStore {
         uncertaintyScore: 0.35,
         attackRating: 1.00,
         defenseRating: 1.00,
-        cornerAttackRating: 1.10,
+        h1AttackRating: 1.00,
+        h1DefenseRating: 1.00,
+        h2AttackRating: 1.00,
+        h2DefenseRating: 1.00,
+        halfTimeSampleCount: 0,
+        cornerAttackRating: 1.00,
+        cornerForRating: 1.00,
+        cornerAgainstRating: 1.00,
+        cornersSampleCount: 0,
         disciplineRating: 1.00,
+        cardForRating: 1.00,
+        cardAgainstRating: 1.00,
+        cardsSampleCount: 0,
         recentForm,
       };
     }
 
-    const baseGoalsPerMatch = 1.35;
+    const calParams = getCalibratedParams();
+    const K_HALVES = calParams.halvesValidation?.optimalHalfShrinkageK ?? 60;
+    const defaultHomeGoals = compCfg?.goals.avgHomeGoals ?? 1.44;
+    const defaultAwayGoals = compCfg?.goals.avgAwayGoals ?? 1.14;
+    const defaultH1Home = compCfg?.halves?.avgHome1HGoals ?? 0.65;
+    const defaultH1Away = compCfg?.halves?.avgAway1HGoals ?? 0.51;
+    const defaultH2Home = compCfg?.halves?.avgHome2HGoals ?? 0.79;
+    const defaultH2Away = compCfg?.halves?.avgAway2HGoals ?? 0.63;
+    const defaultHomeCorners = compCfg?.corners?.avgHomeCorners ?? 5.45;
+    const defaultAwayCorners = compCfg?.corners?.avgAwayCorners ?? 4.50;
+    const defaultTeamCards = (compCfg?.cards?.avgTotalCards ?? 4.10) / 2;
+
     let weightSum = 0;
-    let weightedGoalsScored = 0;
-    let weightedGoalsConceded = 0;
+    let weightedGoalForRatio = 0;
+    let weightedGoalAgainstRatio = 0;
+
+    let halfTimeSampleCount = 0;
+    let halfWeightSum = 0;
+    let weightedH1ForRatio = 0;
+    let weightedH1AgainstRatio = 0;
+    let weightedH2ForRatio = 0;
+    let weightedH2AgainstRatio = 0;
+
+    let cornersSampleCount = 0;
     let cornerWeightSum = 0;
-    let weightedCorners = 0;
+    let weightedCornerForRatio = 0;
+    let weightedCornerAgainstRatio = 0;
+
+    let cardsSampleCount = 0;
     let cardWeightSum = 0;
-    let weightedCards = 0;
+    let weightedCardForRatio = 0;
+    let weightedCardAgainstRatio = 0;
 
     for (const m of matches) {
       const isHome = this.matchSideForTeam(m, idVariants, normName) === 'home';
@@ -1014,27 +1104,74 @@ class MatchesStore {
       const daysAgo = Math.max(0, (refTime - new Date(m.kickoff_time).getTime()) / (1000 * 60 * 60 * 24));
       const w = Math.exp(-0.005 * daysAgo);
 
-      weightSum += w;
-      weightedGoalsScored += ts * w;
-      weightedGoalsConceded += os * w;
+      const mCfg = getLeagueCalibratedConfig(m.competition_code) || compCfg;
+      const mHomeG = mCfg?.goals.avgHomeGoals ?? defaultHomeGoals;
+      const mAwayG = mCfg?.goals.avgAwayGoals ?? defaultAwayGoals;
 
-      const tc = isHome ? m.home_corners : m.away_corners;
-      if (typeof tc === 'number' && !isNaN(tc)) {
-        cornerWeightSum += w;
-        weightedCorners += tc * w;
+      weightSum += w;
+      weightedGoalForRatio += (ts / Math.max(0.4, isHome ? mHomeG : mAwayG)) * w;
+      weightedGoalAgainstRatio += (os / Math.max(0.4, isHome ? mAwayG : mHomeG)) * w;
+
+      // Half-time goals (only when valid HT scores exist and FT >= HT)
+      const hht = m.home_half_time_score;
+      const aht = m.away_half_time_score;
+      if (
+        typeof hht === 'number' && typeof aht === 'number' &&
+        !isNaN(hht) && !isNaN(aht) &&
+        (m.home_score ?? 0) >= hht && (m.away_score ?? 0) >= aht
+      ) {
+        const ts1 = isHome ? hht : aht;
+        const os1 = isHome ? aht : hht;
+        const ts2 = isHome ? ((m.home_score ?? 0) - hht) : ((m.away_score ?? 0) - aht);
+        const os2 = isHome ? ((m.away_score ?? 0) - aht) : ((m.home_score ?? 0) - hht);
+
+        const base1For = isHome ? (mCfg?.halves?.avgHome1HGoals ?? defaultH1Home) : (mCfg?.halves?.avgAway1HGoals ?? defaultH1Away);
+        const base1Ag = isHome ? (mCfg?.halves?.avgAway1HGoals ?? defaultH1Away) : (mCfg?.halves?.avgHome1HGoals ?? defaultH1Home);
+        const base2For = isHome ? (mCfg?.halves?.avgHome2HGoals ?? defaultH2Home) : (mCfg?.halves?.avgAway2HGoals ?? defaultH2Away);
+        const base2Ag = isHome ? (mCfg?.halves?.avgAway2HGoals ?? defaultH2Away) : (mCfg?.halves?.avgHome2HGoals ?? defaultH2Home);
+
+        halfTimeSampleCount++;
+        halfWeightSum += w;
+        weightedH1ForRatio += (ts1 / Math.max(0.25, base1For)) * w;
+        weightedH1AgainstRatio += (os1 / Math.max(0.25, base1Ag)) * w;
+        weightedH2ForRatio += (ts2 / Math.max(0.25, base2For)) * w;
+        weightedH2AgainstRatio += (os2 / Math.max(0.25, base2Ag)) * w;
       }
 
+      // Corners FOR and AGAINST (strictly requires both home and away corners recorded)
+      const hc = m.home_corners;
+      const ac = m.away_corners;
+      if (typeof hc === 'number' && typeof ac === 'number' && !isNaN(hc) && !isNaN(ac)) {
+        const cf = isHome ? hc : ac;
+        const ca = isHome ? ac : hc;
+        const baseCF = isHome ? (mCfg?.corners?.avgHomeCorners ?? defaultHomeCorners) : (mCfg?.corners?.avgAwayCorners ?? defaultAwayCorners);
+        const baseCA = isHome ? (mCfg?.corners?.avgAwayCorners ?? defaultAwayCorners) : (mCfg?.corners?.avgHomeCorners ?? defaultHomeCorners);
+
+        cornersSampleCount++;
+        cornerWeightSum += w;
+        weightedCornerForRatio += (cf / Math.max(1.5, baseCF)) * w;
+        weightedCornerAgainstRatio += (ca / Math.max(1.5, baseCA)) * w;
+      }
+
+      // Disciplinary Cards FOR and AGAINST
       const hy = m.home_yellow_cards;
       const ay = m.away_yellow_cards;
-      if (typeof hy === 'number' && typeof ay === 'number') {
-        const totalMatchCards = hy + ay + (m.home_red_cards ?? 0) + (m.away_red_cards ?? 0);
+      if (typeof hy === 'number' && typeof ay === 'number' && !isNaN(hy) && !isNaN(ay)) {
+        const homeCards = hy + (m.home_red_cards ?? 0);
+        const awayCards = ay + (m.away_red_cards ?? 0);
+        const cf = isHome ? homeCards : awayCards;
+        const ca = isHome ? awayCards : homeCards;
+        const baseC = Math.max(0.8, (mCfg?.cards?.avgTotalCards ?? (defaultTeamCards * 2)) / 2);
+
+        cardsSampleCount++;
         cardWeightSum += w;
-        weightedCards += totalMatchCards * w;
+        weightedCardForRatio += (cf / baseC) * w;
+        weightedCardAgainstRatio += (ca / baseC) * w;
       }
     }
 
-    let rawAttack = weightSum > 0 ? (weightedGoalsScored / weightSum) / baseGoalsPerMatch : 1.00;
-    let rawDefense = weightSum > 0 ? (weightedGoalsConceded / weightSum) / baseGoalsPerMatch : 1.00;
+    let rawAttack = weightSum > 0 ? (weightedGoalForRatio / weightSum) : 1.00;
+    let rawDefense = weightSum > 0 ? (weightedGoalAgainstRatio / weightSum) : 1.00;
 
     // Newly promoted clubs without lower-tier history get ratings shrunk toward league average (1.00)
     if (isPromoted) {
@@ -1043,18 +1180,46 @@ class MatchesStore {
       rawDefense = ((storedMatchCount * rawDefense) + (K0 * 1.00)) / (storedMatchCount + K0);
     }
 
-    const attackRating = Number(Math.max(0.20, Math.min(2.50, rawAttack)).toFixed(2));
-    const defenseRating = Number(Math.max(0.20, Math.min(2.50, rawDefense)).toFixed(2));
-    const cornerAttackRating = cornerWeightSum > 0
-      ? Number(Math.max(0.50, Math.min(2.00, (weightedCorners / cornerWeightSum) / 5.0)).toFixed(2))
-      : 1.10;
-    const disciplineRating = cardWeightSum > 0
-      ? Number(Math.max(0.60, Math.min(1.60, (weightedCards / cardWeightSum) / 4.2)).toFixed(2))
+    const attackRating = Number(Math.max(0.20, Math.min(2.50, rawAttack)).toFixed(3));
+    const defenseRating = Number(Math.max(0.20, Math.min(2.50, rawDefense)).toFixed(3));
+
+    // Half-time goal rates with empirical K_HALVES = 60 shrinkage
+    const shrinkHalf = (raw: number, n: number) => ((n * raw) + (K_HALVES * 1.00)) / (n + K_HALVES);
+    const h1AttackRating = halfWeightSum > 0
+      ? Number(Math.max(0.45, Math.min(1.85, shrinkHalf(weightedH1ForRatio / halfWeightSum, halfTimeSampleCount))).toFixed(3))
+      : 1.00;
+    const h1DefenseRating = halfWeightSum > 0
+      ? Number(Math.max(0.45, Math.min(1.85, shrinkHalf(weightedH1AgainstRatio / halfWeightSum, halfTimeSampleCount))).toFixed(3))
+      : 1.00;
+    const h2AttackRating = halfWeightSum > 0
+      ? Number(Math.max(0.45, Math.min(1.85, shrinkHalf(weightedH2ForRatio / halfWeightSum, halfTimeSampleCount))).toFixed(3))
+      : 1.00;
+    const h2DefenseRating = halfWeightSum > 0
+      ? Number(Math.max(0.45, Math.min(1.85, shrinkHalf(weightedH2AgainstRatio / halfWeightSum, halfTimeSampleCount))).toFixed(3))
+      : 1.00;
+
+    // Corners FOR and AGAINST with Bayesian shrinkage K=8 toward 1.00
+    const K_CORNERS = 8;
+    const cornerForRating = cornerWeightSum > 0
+      ? Number(Math.max(0.55, Math.min(1.75, ((cornersSampleCount * (weightedCornerForRatio / cornerWeightSum)) + K_CORNERS) / (cornersSampleCount + K_CORNERS))).toFixed(3))
+      : 1.00;
+    const cornerAgainstRating = cornerWeightSum > 0
+      ? Number(Math.max(0.55, Math.min(1.75, ((cornersSampleCount * (weightedCornerAgainstRatio / cornerWeightSum)) + K_CORNERS) / (cornersSampleCount + K_CORNERS))).toFixed(3))
+      : 1.00;
+
+    // Cards FOR and AGAINST with Bayesian shrinkage K=10 toward 1.00
+    const K_CARDS = 10;
+    const cardForRating = cardWeightSum > 0
+      ? Number(Math.max(0.60, Math.min(1.65, ((cardsSampleCount * (weightedCardForRatio / cardWeightSum)) + K_CARDS) / (cardsSampleCount + K_CARDS))).toFixed(3))
+      : 1.00;
+    const cardAgainstRating = cardWeightSum > 0
+      ? Number(Math.max(0.60, Math.min(1.65, ((cardsSampleCount * (weightedCardAgainstRatio / cardWeightSum)) + K_CARDS) / (cardsSampleCount + K_CARDS))).toFixed(3))
       : 1.00;
 
     return {
       teamId: canonicalId,
       teamName,
+      competitionCode: inferredCompCode,
       storedMatchCount,
       lastMatchDate,
       daysSinceLastMatch,
@@ -1064,10 +1229,151 @@ class MatchesStore {
       uncertaintyScore: isPromoted ? 0.16 : 0.12,
       attackRating,
       defenseRating,
-      cornerAttackRating,
-      disciplineRating,
+      h1AttackRating,
+      h1DefenseRating,
+      h2AttackRating,
+      h2DefenseRating,
+      halfTimeSampleCount,
+      cornerAttackRating: Number(cornerForRating.toFixed(2)),
+      cornerForRating,
+      cornerAgainstRating,
+      cornersSampleCount,
+      disciplineRating: Number(cardForRating.toFixed(2)),
+      cardForRating,
+      cardAgainstRating,
+      cardsSampleCount,
       recentForm,
     };
+  }
+
+  /**
+   * Computes a time-decayed referee card issuance rate shrunk toward the league baseline (K=5).
+   * If no referee is announced (or the league lacks referee records), returns league baseline explicitly.
+   */
+  getShrunkRefereeProfileSync(
+    refereeName: string | undefined,
+    competitionCode: string,
+    asOfDate?: string
+  ): ShrunkRefereeProfile {
+    this.ensureHydratedFromDbSync();
+    const calParams = getCalibratedParams();
+    const shrinkageK = calParams.cardsAndRefereeValidation?.optimalRefShrinkageK ?? 5;
+    const compCfg = getLeagueCalibratedConfig(competitionCode);
+    const hasRefereeDataInLeague = Boolean(compCfg?.capabilities.hasReferee);
+    const leagueBaseline = Number((compCfg?.cards?.avgTotalCards ?? 4.05).toFixed(3));
+
+    const cleanRef = (refereeName || '').trim();
+    if (!hasRefereeDataInLeague || !cleanRef) {
+      return {
+        refereeName: undefined,
+        announced: false,
+        hasRefereeDataInLeague,
+        sampleSize: 0,
+        rawAvgCards: null,
+        shrunkRate: leagueBaseline,
+        leagueBaseline,
+        shrinkageK,
+        explanation: !hasRefereeDataInLeague
+          ? `Referee column unavailable for ${competitionCode}; using league baseline (${leagueBaseline.toFixed(2)} cards/match).`
+          : `No referee announced yet; using league baseline (${leagueBaseline.toFixed(2)} cards/match).`,
+      };
+    }
+
+    const normRef = cleanRef.toLowerCase();
+    const refTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
+    let sampleSize = 0;
+    let weightSum = 0;
+    let weightedCards = 0;
+
+    for (const m of this.inMemoryMatches.values()) {
+      if (!m.referee || m.referee.trim().toLowerCase() !== normRef) continue;
+      if (asOfDate && m.kickoff_time >= asOfDate) continue;
+      if (m.home_yellow_cards === null || m.home_yellow_cards === undefined) continue;
+      if (m.away_yellow_cards === null || m.away_yellow_cards === undefined) continue;
+
+      const totalCards =
+        m.home_yellow_cards +
+        m.away_yellow_cards +
+        (m.home_red_cards ?? 0) +
+        (m.away_red_cards ?? 0);
+
+      const daysAgo = Math.max(0, (refTime - new Date(m.kickoff_time).getTime()) / (1000 * 60 * 60 * 24));
+      const w = Math.exp(-0.005 * daysAgo);
+      sampleSize++;
+      weightSum += w;
+      weightedCards += totalCards * w;
+    }
+
+    if (sampleSize === 0 || weightSum <= 0) {
+      return {
+        refereeName: cleanRef,
+        announced: true,
+        hasRefereeDataInLeague,
+        sampleSize: 0,
+        rawAvgCards: null,
+        shrunkRate: leagueBaseline,
+        leagueBaseline,
+        shrinkageK,
+        explanation: `Appointed referee ${cleanRef} has 0 stored matches; shrunk to league baseline (${leagueBaseline.toFixed(2)} cards/match).`,
+      };
+    }
+
+    const rawAvgCards = Number((weightedCards / weightSum).toFixed(3));
+    const shrunkRate = Number((((sampleSize * rawAvgCards) + (shrinkageK * leagueBaseline)) / (sampleSize + shrinkageK)).toFixed(3));
+
+    return {
+      refereeName: cleanRef,
+      announced: true,
+      hasRefereeDataInLeague,
+      sampleSize,
+      rawAvgCards,
+      shrunkRate,
+      leagueBaseline,
+      shrinkageK,
+      explanation: `Appointed referee ${cleanRef}: ${rawAvgCards.toFixed(2)} raw cards/match across ${sampleSize} matches, shrunk (K=${shrinkageK}) to ${shrunkRate.toFixed(2)} vs ${leagueBaseline.toFixed(2)} league baseline.`,
+    };
+  }
+
+  /**
+   * Queries the local SQLite rivalries table by canonical ordered team pair IDs.
+   */
+  getDerbyInfoSync(
+    homeTeam: string | { id?: string; name?: string },
+    awayTeam: string | { id?: string; name?: string }
+  ): RivalryLookupResult {
+    const hCanon = this.resolveCanonicalAndAliases(homeTeam).canonicalId;
+    const aCanon = this.resolveCanonicalAndAliases(awayTeam).canonicalId;
+    if (!hCanon || !aCanon || hCanon === aCanon) {
+      return { isDerby: false };
+    }
+
+    const pairA = hCanon < aCanon ? hCanon : aCanon;
+    const pairB = hCanon < aCanon ? aCanon : hCanon;
+
+    if (typeof window === 'undefined') {
+      try {
+        const db = getLocalDatabase();
+        if (db) {
+          const row = db.prepare(`
+            SELECT rivalry_name, source, intensity
+            FROM rivalries
+            WHERE team_a_id = ? AND team_b_id = ?
+            LIMIT 1
+          `).get(pairA, pairB) as { rivalry_name: string; source: string; intensity: number } | undefined;
+
+          if (row) {
+            return {
+              isDerby: true,
+              derbyName: row.rivalry_name,
+              source: row.source,
+              intensity: row.intensity,
+            };
+          }
+        }
+      } catch (_) {}
+    }
+
+    return { isDerby: false };
   }
 
   /**
@@ -1383,6 +1689,96 @@ class MatchesStore {
    */
   async getPreKickoffOdds(matchId: string): Promise<StoredOddsSnapshot[]> {
     return this.getOdds(matchId, true);
+  }
+
+  /**
+   * Synchronous lookup of real stored bookmaker odds (including Asian Handicap prices)
+   * from local SQLite odds_snapshots or in-memory snapshots. Never invents prices.
+   */
+  getVerifiedOddsSync(matchId: string, existing?: VerifiedMatchOdds): VerifiedMatchOdds | undefined {
+    let rows: StoredOddsSnapshot[] = [];
+    if (typeof window === 'undefined') {
+      try {
+        const db = getLocalDatabase();
+        if (db && matchId) {
+          rows = db
+            .prepare(`SELECT * FROM odds_snapshots WHERE match_id = ?`)
+            .all(matchId) as StoredOddsSnapshot[];
+        }
+      } catch (_) {}
+    }
+
+    if (rows.length === 0) {
+      rows = Array.from(this.inMemoryOdds.values()).filter(o => o.match_id === matchId);
+    }
+
+    if (rows.length === 0) {
+      return existing;
+    }
+
+    const merged: VerifiedMatchOdds = existing ? { ...existing } : {};
+    const ahHome: Record<string, number> = { ...(merged.asianHandicapHome || {}) };
+    const ahAway: Record<string, number> = { ...(merged.asianHandicapAway || {}) };
+    let hasAh = Object.keys(ahHome).length > 0 || Object.keys(ahAway).length > 0;
+
+    // Prefer pre-kickoff snapshots and Avg / Pinnacle / B365 bookmakers
+    const snapshotPriority = (st: string) =>
+      st === 'live_pre_kickoff' || st === 'csv_pre_match' ? 0 : 1;
+    const bookmakerPriority = (bm: string) => {
+      const b = (bm || '').toLowerCase();
+      if (b.includes('avg') || b.includes('market')) return 0;
+      if (b.includes('pinnacle') || b.includes('ps')) return 1;
+      if (b.includes('bet365') || b.includes('b365')) return 2;
+      return 3;
+    };
+    rows.sort(
+      (a, b) =>
+        snapshotPriority(a.snapshot_type) - snapshotPriority(b.snapshot_type) ||
+        bookmakerPriority(a.bookmaker) - bookmakerPriority(b.bookmaker)
+    );
+
+    const parseAhLine = (selection: string): number | null => {
+      const m = (selection || '').trim().match(/([+-]?\d+(?:\.\d+)?)\s*$/);
+      if (!m) return null;
+      const val = Number(m[1]);
+      return Number.isFinite(val) ? val : null;
+    };
+
+    for (const r of rows) {
+      if (!r || !r.decimal_odds || r.decimal_odds <= 1.0) continue;
+      if (r.market_code === '1X2_HOME' && !merged.homeWin) merged.homeWin = r.decimal_odds;
+      else if (r.market_code === '1X2_DRAW' && !merged.draw) merged.draw = r.decimal_odds;
+      else if (r.market_code === '1X2_AWAY' && !merged.awayWin) merged.awayWin = r.decimal_odds;
+      else if (r.market_code === 'TOTAL_GOALS_O25' && !merged.over25Goals) merged.over25Goals = r.decimal_odds;
+      else if (r.market_code === 'TOTAL_GOALS_U25' && !merged.under25Goals) merged.under25Goals = r.decimal_odds;
+      else if (r.market_code === 'ASIAN_HANDICAP_HOME') {
+        const line = parseAhLine(r.selection);
+        if (line !== null) {
+          const key = String(line);
+          if (!ahHome[key]) {
+            ahHome[key] = r.decimal_odds;
+            if (merged.asianHandicapLine === undefined) merged.asianHandicapLine = line;
+            hasAh = true;
+          }
+        }
+      } else if (r.market_code === 'ASIAN_HANDICAP_AWAY') {
+        const line = parseAhLine(r.selection);
+        if (line !== null) {
+          const key = String(line);
+          if (!ahAway[key]) {
+            ahAway[key] = r.decimal_odds;
+            hasAh = true;
+          }
+        }
+      }
+    }
+
+    if (hasAh) {
+      merged.asianHandicapHome = ahHome;
+      merged.asianHandicapAway = ahAway;
+    }
+
+    return Object.keys(merged).length > 0 ? merged : existing;
   }
 
   /**

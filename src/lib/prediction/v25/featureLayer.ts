@@ -12,6 +12,7 @@ import { evaluateContextualH2H, H2HEvaluationResult, H2HMeetingRecord } from '..
 import { isTeamNewsEnabled } from './featureFlags';
 import { devigCompleteMarket } from '../oddsEngine';
 import { compareWithExternalBenchmark, BenchmarkComparisonResult } from '../externalBenchmarks';
+import { getCalibratedParams, getLeagueCapabilities } from '../calibratedParams';
 
 export interface V25VenueH2HRecord {
   meetingsCount: number;
@@ -110,11 +111,15 @@ export interface V25WeatherKickoff {
 
 export interface V25DisciplinaryProfile {
   refereeName: string;
+  refereeAnnounced: boolean;
+  refereeSampleSize: number;
   refereeCardsPerMatch: number;
+  refereeLeagueBaseline: number;
+  refereeExplanation: string;
   refereeFoulsPerCard: number;
   teamFoulsPerMatch: number;
   teamCardsPerMatch: number;
-  derbyCardMultiplier: number; // +18% on derbies
+  derbyCardMultiplier: number;
   expectedTotalBookings: number;
 }
 
@@ -160,6 +165,7 @@ export interface V25FixtureFeatures {
   transfers: V25TransfersIntegration;
   isDerby: boolean;
   derbyName?: string;
+  derbySource?: string;
   weather: V25WeatherKickoff;
   discipline: V25DisciplinaryProfile;
   marketPrior: V25MarketPrior;
@@ -289,10 +295,17 @@ export class FeatureLayerEngine {
       integrationDiscount: 0.85, // 15% discount for newer squad integrations
     };
 
-    // 9. Derby / rivalry
+    // 9. Derby / rivalry (DB rivalries table first, catalog/tags fallback)
+    const dbDerby = matchesStore.getDerbyInfoSync(context.homeTeamName, context.awayTeamName);
     const rivalryEntry = VERIFIED_RIVALRIES_CATALOG[matchupKey];
-    const isDerby = Boolean(rivalryEntry || (context.stateTags && context.stateTags.includes('derby')));
-    const derbyName = rivalryEntry ? rivalryEntry.name : isDerby ? 'Regional Derby' : undefined;
+    const isDerby = Boolean(
+      context.isDerby ||
+      dbDerby.isDerby ||
+      rivalryEntry ||
+      (context.stateTags && context.stateTags.includes('derby'))
+    );
+    const derbyName = context.derbyName || dbDerby.derbyName || (rivalryEntry ? rivalryEntry.name : isDerby ? 'Regional Derby' : undefined);
+    const derbySource = context.derbySource || dbDerby.source || (rivalryEntry ? 'verified_rivalries_catalog' : undefined);
 
     // 10. Weather at kickoff (Learned coefficients for stadium coordinates)
     const { weather, weatherCondition, isMissingWeather } = this.computeWeatherWithTelemetry(context);
@@ -378,6 +391,7 @@ export class FeatureLayerEngine {
       transfers,
       isDerby,
       derbyName,
+      derbySource,
       weather,
       discipline,
       marketPrior,
@@ -660,18 +674,67 @@ export class FeatureLayerEngine {
   }
 
   private static computeDiscipline(context: FixtureContext, isDerby: boolean): V25DisciplinaryProfile {
-    const derbyCardMultiplier = isDerby ? 1.22 : 1.0;
-    const refereeCards = 4.10;
-    const expectedBookings = Number(((refereeCards * 0.5 + context.expectedCards * 0.5) * derbyCardMultiplier).toFixed(2));
+    const cap = context.leagueCapabilities || getLeagueCapabilities(context.competitionCode);
+    const calParams = getCalibratedParams();
+    const refProfile = matchesStore.getShrunkRefereeProfileSync(
+      context.referee,
+      context.competitionCode,
+      context.kickoffTime
+    );
+
+    const refereeLeagueBaseline = context.refereeLeagueBaseline ?? refProfile.leagueBaseline;
+    const refereeShrunkRate = context.refereeShrunkRate ?? refProfile.shrunkRate;
+    const refereeAnnounced = context.refereeAnnounced ?? refProfile.announced;
+    const refereeSampleSize = context.refereeMatchCount ?? refProfile.sampleSize;
+
+    const derbyCardMultiplier = isDerby && calParams.derbySignificance.applyCardsAdjustment
+      ? calParams.derbySignificance.cardsMultiplier
+      : 1.0;
+
+    if (!cap.hasCards) {
+      return {
+        refereeName: refereeAnnounced && context.referee ? context.referee : 'Unannounced',
+        refereeAnnounced,
+        refereeSampleSize,
+        refereeCardsPerMatch: 0,
+        refereeLeagueBaseline: 0,
+        refereeExplanation: `Bookings data unavailable for competition ${context.competitionCode}. Cards market disabled.`,
+        refereeFoulsPerCard: 0,
+        teamFoulsPerMatch: 0,
+        teamCardsPerMatch: 0,
+        derbyCardMultiplier: 1.0,
+        expectedTotalBookings: 0,
+      };
+    }
+
+    const teamCardFactor = (context.homeCardForRating !== undefined && context.awayCardForRating !== undefined)
+      ? (context.homeCardForRating + context.awayCardForRating) / 2
+      : 1.0;
+
+    const computedBookings = (context.expectedCards && context.expectedCards > 0)
+      ? context.expectedCards
+      : Number((refereeShrunkRate * teamCardFactor * derbyCardMultiplier).toFixed(2));
+
+    const refereeName = refereeAnnounced && refProfile.refereeName
+      ? refProfile.refereeName
+      : 'League baseline (no referee announced)';
+
+    const refereeExplanation = refereeAnnounced && refProfile.refereeName
+      ? `Appointed referee ${refProfile.refereeName} (${refereeSampleSize} matches) shrunk toward league baseline (${refereeLeagueBaseline.toFixed(2)}) yields ${refereeShrunkRate.toFixed(2)} cards per fixture.`
+      : `No referee announced; using league baseline of ${refereeLeagueBaseline.toFixed(2)} cards per fixture.`;
 
     return {
-      refereeName: 'Elite FIFA Referee',
-      refereeCardsPerMatch: refereeCards,
+      refereeName,
+      refereeAnnounced,
+      refereeSampleSize,
+      refereeCardsPerMatch: Number(refereeShrunkRate.toFixed(2)),
+      refereeLeagueBaseline: Number(refereeLeagueBaseline.toFixed(2)),
+      refereeExplanation,
       refereeFoulsPerCard: 4.8,
       teamFoulsPerMatch: 11.8,
-      teamCardsPerMatch: 2.1,
+      teamCardsPerMatch: Number((computedBookings / 2).toFixed(2)),
       derbyCardMultiplier,
-      expectedTotalBookings: expectedBookings,
+      expectedTotalBookings: Number(computedBookings.toFixed(2)),
     };
   }
 

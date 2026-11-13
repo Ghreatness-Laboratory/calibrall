@@ -8,8 +8,10 @@ import {
   ContextFactorMeasurement, 
   FactorContribution, 
   MissingFactorFlag, 
-  FixtureStateTagInfo 
+  FixtureStateTagInfo,
+  LeagueColumnCapabilities
 } from '@/types';
+import { getCalibratedParams, getLeagueCapabilities } from './calibratedParams';
 
 // ====================================================================
 // 1. FACTOR DEFINITIONS & VALIDATED MARKET WEIGHTS
@@ -422,6 +424,10 @@ export function evaluateContextFactors(params: {
   dataCoverageScore?: number | null;
   rawStateTags?: StateTag[];
   lineupConfirmed?: boolean;
+  referee?: string;
+  refereeAnnounced?: boolean;
+  refereeLeagueBaseline?: number;
+  leagueCapabilities?: LeagueColumnCapabilities;
 }): ContextEvaluationResult {
   const {
     homeXg,
@@ -490,6 +496,8 @@ export function evaluateContextFactors(params: {
   const isDerby = stateTags.includes('derby');
   const isHighStakes = stateTags.includes('high-stakes');
   const isDeadRubber = stateTags.includes('dead-rubber');
+  const calParams = getCalibratedParams();
+  const derbyBoostPct = ((calParams.derbySignificance.cardsMultiplier - 1) * 100).toFixed(1);
   activeFactors.push({
     factorCode: 'match_stakes',
     factorName: FACTOR_DEFINITIONS.match_stakes.name,
@@ -497,7 +505,7 @@ export function evaluateContextFactors(params: {
     homeValue: isDerby ? 'Rivalry Priority' : isHighStakes ? 'Title Contention' : isDeadRubber ? 'Mid-Table Inactive' : 'Standard League Fixture',
     awayValue: isDerby ? 'Rivalry Priority' : isHighStakes ? 'European Qualifying' : 'Standard League Points',
     description: isDerby 
-      ? 'Historic derby friction; booking line expectation elevated by +18%.' 
+      ? `Verified derby fixture: stored matches show significant card uplift (+${derbyBoostPct}%); goals and draws remain unadjusted.` 
       : isDeadRubber 
       ? 'Zero competitive positioning leverage; variance inflated.'
       : 'Competitive league matchday pressure active.',
@@ -525,31 +533,46 @@ export function evaluateContextFactors(params: {
   });
 
   // 2.5 Tactical Matchup
+  const cap = params.leagueCapabilities || getLeagueCapabilities(params.competitionCode);
   const totalCornersX = expectedCornersHome + expectedCornersAway;
+  const hasCornerCov = Boolean(cap.hasCorners && totalCornersX > 0);
   activeFactors.push({
     factorCode: 'tactical_matchup',
     factorName: FACTOR_DEFINITIONS.tactical_matchup.name,
     category: 'tactics',
-    homeValue: `${expectedCornersHome.toFixed(1)} Exp Corners (High Flank Overlap)`,
-    awayValue: `${expectedCornersAway.toFixed(1)} Exp Corners (Deep Block Defense)`,
-    description: `Tactical style analysis: total ${totalCornersX.toFixed(1)} expected corners generated via wing deliveries.`,
+    homeValue: hasCornerCov ? `${expectedCornersHome.toFixed(1)} Exp Corners` : 'Corners unavailable',
+    awayValue: hasCornerCov ? `${expectedCornersAway.toFixed(1)} Exp Corners` : 'Corners unavailable',
+    description: hasCornerCov
+      ? `Negative Binomial model using corners for and against ratings projects ${totalCornersX.toFixed(1)} full match corners.`
+      : `Full match corner data insufficient or unavailable for competition ${params.competitionCode}; corners market disabled.`,
     marketWeights: FACTOR_DEFINITIONS.tactical_matchup.marketWeights,
-    isMeasured: true,
-    isMissing: false,
+    isMeasured: hasCornerCov,
+    isMissing: !hasCornerCov,
     shrinkageApplied: 0.11,
   });
 
   // 2.6 Referee Rules & Disciplinary
+  const refAnnounced = Boolean(params.refereeAnnounced && params.referee);
+  const leagueCardBaseline = params.refereeLeagueBaseline ?? expectedCards;
+  const hasCardsCov = Boolean(cap.hasCards && expectedCards > 0);
   activeFactors.push({
     factorCode: 'referee_rules',
     factorName: FACTOR_DEFINITIONS.referee_rules.name,
     category: 'referee',
-    homeValue: `Avg ${expectedCards.toFixed(1)} Cards/Game`,
-    awayValue: 'Card Threshold: 3.8/game',
-    description: `Appointed referee historical issuance rate: ${expectedCards.toFixed(2)} bookings per game.`,
+    homeValue: !hasCardsCov
+      ? 'Cards unavailable'
+      : refAnnounced
+        ? `${params.referee} (${expectedCards.toFixed(2)} exp)`
+        : `League baseline (${leagueCardBaseline.toFixed(2)})`,
+    awayValue: hasCardsCov ? `Expected Total: ${expectedCards.toFixed(2)}` : 'Cards disabled',
+    description: !hasCardsCov
+      ? `Bookings columns unavailable for competition ${params.competitionCode}; cards market disabled.`
+      : refAnnounced
+        ? `Appointed referee ${params.referee} shrunk toward league baseline yields ${expectedCards.toFixed(2)} expected cards.`
+        : `Referee unannounced; using league baseline of ${leagueCardBaseline.toFixed(2)} cards per fixture (${expectedCards.toFixed(2)} expected cards).`,
     marketWeights: FACTOR_DEFINITIONS.referee_rules.marketWeights,
-    isMeasured: true,
-    isMissing: false,
+    isMeasured: hasCardsCov,
+    isMissing: !refAnnounced,
     shrinkageApplied: 0.10,
   });
 

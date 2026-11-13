@@ -144,6 +144,22 @@ export interface FixtureStateTagInfo {
   hypothesis: string;
 }
 
+export interface LeagueColumnCapabilities {
+  competitionCode: string;
+  leagueGroup: 'UK_WITH_REF' | 'EURO_NO_REF' | 'EXTRA_GOALS_ONLY';
+  hasGoals: boolean;
+  hasHalfTimeGoals: boolean;
+  hasCorners: boolean;
+  hasCards: boolean;
+  hasReferee: boolean;
+  hasAsianHandicapPrices: boolean;
+  sampleSizeMatches: number;
+  cornersSampleSize?: number;
+  cardsSampleSize?: number;
+  halfTimeSampleSize?: number;
+  refereeSampleSize?: number;
+}
+
 export interface FixtureContext {
   fixtureId: string;
   homeTeamName: string;
@@ -155,11 +171,38 @@ export interface FixtureContext {
   homeDefenseRating: number;
   awayAttackRating: number;
   awayDefenseRating: number;
+  home1HAttackRating?: number;
+  home1HDefenseRating?: number;
+  away1HAttackRating?: number;
+  away1HDefenseRating?: number;
+  home2HAttackRating?: number;
+  home2HDefenseRating?: number;
+  away2HAttackRating?: number;
+  away2HDefenseRating?: number;
+  homeCornerForRating?: number;
+  homeCornerAgainstRating?: number;
+  awayCornerForRating?: number;
+  awayCornerAgainstRating?: number;
+  homeCornerSampleCount?: number;
+  awayCornerSampleCount?: number;
+  homeCardForRating?: number;
+  awayCardForRating?: number;
+  homeCardSampleCount?: number;
+  awayCardSampleCount?: number;
   homeXg: number;
   awayXg: number;
   expectedCornersHome: number;
   expectedCornersAway: number;
   expectedCards: number;
+  referee?: string;
+  refereeAnnounced?: boolean;
+  refereeMatchCount?: number;
+  refereeShrunkRate?: number;
+  refereeLeagueBaseline?: number;
+  isDerby?: boolean;
+  derbyName?: string;
+  derbySource?: string;
+  leagueCapabilities?: LeagueColumnCapabilities;
   uncertaintyScore: number | null;
   dataCoverageScore: number | null;
   sampleSizeMatches: number;
@@ -185,6 +228,9 @@ export interface VerifiedMatchOdds {
   under95Corners?: number;
   over45Cards?: number;
   under45Cards?: number;
+  asianHandicapLine?: number;
+  asianHandicapHome?: Record<string, number>;
+  asianHandicapAway?: Record<string, number>;
 }
 
 export interface Competition {
@@ -277,6 +323,34 @@ export interface Fixture {
     lineupConfirmed?: boolean;
     verifiedOdds?: VerifiedMatchOdds;
     noRecommendationReason?: string;
+    home1HAttackRating?: number;
+    home1HDefenseRating?: number;
+    away1HAttackRating?: number;
+    away1HDefenseRating?: number;
+    home2HAttackRating?: number;
+    home2HDefenseRating?: number;
+    away2HAttackRating?: number;
+    away2HDefenseRating?: number;
+    halfTimeSampleCount?: number;
+    homeCornerForRating?: number;
+    homeCornerAgainstRating?: number;
+    awayCornerForRating?: number;
+    awayCornerAgainstRating?: number;
+    homeCornerSampleCount?: number;
+    awayCornerSampleCount?: number;
+    homeCardForRating?: number;
+    awayCardForRating?: number;
+    homeCardSampleCount?: number;
+    awayCardSampleCount?: number;
+    referee?: string;
+    refereeAnnounced?: boolean;
+    refereeMatchCount?: number;
+    refereeShrunkRate?: number;
+    refereeLeagueBaseline?: number;
+    isDerby?: boolean;
+    derbyName?: string;
+    derbySource?: string;
+    leagueCapabilities?: LeagueColumnCapabilities;
   };
   verifiedOdds?: VerifiedMatchOdds;
   hasCoachChange?: boolean;

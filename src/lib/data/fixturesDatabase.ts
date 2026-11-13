@@ -114,6 +114,7 @@ export function mapDbRowToFixture(row: any): Fixture | null {
     homeScore: row.home_score ?? null,
     awayScore: row.away_score ?? null,
     venue: row.venue || 'Stadium',
+    referee: row.referee || undefined,
     dataFreshness: row.updated_at || new Date().toISOString(),
   };
 }
@@ -202,6 +203,7 @@ export async function syncFootballFixturesToDatabase(
         home_score: f.homeScore ?? null,
         away_score: f.awayScore ?? null,
         venue: f.venue || null,
+        referee: f.referee || null,
         source: f.source || 'provider:espn',
         is_demo: false,
         updated_at: nowIso,

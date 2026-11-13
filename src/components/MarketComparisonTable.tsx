@@ -170,7 +170,7 @@ export default function MarketComparisonTable({
               </span>
               {pred.handicapLine !== undefined && (
                 <span className="text-[10px] font-mono px-1.5 py-0.2 bg-[#151E19] text-[#8B9890] rounded border border-white/[0.07]">
-                  {pred.handicapLine > 0 ? `+${pred.handicapLine}` : pred.handicapLine}
+                  {cleanDisplayText(pred.handicapLine > 0 ? `+${pred.handicapLine}` : `${pred.handicapLine}`)}
                 </span>
               )}
             </div>
@@ -214,12 +214,22 @@ export default function MarketComparisonTable({
                   Check data
                 </span>
               )}
-              {pred.marketOdds ? (
-                <span className="tabular-nums">@{oddsFormatted}</span>
+              {pred.marketOdds && pred.marketOdds > 1.0 ? (
+                <>
+                  <span className="tabular-nums text-[#ECF1EE]">@{oddsFormatted}</span>
+                  {pred.expectedValue !== null && pred.expectedValue !== undefined && (
+                    <span className={`tabular-nums ${evFormatted.colorClass}`}>
+                      {cleanDisplayText(evFormatted.text)}
+                    </span>
+                  )}
+                </>
               ) : (
-                <span className="text-[9px] text-[#5E6A63]">No odds</span>
+                <>
+                  <span className="text-[9px] text-[#5E6A63]">No odds</span>
+                  <span>·</span>
+                  <span className="text-[#8B9890] tabular-nums">Analysis only</span>
+                </>
               )}
-              <span className="text-[#8B9890] tabular-nums">Analysis only</span>
             </div>
           </div>
 
@@ -264,11 +274,13 @@ export default function MarketComparisonTable({
             <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono pt-1 text-[#8B9890] tabular-nums">
               <div>
                 <span>Odds: </span>
-                <span className="text-[#ECF1EE]">{oddsFormatted}</span>
+                <span className="text-[#ECF1EE]">{pred.marketOdds && pred.marketOdds > 1.0 ? oddsFormatted : 'No price'}</span>
               </div>
               <div>
-                <span>Calibration status: </span>
-                <span className="text-[#8B9890]">Withheld: analysis only</span>
+                <span>Market status: </span>
+                <span className="text-[#8B9890]">
+                  {pred.marketOdds && pred.marketOdds > 1.0 ? `Bookmaker price active (EV ${cleanDisplayText(evFormatted.text)})` : 'Probability analysis only'}
+                </span>
               </div>
               <div>
                 <span>Data coverage: </span>

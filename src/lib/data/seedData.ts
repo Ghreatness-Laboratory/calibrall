@@ -1,7 +1,21 @@
 // MATCHMIND: Verified Development & Demonstration Dataset
 // Real European fixtures, verified team underlying metrics, historical performance benchmarks
 
-import { Competition, Team, Fixture, PerformanceReport, StateTag } from '@/types';
+import {
+  Competition,
+  Team,
+  Fixture,
+  PerformanceReport,
+  StateTag,
+  VerifiedMatchOdds,
+  LeagueColumnCapabilities,
+} from '@/types';
+import {
+  getCalibratedParams,
+  getLeagueCalibratedConfig,
+  getLeagueCapabilities,
+  resolveLeagueGoalMeans,
+} from '../prediction/calibratedParams';
 
 export const COMPETITIONS: Competition[] = [
   {
@@ -333,20 +347,36 @@ export interface FixtureStatisticalContext {
   insufficientData?: boolean;
   stateTags?: StateTag[];
   lineupConfirmed?: boolean;
-  verifiedOdds?: {
-    homeWin?: number;
-    draw?: number;
-    awayWin?: number;
-    over25Goals?: number;
-    under25Goals?: number;
-    bttsYes?: number;
-    bttsNo?: number;
-    over95Corners?: number;
-    under95Corners?: number;
-    over45Cards?: number;
-    under45Cards?: number;
-  };
+  verifiedOdds?: VerifiedMatchOdds;
   noRecommendationReason?: string;
+  home1HAttackRating?: number;
+  home1HDefenseRating?: number;
+  away1HAttackRating?: number;
+  away1HDefenseRating?: number;
+  home2HAttackRating?: number;
+  home2HDefenseRating?: number;
+  away2HAttackRating?: number;
+  away2HDefenseRating?: number;
+  halfTimeSampleCount?: number;
+  homeCornerForRating?: number;
+  homeCornerAgainstRating?: number;
+  awayCornerForRating?: number;
+  awayCornerAgainstRating?: number;
+  homeCornerSampleCount?: number;
+  awayCornerSampleCount?: number;
+  homeCardForRating?: number;
+  awayCardForRating?: number;
+  homeCardSampleCount?: number;
+  awayCardSampleCount?: number;
+  referee?: string;
+  refereeAnnounced?: boolean;
+  refereeMatchCount?: number;
+  refereeShrunkRate?: number;
+  refereeLeagueBaseline?: number;
+  isDerby?: boolean;
+  derbyName?: string;
+  derbySource?: string;
+  leagueCapabilities?: LeagueColumnCapabilities;
 }
 
 import { displayName } from '../utils/formatText';
@@ -360,9 +390,10 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
 
   const homeTeamDisplayName = displayName(fixture.homeTeam);
   const awayTeamDisplayName = displayName(fixture.awayTeam);
+  const compCode = fixture.competition?.code;
 
-  const homeDb = matchesStore.getTeamStatsSync(fixture.homeTeam, fixture.kickoffTime);
-  const awayDb = matchesStore.getTeamStatsSync(fixture.awayTeam, fixture.kickoffTime);
+  const homeDb = matchesStore.getTeamStatsSync(fixture.homeTeam, fixture.kickoffTime, compCode);
+  const awayDb = matchesStore.getTeamStatsSync(fixture.awayTeam, fixture.kickoffTime, compCode);
 
   const homeStoredCount = homeDb.storedMatchCount;
   const awayStoredCount = awayDb.storedMatchCount;
@@ -456,28 +487,63 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const isAwayLowSample = awayStoredCount < 10;
   const isLowSample = isHomeLowSample || isAwayLowSample;
 
-  const comp = fixture.competition;
   const homeAttack = isHomeLowSample ? 1.00 : homeDb.attackRating;
   const homeDefense = isHomeLowSample ? 1.00 : homeDb.defenseRating;
   const awayAttack = isAwayLowSample ? 1.00 : awayDb.attackRating;
   const awayDefense = isAwayLowSample ? 1.00 : awayDb.defenseRating;
 
-  const baseGoals = (comp.avgGoalsPerGame || 2.80) / 2;
-  const homeXg = Number((homeAttack * awayDefense * baseGoals * 1.08).toFixed(2));
-  const awayXg = Number((awayAttack * homeDefense * baseGoals * 0.92).toFixed(2));
+  // Empirical league-calibrated home/away goal means from SQLite (zero hardcoded 1.35 or 2.80)
+  const goalMeans = resolveLeagueGoalMeans(compCode);
+  const leagueCfg = getLeagueCalibratedConfig(compCode);
+  const baseCap = getLeagueCapabilities(compCode);
+  const calParams = getCalibratedParams();
 
-  const baseCorners = (comp.avgCornersPerGame || 10.0) / 2;
-  const expectedCornersHome = Number((homeDb.cornerAttackRating * baseCorners * 1.05).toFixed(1));
-  const expectedCornersAway = Number((awayDb.cornerAttackRating * baseCorners * 0.95).toFixed(1));
+  const homeXg = Number((homeAttack * awayDefense * goalMeans.avgHomeGoals).toFixed(2));
+  const awayXg = Number((awayAttack * homeDefense * goalMeans.avgAwayGoals).toFixed(2));
 
-  const baseCards = comp.avgCardsPerGame || 4.2;
-  const expectedCards = Number((baseCards * ((homeDb.disciplineRating + awayDb.disciplineRating) / 2)).toFixed(1));
+  // Corners: only enabled when league has corner columns AND both teams have >= 6 corner matches stored
+  const cornersEligible = Boolean(
+    baseCap.hasCorners &&
+    leagueCfg?.corners &&
+    homeDb.cornersSampleCount >= 6 &&
+    awayDb.cornersSampleCount >= 6
+  );
+  const expectedCornersHome = cornersEligible && leagueCfg?.corners
+    ? Number((leagueCfg.corners.avgHomeCorners * homeDb.cornerForRating * awayDb.cornerAgainstRating).toFixed(2))
+    : 0;
+  const expectedCornersAway = cornersEligible && leagueCfg?.corners
+    ? Number((leagueCfg.corners.avgAwayCorners * awayDb.cornerForRating * homeDb.cornerAgainstRating).toFixed(2))
+    : 0;
+
+  // Cards & Referee & Derby: only enabled when league has card columns
+  const cardsCfg = baseCap.hasCards ? leagueCfg?.cards : null;
+  const refProfile = matchesStore.getShrunkRefereeProfileSync(fixture.referee, compCode, fixture.kickoffTime);
+  const derbyInfo = matchesStore.getDerbyInfoSync(fixture.homeTeam, fixture.awayTeam);
+  const derbyCardMult = derbyInfo.isDerby && calParams.derbySignificance.applyCardsAdjustment
+    ? calParams.derbySignificance.cardsMultiplier
+    : 1.0;
+
+  const expectedCards = cardsCfg
+    ? Number(
+        Math.max(
+          1.2,
+          refProfile.shrunkRate * ((homeDb.cardForRating + awayDb.cardForRating) / 2) * derbyCardMult
+        ).toFixed(2)
+      )
+    : 0;
+
+  const effectiveCapabilities: LeagueColumnCapabilities = {
+    ...baseCap,
+    hasCorners: cornersEligible,
+    hasHalfTimeGoals: Boolean(baseCap.hasHalfTimeGoals && leagueCfg?.halves),
+    hasCards: Boolean(baseCap.hasCards && cardsCfg),
+  };
 
   const sampleMatches = homeStoredCount + awayStoredCount;
 
   // Computed (non-constant) data coverage score
   const sampleCoverage = Math.min(0.78, (sampleMatches / 44) * 0.78);
-  const refereeBonus = fixture.referee ? 0.07 : 0.02;
+  const refereeBonus = refProfile.announced ? 0.07 : 0.02;
   const lineupBonus = fixture.status !== 'POSTPONED' && fixture.status !== 'CANCELED' ? 0.08 : 0.02;
   const statusBonus = fixture.status === 'FINISHED' ? 0.05 : 0.01;
   const oddsBonus = fixture.verifiedOdds ? 0.04 : 0.0;
@@ -492,6 +558,9 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const stateTags: StateTag[] = [];
   if (isLowSample) {
     stateTags.push('low-sample');
+  }
+  if (derbyInfo.isDerby) {
+    stateTags.push('derby');
   }
 
   return {
@@ -508,6 +577,34 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     stateTags,
     lineupConfirmed: fixture.status !== 'POSTPONED' && fixture.status !== 'CANCELED',
     verifiedOdds: fixture.verifiedOdds,
+    home1HAttackRating: homeDb.h1AttackRating,
+    home1HDefenseRating: homeDb.h1DefenseRating,
+    away1HAttackRating: awayDb.h1AttackRating,
+    away1HDefenseRating: awayDb.h1DefenseRating,
+    home2HAttackRating: homeDb.h2AttackRating,
+    home2HDefenseRating: homeDb.h2DefenseRating,
+    away2HAttackRating: awayDb.h2AttackRating,
+    away2HDefenseRating: awayDb.h2DefenseRating,
+    halfTimeSampleCount: Math.min(homeDb.halfTimeSampleCount, awayDb.halfTimeSampleCount),
+    homeCornerForRating: homeDb.cornerForRating,
+    homeCornerAgainstRating: homeDb.cornerAgainstRating,
+    awayCornerForRating: awayDb.cornerForRating,
+    awayCornerAgainstRating: awayDb.cornerAgainstRating,
+    homeCornerSampleCount: homeDb.cornersSampleCount,
+    awayCornerSampleCount: awayDb.cornersSampleCount,
+    homeCardForRating: homeDb.cardForRating,
+    awayCardForRating: awayDb.cardForRating,
+    homeCardSampleCount: homeDb.cardsSampleCount,
+    awayCardSampleCount: awayDb.cardsSampleCount,
+    referee: fixture.referee || undefined,
+    refereeAnnounced: refProfile.announced,
+    refereeMatchCount: refProfile.sampleSize,
+    refereeShrunkRate: refProfile.shrunkRate,
+    refereeLeagueBaseline: refProfile.leagueBaseline,
+    isDerby: derbyInfo.isDerby,
+    derbyName: derbyInfo.derbyName,
+    derbySource: derbyInfo.source,
+    leagueCapabilities: effectiveCapabilities,
   };
 }
 
