@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getFixtureStatistics } from '@/lib/data/seedData';
+import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import MarketComparisonTable from '@/components/MarketComparisonTable';
 import ExplanationCard from '@/components/ExplanationCard';
@@ -89,31 +89,7 @@ export default function MatchAnalysisPage() {
 
   const footballEvaluation = useMemo(() => {
     if (!fixture || isBasketball || !stats) return null;
-    return evaluateFixtureMarkets({
-      fixtureId: fixture.id,
-      homeTeamName: fixture.homeTeam.name,
-      awayTeamName: fixture.awayTeam.name,
-      competitionCode: fixture.competition.code,
-      competitionName: fixture.competition.name,
-      homeAttackRating: fixture.homeTeam.attackRating ?? 1.0,
-      homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
-      awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
-      awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
-      homeXg: stats.homeXg,
-      awayXg: stats.awayXg,
-      expectedCornersHome: stats.expectedCornersHome,
-      expectedCornersAway: stats.expectedCornersAway,
-      expectedCards: stats.expectedCards,
-      uncertaintyScore: stats.uncertaintyScore as any,
-      dataCoverageScore: stats.dataCoverageScore as any,
-      sampleSizeMatches: stats.sampleSizeMatches,
-      stateTags: stats.stateTags,
-      lineupConfirmed: stats.lineupConfirmed,
-      verifiedOdds: stats.verifiedOdds,
-      insufficientData: stats.insufficientData || fixture.insufficientData,
-      hasRealTeamStrength: stats.hasRealTeamStrength,
-      noRecommendationReason: stats.noRecommendationReason,
-    });
+    return evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
   }, [fixture, isBasketball, stats]);
 
   const basketballPredictions = useMemo(() => {

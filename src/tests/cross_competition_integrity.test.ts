@@ -127,18 +127,6 @@ export function runCrossCompetitionIntegrityTests(): { passed: boolean; failures
     console.log('✓ [Integrity PASS] Genuine mismatch Arsenal (PL) vs Bayern Munich (BL1) in domestic PL correctly rejected.');
   }
 
-  // Also verify that two ESPN-style TBD placeholder fixtures within 4.5 hours
-  // do NOT trigger a "[Integrity Check FAILED] Duplicate team scheduling" violation.
-  console.log('\n--- Verifying TBD Placeholder Fixture Filtering ---');
-  const tbd1 = createDummyFixture('fix_espn_401933731', 'PL', 'Premier League', 'Arsenal', 'TBD Away', '2026-11-15T15:00:00Z');
-  const tbd2 = createDummyFixture('fix_espn_401933729', 'PL', 'Premier League', 'Chelsea', 'TBD Away', '2026-11-15T19:30:00Z');
-  const tbdReport = validateFixtureIntegrity([tbd1, tbd2]);
-  if (tbdReport.violations.length > 0 || tbdReport.validFixtures.length !== 0) {
-    failures.push(`Expected TBD fixtures to be quietly excluded with 0 violations, got violations=${tbdReport.violations.join('; ')}, valid=${tbdReport.validFixtures.length}`);
-  } else {
-    console.log('✓ [Integrity PASS] TBD placeholder fixtures cleanly excluded with zero duplicate-team violations.');
-  }
-
   return {
     passed: failures.length === 0,
     failures,

@@ -314,8 +314,8 @@ export class DixonColesV25Evaluator {
         }
       }
 
-      // Penalize generic picks, high-variance secondary markets, and wide handicaps
-      if (isGenericPick) rankingScore *= 0.3;
+      // Penalize generic picks (only in unpriced/probability mode), high-variance secondary markets, and wide handicaps
+      if (isGenericPick && !cand.marketOdds) rankingScore *= 0.3;
       if (cand.optionType === 'corners') rankingScore *= 0.85;
       if (cand.optionType === 'bookings') rankingScore *= 0.85;
       if (cand.optionType === 'asian_handicap') rankingScore *= 0.75;
@@ -441,7 +441,7 @@ export class DixonColesV25Evaluator {
 
     const eligibleTopPicks = processed.filter(p => {
       if (p.sanityTripwire) return false;
-      if (p.isGenericPick) return false;
+      if (p.isGenericPick && !p.marketOdds) return false;
       // Wide handicaps (|line| >= 1.5) cannot be top pick!
       if (p.optionType === 'asian_handicap' && Math.abs(p.handicapLine ?? 0) >= 1.5) return false;
       if (p.qualificationStatus === 'NO_RECOMMENDATION' || p.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY' || p.qualificationStatus === 'PROBABILITY_ANALYSIS_ONLY') return false;

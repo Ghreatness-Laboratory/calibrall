@@ -6,7 +6,7 @@
 
 import { ScorelineProbabilityMatrix } from './enhancedTeamStrength';
 import { negBinomialProb, generateHalfByHalfGoalDistribution } from './math';
-import { getCalibratedParams } from './calibratedParams';
+import { getCalibratedParams, getLeagueCalibratedConfig } from './calibratedParams';
 
 export interface JointMarketProbabilities {
   // 1X2
@@ -52,7 +52,8 @@ export class MarketSpecificModelsEngine {
     homeCornersExp: number = 5.6,
     awayCornersExp: number = 4.4,
     refereeCardsPerGame: number = 4.2,
-    isDerby: boolean = false
+    isDerby: boolean = false,
+    competitionCode?: string
   ): JointMarketProbabilities {
     const rawHomeWin = matrix.homeWin;
     const rawDraw = matrix.draw;
@@ -68,26 +69,31 @@ export class MarketSpecificModelsEngine {
     const o25 = Math.min(o15, matrix.over25);
     const o35 = Math.min(o25, matrix.over35);
 
+    const cal = getCalibratedParams();
+    const leagueCfg = getLeagueCalibratedConfig(competitionCode);
+    const firstHalfShare = leagueCfg?.halves?.firstHalfGoalShare ?? 0.439;
+    const cornersAlpha = leagueCfg?.corners?.overdispersionAlpha ?? 0.085;
+    const cardsAlpha = leagueCfg?.cards?.overdispersionAlpha ?? 0.045;
+
     // Half-by-half distribution
     const halfDist = generateHalfByHalfGoalDistribution(
       matrix.expectedHomeGoals,
       matrix.expectedAwayGoals,
-      0.439
+      firstHalfShare
     );
     const fhOver05 = Number(halfDist.firstHalf.overUnderGoals[0.5].over.toFixed(4));
     const fhUnder15 = Number(halfDist.firstHalf.overUnderGoals[1.5].under.toFixed(4));
 
     // Negative Binomial Corner Model
     const totalCornersExp = homeCornersExp + awayCornersExp;
-    const cornersO95 = this.calculateNegativeBinomialOver(totalCornersExp, 9.5, 0.085);
+    const cornersO95 = this.calculateNegativeBinomialOver(totalCornersExp, 9.5, cornersAlpha);
 
     // Negative Binomial Bookings Model (Referee rate + statistically verified derby cards multiplier)
-    const cal = getCalibratedParams();
     const derbyMultiplier = isDerby && cal.derbySignificance.applyCardsAdjustment
       ? cal.derbySignificance.cardsMultiplier
       : 1.0;
     const adjustedCardsExp = refereeCardsPerGame * derbyMultiplier;
-    const cardsO45 = this.calculateNegativeBinomialOver(adjustedCardsExp, 4.5, 0.045);
+    const cardsO45 = this.calculateNegativeBinomialOver(adjustedCardsExp, 4.5, cardsAlpha);
 
     return {
       homeWin: rawHomeWin,

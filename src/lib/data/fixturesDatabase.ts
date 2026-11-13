@@ -17,6 +17,7 @@ import {
 } from './canonicalCompetitions';
 import { matchesDayFilter, DayFilterType } from '@/lib/utils/dateWindow';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { isPlaceholderTeamName } from './fixtureIntegrity';
 
 export { matchesDayFilter };
 export type { DayFilterType };
@@ -55,6 +56,10 @@ export function mapDbRowToFixture(row: any): Fixture | null {
       compId,
       row.source || 'db:fixtures'
     );
+    return null;
+  }
+
+  if (isPlaceholderTeamName(row.home_team_name) || isPlaceholderTeamName(row.away_team_name)) {
     return null;
   }
 
@@ -136,7 +141,7 @@ export async function syncFootballFixturesToDatabase(
     // 1. Clean legacy hardcoded seed fixtures & outdated football fixtures prior to dateFrom
     const { data: existingRows } = await supabase
       .from('fixtures')
-      .select('id, provider_id, competition_id, kickoff_time, is_demo, source');
+      .select('id, provider_id, competition_id, home_team_name, away_team_name, kickoff_time, is_demo, source');
 
     if (existingRows && Array.isArray(existingRows)) {
       const idsToDelete: string[] = [];
@@ -150,8 +155,9 @@ export async function syncFootballFixturesToDatabase(
         const isDemoRow = r.is_demo === 1 || r.is_demo === true || r.source === 'seed';
         const isNonCanonical = !isCanonicalCompetitionId(r.competition_id);
         const isExpired = Boolean(minIso && r.kickoff_time && String(r.kickoff_time) < minIso);
+        const isPlaceholder = isPlaceholderTeamName(r.home_team_name) || isPlaceholderTeamName(r.away_team_name);
 
-        if (isLegacySeed || isDemoRow || isNonCanonical || isExpired) {
+        if (isLegacySeed || isDemoRow || isNonCanonical || isExpired || isPlaceholder) {
           if (r.id) idsToDelete.push(String(r.id));
         }
       }
@@ -166,6 +172,10 @@ export async function syncFootballFixturesToDatabase(
     const nowIso = new Date().toISOString();
 
     for (const f of fixtures) {
+      if (isPlaceholderTeamName(f.homeTeam?.name) || isPlaceholderTeamName(f.awayTeam?.name)) {
+        rejected++;
+        continue;
+      }
       const compId = f.competitionId || f.competition?.id;
       if (!isCanonicalCompetitionId(compId)) {
         logCompetitionIntegrityError(

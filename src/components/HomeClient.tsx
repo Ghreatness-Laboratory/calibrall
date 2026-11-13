@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
-import { getFixtureStatistics, VERIFIED_PERFORMANCE_REPORT } from '@/lib/data/seedData';
+import { getFixtureStatistics, buildFixtureContextFromStats, VERIFIED_PERFORMANCE_REPORT } from '@/lib/data/seedData';
 import { VERIFIED_NBA_PERFORMANCE_REPORT } from '@/lib/data/nbaSeedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
@@ -32,30 +32,7 @@ export default function HomeClient() {
   // Football evaluated fixtures
   const showcaseFootballFixtures = fixtures.slice(0, 3).map(fixture => {
     const stats = getFixtureStatistics(fixture);
-    const evalResult = evaluateFixtureMarkets({
-      fixtureId: fixture.id,
-      homeTeamName: fixture.homeTeam.name,
-      awayTeamName: fixture.awayTeam.name,
-      competitionCode: fixture.competition.code,
-      competitionName: fixture.competition.name,
-      homeAttackRating: fixture.homeTeam.attackRating ?? 1.0,
-      homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
-      awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
-      awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
-      homeXg: stats.homeXg,
-      awayXg: stats.awayXg,
-      expectedCornersHome: stats.expectedCornersHome,
-      expectedCornersAway: stats.expectedCornersAway,
-      expectedCards: stats.expectedCards,
-      uncertaintyScore: stats.uncertaintyScore as any,
-      dataCoverageScore: stats.dataCoverageScore as any,
-      sampleSizeMatches: stats.sampleSizeMatches,
-      stateTags: stats.stateTags,
-      lineupConfirmed: stats.lineupConfirmed,
-      verifiedOdds: stats.verifiedOdds,
-      insufficientData: stats.insufficientData || fixture.insufficientData,
-      hasRealTeamStrength: stats.hasRealTeamStrength,
-    });
+    const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
     return {
       fixture,
       topPick: evalResult.topPick,

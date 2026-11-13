@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFootballDataProvider } from '@/lib/data/provider';
-import { getFixtureStatistics } from '@/lib/data/seedData';
+import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 
 export const dynamic = 'force-dynamic';
@@ -33,28 +33,7 @@ export async function GET() {
   liveResult.fixtures.filter(f => f.status !== 'FINISHED').forEach(fixture => {
     const stats = getFixtureStatistics(fixture);
 
-    const evalResult = evaluateFixtureMarkets({
-      fixtureId: fixture.id,
-      homeTeamName: fixture.homeTeam.name,
-      awayTeamName: fixture.awayTeam.name,
-      competitionCode: fixture.competition.code,
-      competitionName: fixture.competition.name,
-      homeAttackRating: fixture.homeTeam.attackRating ?? 1.0,
-      homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
-      awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
-      awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
-      homeXg: stats.homeXg,
-      awayXg: stats.awayXg,
-      expectedCornersHome: stats.expectedCornersHome,
-      expectedCornersAway: stats.expectedCornersAway,
-      expectedCards: stats.expectedCards,
-      uncertaintyScore: stats.uncertaintyScore as any,
-      dataCoverageScore: stats.dataCoverageScore as any,
-      sampleSizeMatches: stats.sampleSizeMatches,
-      verifiedOdds: stats.verifiedOdds,
-      insufficientData: stats.insufficientData,
-      hasRealTeamStrength: stats.hasRealTeamStrength,
-    });
+    const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
 
     if (evalResult.topPick) {
       qualified.push({

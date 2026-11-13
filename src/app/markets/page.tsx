@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { getFixtureStatistics } from '@/lib/data/seedData';
+import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
@@ -96,30 +96,7 @@ export default function MarketExplorerPage() {
         }
       } else {
         const stats = getFixtureStatistics(fixture);
-        const evalResult = evaluateFixtureMarkets({
-          fixtureId: fixture.id,
-          homeTeamName: fixture.homeTeam.name,
-          awayTeamName: fixture.awayTeam.name,
-          competitionCode: fixture.competition.code,
-          competitionName: fixture.competition.name,
-          homeAttackRating: fixture.homeTeam.attackRating ?? 1.0,
-          homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
-          awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
-          awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
-          homeXg: stats.homeXg,
-          awayXg: stats.awayXg,
-          expectedCornersHome: stats.expectedCornersHome,
-          expectedCornersAway: stats.expectedCornersAway,
-          expectedCards: stats.expectedCards,
-          uncertaintyScore: stats.uncertaintyScore as any,
-          dataCoverageScore: stats.dataCoverageScore as any,
-          sampleSizeMatches: stats.sampleSizeMatches,
-          stateTags: stats.stateTags,
-          lineupConfirmed: stats.lineupConfirmed,
-          verifiedOdds: stats.verifiedOdds,
-          insufficientData: stats.insufficientData || fixture.insufficientData,
-          hasRealTeamStrength: stats.hasRealTeamStrength,
-        });
+        const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
 
         const matchedPred = evalResult.predictions.find(p => p.marketCode === selectedMarketLine);
         if (matchedPred) {

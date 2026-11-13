@@ -9,7 +9,6 @@
 import { Fixture } from '@/types';
 import { lookupTeamStrength, normalizeTeamLookupKey, COMPETITION_CLUBS, COMPETITION_COUNTRY_MAP } from './teamDatabase';
 import { isCanonicalCompetitionId, logCompetitionIntegrityError } from './canonicalCompetitions';
-import { isPlaceholderTeam } from './canonicalTeams';
 
 export interface IntegrityValidationReport {
   isValid: boolean;
@@ -19,6 +18,21 @@ export interface IntegrityValidationReport {
     reason: string;
   }[];
   violations: string[];
+}
+
+export function isPlaceholderTeamName(name?: string | null): boolean {
+  if (!name) return true;
+  const n = name.trim().toLowerCase();
+  if (!n) return true;
+  return (
+    n === 'tbd' ||
+    n === 'tba' ||
+    n === 'tbd home' ||
+    n === 'tbd away' ||
+    n === 'to be determined' ||
+    n === 'to be announced' ||
+    /^tbd\b/i.test(n)
+  );
 }
 
 /**
@@ -63,6 +77,15 @@ export function validateFixtureIntegrity(
       continue;
     }
 
+    // Rule 1a: Skip unconfirmed TBD/placeholder team slots (playoff/knockout brackets)
+    if (isPlaceholderTeamName(f.homeTeam?.name) || isPlaceholderTeamName(f.awayTeam?.name)) {
+      console.warn(
+        `[Integrity Check SKIPPED] Fixture ${f.id} has unconfirmed TBD placeholder team ("${f.homeTeam?.name}" vs "${f.awayTeam?.name}").`
+      );
+      rejectedFixtures.push({ fixtureId: f.id, reason: 'Unconfirmed TBD team placeholder' });
+      continue;
+    }
+
     // Rule 1b: Canonical competition_id check (Mandatory: Every fixture must have a canonical competition_id)
     // A fixture with none is logged as an error and never shown under a fallback.
     const compId = f.competitionId || f.competition?.id;
@@ -80,16 +103,6 @@ export function validateFixtureIntegrity(
       console.error(msg);
       violations.push(msg);
       rejectedFixtures.push({ fixtureId: f.id, reason: 'Invalid kickoffTime' });
-      continue;
-    }
-
-    // Rule 2b: Exclude unconfirmed bracket/playoff placeholder fixtures (e.g. "TBD Home", "TBD Away")
-    // cleanly before 48h team deduplication so placeholders never cause duplicate-team errors.
-    if (
-      isPlaceholderTeam(f.homeTeam?.name, f.homeTeam?.id) ||
-      isPlaceholderTeam(f.awayTeam?.name, f.awayTeam?.id)
-    ) {
-      rejectedFixtures.push({ fixtureId: f.id, reason: 'Unconfirmed placeholder team (TBD)' });
       continue;
     }
 
@@ -209,10 +222,13 @@ export function validateFixtureIntegrity(
     const awayKey = normalizeTeamLookupKey(f.awayTeam.name) || f.awayTeam.id;
     const currentMatchKey = `${homeKey}_${awayKey}`;
 
+    const homeIsPlaceholder = isPlaceholderTeamName(f.homeTeam?.name);
+    const awayIsPlaceholder = isPlaceholderTeamName(f.awayTeam?.name);
+
     let hasConflict = false;
 
     // Check home team
-    const homePrev = teamScheduledTimes.get(homeKey) || [];
+    const homePrev = homeIsPlaceholder ? [] : (teamScheduledTimes.get(homeKey) || []);
     for (const prev of homePrev) {
       if (prev.fixtureId === f.id) continue;
       const deltaHours = Math.abs(kickoffMs - prev.kickoffMs) / (3600 * 1000);
@@ -233,7 +249,7 @@ export function validateFixtureIntegrity(
     if (hasConflict) continue;
 
     // Check away team
-    const awayPrev = teamScheduledTimes.get(awayKey) || [];
+    const awayPrev = awayIsPlaceholder ? [] : (teamScheduledTimes.get(awayKey) || []);
     for (const prev of awayPrev) {
       if (prev.fixtureId === f.id) continue;
       const deltaHours = Math.abs(kickoffMs - prev.kickoffMs) / (3600 * 1000);

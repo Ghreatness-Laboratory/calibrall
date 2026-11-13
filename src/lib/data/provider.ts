@@ -9,7 +9,7 @@
 // - Demo data is strictly gated behind process.env.USE_DEMO_DATA === 'true' (defaults to false).
 
 import { Competition, Fixture, FixtureContext, Team, VerifiedMatchOdds, MatchStatus } from '@/types';
-import { getFixtureStatistics } from './seedData';
+import { getFixtureStatistics, buildFixtureContextFromStats } from './seedData';
 import { evaluateFixtureMarkets } from '../prediction/marketSelection';
 import { computeRequestDateWindow } from '../utils/dateWindow';
 import { serverCache } from '../cache/serverCache';
@@ -30,8 +30,8 @@ import {
   syncFootballFixturesToDatabase,
   matchesDayFilter,
 } from './fixturesDatabase';
-import { validateFixtureIntegrity } from './fixtureIntegrity';
-import { lookupCanonicalTeam, recordUnresolvedTeam, isPlaceholderTeam } from './canonicalTeams';
+import { validateFixtureIntegrity, isPlaceholderTeamName } from './fixtureIntegrity';
+import { lookupCanonicalTeam, recordUnresolvedTeam } from './canonicalTeams';
 
 export interface ProviderHealth {
   providerName: string;
@@ -131,12 +131,7 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
     return null;
   }
 
-  if (
-    !m.homeTeam?.name ||
-    !m.awayTeam?.name ||
-    isPlaceholderTeam(m.homeTeam.name, m.homeTeam.id) ||
-    isPlaceholderTeam(m.awayTeam.name, m.awayTeam.id)
-  ) {
+  if (isPlaceholderTeamName(m.homeTeam?.name) || isPlaceholderTeamName(m.awayTeam?.name)) {
     return null;
   }
 
@@ -232,12 +227,7 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture | null {
     return null;
   }
 
-  if (
-    !home.name ||
-    !away.name ||
-    isPlaceholderTeam(home.name, home.id) ||
-    isPlaceholderTeam(away.name, away.id)
-  ) {
+  if (isPlaceholderTeamName(home.name) || isPlaceholderTeamName(away.name)) {
     return null;
   }
 
@@ -326,12 +316,9 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
     return null;
   }
 
-  const homeRawName = homeComp.team?.displayName || homeComp.team?.name || homeComp.team?.shortDisplayName || '';
-  const awayRawName = awayComp.team?.displayName || awayComp.team?.name || awayComp.team?.shortDisplayName || '';
-  if (
-    isPlaceholderTeam(homeRawName, homeComp.team?.id ?? homeComp.id) ||
-    isPlaceholderTeam(awayRawName, awayComp.team?.id ?? awayComp.id)
-  ) {
+  const rawHomeName = homeComp.team?.displayName || homeComp.team?.name;
+  const rawAwayName = awayComp.team?.displayName || awayComp.team?.name;
+  if (isPlaceholderTeamName(rawHomeName) || isPlaceholderTeamName(rawAwayName)) {
     return null;
   }
 
@@ -1045,59 +1032,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     if (!fixture) return null;
 
     const stats = getFixtureStatistics(fixture);
-    return {
-      fixtureId: fixture.id,
-      homeTeamName: fixture.homeTeam.name,
-      awayTeamName: fixture.awayTeam.name,
-      competitionCode: fixture.competition.code,
-      competitionName: fixture.competition.name,
-      kickoffTime: fixture.kickoffTime,
-      homeAttackRating: fixture.homeTeam.attackRating ?? 1.0,
-      homeDefenseRating: fixture.homeTeam.defenseRating ?? 1.0,
-      awayAttackRating: fixture.awayTeam.attackRating ?? 1.0,
-      awayDefenseRating: fixture.awayTeam.defenseRating ?? 1.0,
-      home1HAttackRating: stats.home1HAttackRating,
-      home1HDefenseRating: stats.home1HDefenseRating,
-      away1HAttackRating: stats.away1HAttackRating,
-      away1HDefenseRating: stats.away1HDefenseRating,
-      home2HAttackRating: stats.home2HAttackRating,
-      home2HDefenseRating: stats.home2HDefenseRating,
-      away2HAttackRating: stats.away2HAttackRating,
-      away2HDefenseRating: stats.away2HDefenseRating,
-      homeCornerForRating: stats.homeCornerForRating,
-      homeCornerAgainstRating: stats.homeCornerAgainstRating,
-      awayCornerForRating: stats.awayCornerForRating,
-      awayCornerAgainstRating: stats.awayCornerAgainstRating,
-      homeCornerSampleCount: stats.homeCornerSampleCount,
-      awayCornerSampleCount: stats.awayCornerSampleCount,
-      homeCardForRating: stats.homeCardForRating,
-      awayCardForRating: stats.awayCardForRating,
-      homeCardSampleCount: stats.homeCardSampleCount,
-      awayCardSampleCount: stats.awayCardSampleCount,
-      homeXg: stats.homeXg,
-      awayXg: stats.awayXg,
-      expectedCornersHome: stats.expectedCornersHome,
-      expectedCornersAway: stats.expectedCornersAway,
-      expectedCards: stats.expectedCards,
-      referee: fixture.referee || stats.referee,
-      refereeAnnounced: stats.refereeAnnounced,
-      refereeMatchCount: stats.refereeMatchCount,
-      refereeShrunkRate: stats.refereeShrunkRate,
-      refereeLeagueBaseline: stats.refereeLeagueBaseline,
-      isDerby: stats.isDerby,
-      derbyName: stats.derbyName,
-      derbySource: stats.derbySource,
-      leagueCapabilities: stats.leagueCapabilities,
-      uncertaintyScore: stats.uncertaintyScore,
-      dataCoverageScore: stats.dataCoverageScore,
-      sampleSizeMatches: stats.sampleSizeMatches,
-      stateTags: stats.stateTags,
-      lineupConfirmed: stats.lineupConfirmed,
-      verifiedOdds: fixture.verifiedOdds || stats.verifiedOdds,
-      insufficientData: stats.insufficientData || fixture.insufficientData,
-      hasRealTeamStrength: stats.hasRealTeamStrength,
-      noRecommendationReason: stats.noRecommendationReason,
-    };
+    return buildFixtureContextFromStats(fixture, stats);
   }
 
   async getFixtures(params?: { competitionId?: string; day?: string; status?: string }): Promise<Fixture[]> {
