@@ -469,6 +469,7 @@ function main() {
   //    - Held-out Halves Brier (separate 1H/2H rates vs flat 0.43 ratio)
   //    - Held-out Corners NegBinomial vs Poisson (using team corners FOR & AGAINST)
   //    - Held-out Cards NegBinomial + Referee Shrinkage K_ref vs League Baseline
+  //    - Per-(leagueGroup, marketFamily) match-cluster walk-forward Brier Skill vs causal league base rate + 1000 bootstrap CIs
   const leagueCutoffIdx = new Map<string, number>();
   const leagueSeenIdx = new Map<string, number>();
   for (const [comp, rows] of byLeague.entries()) {
@@ -485,6 +486,117 @@ function main() {
   const teamCards = new Map<string, DecayedTracker>();
   const refTracker = new Map<string, DecayedTracker>(); // key: comp + '::' + normRef
   const h2hPairHistory = new Map<string, Array<{ ms: number; homeId: string; awayId: string; hg: number; ag: number }>>();
+
+  // Causal per-league expanding counters (strictly t < now, ZERO future leakage for walk-forward baselines)
+  interface CausalLeagueStats {
+    n: number;
+    hg: number;
+    ag: number;
+    hw: number;
+    dw: number;
+    aw: number;
+    btts: number;
+    totO: Record<number, number>;
+    homeO: Record<number, number>;
+    awayO: Record<number, number>;
+    ahRetSum: Record<number, number>;
+    htN: number;
+    h1g: number;
+    a1g: number;
+    h2g: number;
+    a2g: number;
+    hsh1: number;
+    hsh2: number;
+    hshEq: number;
+    fhO05: number;
+    fhO15: number;
+    shH: number;
+    shD: number;
+    shA: number;
+    cornersN: number;
+    hc: number;
+    ac: number;
+    cornersSumSq: number;
+    cornersO: Record<number, number>;
+    cardsN: number;
+    cardsSum: number;
+    cardsSumSq: number;
+    cardsO: Record<number, number>;
+  }
+
+  const GOAL_LINES = [0.5, 1.5, 2.5, 3.5, 4.5];
+  const TEAM_GOAL_LINES = [0.5, 1.5, 2.5];
+  const AH_LINES = [-1.5, -1.25, -1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5];
+  const CORNER_LINES = [8.5, 9.5, 10.5, 11.5];
+  const CARD_LINES = [2.5, 3.5, 4.5, 5.5];
+
+  const causalStats = new Map<string, CausalLeagueStats>();
+  const getOrInitCausal = (comp: string): CausalLeagueStats => {
+    let st = causalStats.get(comp);
+    if (!st) {
+      st = {
+        n: 0, hg: 0, ag: 0, hw: 0, dw: 0, aw: 0, btts: 0,
+        totO: { 0.5: 0, 1.5: 0, 2.5: 0, 3.5: 0, 4.5: 0 },
+        homeO: { 0.5: 0, 1.5: 0, 2.5: 0 },
+        awayO: { 0.5: 0, 1.5: 0, 2.5: 0 },
+        ahRetSum: Object.fromEntries(AH_LINES.map(l => [l, 0])),
+        htN: 0, h1g: 0, a1g: 0, h2g: 0, a2g: 0, hsh1: 0, hsh2: 0, hshEq: 0, fhO05: 0, fhO15: 0, shH: 0, shD: 0, shA: 0,
+        cornersN: 0, hc: 0, ac: 0, cornersSumSq: 0, cornersO: { 8.5: 0, 9.5: 0, 10.5: 0, 11.5: 0 },
+        cardsN: 0, cardsSum: 0, cardsSumSq: 0, cardsO: { 2.5: 0, 3.5: 0, 4.5: 0, 5.5: 0 },
+      };
+      causalStats.set(comp, st);
+    }
+    return st;
+  };
+
+  function settleAhReturn(hg: number, ag: number, line: number): number {
+    const rem = Math.abs(line % 0.5);
+    if (rem < 0.01) {
+      const diff = hg + line - ag;
+      if (diff > 0.001) return 1.0;
+      if (Math.abs(diff) <= 0.001) return 0.5;
+      return 0.0;
+    }
+    const rLow = settleAhReturn(hg, ag, line - 0.25);
+    const rHigh = settleAhReturn(hg, ag, line + 0.25);
+    return 0.5 * (rLow + rHigh);
+  }
+
+  // Match-cluster Brier pairs per (leagueGroup, marketFamily)
+  type WfFamily =
+    | 'result'
+    | 'draw'
+    | 'double_chance'
+    | 'goals_over_under'
+    | 'both_teams_to_score'
+    | 'handicap'
+    | 'highest_scoring_half'
+    | 'first_half_goals'
+    | 'second_half_result'
+    | 'corners'
+    | 'bookings';
+
+  const WF_FAMILIES: WfFamily[] = [
+    'result',
+    'draw',
+    'double_chance',
+    'goals_over_under',
+    'both_teams_to_score',
+    'handicap',
+    'highest_scoring_half',
+    'first_half_goals',
+    'second_half_result',
+    'corners',
+    'bookings',
+  ];
+
+  // Each entry is one match cluster: { sumSqModel, sumSqBase, kLines }
+  const wfClusters = new Map<string, Array<{ sumSqModel: number; sumSqBase: number; kLines: number }>>();
+  const pushWfCluster = (grp: LeagueGroupKey, fam: WfFamily, sumSqModel: number, sumSqBase: number, kLines: number) => {
+    const key = `${grp}::${fam}`;
+    if (!wfClusters.has(key)) wfClusters.set(key, []);
+    wfClusters.get(key)!.push({ sumSqModel, sumSqBase, kLines });
+  };
 
   // Ablation accumulators
   const K_TEAM = 12;
@@ -509,21 +621,23 @@ function main() {
     const comp = canonicalComp(m.competition_code);
     const lCfg = leaguesOutput[comp];
     if (!lCfg) continue;
+    const grp = getLeagueGroup(comp);
+    const cst = getOrInitCausal(comp);
 
     const idx = leagueSeenIdx.get(comp)!;
     leagueSeenIdx.set(comp, idx + 1);
     const isTest = idx >= (leagueCutoffIdx.get(comp) ?? 0);
     const tsMs = new Date(m.kickoff_time).getTime();
 
-    const avgHG = lCfg.goals.avgHomeGoals;
-    const avgAG = lCfg.goals.avgAwayGoals;
-    const avgTG = lCfg.goals.avgGoals;
+    const avgHG = cst.n >= 30 ? cst.hg / cst.n : lCfg.goals.avgHomeGoals;
+    const avgAG = cst.n >= 30 ? cst.ag / cst.n : lCfg.goals.avgAwayGoals;
+    const avgTG = avgHG + avgAG;
     const rho = lCfg.goals.dixonColesRho;
 
     const hTeam = currentDecayedRate(teamGoalsAll.get(m.home_team_id), tsMs, avgTG / 2, K_TEAM);
     const aTeam = currentDecayedRate(teamGoalsAll.get(m.away_team_id), tsMs, avgTG / 2, K_TEAM);
 
-    if (isTest && hTeam.matches >= 10 && aTeam.matches >= 10) {
+    if (isTest && hTeam.matches >= 10 && aTeam.matches >= 10 && cst.n >= 30) {
       const basePerSide = avgTG / 2;
       const baseLam = Math.max(0.25, Math.min(4.8, avgHG * (hTeam.forRate / basePerSide) * (aTeam.againstRate / basePerSide)));
       const baseMu = Math.max(0.25, Math.min(4.8, avgAG * (aTeam.forRate / basePerSide) * (hTeam.againstRate / basePerSide)));
@@ -550,17 +664,21 @@ function main() {
       const actualO25 = (m.home_score + m.away_score) > 2.5 ? 1 : 0;
       const actualBtts = (m.home_score >= 1 && m.away_score >= 1) ? 1 : 0;
 
-      // Only evaluate H2H ablation across fixtures that actually have H2H sample (and overall)
+      // H2H ablation sweep (plus retain w=0.04 matrix probabilities for comprehensive walk-forward check)
+      let wfMatrix: number[][] | null = null;
       for (const w of H2H_WEIGHTS) {
-        const mod = w * h2hSampleWeight * h2hGoalDiff * 5.0; // scaled adjustment
+        const mod = w * h2hSampleWeight * h2hGoalDiff * 5.0;
         const lam = Math.max(0.2, Math.min(5.0, baseLam * Math.exp(mod)));
         const mu = Math.max(0.2, Math.min(5.0, baseMu * Math.exp(-mod)));
 
         let pH = 0, pD = 0, pA = 0, pO25 = 0, pBtts = 0, tot = 0;
+        const mat: number[][] = [];
         for (let x = 0; x <= 7; x++) {
+          mat[x] = [];
           const px = poissonProb(lam, x);
           for (let y = 0; y <= 7; y++) {
             const p = px * poissonProb(mu, y) * dcTau(x, y, lam, mu, rho);
+            mat[x][y] = p;
             tot += p;
             if (x > y) pH += p; else if (x === y) pD += p; else pA += p;
             if (x + y > 2.5) pO25 += p;
@@ -568,6 +686,14 @@ function main() {
           }
         }
         pH /= tot; pD /= tot; pA /= tot; pO25 /= tot; pBtts /= tot;
+        if (w === 0.04) {
+          for (let x = 0; x <= 7; x++) {
+            for (let y = 0; y <= 7; y++) {
+              mat[x][y] /= tot;
+            }
+          }
+          wfMatrix = mat;
+        }
 
         const brier1X2 = ((pH - actualH) ** 2 + (pD - actualD) ** 2 + (pA - actualA) ** 2) / 3;
         const brierO25 = (pO25 - actualO25) ** 2;
@@ -579,27 +705,127 @@ function main() {
         h2hBrierSums[w].sumBtts += brierBtts;
       }
 
+      // Comprehensive per-(leagueGroup, marketFamily) Walk-Forward Scoring (using normalized joint matrix)
+      if (wfMatrix) {
+        let pH = 0, pD = 0, pA = 0, pBtts = 0;
+        const pTotO: Record<number, number> = { 0.5: 0, 1.5: 0, 2.5: 0, 3.5: 0, 4.5: 0 };
+        const pHomeO: Record<number, number> = { 0.5: 0, 1.5: 0, 2.5: 0 };
+        const pAwayO: Record<number, number> = { 0.5: 0, 1.5: 0, 2.5: 0 };
+        const pAhRet: Record<number, number> = Object.fromEntries(AH_LINES.map(l => [l, 0]));
+
+        for (let x = 0; x <= 7; x++) {
+          for (let y = 0; y <= 7; y++) {
+            const p = wfMatrix[x][y];
+            if (x > y) pH += p; else if (x === y) pD += p; else pA += p;
+            if (x >= 1 && y >= 1) pBtts += p;
+            for (const l of GOAL_LINES) if (x + y > l) pTotO[l] += p;
+            for (const l of TEAM_GOAL_LINES) {
+              if (x > l) pHomeO[l] += p;
+              if (y > l) pAwayO[l] += p;
+            }
+            for (const l of AH_LINES) {
+              pAhRet[l] += p * settleAhReturn(x, y, l);
+            }
+          }
+        }
+
+        const baseH = cst.hw / cst.n;
+        const baseD = cst.dw / cst.n;
+        const baseA = cst.aw / cst.n;
+        const baseBtts = cst.btts / cst.n;
+
+        // 1. result (1X2_HOME, 1X2_AWAY)
+        pushWfCluster(
+          grp,
+          'result',
+          (pH - actualH) ** 2 + (pA - actualA) ** 2,
+          (baseH - actualH) ** 2 + (baseA - actualA) ** 2,
+          2
+        );
+
+        // 2. draw (1X2_DRAW)
+        pushWfCluster(grp, 'draw', (pD - actualD) ** 2, (baseD - actualD) ** 2, 1);
+
+        // 3. double_chance (DC_1X, DC_X2, DC_12)
+        const act1X = actualH + actualD;
+        const actX2 = actualA + actualD;
+        const act12 = actualH + actualA;
+        pushWfCluster(
+          grp,
+          'double_chance',
+          ((pH + pD) - act1X) ** 2 + ((pA + pD) - actX2) ** 2 + ((pH + pA) - act12) ** 2,
+          ((baseH + baseD) - act1X) ** 2 + ((baseA + baseD) - actX2) ** 2 + ((baseH + baseA) - act12) ** 2,
+          3
+        );
+
+        // 4. goals_over_under (Total O/U 0.5..4.5 + Team Totals Home/Away O/U 0.5..2.5)
+        let gModelSq = 0, gBaseSq = 0, gK = 0;
+        const totG = m.home_score + m.away_score;
+        for (const l of GOAL_LINES) {
+          const yAct = totG > l ? 1 : 0;
+          const bRate = cst.totO[l] / cst.n;
+          gModelSq += (pTotO[l] - yAct) ** 2;
+          gBaseSq += (bRate - yAct) ** 2;
+          gK += 1;
+        }
+        for (const l of TEAM_GOAL_LINES) {
+          const yH = m.home_score > l ? 1 : 0;
+          const bH = cst.homeO[l] / cst.n;
+          gModelSq += (pHomeO[l] - yH) ** 2;
+          gBaseSq += (bH - yH) ** 2;
+          gK += 1;
+
+          const yA = m.away_score > l ? 1 : 0;
+          const bA = cst.awayO[l] / cst.n;
+          gModelSq += (pAwayO[l] - yA) ** 2;
+          gBaseSq += (bA - yA) ** 2;
+          gK += 1;
+        }
+        pushWfCluster(grp, 'goals_over_under', gModelSq, gBaseSq, gK);
+
+        // 5. both_teams_to_score
+        pushWfCluster(grp, 'both_teams_to_score', (pBtts - actualBtts) ** 2, (baseBtts - actualBtts) ** 2, 1);
+
+        // 6. handicap (all 13 Asian Handicap lines -1.5..+1.5 via normalized settlement return)
+        let ahModelSq = 0, ahBaseSq = 0;
+        for (const l of AH_LINES) {
+          const yRet = settleAhReturn(m.home_score, m.away_score, l);
+          const bRet = cst.ahRetSum[l] / cst.n;
+          ahModelSq += (pAhRet[l] - yRet) ** 2;
+          ahBaseSq += (bRet - yRet) ** 2;
+        }
+        pushWfCluster(grp, 'handicap', ahModelSq, ahBaseSq, AH_LINES.length);
+      }
+
       // Halves held-out evaluation (separate 1H/2H rates across K_HALVES vs league-specific 1H share & flat 0.43)
-      if (lCfg.halves && m.home_half_time_score !== null && m.away_half_time_score !== null) {
-        const h1Mean = lCfg.halves.avgHome1HGoals;
-        const a1Mean = lCfg.halves.avgAway1HGoals;
-        const h2Mean = lCfg.halves.avgHome2HGoals;
-        const a2Mean = lCfg.halves.avgAway2HGoals;
-        const base1H = (h1Mean + a1Mean) / 2;
-        const base2H = (h2Mean + a2Mean) / 2;
+      if (lCfg.halves && m.home_half_time_score !== null && m.away_half_time_score !== null && cst.htN >= 30) {
+        const h1Mean = cst.h1g / cst.htN;
+        const a1Mean = cst.a1g / cst.htN;
+        const h2Mean = cst.h2g / cst.htN;
+        const a2Mean = cst.a2g / cst.htN;
+        const base1H = Math.max(0.05, (h1Mean + a1Mean) / 2);
+        const base2H = Math.max(0.05, (h2Mean + a2Mean) / 2);
 
         const h1Check = team1HGoals.get(m.home_team_id)?.matches ?? 0;
         const a1Check = team1HGoals.get(m.away_team_id)?.matches ?? 0;
 
         if (h1Check >= 10 && a1Check >= 10) {
           const t1 = m.home_half_time_score + m.away_half_time_score;
-          const t2 = (m.home_score - m.home_half_time_score) + (m.away_score - m.away_half_time_score);
+          const h2Actual = Math.max(0, m.home_score - m.home_half_time_score);
+          const a2Actual = Math.max(0, m.away_score - m.away_half_time_score);
+          const t2 = h2Actual + a2Actual;
           const actHsh2 = t2 > t1 ? 1 : 0;
+          const actHsh1 = t1 > t2 ? 1 : 0;
+          const actHshEq = t1 === t2 ? 1 : 0;
           const actFh05 = t1 > 0.5 ? 1 : 0;
+          const actFh15 = t1 > 1.5 ? 1 : 0;
+          const actShH = h2Actual > a2Actual ? 1 : 0;
+          const actShD = h2Actual === a2Actual ? 1 : 0;
+          const actShA = h2Actual < a2Actual ? 1 : 0;
 
           const flat1H = (baseLam + baseMu) * 0.43;
           const flat2H = (baseLam + baseMu) * 0.57;
-          const computeHsh2 = (m1: number, m2: number) => {
+          const computeHsh = (m1: number, m2: number) => {
             let p1 = 0, p2 = 0, pEq = 0;
             for (let g1 = 0; g1 <= 7; g1++) {
               const pg1 = poissonProb(m1, g1);
@@ -609,9 +835,15 @@ function main() {
               }
             }
             const s = p1 + p2 + pEq;
-            return { p2: p2 / s, pFhO05: 1 - Math.exp(-m1) };
+            return {
+              p1: p1 / s,
+              p2: p2 / s,
+              pEq: pEq / s,
+              pFhO05: poisOverProb(m1, 0.5),
+              pFhO15: poisOverProb(m1, 1.5),
+            };
           };
-          const flatPred = computeHsh2(flat1H, flat2H);
+          const flatPred = computeHsh(flat1H, flat2H);
 
           for (const kh of HALVES_KS) {
             const h1 = currentDecayedRate(team1HGoals.get(m.home_team_id), tsMs, base1H, kh);
@@ -621,54 +853,119 @@ function main() {
 
             const sep1H = Math.max(0.1, h1Mean * (h1.forRate / base1H) * (a1.againstRate / base1H))
                         + Math.max(0.1, a1Mean * (a1.forRate / base1H) * (h1.againstRate / base1H));
-            const sep2H = Math.max(0.1, h2Mean * (h2.forRate / base2H) * (a2.againstRate / base2H))
-                        + Math.max(0.1, a2Mean * (a2.forRate / base2H) * (h2.againstRate / base2H));
-            const sepPred = computeHsh2(sep1H, sep2H);
+            const sep2HHome = Math.max(0.1, h2Mean * (h2.forRate / base2H) * (a2.againstRate / base2H));
+            const sep2HAway = Math.max(0.1, a2Mean * (a2.forRate / base2H) * (h2.againstRate / base2H));
+            const sep2H = sep2HHome + sep2HAway;
+            const sepPred = computeHsh(sep1H, sep2H);
 
             halvesKSweep[kh].n++;
             halvesKSweep[kh].sepHshBrier += (sepPred.p2 - actHsh2) ** 2;
             halvesKSweep[kh].flatHshBrier += (flatPred.p2 - actHsh2) ** 2;
             halvesKSweep[kh].sepFhBrier += (sepPred.pFhO05 - actFh05) ** 2;
             halvesKSweep[kh].flatFhBrier += (flatPred.pFhO05 - actFh05) ** 2;
+
+            if (kh === 40) {
+              // Walk-forward clusters for highest_scoring_half, first_half_goals, second_half_result
+              const bHsh1 = cst.hsh1 / cst.htN;
+              const bHsh2 = cst.hsh2 / cst.htN;
+              const bHshEq = cst.hshEq / cst.htN;
+              pushWfCluster(
+                grp,
+                'highest_scoring_half',
+                (sepPred.p1 - actHsh1) ** 2 + (sepPred.p2 - actHsh2) ** 2 + (sepPred.pEq - actHshEq) ** 2,
+                (bHsh1 - actHsh1) ** 2 + (bHsh2 - actHsh2) ** 2 + (bHshEq - actHshEq) ** 2,
+                3
+              );
+
+              const bFh05 = cst.fhO05 / cst.htN;
+              const bFh15 = cst.fhO15 / cst.htN;
+              pushWfCluster(
+                grp,
+                'first_half_goals',
+                (sepPred.pFhO05 - actFh05) ** 2 + (sepPred.pFhO15 - actFh15) ** 2,
+                (bFh05 - actFh05) ** 2 + (bFh15 - actFh15) ** 2,
+                2
+              );
+
+              let p2H = 0, p2D = 0, p2A = 0, tot2H = 0;
+              for (let x = 0; x <= 6; x++) {
+                const px = poissonProb(sep2HHome, x);
+                for (let y = 0; y <= 6; y++) {
+                  const j = px * poissonProb(sep2HAway, y);
+                  tot2H += j;
+                  if (x > y) p2H += j; else if (x === y) p2D += j; else p2A += j;
+                }
+              }
+              p2H /= tot2H; p2D /= tot2H; p2A /= tot2H;
+              const bShH = cst.shH / cst.htN;
+              const bShD = cst.shD / cst.htN;
+              const bShA = cst.shA / cst.htN;
+              pushWfCluster(
+                grp,
+                'second_half_result',
+                (p2H - actShH) ** 2 + (p2D - actShD) ** 2 + (p2A - actShA) ** 2,
+                (bShH - actShH) ** 2 + (bShD - actShD) ** 2 + (bShA - actShA) ** 2,
+                3
+              );
+            }
           }
         }
       }
 
-      // Corners held-out evaluation (NegBinomial + Corners FOR & AGAINST vs Poisson & Baseline)
-      if (lCfg.corners && m.home_corners !== null && m.away_corners !== null) {
-        const cMeanSide = lCfg.corners.avgTotalCorners / 2;
+      // Corners held-out evaluation (NegBinomial + Corners FOR & AGAINST vs Poisson & Causal Baseline)
+      if (lCfg.corners && m.home_corners !== null && m.away_corners !== null && cst.cornersN >= 30) {
+        const avgHC = cst.hc / cst.cornersN;
+        const avgAC = cst.ac / cst.cornersN;
+        const avgTotC = avgHC + avgAC;
+        const cMeanSide = Math.max(0.5, avgTotC / 2);
+        const meanSq = avgTotC;
+        const varC = Math.max(avgTotC + 0.1, (cst.cornersSumSq / cst.cornersN - avgTotC * avgTotC) * (cst.cornersN / Math.max(1, cst.cornersN - 1)));
+        const alphaC = Math.max(0.01, (varC - meanSq) / (avgTotC * avgTotC));
+
         const hc = currentDecayedRate(teamCorners.get(m.home_team_id), tsMs, cMeanSide, K_CORNERS);
         const ac = currentDecayedRate(teamCorners.get(m.away_team_id), tsMs, cMeanSide, K_CORNERS);
         if (hc.matches >= 10 && ac.matches >= 10) {
-          const expHC = lCfg.corners.avgHomeCorners * (hc.forRate / cMeanSide) * (ac.againstRate / cMeanSide);
-          const expAC = lCfg.corners.avgAwayCorners * (ac.forRate / cMeanSide) * (hc.againstRate / cMeanSide);
+          const expHC = avgHC * (hc.forRate / cMeanSide) * (ac.againstRate / cMeanSide);
+          const expAC = avgAC * (ac.forRate / cMeanSide) * (hc.againstRate / cMeanSide);
           const expTotalC = Math.max(4.5, Math.min(17.0, expHC + expAC));
-          const alphaC = lCfg.corners.overdispersionAlpha;
+          const totC = m.home_corners + m.away_corners;
 
-          const actO95 = (m.home_corners + m.away_corners) > 9.5 ? 1 : 0;
-          const pNb = nbOverProb(expTotalC, 9.5, alphaC, 30);
-          const pPois = poisOverProb(expTotalC, 9.5);
-          const pBase = lCfg.corners.o95Rate;
+          const actO95 = totC > 9.5 ? 1 : 0;
+          const pNb95 = nbOverProb(expTotalC, 9.5, alphaC, 30);
+          const pPois95 = poisOverProb(expTotalC, 9.5);
+          const pBase95 = cst.cornersO[9.5] / cst.cornersN;
 
           cornersEvalN++;
-          cornersNbBrier += (pNb - actO95) ** 2;
-          cornersPoisBrier += (pPois - actO95) ** 2;
-          cornersBaseBrier += (pBase - actO95) ** 2;
-          cornersNbLl -= actO95 ? Math.log(pNb) : Math.log(1 - pNb);
-          cornersPoisLl -= actO95 ? Math.log(pPois) : Math.log(1 - pPois);
+          cornersNbBrier += (pNb95 - actO95) ** 2;
+          cornersPoisBrier += (pPois95 - actO95) ** 2;
+          cornersBaseBrier += (pBase95 - actO95) ** 2;
+          cornersNbLl -= actO95 ? Math.log(pNb95) : Math.log(1 - pNb95);
+          cornersPoisLl -= actO95 ? Math.log(pPois95) : Math.log(1 - pPois95);
+
+          let cModSq = 0, cBaseSq = 0;
+          for (const cl of CORNER_LINES) {
+            const act = totC > cl ? 1 : 0;
+            const pMod = nbOverProb(expTotalC, cl, alphaC, 30);
+            const pBas = cst.cornersO[cl] / cst.cornersN;
+            cModSq += (pMod - act) ** 2;
+            cBaseSq += (pBas - act) ** 2;
+          }
+          pushWfCluster(grp, 'corners', cModSq, cBaseSq, CORNER_LINES.length);
         }
       }
 
       // Cards held-out evaluation (NegBinomial + Referee Shrinkage)
-      if (lCfg.cards && m.home_yellow_cards !== null && m.away_yellow_cards !== null) {
+      if (lCfg.cards && m.home_yellow_cards !== null && m.away_yellow_cards !== null && cst.cardsN >= 30) {
         const totalC = m.home_yellow_cards + m.away_yellow_cards + (m.home_red_cards ?? 0) + (m.away_red_cards ?? 0);
         const actO45 = totalC > 4.5 ? 1 : 0;
-        const cardMean = lCfg.cards.avgTotalCards;
-        const alphaCards = lCfg.cards.overdispersionAlpha;
+        const cardMean = Math.max(1.0, cst.cardsSum / cst.cardsN);
+        const varCards = Math.max(cardMean + 0.1, (cst.cardsSumSq / cst.cardsN - cardMean * cardMean) * (cst.cardsN / Math.max(1, cst.cardsN - 1)));
+        const alphaCards = Math.max(0.01, (varCards - cardMean) / (cardMean * cardMean));
         const hCd = currentDecayedRate(teamCards.get(m.home_team_id), tsMs, cardMean / 2, K_CORNERS);
         const aCd = currentDecayedRate(teamCards.get(m.away_team_id), tsMs, cardMean / 2, K_CORNERS);
         const teamCardsRatio = ((hCd.forRate + hCd.againstRate + aCd.forRate + aCd.againstRate) / 2) / cardMean;
 
+        let chosenMuCards = Math.max(1.5, Math.min(9.0, cardMean * (0.3 * teamCardsRatio + 0.7)));
         if (m.referee && m.referee.trim().length > 0) {
           const refKey = `${comp}::${m.referee.trim().toLowerCase()}`;
           const rt = refTracker.get(refKey);
@@ -677,6 +974,7 @@ function main() {
               ? ((rt.gfSum * Math.exp(-DECAY_LAMBDA * Math.max(0, (tsMs - rt.lastMs) / DAY_MS)) + kRef * cardMean) / (rt.wSum * Math.exp(-DECAY_LAMBDA * Math.max(0, (tsMs - rt.lastMs) / DAY_MS)) + kRef))
               : cardMean;
             const muCardsRef = Math.max(1.5, Math.min(9.0, 0.5 * refShrunk + 0.5 * cardMean * teamCardsRatio));
+            if (kRef === 10) chosenMuCards = muCardsRef;
             const muCardsBase = Math.max(1.5, Math.min(9.0, cardMean * (0.3 * teamCardsRatio + 0.7)));
 
             const pNbRef = nbOverProb(muCardsRef, 4.5, alphaCards, 20);
@@ -689,16 +987,45 @@ function main() {
             cardsRefBrier[kRef].nbBaseBrier += (pNbBase - actO45) ** 2;
           }
         } else {
-          // Group 2 no referee: NegBinomial vs Poisson
           const muCardsBase = Math.max(1.5, Math.min(9.0, cardMean * (0.3 * teamCardsRatio + 0.7)));
+          chosenMuCards = muCardsBase;
           cardsNoRefEvalN++;
           cardsNoRefNbBrier += (nbOverProb(muCardsBase, 4.5, alphaCards, 20) - actO45) ** 2;
           cardsNoRefPoisBrier += (poisOverProb(muCardsBase, 4.5) - actO45) ** 2;
         }
+
+        if (hCd.matches >= 10 && aCd.matches >= 10) {
+          let cdModSq = 0, cdBaseSq = 0;
+          for (const cl of CARD_LINES) {
+            const act = totalC > cl ? 1 : 0;
+            const pMod = nbOverProb(chosenMuCards, cl, alphaCards, 20);
+            const pBas = cst.cardsO[cl] / cst.cardsN;
+            cdModSq += (pMod - act) ** 2;
+            cdBaseSq += (pBas - act) ** 2;
+          }
+          pushWfCluster(grp, 'bookings', cdModSq, cdBaseSq, CARD_LINES.length);
+        }
       }
     }
 
-    // Update all trackers strictly AFTER prediction evaluation
+    // Update all causal league stats & trackers strictly AFTER prediction evaluation
+    cst.n += 1;
+    cst.hg += m.home_score;
+    cst.ag += m.away_score;
+    if (m.home_score > m.away_score) cst.hw += 1;
+    else if (m.home_score === m.away_score) cst.dw += 1;
+    else cst.aw += 1;
+    if (m.home_score >= 1 && m.away_score >= 1) cst.btts += 1;
+    const mTotG = m.home_score + m.away_score;
+    for (const l of GOAL_LINES) if (mTotG > l) cst.totO[l] += 1;
+    for (const l of TEAM_GOAL_LINES) {
+      if (m.home_score > l) cst.homeO[l] += 1;
+      if (m.away_score > l) cst.awayO[l] += 1;
+    }
+    for (const l of AH_LINES) {
+      cst.ahRetSum[l] += settleAhReturn(m.home_score, m.away_score, l);
+    }
+
     if (!teamGoalsHome.has(m.home_team_id)) teamGoalsHome.set(m.home_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
     if (!teamGoalsAway.has(m.away_team_id)) teamGoalsAway.set(m.away_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
     if (!teamGoalsAll.has(m.home_team_id)) teamGoalsAll.set(m.home_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
@@ -709,19 +1036,36 @@ function main() {
     updateTracker(teamGoalsAll.get(m.away_team_id)!, tsMs, m.away_score, m.home_score);
 
     if (m.home_half_time_score !== null && m.away_half_time_score !== null) {
+      const h1 = m.home_half_time_score;
+      const a1 = m.away_half_time_score;
+      const h2 = Math.max(0, m.home_score - h1);
+      const a2 = Math.max(0, m.away_score - a1);
+      cst.htN += 1;
+      cst.h1g += h1; cst.a1g += a1; cst.h2g += h2; cst.a2g += a2;
+      const t1 = h1 + a1, t2 = h2 + a2;
+      if (t1 > t2) cst.hsh1 += 1; else if (t2 > t1) cst.hsh2 += 1; else cst.hshEq += 1;
+      if (t1 > 0.5) cst.fhO05 += 1;
+      if (t1 > 1.5) cst.fhO15 += 1;
+      if (h2 > a2) cst.shH += 1; else if (h2 === a2) cst.shD += 1; else cst.shA += 1;
+
       if (!team1HGoals.has(m.home_team_id)) team1HGoals.set(m.home_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
       if (!team1HGoals.has(m.away_team_id)) team1HGoals.set(m.away_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
       if (!team2HGoals.has(m.home_team_id)) team2HGoals.set(m.home_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
       if (!team2HGoals.has(m.away_team_id)) team2HGoals.set(m.away_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
-      const h2 = Math.max(0, m.home_score - m.home_half_time_score);
-      const a2 = Math.max(0, m.away_score - m.away_half_time_score);
-      updateTracker(team1HGoals.get(m.home_team_id)!, tsMs, m.home_half_time_score, m.away_half_time_score);
-      updateTracker(team1HGoals.get(m.away_team_id)!, tsMs, m.away_half_time_score, m.home_half_time_score);
+      updateTracker(team1HGoals.get(m.home_team_id)!, tsMs, h1, a1);
+      updateTracker(team1HGoals.get(m.away_team_id)!, tsMs, a1, h1);
       updateTracker(team2HGoals.get(m.home_team_id)!, tsMs, h2, a2);
       updateTracker(team2HGoals.get(m.away_team_id)!, tsMs, a2, h2);
     }
 
     if (m.home_corners !== null && m.away_corners !== null) {
+      const tc = m.home_corners + m.away_corners;
+      cst.cornersN += 1;
+      cst.hc += m.home_corners;
+      cst.ac += m.away_corners;
+      cst.cornersSumSq += tc * tc;
+      for (const cl of CORNER_LINES) if (tc > cl) cst.cornersO[cl] += 1;
+
       if (!teamCorners.has(m.home_team_id)) teamCorners.set(m.home_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
       if (!teamCorners.has(m.away_team_id)) teamCorners.set(m.away_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
       updateTracker(teamCorners.get(m.home_team_id)!, tsMs, m.home_corners, m.away_corners);
@@ -731,6 +1075,12 @@ function main() {
     if (m.home_yellow_cards !== null && m.away_yellow_cards !== null) {
       const hCards = m.home_yellow_cards + (m.home_red_cards ?? 0);
       const aCards = m.away_yellow_cards + (m.away_red_cards ?? 0);
+      const totCd = hCards + aCards;
+      cst.cardsN += 1;
+      cst.cardsSum += totCd;
+      cst.cardsSumSq += totCd * totCd;
+      for (const cl of CARD_LINES) if (totCd > cl) cst.cardsO[cl] += 1;
+
       if (!teamCards.has(m.home_team_id)) teamCards.set(m.home_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
       if (!teamCards.has(m.away_team_id)) teamCards.set(m.away_team_id, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
       updateTracker(teamCards.get(m.home_team_id)!, tsMs, hCards, aCards);
@@ -739,7 +1089,7 @@ function main() {
       if (m.referee && m.referee.trim().length > 0) {
         const refKey = `${comp}::${m.referee.trim().toLowerCase()}`;
         if (!refTracker.has(refKey)) refTracker.set(refKey, { matches: 0, wSum: 0, gfSum: 0, gaSum: 0, lastMs: tsMs });
-        updateTracker(refTracker.get(refKey)!, tsMs, hCards + aCards, 0);
+        updateTracker(refTracker.get(refKey)!, tsMs, totCd, 0);
       }
     }
 
@@ -799,6 +1149,101 @@ function main() {
     }
   }
 
+  // Compute 1,000-resample Match-Cluster Bootstrap Brier Skill Score + 95% CI per (leagueGroup, marketFamily)
+  interface WalkForwardMarketValidationEntry {
+    leagueGroup: LeagueGroupKey;
+    market: WfFamily;
+    matches: number;
+    samples: number;
+    modelBrier: number;
+    baseBrier: number;
+    brierSkill: number;
+    ci95Lower: number;
+    ci95Upper: number;
+    allowed: boolean;
+    reason: string;
+  }
+
+  const walkForwardMarketValidation: Record<LeagueGroupKey, Record<string, WalkForwardMarketValidationEntry>> = {
+    UK_WITH_REF: {},
+    EURO_NO_REF: {},
+    EXTRA_GOALS_ONLY: {},
+  };
+
+  let rngSeed = 20250501;
+  const nextRand = () => {
+    rngSeed = (rngSeed * 16807) % 2147483647;
+    return (rngSeed - 1) / 2147483646;
+  };
+
+  const GROUPS: LeagueGroupKey[] = ['UK_WITH_REF', 'EURO_NO_REF', 'EXTRA_GOALS_ONLY'];
+  for (const grp of GROUPS) {
+    for (const fam of WF_FAMILIES) {
+      const clusters = wfClusters.get(`${grp}::${fam}`) || [];
+      const nMatches = clusters.length;
+      if (nMatches < 30) {
+        walkForwardMarketValidation[grp][fam] = {
+          leagueGroup: grp,
+          market: fam,
+          matches: nMatches,
+          samples: nMatches > 0 ? clusters.reduce((s, c) => s + c.kLines, 0) : 0,
+          modelBrier: 0,
+          baseBrier: 0,
+          brierSkill: 0,
+          ci95Lower: -1,
+          ci95Upper: 1,
+          allowed: false,
+          reason: nMatches === 0
+            ? `Disabled: no stored column data for ${fam} in ${grp}.`
+            : `Disabled: insufficient held-out sample (${nMatches} < 30 matches).`,
+        };
+        continue;
+      }
+
+      let totalMod = 0, totalBas = 0, totalSamples = 0;
+      for (const c of clusters) {
+        totalMod += c.sumSqModel;
+        totalBas += c.sumSqBase;
+        totalSamples += c.kLines;
+      }
+      const modelBrier = totalMod / totalSamples;
+      const baseBrier = totalBas / totalSamples;
+      const brierSkill = baseBrier > 0 ? 1 - modelBrier / baseBrier : 0;
+
+      const bootBss: number[] = new Array(1000);
+      for (let it = 0; it < 1000; it++) {
+        let bMod = 0, bBas = 0;
+        for (let i = 0; i < nMatches; i++) {
+          const c = clusters[Math.floor(nextRand() * nMatches)];
+          bMod += c.sumSqModel;
+          bBas += c.sumSqBase;
+        }
+        bootBss[it] = bBas > 0 ? 1 - bMod / bBas : 0;
+      }
+      bootBss.sort((a, b) => a - b);
+      const ci95Lower = Number(bootBss[25].toFixed(4));
+      const ci95Upper = Number(bootBss[975].toFixed(4));
+      const bssRounded = Number(brierSkill.toFixed(4));
+      const allowed = nMatches >= 30 && bssRounded > 0 && ci95Lower > 0;
+
+      walkForwardMarketValidation[grp][fam] = {
+        leagueGroup: grp,
+        market: fam,
+        matches: nMatches,
+        samples: totalSamples,
+        modelBrier: Number(modelBrier.toFixed(5)),
+        baseBrier: Number(baseBrier.toFixed(5)),
+        brierSkill: bssRounded,
+        ci95Lower,
+        ci95Upper,
+        allowed,
+        reason: allowed
+          ? `Allowed: BSS +${bssRounded.toFixed(4)} (95% CI [+${ci95Lower.toFixed(4)}, +${ci95Upper.toFixed(4)}] > 0 across ${nMatches} held-out matches).`
+          : `Rejected: BSS ${bssRounded >= 0 ? '+' : ''}${bssRounded.toFixed(4)} (95% CI [${ci95Lower.toFixed(4)}, ${ci95Upper.toFixed(4)}]) does not exceed 0 with CI lower > 0.`,
+      };
+    }
+  }
+
   // 3. Derby Statistical Significance Test (league-matched: within-league excess vs non-derbies in same leagues)
   const derbyGoals: number[] = [], nonDerbyGoals: number[] = [];
   const derbyDraws: number[] = [], nonDerbyDraws: number[] = [];
@@ -820,7 +1265,6 @@ function main() {
     const [pA, pB] = canonicalPairIds(m.home_team_id, m.away_team_id);
     const isDerby = rivalrySet.has(`${pA}__${pB}`);
 
-    // Test league-centered residuals (and raw draws) so cross-league base rates never bias the test
     const goalExcess = (m.home_score + m.away_score) - lCfg.goals.avgGoals;
     const drawExcess = (m.home_score === m.away_score ? 1 : 0) - lCfg.goals.drawRate;
     if (isDerby) {
@@ -851,8 +1295,7 @@ function main() {
   const derbyDrawTest = welchTTest(derbyDraws, nonDerbyDraws);
   const derbyCornersTest = welchTTest(derbyCorners, nonDerbyCorners);
 
-  // Compute derby card multiplier if statistically significant (p < 0.05)
-  const derbyMeanCardsBase = 4.2; // just for percentage scaling vs league average
+  const derbyMeanCardsBase = 4.2;
   const avgCardsWeightedInDerbyLeagues = (() => {
     let s = 0, c = 0;
     for (const m of matches) {
@@ -942,6 +1385,7 @@ function main() {
       applyDrawAdjustment: derbyDrawTest.significant05,
       applyCornersAdjustment: derbyCornersTest.significant05,
     },
+    walkForwardMarketValidation,
     leagues: leaguesOutput,
   };
 
@@ -949,7 +1393,7 @@ function main() {
   fs.writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf8');
 
   console.log('====================================================================');
-  console.log('EMPIRICAL CALIBRATION, H2H ABLATION & DERBY SIGNIFICANCE (FROM DB)');
+  console.log('EMPIRICAL CALIBRATION, H2H ABLATION & WALK-FORWARD MARKET GATING');
   console.log('====================================================================');
   console.log(`Total finished stored matches: ${matches.length}`);
   console.log('\n--- 1. SAMPLE SIZE PER MARKET AND LEAGUE GROUP ---');
@@ -963,16 +1407,19 @@ function main() {
     console.log(`  Referee Coverage (stored referee): N = ${s.refereeMatches}`);
   }
 
-  console.log('\n--- 2. PER-LEAGUE COVERAGE & CALIBRATED PARAMETERS ---');
-  for (const comp of Object.keys(leaguesOutput).sort()) {
-    const l = leaguesOutput[comp];
-    console.log(
-      `${comp.padEnd(4)} | grp=${l.leagueGroup.padEnd(16)} | N_FT=${String(l.goals.sampleSize).padStart(4)} rho=${l.goals.dixonColesRho.toFixed(3)} avgG=${l.goals.avgGoals.toFixed(2)}` +
-      ` | HT=${l.halves ? `${l.halves.sampleSize} (1H=${(l.halves.firstHalfGoalShare * 100).toFixed(1)}%)` : 'DISABLED'}` +
-      ` | Corners=${l.corners ? `${l.corners.sampleSize} (mu=${l.corners.avgTotalCorners.toFixed(2)}, alpha=${l.corners.overdispersionAlpha.toFixed(4)})` : 'DISABLED'}` +
-      ` | Cards=${l.cards ? `${l.cards.sampleSize} (mu=${l.cards.avgTotalCards.toFixed(2)}, alpha=${l.cards.overdispersionAlpha.toFixed(4)})` : 'DISABLED'}` +
-      ` | Ref=${l.capabilities.refereeSampleSize} | AH_Odds=${ahCountByLeague.get(comp) || 0}`
-    );
+  console.log('\n--- 2. WALK-FORWARD RESULTS PER MARKET & LEAGUE GROUP (1,000 BOOTSTRAP RESAMPLES) ---');
+  for (const grp of GROUPS) {
+    console.log(`\nLeague Group: ${grp}`);
+    console.log('  Market                | Matches | Samples | ModelBrier | BaseBrier | BrierSkill | 95% CI               | Allowed');
+    console.log('  ----------------------+---------+---------+------------+-----------+------------+----------------------+--------');
+    for (const fam of WF_FAMILIES) {
+      const r = walkForwardMarketValidation[grp][fam];
+      const ciStr = `[${r.ci95Lower >= 0 ? '+' : ''}${r.ci95Lower.toFixed(4)}, ${r.ci95Upper >= 0 ? '+' : ''}${r.ci95Upper.toFixed(4)}]`;
+      const bssStr = `${r.brierSkill >= 0 ? '+' : ''}${r.brierSkill.toFixed(4)}`;
+      console.log(
+        `  ${fam.padEnd(21)} | ${String(r.matches).padStart(7)} | ${String(r.samples).padStart(7)} | ${r.modelBrier.toFixed(5).padStart(10)} | ${r.baseBrier.toFixed(5).padStart(9)} | ${bssStr.padStart(10)} | ${ciStr.padEnd(20)} | ${r.allowed ? 'YES' : 'NO'}`
+      );
+    }
   }
 
   console.log('\n--- 3. HELD-OUT H2H BRIER SCORE ABLATION ---');

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
-import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import NBAScoreProjectionTool from '@/components/nba/NBAScoreProjectionTool';
@@ -62,27 +62,28 @@ export default function DashboardPage() {
 
   const savedFixtureIds = useMemo(() => getStoredSavedFixtures(), []);
 
-  // Pre-calculate market evaluation for all live football fixtures
+  // Pre-calculate market evaluation for all live football fixtures with 40% diversity cap
   const evaluatedFixtures = useMemo(() => {
     if (isBasketball) return [];
-    return fixtures.map(fixture => {
+    const raw = fixtures.map(fixture => {
       const stats = getFixtureStatistics(fixture);
-
       const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
 
       return {
+        fixtureId: fixture.id,
         fixture,
         predictions: evalResult.predictions,
         topPick: evalResult.topPick,
         noRecommendationReason: evalResult.noRecommendationReason || stats.noRecommendationReason,
       };
     });
+    return selectDiversifiedSlatePicks(raw, 0.40);
   }, [fixtures, isBasketball]);
 
-  // Filter football fixtures by competition_id ONLY + tab day/status
+  // Filter football fixtures by competition_id ONLY + tab day/status and preserve diversity cap on visible slate
   const filteredList = useMemo(() => {
     if (isBasketball) return [];
-    return evaluatedFixtures.filter(({ fixture }) => {
+    const subset = evaluatedFixtures.filter(({ fixture }) => {
       if (selectedCompId !== 'ALL' && (fixture.competitionId || fixture.competition.id) !== selectedCompId) {
         return false;
       }
@@ -100,6 +101,7 @@ export default function DashboardPage() {
       }
       return fixture.status !== 'FINISHED';
     });
+    return selectDiversifiedSlatePicks(subset, 0.40);
   }, [evaluatedFixtures, selectedCompId, searchQuery, activeTab, isBasketball]);
 
   // Basketball filtered fixtures

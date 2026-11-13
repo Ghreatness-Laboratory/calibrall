@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
-import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import SportSwitcher from '@/components/SportSwitcher';
@@ -91,21 +91,22 @@ export default function MatchesPage() {
     setSelectedFootballGroup('ALL');
   };
 
-  // Football evaluated fixtures
+  // Football evaluated fixtures with 40% market family diversity cap
   const evaluatedFootballFixtures = useMemo(() => {
     if (isBasketball) return [];
-    return fixtures.map(fixture => {
+    const raw = fixtures.map(fixture => {
       const stats = getFixtureStatistics(fixture);
-
       const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
 
       return {
+        fixtureId: fixture.id,
         fixture,
         topPick: evalResult.topPick,
         predictions: evalResult.predictions,
         noRecommendationReason: evalResult.noRecommendationReason || stats.noRecommendationReason,
       };
     });
+    return selectDiversifiedSlatePicks(raw, 0.40);
   }, [fixtures, isBasketball]);
 
   // Market Group Matching

@@ -304,6 +304,27 @@ export default function FixtureCard({
                 )}
               </div>
 
+              {/* Real Odds, De-vigged Probability & Expected Value (strictly omitted when unpriced) */}
+              <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10.5px] tabular-nums">
+                {hasRealOdds && topPrediction.evidence?.expectedValue !== null && topPrediction.evidence?.expectedValue !== undefined ? (
+                  <>
+                    <span className="text-[#E9EFEB]">
+                      Price @{oddsFormatted}
+                      {topPrediction.evidence.deviggedMarketProb !== null && topPrediction.evidence.deviggedMarketProb !== undefined
+                        ? ` · Market ${(topPrediction.evidence.deviggedMarketProb * 100).toFixed(1)}%`
+                        : ''}
+                    </span>
+                    <span className="font-semibold text-[#B8E636]">
+                      EV {cleanDisplayText(evFormatted || '')}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[#8B9892]">
+                    No bookmaker odds stored · Probability analysis only
+                  </span>
+                )}
+              </div>
+
               {/* Settlement Banner when match completed */}
               {settledTopPrediction && (
                 <div className={`mt-0.5 px-2 py-1 rounded-[6px] flex items-center justify-between text-[10px] border ${
@@ -330,6 +351,57 @@ export default function FixtureCard({
                     className="h-full rounded-full transition-all duration-300 bg-[#B8E636]"
                     style={{ width: `${probProgress}%` }}
                   />
+                </div>
+              )}
+
+              {/* Evidence Audit Strip */}
+              {topPrediction.evidence && (
+                <div className="pt-1.5 mt-1 border-t border-[#1F2A24] space-y-1 text-[10px] leading-snug text-[#8B9892]">
+                  <p className="text-[#E9EFEB]/90">
+                    {cleanDisplayText(topPrediction.evidence.whyLineChosen)}
+                  </p>
+                  <div className="grid grid-cols-1 gap-0.5 tabular-nums">
+                    <div>
+                      <span className="text-[#5E6B65]">Strengths: </span>
+                      <span>
+                        {cleanDisplayText(
+                          `Home Att ${topPrediction.evidence.fittedStrengths.homeAttack.toFixed(2)} Def ${topPrediction.evidence.fittedStrengths.homeDefense.toFixed(2)} (${topPrediction.evidence.fittedStrengths.homeXg.toFixed(2)} xG) vs Away Att ${topPrediction.evidence.fittedStrengths.awayAttack.toFixed(2)} Def ${topPrediction.evidence.fittedStrengths.awayDefense.toFixed(2)} (${topPrediction.evidence.fittedStrengths.awayXg.toFixed(2)} xG)`
+                        )}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[#5E6B65]">Samples: </span>
+                      <span>
+                        {cleanDisplayText(
+                          `Home ${topPrediction.evidence.sampleSizes.homeMatches} · Away ${topPrediction.evidence.sampleSizes.awayMatches} · League ${topPrediction.evidence.sampleSizes.leagueMatches} · Walk forward ${topPrediction.evidence.sampleSizes.walkForwardMatches} · H2H ${topPrediction.evidence.sampleSizes.h2hMeetings}`
+                        )}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[#5E6B65]">Referee: </span>
+                      <span>
+                        {cleanDisplayText(
+                          topPrediction.evidence.referee.announced && topPrediction.evidence.referee.name
+                            ? `${topPrediction.evidence.referee.name} (${topPrediction.evidence.referee.shrunkCardsPerMatch !== undefined ? topPrediction.evidence.referee.shrunkCardsPerMatch.toFixed(2) : 'baseline'} cards/m vs ${topPrediction.evidence.referee.leagueBaseline !== undefined ? topPrediction.evidence.referee.leagueBaseline.toFixed(2) : 'league'} baseline)`
+                            : topPrediction.evidence.referee.leagueBaseline !== undefined
+                              ? `Unannounced (league baseline ${topPrediction.evidence.referee.leagueBaseline.toFixed(2)} cards/m)`
+                              : topPrediction.evidence.referee.explanation
+                        )}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[#5E6B65]">H2H &amp; Derby: </span>
+                      <span>
+                        {cleanDisplayText(
+                          `${topPrediction.evidence.h2h.summary} (w=${topPrediction.evidence.h2h.weightApplied.toFixed(2)}) · ${
+                            topPrediction.evidence.derby.isDerby
+                              ? `Derby: ${topPrediction.evidence.derby.name || 'Rivalry'} (${topPrediction.evidence.derby.source || 'verified'}, cards x${topPrediction.evidence.derby.cardsMultiplierApplied.toFixed(2)})`
+                              : 'No active rivalry flag'
+                          }`
+                        )}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

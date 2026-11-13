@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getFootballDataProvider } from '@/lib/data/provider';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
-import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 120;
@@ -28,23 +28,30 @@ export async function GET() {
     );
   }
 
-  const qualified: any[] = [];
-
-  liveResult.fixtures.filter(f => f.status !== 'FINISHED').forEach(fixture => {
-    const stats = getFixtureStatistics(fixture);
-
-    const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
-
-    if (evalResult.topPick) {
-      qualified.push({
+  const evaluated = liveResult.fixtures
+    .filter(f => f.status !== 'FINISHED')
+    .map(fixture => {
+      const stats = getFixtureStatistics(fixture);
+      const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
+      return {
         fixtureId: fixture.id,
-        match: `${fixture.homeTeam.name} vs ${fixture.awayTeam.name}`,
-        competition: fixture.competition.name,
-        kickoff: fixture.kickoffTime,
+        fixture,
         topPick: evalResult.topPick,
-      });
-    }
-  });
+        predictions: evalResult.predictions,
+        noRecommendationReason: evalResult.noRecommendationReason,
+      };
+    });
+
+  const diversified = selectDiversifiedSlatePicks(evaluated, 0.40);
+  const qualified = diversified
+    .filter(item => item.topPick !== null)
+    .map(item => ({
+      fixtureId: item.fixture.id,
+      match: `${item.fixture.homeTeam.name} vs ${item.fixture.awayTeam.name}`,
+      competition: item.fixture.competition.name,
+      kickoff: item.fixture.kickoffTime,
+      topPick: item.topPick,
+    }));
 
   return NextResponse.json(
     {

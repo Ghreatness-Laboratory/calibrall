@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
-import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import { useSport } from '@/lib/context/SportContext';
@@ -23,17 +23,19 @@ export default function SavedMatchesPage() {
   }, []);
 
   const savedFixtures = useMemo(() => {
-    return fixtures.filter(f => savedIds.includes(f.id)).map(fixture => {
+    const raw = fixtures.filter(f => savedIds.includes(f.id)).map(fixture => {
       const stats = getFixtureStatistics(fixture);
-
       const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
 
       return {
+        fixtureId: fixture.id,
         fixture,
         topPick: evalResult.topPick,
+        predictions: evalResult.predictions,
         noRecommendationReason: evalResult.noRecommendationReason || stats.noRecommendationReason,
       };
     });
+    return selectDiversifiedSlatePicks(raw, 0.40);
   }, [fixtures, savedIds]);
 
   const handleClearAll = () => {

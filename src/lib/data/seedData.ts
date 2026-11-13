@@ -344,6 +344,8 @@ export interface FixtureStatisticalContext {
   uncertaintyScore: number | null;
   dataCoverageScore: number | null;
   sampleSizeMatches: number;
+  homeSampleMatches?: number;
+  awaySampleMatches?: number;
   hasRealTeamStrength?: boolean;
   insufficientData?: boolean;
   stateTags?: StateTag[];
@@ -573,6 +575,8 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     uncertaintyScore: uncertainty,
     dataCoverageScore: dataCoverage,
     sampleSizeMatches: Math.round(sampleMatches / 2),
+    homeSampleMatches: homeStoredCount,
+    awaySampleMatches: awayStoredCount,
     hasRealTeamStrength: true,
     insufficientData: false,
     stateTags,
@@ -659,6 +663,8 @@ export function buildFixtureContextFromStats(
     uncertaintyScore: stats.uncertaintyScore as any,
     dataCoverageScore: stats.dataCoverageScore as any,
     sampleSizeMatches: stats.sampleSizeMatches,
+    homeSampleMatches: stats.homeSampleMatches,
+    awaySampleMatches: stats.awaySampleMatches,
     stateTags: stats.stateTags,
     lineupConfirmed: stats.lineupConfirmed,
     verifiedOdds: fixture.verifiedOdds || stats.verifiedOdds,

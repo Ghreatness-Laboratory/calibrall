@@ -3,18 +3,19 @@
 // Platt calibration, match-specific competitive Asian handicaps, honest confidence tiers,
 // per-prediction data completeness and uncertainty, sanity tripwires, and zero-force pick selection.
 
-import { 
-  FixtureContext, 
-  MarketPrediction, 
-  SupportedOptionType, 
-  MarketCategory, 
-  MarketPeriod, 
-  ConfidenceTier,
-  QualificationStatus
+import {
+  FixtureContext,
+  MarketPrediction,
+  SupportedOptionType,
+  MarketCategory,
+  MarketPeriod,
+  QualificationStatus,
+  PickEvidence,
+  VerifiedMatchOdds,
 } from '@/types';
 import { FeatureLayerEngine, V25FixtureFeatures } from './featureLayer';
-import { DixonColesV25Engine, V25ScorelineMatrix } from './dixonColesV25';
-import { ConfidenceEngine, V25RiskFlagEvaluation } from './confidenceEngine';
+import { DixonColesV25Engine, V25ScorelineMatrix, COVARIATE_COEFFICIENTS } from './dixonColesV25';
+import { ConfidenceEngine } from './confidenceEngine';
 import { WhyPanelGenerator } from './whyPanel';
 import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
 import { formatSelectionName } from '../marketCatalog';
@@ -22,10 +23,14 @@ import { getMarketBaseline } from '../baselines';
 import { marketMonitor, getEquivalentCanonicalKey } from '../marketMonitor';
 import { getMarketFamily } from '../marketSelection';
 import { calculateFragilityScore } from '../fragilityAndSubstitutes';
-import { getLeagueCalibratedConfig, getLeagueCapabilities } from '../calibratedParams';
+import { getCalibratedParams, getLeagueCalibratedConfig, getLeagueCapabilities } from '../calibratedParams';
+import { checkMarketGating } from '../marketGating';
+import { devigCompleteMarket } from '../oddsEngine';
+
+export const PICK_CONFIDENCE_THRESHOLD = 0.70;
 
 export interface V25EvaluatedFixtureResult {
-  engineVersion: 'v2.5.0';
+  engineVersion: 'v25.0';
   fixtureId: string;
   features: V25FixtureFeatures;
   scorelineMatrix: V25ScorelineMatrix;
@@ -47,6 +52,7 @@ interface RawOptionCandidate {
   settlementRule: string;
   rawProb: number;
   marketOdds?: number;
+  deviggedProb?: number;
   pushProbability?: number;
   winProb?: number;
   halfWinProb?: number;
@@ -58,14 +64,138 @@ interface RawOptionCandidate {
   plainEnglishReason?: string;
 }
 
+type LadderKind = 'over' | 'under' | 'ah';
+
+interface LadderInfo {
+  ladderKey: string;
+  kind: LadderKind;
+  numericValue: number;
+}
+
+function getLadderInfo(p: Pick<MarketPrediction, 'marketCode' | 'marketCategory' | 'optionType' | 'line' | 'handicapLine'>): LadderInfo | null {
+  const code = p.marketCode;
+  if (code.startsWith('TOTAL_GOALS_O') && p.line !== undefined) {
+    return { ladderKey: 'total_goals_over', kind: 'over', numericValue: p.line };
+  }
+  if (code.startsWith('TOTAL_GOALS_U') && p.line !== undefined) {
+    return { ladderKey: 'total_goals_under', kind: 'under', numericValue: p.line };
+  }
+  if (code.startsWith('TEAM_GOALS_HOME_O') && p.line !== undefined) {
+    return { ladderKey: 'team_goals_home_over', kind: 'over', numericValue: p.line };
+  }
+  if (code.startsWith('TEAM_GOALS_HOME_U') && p.line !== undefined) {
+    return { ladderKey: 'team_goals_home_under', kind: 'under', numericValue: p.line };
+  }
+  if (code.startsWith('TEAM_GOALS_AWAY_O') && p.line !== undefined) {
+    return { ladderKey: 'team_goals_away_over', kind: 'over', numericValue: p.line };
+  }
+  if (code.startsWith('TEAM_GOALS_AWAY_U') && p.line !== undefined) {
+    return { ladderKey: 'team_goals_away_under', kind: 'under', numericValue: p.line };
+  }
+  if (code.startsWith('FH_GOALS_O') && p.line !== undefined) {
+    return { ladderKey: 'fh_goals_over', kind: 'over', numericValue: p.line };
+  }
+  if (code.startsWith('FH_GOALS_U') && p.line !== undefined) {
+    return { ladderKey: 'fh_goals_under', kind: 'under', numericValue: p.line };
+  }
+  if (code.startsWith('CORNERS_O') && p.line !== undefined) {
+    return { ladderKey: 'corners_over', kind: 'over', numericValue: p.line };
+  }
+  if (code.startsWith('CORNERS_U') && p.line !== undefined) {
+    return { ladderKey: 'corners_under', kind: 'under', numericValue: p.line };
+  }
+  if (code.startsWith('CARDS_O') && p.line !== undefined) {
+    return { ladderKey: 'cards_over', kind: 'over', numericValue: p.line };
+  }
+  if (code.startsWith('CARDS_U') && p.line !== undefined) {
+    return { ladderKey: 'cards_under', kind: 'under', numericValue: p.line };
+  }
+  if (p.optionType === 'asian_handicap' && p.handicapLine !== undefined) {
+    const side = code.startsWith('AH_HOME_') ? 'home' : 'away';
+    return { ladderKey: `ah_${side}`, kind: 'ah', numericValue: p.handicapLine };
+  }
+  return null;
+}
+
+function resolveExactDeviggedProb(
+  marketCode: string,
+  marketOdds: number | undefined,
+  odds: VerifiedMatchOdds,
+  handicapLine?: number
+): number | undefined {
+  if (!marketOdds || marketOdds <= 1.0) return undefined;
+
+  if (
+    (marketCode === '1X2_HOME' || marketCode === '1X2_DRAW' || marketCode === '1X2_AWAY') &&
+    odds.homeWin && odds.homeWin > 1.0 &&
+    odds.draw && odds.draw > 1.0 &&
+    odds.awayWin && odds.awayWin > 1.0
+  ) {
+    const { deviggedProbs } = devigCompleteMarket([odds.homeWin, odds.draw, odds.awayWin]);
+    if (marketCode === '1X2_HOME') return deviggedProbs[0];
+    if (marketCode === '1X2_DRAW') return deviggedProbs[1];
+    return deviggedProbs[2];
+  }
+
+  if (
+    (marketCode === 'TOTAL_GOALS_O25' || marketCode === 'TOTAL_GOALS_U25') &&
+    odds.over25Goals && odds.over25Goals > 1.0 &&
+    odds.under25Goals && odds.under25Goals > 1.0
+  ) {
+    const { deviggedProbs } = devigCompleteMarket([odds.over25Goals, odds.under25Goals]);
+    return marketCode === 'TOTAL_GOALS_O25' ? deviggedProbs[0] : deviggedProbs[1];
+  }
+
+  if (
+    (marketCode === 'BTTS_YES' || marketCode === 'BTTS_NO') &&
+    odds.bttsYes && odds.bttsYes > 1.0 &&
+    odds.bttsNo && odds.bttsNo > 1.0
+  ) {
+    const { deviggedProbs } = devigCompleteMarket([odds.bttsYes, odds.bttsNo]);
+    return marketCode === 'BTTS_YES' ? deviggedProbs[0] : deviggedProbs[1];
+  }
+
+  if (
+    (marketCode === 'CORNERS_O95' || marketCode === 'CORNERS_U95') &&
+    odds.over95Corners && odds.over95Corners > 1.0 &&
+    odds.under95Corners && odds.under95Corners > 1.0
+  ) {
+    const { deviggedProbs } = devigCompleteMarket([odds.over95Corners, odds.under95Corners]);
+    return marketCode === 'CORNERS_O95' ? deviggedProbs[0] : deviggedProbs[1];
+  }
+
+  if (
+    (marketCode === 'CARDS_O45' || marketCode === 'CARDS_U45') &&
+    odds.over45Cards && odds.over45Cards > 1.0 &&
+    odds.under45Cards && odds.under45Cards > 1.0
+  ) {
+    const { deviggedProbs } = devigCompleteMarket([odds.over45Cards, odds.under45Cards]);
+    return marketCode === 'CARDS_O45' ? deviggedProbs[0] : deviggedProbs[1];
+  }
+
+  if (marketCode.startsWith('AH_') && handicapLine !== undefined) {
+    const isHome = marketCode.startsWith('AH_HOME_');
+    const hLine = isHome ? handicapLine : -handicapLine;
+    const aLine = -hLine;
+    const hPrice = odds.asianHandicapHome?.[String(hLine)] ?? (odds.asianHandicapHome as Record<number, number> | undefined)?.[hLine];
+    const aPrice = odds.asianHandicapAway?.[String(aLine)] ?? (odds.asianHandicapAway as Record<number, number> | undefined)?.[aLine];
+    if (hPrice && hPrice > 1.0 && aPrice && aPrice > 1.0) {
+      const { deviggedProbs } = devigCompleteMarket([hPrice, aPrice]);
+      return isHome ? deviggedProbs[0] : deviggedProbs[1];
+    }
+  }
+
+  // Fallback when only one side of the book is available
+  return Math.max(0.02, Math.min(0.98, (1 / marketOdds) / 1.05));
+}
+
 export class DixonColesV25Evaluator {
   public static evaluateFixture(context: FixtureContext): V25EvaluatedFixtureResult {
-    // 0. HARD RULE: If a fixture has no real team-strength input or data is stale (> 21 days),
-    // do not return a pick for it.
+    // 0. HARD RULE: If a fixture has no real team-strength input or data is stale (> 21 days), abstains.
     if (context.insufficientData || context.hasRealTeamStrength === false || context.noRecommendationReason?.startsWith('Data out of date')) {
       const features = FeatureLayerEngine.computeFixtureFeatures(context);
       return {
-        engineVersion: 'v2.5.0',
+        engineVersion: 'v25.0',
         fixtureId: context.fixtureId,
         features,
         scorelineMatrix: DixonColesV25Engine.generateScorelineMatrix(1.0, 1.0, features),
@@ -77,17 +207,18 @@ export class DixonColesV25Evaluator {
       };
     }
 
-    // 1. Compute pre-kickoff features (Zero temporal leakage)
+    // 1. Pre-kickoff features (Zero temporal leakage)
     const features = FeatureLayerEngine.computeFixtureFeatures(context);
 
-    // 2. Compute covariate-adjusted lambda and mu
+    // 2. Covariate-adjusted lambda and mu
     const { lambda, mu } = DixonColesV25Engine.computeCovariateRates(
       context.homeXg,
       context.awayXg,
       features
     );
 
-    // 2b. Resolve calibrated league parameters and separate 1H/2H team goal rates
+    // 2b. League parameters and separate 1H/2H team goal rates
+    const calParams = getCalibratedParams();
     const leagueCfg = getLeagueCalibratedConfig(context.competitionCode);
     const cap = context.leagueCapabilities || getLeagueCapabilities(context.competitionCode);
     const rho = leagueCfg?.goals.dixonColesRho ?? -0.05;
@@ -114,7 +245,7 @@ export class DixonColesV25Evaluator {
       };
     }
 
-    // 3. Generate 10x10 scoreline joint distribution matrix with Asian Handicaps & Team Totals
+    // 3. Scoreline joint distribution matrix
     const matrixResult = DixonColesV25Engine.generateScorelineMatrix(
       lambda,
       mu,
@@ -124,42 +255,44 @@ export class DixonColesV25Evaluator {
       explicitHalfXg
     );
 
-    // 4. Generate candidate markets gated strictly by league/team column availability (NO fake odds)
+    // 4. Generate candidate markets across EVERY enabled market & line
     const candidates = this.buildCandidateList(context, matrixResult, features, lambda, mu);
 
-    // 5. Calibrate, compute PER-PREDICTION values, evaluate risk flags, and assign honest confidence tiers
+    // Pre-compute common sample sizes & feature context for PickEvidence
+    const homeSamples = context.homeSampleMatches ?? context.sampleSizeMatches ?? 0;
+    const awaySamples = context.awaySampleMatches ?? context.sampleSizeMatches ?? 0;
+    const leagueSamples = leagueCfg?.goals.sampleSize ?? cap.sampleSizeMatches ?? 0;
+    const h2hMeetingsCount = features.h2h.meetingsCount;
+    const h2hSummaryText = h2hMeetingsCount > 0
+      ? cleanDisplayText(`${h2hMeetingsCount} prior meetings (${features.h2h.homeWins}W ${features.h2h.draws}D ${features.h2h.awayWins}L), shrunk goal diff ${features.h2h.shrunkGoalDiff >= 0 ? '+' : ''}${features.h2h.shrunkGoalDiff.toFixed(2)}`)
+      : 'No recent head to head meetings in stored window';
+
+    // 5. Calibrate, gate by walk-forward BSS, compute EV only on real odds
     const processed: MarketPrediction[] = [];
+    const verifiedOdds = context.verifiedOdds || {};
 
     for (const cand of candidates) {
-      // Risk flags check
       const riskEval = ConfidenceEngine.evaluateRiskFlags(
         cand.optionType,
         cand.selection,
         features
       );
 
-      // REAL PER-PREDICTION DATA COMPLETENESS (Not a constant!)
+      // Per-prediction data completeness
       const baseCoverage = context.dataCoverageScore ?? 0.88;
       let predCompleteness = baseCoverage * 0.94;
       if (context.lineupConfirmed) predCompleteness += 0.035;
       if (context.sampleSizeMatches >= 20) predCompleteness += 0.035;
       else if (context.sampleSizeMatches < 14) predCompleteness -= 0.05;
-
       if (cand.marketOdds !== undefined) predCompleteness += 0.035;
       else predCompleteness -= 0.04;
-
-      if (cand.marketCategory === 'total_corners' || cand.marketCategory === 'team_corners') {
-        predCompleteness -= 0.045;
-      } else if (cand.marketCategory === 'bookings') {
-        predCompleteness -= 0.055;
-      } else if (cand.marketCategory === 'handicap') {
-        predCompleteness -= 0.025;
-      } else if (cand.marketCategory === 'match_result') {
-        predCompleteness += 0.02;
-      }
+      if (cand.marketCategory === 'total_corners' || cand.marketCategory === 'team_corners') predCompleteness -= 0.045;
+      else if (cand.marketCategory === 'bookings') predCompleteness -= 0.055;
+      else if (cand.marketCategory === 'handicap') predCompleteness -= 0.025;
+      else if (cand.marketCategory === 'match_result') predCompleteness += 0.02;
       predCompleteness = Math.max(0.60, Math.min(0.98, Number(predCompleteness.toFixed(3))));
 
-      // REAL PER-PREDICTION UNCERTAINTY SPREAD (Not a constant!)
+      // Per-prediction uncertainty spread
       const baseUncertainty = context.uncertaintyScore ?? 0.08;
       let categoryMultiplier = 1.0;
       switch (cand.marketCategory) {
@@ -176,33 +309,36 @@ export class DixonColesV25Evaluator {
         default: categoryMultiplier = 1.05; break;
       }
       const baseMarketSpread = (baseUncertainty * 0.32 * categoryMultiplier) + 0.012;
-
       const samplePenalty = Math.max(0, 16 - context.sampleSizeMatches) * 0.003;
       const weatherPenalty = features.weather.isMissing ? 0.008 : 0;
       const riskPenalty = riskEval.downgradesCount * 0.008;
       const completenessPenalty = (1.0 - predCompleteness) * 0.055;
-
       const uncertaintySpread = Number(Math.min(0.12, Math.max(0.024,
         baseMarketSpread + completenessPenalty + samplePenalty + weatherPenalty + riskPenalty
       )).toFixed(4));
 
-      // Platt calibration and market devigging
-      let deviggedMarketProb: number | undefined = undefined;
+      // Market de-vigging and Platt calibration
+      let deviggedMarketProb: number | undefined = cand.deviggedProb;
       let skillVsDeviggedMarket: number | null | undefined = undefined;
       let calProb = cand.rawProb;
 
       if (cand.marketOdds && cand.marketOdds > 1.0) {
-        const implied = 1 / cand.marketOdds;
-        deviggedMarketProb = Math.max(0.02, Math.min(0.98, implied / 1.05));
+        if (deviggedMarketProb === undefined) {
+          deviggedMarketProb = resolveExactDeviggedProb(cand.marketCode, cand.marketOdds, verifiedOdds, cand.handicapLine);
+        }
         const calibration = DixonColesV25Engine.calibratePrediction(
           cand.rawProb,
           cand.marketCategory,
           cand.marketOdds,
           features,
-          riskEval.downgradesCount
+          riskEval.downgradesCount,
+          deviggedMarketProb
         );
         calProb = calibration.calibratedProb;
-        skillVsDeviggedMarket = Number((calProb - deviggedMarketProb).toFixed(4));
+        deviggedMarketProb = calibration.deviggedMarketProb;
+        if (deviggedMarketProb !== undefined) {
+          skillVsDeviggedMarket = Number((calProb - deviggedMarketProb).toFixed(4));
+        }
       } else {
         const calibration = DixonColesV25Engine.calibratePrediction(
           cand.rawProb,
@@ -212,10 +348,11 @@ export class DixonColesV25Evaluator {
           riskEval.downgradesCount
         );
         calProb = calibration.calibratedProb;
+        deviggedMarketProb = undefined;
         skillVsDeviggedMarket = null;
       }
 
-      // Expected Value and Sanity Tripwire (NO FAKE ODDS OR EV)
+      // Expected Value (p * odds - 1, or exact AH settlement when quarter/push applies) — strictly null without real odds
       let ev: number | null = null;
       let edge: number | undefined = undefined;
       let implied: number | undefined = undefined;
@@ -225,7 +362,6 @@ export class DixonColesV25Evaluator {
       if (cand.marketOdds && cand.marketOdds > 1.0) {
         implied = Number((1 / cand.marketOdds).toFixed(4));
         if (cand.handicapType === 'asian' && cand.winProb !== undefined) {
-          // Exact Asian Handicap settlement EV including full win, half-win, push (0 net), half-loss (-0.5), full loss (-1.0)
           const o = cand.marketOdds;
           const exactEv =
             (cand.winProb * (o - 1)) +
@@ -236,35 +372,33 @@ export class DixonColesV25Evaluator {
         } else {
           ev = Number(((calProb * cand.marketOdds) - 1.0).toFixed(4));
         }
-        edge = Number((calProb - implied).toFixed(4));
+        edge = deviggedMarketProb !== undefined
+          ? Number((calProb - deviggedMarketProb).toFixed(4))
+          : Number((calProb - implied).toFixed(4));
 
-        // Sanity Tripwires:
-        // 1. Any EV above 15%
-        // 2. Any model probability differing from de-vigged market probability by > 15 points
         if (ev > 0.15 || (deviggedMarketProb !== undefined && Math.abs(calProb - deviggedMarketProb) > 0.15)) {
           sanityTripwire = true;
           tripwireReason = ev > 0.15
             ? `EV (+${(ev * 100).toFixed(1)}%) exceeds 15% credibility limit. Check data.`
-            : `Model probability (${(calProb * 100).toFixed(1)}%) differs from de-vigged market (${((deviggedMarketProb ?? 0) * 100).toFixed(1)}%) by >15 points. Check data.`;
+            : `Model probability (${(calProb * 100).toFixed(1)}%) differs from devigged market (${((deviggedMarketProb ?? 0) * 100).toFixed(1)}%) by >15 points. Check data.`;
         }
       } else {
-        // If odds missing, EV is strictly NULL (probability analysis only)
         ev = null;
         edge = undefined;
         implied = undefined;
       }
 
-      // Baseline comparison & Fixture-specificity check
+      // Baseline comparison
       const baselineResult = getMarketBaseline(cand.marketCode, context.competitionCode, cand.line, (context as any).teamStats);
       const baseRate = baselineResult.baseRate;
       const edgeOverBaseline = Number((calProb - baseRate).toFixed(4));
-      // Generic check: If probability is within 2.5% of baseline rate, it is generic
-      const isGenericPick = Math.abs(calProb - baseRate) <= 0.025;
+      const isGenericPick = Math.abs(calProb - baseRate) <= 0.020;
 
-      // Wide handicap check: Wide cushion lines (|line| >= 1.5 or baseRate >= 0.70) cannot get cheap probability credit
-      const isWideHandicap = cand.optionType === 'asian_handicap' && (Math.abs(cand.handicapLine ?? 0) >= 1.5 || baseRate >= 0.70 || calProb >= 0.72);
+      // Walk-Forward Brier Skill Gate per (leagueGroup, marketFamily)
+      const fam = getMarketFamily(cand.optionType, cand.marketCode, cand.marketCategory);
+      const gate = checkMarketGating(fam, context.competitionCode);
 
-      // Confidence Assessment using per-prediction values
+      // Confidence assessment
       const confAssessment = ConfidenceEngine.evaluateConfidence(
         calProb,
         uncertaintySpread,
@@ -274,53 +408,41 @@ export class DixonColesV25Evaluator {
         cand.optionType
       );
 
-      // Qualification & Abstain status
+      // Qualification Status
       let qualStatus: QualificationStatus = 'UNQUALIFIED_MARGINAL';
-      // GATING RULE: A market where odds exist and the model's skill vs the de-vigged market is <= 0 cannot be a recommendation!
       const hasNonPositiveSkillVsMarket = Boolean(
         cand.marketOdds && cand.marketOdds > 1.0 && deviggedMarketProb !== undefined && (skillVsDeviggedMarket ?? 0) <= 0
       );
 
-      if (sanityTripwire) {
+      if (!gate.isAllowed) {
+        qualStatus = 'NO_RECOMMENDATION';
+      } else if (sanityTripwire) {
         qualStatus = 'UNQUALIFIED_MARGINAL';
-      } else if (hasNonPositiveSkillVsMarket) {
+      } else if (hasNonPositiveSkillVsMarket || (cand.marketOdds && (ev ?? 0) <= 0)) {
         qualStatus = 'PROBABILITY_ANALYSIS_ONLY';
       } else if (!confAssessment.isHandicapQualified) {
         qualStatus = 'NO_RECOMMENDATION';
-      } else if (cand.marketOdds && (edge ?? 0) >= 0.025 && (ev ?? 0) > 0.015 && calProb >= 0.28) {
+      } else if (calProb < PICK_CONFIDENCE_THRESHOLD) {
+        qualStatus = 'UNQUALIFIED_MARGINAL';
+      } else if (cand.marketOdds && (ev ?? 0) > 0) {
         qualStatus = 'QUALIFIED_VALUE';
-      } else if (edgeOverBaseline >= 0.030 && calProb >= 0.35 && uncertaintySpread <= 0.075 && !isGenericPick) {
+      } else if (edgeOverBaseline > 0.010 && !isGenericPick) {
         qualStatus = 'QUALIFIED_PROBABILITY';
-      } else if (uncertaintySpread > 0.078) {
-        qualStatus = 'UNQUALIFIED_HIGH_UNCERTAINTY';
       }
 
-      // Ranking score: strictly edge & EV driven
+      // Ranking score (used for ordering; actual topPick prioritizes real-odds +EV first, then unpriced edge)
       let rankingScore = 0;
-      if (hasNonPositiveSkillVsMarket) {
-        rankingScore = 0; // Gated out: cannot be a recommendation
-      } else if (cand.marketOdds && !sanityTripwire) {
-        const edgeVal = Math.max(0, edge ?? 0);
-        if (edgeVal >= 0.015) {
-          rankingScore = Number((edgeVal * 60 * confAssessment.confidenceScore + (ev ?? 0) * 20).toFixed(3));
-        }
-      } else {
-        // Without real odds: ranking must be strictly driven by edge over baseline!
-        // Never reward raw high probability on wide/easy lines (baseRate >= 0.68 or calProb >= 0.70)
-        const edgeVal = edgeOverBaseline;
-        if (edgeVal >= 0.030 && !isGenericPick && baseRate < 0.68 && calProb < 0.70) {
-          const uncertaintyFactor = Math.max(0.4, 1.0 - uncertaintySpread * 2.5);
-          rankingScore = Number((edgeVal * 45 * confAssessment.confidenceScore * uncertaintyFactor).toFixed(3));
-        }
+      if (!gate.isAllowed || sanityTripwire || hasNonPositiveSkillVsMarket || calProb < PICK_CONFIDENCE_THRESHOLD) {
+        rankingScore = 0;
+      } else if (cand.marketOdds && (ev ?? 0) > 0) {
+        // Real odds present: EV dominates ranking!
+        rankingScore = Number((1000 + (ev ?? 0) * 1000 + (edge ?? 0) * 100).toFixed(3));
+      } else if (!cand.marketOdds && edgeOverBaseline > 0.010 && !isGenericPick) {
+        // Probability-only mode (no odds on this line)
+        const uncertaintyFactor = Math.max(0.5, 1.0 - uncertaintySpread * 2.0);
+        rankingScore = Number((edgeOverBaseline * 100 * confAssessment.confidenceScore * uncertaintyFactor + calProb * 10).toFixed(3));
       }
 
-      // Penalize generic picks (only in unpriced/probability mode), high-variance secondary markets, and wide handicaps
-      if (isGenericPick && !cand.marketOdds) rankingScore *= 0.3;
-      if (cand.optionType === 'corners') rankingScore *= 0.85;
-      if (cand.optionType === 'bookings') rankingScore *= 0.85;
-      if (cand.optionType === 'asian_handicap') rankingScore *= 0.75;
-
-      // Generate "Why" panel data
       const whyData = WhyPanelGenerator.generateWhyPanel(
         cand.optionType,
         cand.selection,
@@ -359,13 +481,92 @@ export class DixonColesV25Evaluator {
         hasKeyAttackerAbsent: features.homeAbsences.missingXgShare > 0.15,
       });
 
+      const whyLineDefault = cleanDisplayText(
+        !gate.isAllowed
+          ? `Rejected: ${fam} failed walk forward Brier skill gate in ${gate.leagueGroup} (BSS ${gate.bss >= 0 ? '+' : ''}${gate.bss.toFixed(4)}, 95% CI [${gate.ciLower.toFixed(4)}, ${gate.ciUpper.toFixed(4)}]).`
+          : calProb < PICK_CONFIDENCE_THRESHOLD
+          ? `Below 70.0% confidence threshold (${(calProb * 100).toFixed(1)}% calibrated).`
+          : cand.marketOdds
+          ? `Cleared 70.0% threshold (${(calProb * 100).toFixed(1)}%) with real price @${cand.marketOdds.toFixed(2)} (devigged ${((deviggedMarketProb ?? 0) * 100).toFixed(1)}%, EV ${(ev ?? 0) >= 0 ? '+' : ''}${((ev ?? 0) * 100).toFixed(1)}%).`
+          : `Cleared 70.0% threshold (${(calProb * 100).toFixed(1)}% vs ${(baseRate * 100).toFixed(1)}% baseline, +${(edgeOverBaseline * 100).toFixed(1)}% edge); no bookmaker odds stored so no EV claimed.`
+      );
+
+      const evidence: PickEvidence = {
+        fittedStrengths: {
+          homeAttack: Number((context.homeAttackRating ?? 1.0).toFixed(2)),
+          homeDefense: Number((context.homeDefenseRating ?? 1.0).toFixed(2)),
+          awayAttack: Number((context.awayAttackRating ?? 1.0).toFixed(2)),
+          awayDefense: Number((context.awayDefenseRating ?? 1.0).toFixed(2)),
+          homeXg: Number(lambda.toFixed(2)),
+          awayXg: Number(mu.toFixed(2)),
+          ...(cap.hasCorners && context.expectedCornersHome > 0 ? {
+            expectedCornersHome: Number(context.expectedCornersHome.toFixed(2)),
+            expectedCornersAway: Number(context.expectedCornersAway.toFixed(2)),
+          } : {}),
+          ...(cap.hasCards && features.discipline.expectedTotalBookings > 0 ? {
+            expectedCards: Number(features.discipline.expectedTotalBookings.toFixed(2)),
+          } : {}),
+        },
+        expectedValue: ev,
+        deviggedMarketProb: cand.marketOdds && deviggedMarketProb !== undefined ? Number(deviggedMarketProb.toFixed(4)) : null,
+        sampleSizes: {
+          homeMatches: homeSamples,
+          awayMatches: awaySamples,
+          leagueMatches: leagueSamples,
+          walkForwardMatches: gate.matches,
+          h2hMeetings: h2hMeetingsCount,
+          ...(cap.hasCorners ? { cornersMatches: Math.min(context.homeCornerSampleCount ?? leagueCfg?.corners?.sampleSize ?? 0, context.awayCornerSampleCount ?? leagueCfg?.corners?.sampleSize ?? 0) || leagueCfg?.corners?.sampleSize } : {}),
+          ...(cap.hasCards ? { cardsMatches: leagueCfg?.cards?.sampleSize } : {}),
+          ...(features.discipline.refereeAnnounced ? { refereeMatches: features.discipline.refereeSampleSize } : {}),
+        },
+        referee: {
+          announced: features.discipline.refereeAnnounced,
+          name: features.discipline.refereeAnnounced ? cleanDisplayText(features.discipline.refereeName) : undefined,
+          shrunkCardsPerMatch: features.discipline.refereeAnnounced ? Number(features.discipline.refereeCardsPerMatch.toFixed(2)) : undefined,
+          leagueBaseline: Number(features.discipline.refereeLeagueBaseline.toFixed(2)),
+          explanation: cleanDisplayText(features.discipline.refereeExplanation),
+        },
+        h2h: {
+          meetingsCount: h2hMeetingsCount,
+          shrunkGoalDiff: Number(features.h2h.shrunkGoalDiff.toFixed(3)),
+          weightApplied: COVARIATE_COEFFICIENTS.h2hGoalDiff,
+          summary: h2hSummaryText,
+        },
+        derby: {
+          isDerby: features.isDerby,
+          name: features.derbyName ? cleanDisplayText(features.derbyName) : undefined,
+          source: features.derbySource ? cleanDisplayText(features.derbySource) : undefined,
+          cardsMultiplierApplied: features.isDerby && calParams.derbySignificance.applyCardsAdjustment
+            ? calParams.derbySignificance.cardsMultiplier
+            : 1.0,
+        },
+        whyLineChosen: whyLineDefault,
+        walkForwardValidation: {
+          leagueGroup: gate.leagueGroup,
+          market: fam,
+          brierSkill: gate.bss,
+          ci95Lower: gate.ciLower,
+          ci95Upper: gate.ciUpper,
+          matches: gate.matches,
+          allowed: gate.isAllowed,
+        },
+      };
+
+      const abstainReasonText = !gate.isAllowed
+        ? gate.statusText
+        : confAssessment.disqualificationReason
+        ? confAssessment.disqualificationReason
+        : calProb < PICK_CONFIDENCE_THRESHOLD
+        ? `Calibrated probability ${(calProb * 100).toFixed(1)}% below 70.0% threshold.`
+        : undefined;
+
       const prediction: MarketPrediction = {
         id: `pred_v25_${context.fixtureId}_${cand.marketCode}`,
         fixtureId: context.fixtureId,
         marketCode: cand.marketCode,
         optionType: cand.optionType,
         marketCategory: cand.marketCategory,
-        marketFamily: getMarketFamily(cand.optionType, cand.marketCode, cand.marketCategory),
+        marketFamily: fam,
         marketName: cleanDisplayText(cand.marketName),
         selection: formatSelectionName(cand.selection),
         line: cand.line,
@@ -375,7 +576,7 @@ export class DixonColesV25Evaluator {
         marketOdds: cand.marketOdds,
         impliedProbability: implied,
         expectedValue: ev,
-        edge: edge,
+        edge,
         confidenceTier: confAssessment.confidenceTier,
         riskTier: confAssessment.confidenceTier,
         confidenceScore: confAssessment.confidenceScore,
@@ -384,10 +585,10 @@ export class DixonColesV25Evaluator {
         rankingScore,
         isTopPick: false,
         settlementStatus: 'PENDING',
-        evidenceTier: confAssessment.confidenceTier === 'HIGH' 
-          ? 'High Confidence Projection' 
-          : confAssessment.confidenceTier === 'MEDIUM' 
-          ? 'Medium Confidence Projection' 
+        evidenceTier: confAssessment.confidenceTier === 'HIGH'
+          ? 'High Confidence Projection'
+          : confAssessment.confidenceTier === 'MEDIUM'
+          ? 'Medium Confidence Projection'
           : 'Low Confidence / Speculative',
         dataQualityScore: predCompleteness,
         dataCompletenessScore: predCompleteness,
@@ -406,78 +607,177 @@ export class DixonColesV25Evaluator {
         rawModelProbability: cand.rawProb,
         uncertaintySpread,
         ci90: [Number((calProb - uncertaintySpread * 1.645).toFixed(4)), Number((calProb + uncertaintySpread * 1.645).toFixed(4))],
-        riskFlags: whyData.riskFlags,
+        riskFlags: whyData.riskFlags.map(f => cleanDisplayText(f)),
         whyPanel: {
-          factorsFor: whyData.factorsFor,
-          factorsAgainst: whyData.factorsAgainst,
-          riskFlags: whyData.riskFlags,
+          factorsFor: whyData.factorsFor.map(f => cleanDisplayText(f)),
+          factorsAgainst: whyData.factorsAgainst.map(f => cleanDisplayText(f)),
+          riskFlags: whyData.riskFlags.map(f => cleanDisplayText(f)),
         },
-        engineVersion: 'v2.5.0',
-        abstainReason: confAssessment.disqualificationReason ? cleanDisplayText(confAssessment.disqualificationReason) : undefined,
+        engineVersion: 'v25.0',
+        abstainReason: abstainReasonText ? cleanDisplayText(abstainReasonText) : undefined,
         baselineProbability: baseRate,
         edgeOverBaseline,
         isGenericPick,
+        isValidated: gate.isAllowed,
+        validationStatus: gate.isAllowed ? 'validated' : 'unvalidated',
+        brierSkillScore: gate.bss,
         sanityTripwire,
         tripwireReason: tripwireReason ? cleanDisplayText(tripwireReason) : undefined,
         fragilityScore: fragility.fragilityScore,
-        fragilityFlags: whyData.riskFlags.concat(fragility.fragilityFlags),
+        fragilityFlags: whyData.riskFlags.concat(fragility.fragilityFlags).map(f => cleanDisplayText(f)),
         skillVsDeviggedMarket,
         deviggedMarketProb,
         equivalentCanonicalKey: getEquivalentCanonicalKey(cand.marketCode, cand.selection),
+        evidence,
       };
 
       processed.push(prediction);
     }
 
-    // 6. Rank candidates & Select Top Pick
-    // When the fixture has verified odds, top pick must be a qualified value bet with real verified odds!
-    const hasAnyVerifiedOdds = Boolean(
-      context.verifiedOdds &&
-      Object.values(context.verifiedOdds).some(v =>
-        (typeof v === 'number' && v > 1.0) ||
-        (v && typeof v === 'object' && Object.values(v).some(x => typeof x === 'number' && x > 1.0))
-      )
-    );
-
-    const eligibleTopPicks = processed.filter(p => {
+    // 6. Strict Selection:
+    //    - Must pass Walk-Forward Brier Skill Gate (CI lower > 0) for this leagueGroup
+    //    - Must clear >= 70% calibrated probability threshold
+    //    - Must not trigger sanity tripwire or handicap contradictions
+    //    - Real odds picks must have positive EV (> 0) and positive skill vs devigged market
+    //    - No-odds picks must beat baseline (> 0.01) and not be generic
+    //    - No wide +1.5 cushion handicaps when tighter lines exist (never allow handicapLine >= 1.5 as recommendation)
+    const rawEligible = processed.filter(p => {
+      if (!p.isValidated) return false;
       if (p.sanityTripwire) return false;
-      if (p.isGenericPick && !p.marketOdds) return false;
-      // Wide handicaps (|line| >= 1.5) cannot be top pick!
-      if (p.optionType === 'asian_handicap' && Math.abs(p.handicapLine ?? 0) >= 1.5) return false;
-      if (p.qualificationStatus === 'NO_RECOMMENDATION' || p.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY' || p.qualificationStatus === 'PROBABILITY_ANALYSIS_ONLY') return false;
+      if (p.qualificationStatus === 'NO_RECOMMENDATION' || p.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY' || p.qualificationStatus === 'PROBABILITY_ANALYSIS_ONLY') {
+        return false;
+      }
+      if (p.optionType === 'asian_handicap' && (p.handicapLine ?? 0) >= 1.5) return false;
 
-      // GATING RULE: A market where odds exist and the model's skill vs the de-vigged market is <= 0 cannot be a recommendation!
-      if (p.marketOdds && p.skillVsDeviggedMarket !== undefined && p.skillVsDeviggedMarket !== null && p.skillVsDeviggedMarket <= 0) return false;
-
-      // Hard rule (Bug 1): A pick below roughly 52% or with an edge near zero must not be shown as "Top pick".
-      // Show "No strong lean" instead, and allow a different market to be the top pick for that fixture.
       const pickProb = p.calibratedProbability ?? p.modelProbability;
-      if (pickProb < 0.52) return false;
+      if (pickProb < PICK_CONFIDENCE_THRESHOLD) return false;
 
-      const pickEdge = p.expectedValue !== null && p.expectedValue !== undefined
-        ? p.expectedValue
-        : (p.edgeOverBaseline ?? 0);
-      if (pickEdge <= 0.02) return false;
-
-      if (hasAnyVerifiedOdds) {
-        // When real bookmaker odds exist, top pick MUST have verified odds and positive EV!
-        return Boolean(p.marketOdds && p.qualificationStatus === 'QUALIFIED_VALUE' && (p.expectedValue ?? 0) > 0.015);
+      if (p.marketOdds && p.marketOdds > 1.0) {
+        return (p.expectedValue ?? 0) > 0 && (p.skillVsDeviggedMarket ?? 0) > 0;
       }
 
-      // Offline / probability-only mode (when no verified odds exist on fixture)
-      if ((p.baselineProbability ?? 0) >= 0.68) return false;
-      return (p.edgeOverBaseline ?? 0) >= 0.030 && (p.uncertaintySpread ?? 1.0) <= 0.068;
-    }).sort((a, b) => b.rankingScore - a.rankingScore);
+      if (p.isGenericPick) return false;
+      return (p.edgeOverBaseline ?? 0) > 0.010;
+    });
+
+    // 7. No Default Lines: Collapse each directional ladder to ONLY the highest/strictest line clearing 70%
+    const allLadderCandidates = new Map<string, MarketPrediction[]>();
+    for (const p of processed) {
+      const li = getLadderInfo(p);
+      if (li) {
+        if (!allLadderCandidates.has(li.ladderKey)) allLadderCandidates.set(li.ladderKey, []);
+        allLadderCandidates.get(li.ladderKey)!.push(p);
+      }
+    }
+
+    const ladderWinners = new Map<string, MarketPrediction>();
+    const nonLadderEligible: MarketPrediction[] = [];
+
+    for (const p of rawEligible) {
+      const li = getLadderInfo(p);
+      if (!li) {
+        nonLadderEligible.push(p);
+        continue;
+      }
+      const existing = ladderWinners.get(li.ladderKey);
+      if (!existing) {
+        ladderWinners.set(li.ladderKey, p);
+        continue;
+      }
+      const existLi = getLadderInfo(existing)!;
+      if (li.kind === 'over') {
+        // Highest line wins (e.g. Over 2.5 beats Over 1.5 and Over 0.5)
+        if (li.numericValue > existLi.numericValue) {
+          ladderWinners.set(li.ladderKey, p);
+        }
+      } else {
+        // Strictest / lowest line wins for Under (Under 2.5 beats Under 3.5) and AH (-0.5 beats +0.5)
+        if (li.numericValue < existLi.numericValue) {
+          ladderWinners.set(li.ladderKey, p);
+        }
+      }
+    }
+
+    // Annotate exact whyLineChosen on winning ladder picks showing rejected stricter & omitted easier lines
+    for (const [ladderKey, winner] of ladderWinners.entries()) {
+      const wLi = getLadderInfo(winner)!;
+      const siblings = allLadderCandidates.get(ladderKey) || [];
+      let nextStricter: MarketPrediction | null = null;
+      for (const s of siblings) {
+        const sLi = getLadderInfo(s)!;
+        const isStricter = wLi.kind === 'over'
+          ? sLi.numericValue > wLi.numericValue
+          : sLi.numericValue < wLi.numericValue;
+        if (!isStricter) continue;
+        if (!nextStricter) {
+          nextStricter = s;
+        } else {
+          const nsLi = getLadderInfo(nextStricter)!;
+          const isCloser = wLi.kind === 'over'
+            ? sLi.numericValue < nsLi.numericValue
+            : sLi.numericValue > nsLi.numericValue;
+          if (isCloser) nextStricter = s;
+        }
+      }
+
+      const wProbPct = ((winner.calibratedProbability ?? winner.modelProbability) * 100).toFixed(1);
+      const stricterNote = nextStricter
+        ? `; next stricter line ${nextStricter.selection} fell below 70.0% (${((nextStricter.calibratedProbability ?? nextStricter.modelProbability) * 100).toFixed(1)}%)`
+        : ' (strictest line on ladder)';
+      const oddsNote = winner.marketOdds && winner.expectedValue !== null && winner.expectedValue !== undefined
+        ? ` Priced @${winner.marketOdds.toFixed(2)} vs ${((winner.deviggedMarketProb ?? 0) * 100).toFixed(1)}% devigged prob (EV +${(winner.expectedValue * 100).toFixed(1)}%).`
+        : ' No bookmaker odds stored on this line so no EV calculated.';
+      const text = cleanDisplayText(
+        `Highest line clearing 70.0% confidence (${wProbPct}%)${stricterNote}; easier lines omitted.${oddsNote}`
+      );
+      if (winner.evidence) {
+        winner.evidence.whyLineChosen = text;
+      }
+      winner.plainEnglishReason = winner.plainEnglishReason
+        ? cleanDisplayText(`${winner.plainEnglishReason} ${text}`)
+        : text;
+    }
+
+    // Also update whyLineChosen on non-ladder eligible picks
+    for (const p of nonLadderEligible) {
+      const pPct = ((p.calibratedProbability ?? p.modelProbability) * 100).toFixed(1);
+      const text = p.marketOdds && p.expectedValue !== null && p.expectedValue !== undefined
+        ? cleanDisplayText(`Cleared 70.0% confidence threshold (${pPct}%) with real odds @${p.marketOdds.toFixed(2)} vs ${((p.deviggedMarketProb ?? 0) * 100).toFixed(1)}% devigged market prob (EV +${(p.expectedValue * 100).toFixed(1)}%).`)
+        : cleanDisplayText(`Cleared 70.0% confidence threshold (${pPct}% vs ${((p.baselineProbability ?? 0) * 100).toFixed(1)}% causal baseline, +${((p.edgeOverBaseline ?? 0) * 100).toFixed(1)}% edge); no bookmaker odds stored so no EV claimed.`);
+      if (p.evidence) {
+        p.evidence.whyLineChosen = text;
+      }
+    }
+
+    // 8. Rank surviving picks: real-odds +EV picks rank strictly first by EV descending; unpriced picks rank by edgeOverBaseline descending
+    const eligibleTopPicks = [...ladderWinners.values(), ...nonLadderEligible].sort((a, b) => {
+      const aHasOdds = Boolean(a.marketOdds && a.expectedValue !== null && a.expectedValue !== undefined && a.expectedValue > 0);
+      const bHasOdds = Boolean(b.marketOdds && b.expectedValue !== null && b.expectedValue !== undefined && b.expectedValue > 0);
+      if (aHasOdds && !bHasOdds) return -1;
+      if (!aHasOdds && bHasOdds) return 1;
+      if (aHasOdds && bHasOdds) {
+        const evDiff = (b.expectedValue ?? 0) - (a.expectedValue ?? 0);
+        if (Math.abs(evDiff) > 1e-6) return evDiff;
+      }
+      const edgeDiff = (b.edgeOverBaseline ?? 0) - (a.edgeOverBaseline ?? 0);
+      if (Math.abs(edgeDiff) > 1e-6) return edgeDiff;
+      return b.rankingScore - a.rankingScore;
+    });
+
+    // Zero rankingScore on non-eligible or defeated ladder rungs, then assign strictly ordered rankingScore to eligible winners
+    processed.forEach(p => { p.rankingScore = 0; });
+    eligibleTopPicks.forEach((p, idx) => {
+      p.rankingScore = Number((2000 - idx).toFixed(3));
+    });
 
     let topPick: MarketPrediction | null = null;
-    let alternativePicks: MarketPrediction[] = [];
+    const alternativePicks: MarketPrediction[] = [];
     let noRecommendationReason: string | undefined = undefined;
 
     if (eligibleTopPicks.length > 0) {
       topPick = eligibleTopPicks[0];
       topPick.isTopPick = true;
 
-      // Record recommendation in telemetry monitor
       const fam = getMarketFamily(topPick.optionType, topPick.marketCode, topPick.marketCategory);
       marketMonitor.recordRecommendation(
         context.fixtureId,
@@ -486,11 +786,10 @@ export class DixonColesV25Evaluator {
         topPick.selection
       );
 
-      // Up to 2 alternatives from distinct market categories AND distinct equivalent bet keys (merging equivalent lines)
       const pickedCategories = new Set<string>([topPick.marketCategory]);
       const pickedEquivKeys = new Set<string>([getEquivalentCanonicalKey(topPick.marketCode, topPick.selection)]);
 
-      for (let i = 1; i < eligibleTopPicks.length && alternativePicks.length < 2; i++) {
+      for (let i = 1; i < eligibleTopPicks.length && alternativePicks.length < 4; i++) {
         const alt = eligibleTopPicks[i];
         const altEquivKey = getEquivalentCanonicalKey(alt.marketCode, alt.selection);
         if (!pickedCategories.has(alt.marketCategory) && !pickedEquivKeys.has(altEquivKey)) {
@@ -500,14 +799,17 @@ export class DixonColesV25Evaluator {
         }
       }
     } else {
-      noRecommendationReason = 'No strong lean';
+      noRecommendationReason = 'No pick clears 70.0% confidence and walk forward validation';
     }
 
-    // Sort all predictions by ranking score for consistent UI rendering
-    processed.sort((a, b) => b.rankingScore - a.rankingScore);
+    // Sort all processed predictions: eligible first in exact EV/edge rank, then remaining by calProb
+    processed.sort((a, b) => {
+      if (b.rankingScore !== a.rankingScore) return b.rankingScore - a.rankingScore;
+      return (b.calibratedProbability ?? b.modelProbability) - (a.calibratedProbability ?? a.modelProbability);
+    });
 
     return {
-      engineVersion: 'v2.5.0',
+      engineVersion: 'v25.0',
       fixtureId: context.fixtureId,
       features,
       scorelineMatrix: matrixResult,
@@ -520,8 +822,8 @@ export class DixonColesV25Evaluator {
   }
 
   /**
-   * Builds raw candidate options across authorized market types, strictly gated by league column capabilities.
-   * Real odds are assigned strictly from context.verifiedOdds. NO MOCK ODDS.
+   * Builds candidate options across EVERY enabled market & line, strictly gated by league/team column availability.
+   * Real odds are assigned ONLY when stored on context.verifiedOdds (NO synthetic or fake odds).
    */
   private static buildCandidateList(
     context: FixtureContext,
@@ -537,7 +839,7 @@ export class DixonColesV25Evaluator {
     const home = displayName(context.homeTeamName);
     const away = displayName(context.awayTeamName);
 
-    // 1. 1X2 Match Result (Goals model: enabled for all leagues)
+    // 1. 1X2 Match Result
     list.push({
       marketCode: '1X2_HOME',
       optionType: 'win',
@@ -572,7 +874,7 @@ export class DixonColesV25Evaluator {
       marketOdds: odds.awayWin,
     });
 
-    // 2. Double Chance
+    // 2. Double Chance (NO synthetic derived bookmaker odds!)
     list.push({
       marketCode: 'DC_1X',
       optionType: 'double_chance',
@@ -582,7 +884,7 @@ export class DixonColesV25Evaluator {
       period: 'REGULAR_TIME',
       settlementRule: 'Wins if home victory or draw.',
       rawProb: matrix.doubleChance.homeOrDraw,
-      marketOdds: odds.homeWin && odds.draw ? Number((1 / ((1 / odds.homeWin) + (1 / odds.draw))).toFixed(2)) : undefined,
+      marketOdds: undefined,
     });
     list.push({
       marketCode: 'DC_X2',
@@ -593,11 +895,22 @@ export class DixonColesV25Evaluator {
       period: 'REGULAR_TIME',
       settlementRule: 'Wins if away victory or draw.',
       rawProb: matrix.doubleChance.awayOrDraw,
-      marketOdds: odds.awayWin && odds.draw ? Number((1 / ((1 / odds.awayWin) + (1 / odds.draw))).toFixed(2)) : undefined,
+      marketOdds: undefined,
+    });
+    list.push({
+      marketCode: 'DC_12',
+      optionType: 'double_chance',
+      marketCategory: 'double_chance',
+      marketName: 'Double Chance',
+      selection: `${home} or ${away}`,
+      period: 'REGULAR_TIME',
+      settlementRule: 'Wins if match does not end in a draw.',
+      rawProb: matrix.doubleChance.homeOrAway,
+      marketOdds: undefined,
     });
 
-    // 3. Over / Under Goals
-    [1.5, 2.5, 3.5].forEach(line => {
+    // 3. Over / Under Goals across ALL lines [0.5, 1.5, 2.5, 3.5, 4.5]
+    [0.5, 1.5, 2.5, 3.5, 4.5].forEach(line => {
       const g = matrix.overUnderGoals[line];
       if (g) {
         list.push({
@@ -627,7 +940,7 @@ export class DixonColesV25Evaluator {
       }
     });
 
-    // 3b. Team Totals Over / Under Goals (0.5, 1.5, 2.5) from joint goal distribution
+    // 3b. Team Totals Over / Under Goals (0.5, 1.5, 2.5)
     [0.5, 1.5, 2.5].forEach(line => {
       const codeSuffix = String(line).replace('.', '');
       const hTeam = matrix.teamGoalsOverUnder.home[line];
@@ -728,40 +1041,10 @@ export class DixonColesV25Evaluator {
       marketOdds: undefined,
     });
 
-    // 6. Asian Handicap: Derived from joint goal distribution with half, whole, and quarter lines.
+    // 6. Asian Handicap: Compute ALL 13 half, whole, and quarter lines [-1.5 .. +1.5]
     // Price is populated ONLY when a real bookmaker price exists for that exact line.
-    const goalDiff = lambda - mu;
-    const competitiveLines: number[] = [];
-    if (goalDiff >= 1.35) {
-      competitiveLines.push(-1.5, -1.25);
-    } else if (goalDiff >= 0.85) {
-      competitiveLines.push(-1.0, -0.75);
-    } else if (goalDiff >= 0.35) {
-      competitiveLines.push(-0.5, -0.25);
-    } else if (goalDiff >= -0.35) {
-      competitiveLines.push(0.0);
-    } else if (goalDiff >= -0.85) {
-      competitiveLines.push(0.25, 0.5);
-    } else if (goalDiff >= -1.35) {
-      competitiveLines.push(0.75, 1.0);
-    } else {
-      competitiveLines.push(1.25, 1.5);
-    }
-
-    if (!competitiveLines.includes(-1.0) && Math.abs(goalDiff) <= 1.2) {
-      competitiveLines.push(-1.0);
-    }
-    if (!competitiveLines.includes(1.0) && Math.abs(goalDiff) <= 1.2) {
-      competitiveLines.push(1.0);
-    }
-    // Also ensure any line with a stored real bookmaker AH price is evaluated
-    if (odds.asianHandicapLine !== undefined && !competitiveLines.includes(odds.asianHandicapLine)) {
-      if (matrix.asianHandicap.home[odds.asianHandicapLine]) {
-        competitiveLines.push(odds.asianHandicapLine);
-      }
-    }
-
-    competitiveLines.forEach(line => {
+    const allAhLines = [-1.5, -1.25, -1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5];
+    allAhLines.forEach(line => {
       const hOutcome = matrix.asianHandicap.home[line];
       if (hOutcome) {
         const realHomeAhPrice =
@@ -790,7 +1073,7 @@ export class DixonColesV25Evaluator {
         });
       }
 
-      const oppLine = -line;
+      const oppLine = -line === 0 ? 0 : -line;
       const aOutcome = matrix.asianHandicap.away[oppLine];
       if (aOutcome) {
         const realAwayAhPrice =
@@ -820,9 +1103,8 @@ export class DixonColesV25Evaluator {
       }
     });
 
-    // 7. Corners (Full Match ONLY, Negative Binomial)
-    // Enabled strictly if league has corners AND both teams have sufficient corner sample (e.g. excludes EC without 2627 data).
-    // NEVER builds first-half corners (0/79,061 stored).
+    // 7. Corners (Full Match ONLY, Negative Binomial across [8.5, 9.5, 10.5, 11.5])
+    // NEVER builds first-half corners.
     const hasCornerSample =
       (context.homeCornerSampleCount === undefined || context.homeCornerSampleCount >= 6) &&
       (context.awayCornerSampleCount === undefined || context.awayCornerSampleCount >= 6);
@@ -830,63 +1112,75 @@ export class DixonColesV25Evaluator {
 
     if (cap.hasCorners && hasCornerSample && totalCornersExpected > 0) {
       const corners = DixonColesV25Engine.calculateCorners(context.expectedCornersHome, context.expectedCornersAway, features);
-      list.push({
-        marketCode: 'CORNERS_O95',
-        optionType: 'corners',
-        marketCategory: 'total_corners',
-        marketName: 'Total Corners Over 9.5',
-        selection: 'Over 9.5 corners',
-        line: 9.5,
-        period: 'REGULAR_TIME',
-        settlementRule: 'Full match corners > 9.5.',
-        rawProb: corners.overUnderLines[9.5]?.over ?? 0.50,
-        marketOdds: odds.over95Corners,
-        plainEnglishReason: `Negative Binomial corner model projects ${corners.expectedCorners.toFixed(1)} total corners from team corners for and against ratings.`,
-      });
-      list.push({
-        marketCode: 'CORNERS_U95',
-        optionType: 'corners',
-        marketCategory: 'total_corners',
-        marketName: 'Total Corners Under 9.5',
-        selection: 'Under 9.5 corners',
-        line: 9.5,
-        period: 'REGULAR_TIME',
-        settlementRule: 'Full match corners < 9.5.',
-        rawProb: corners.overUnderLines[9.5]?.under ?? 0.50,
-        marketOdds: odds.under95Corners,
-        plainEnglishReason: `Negative Binomial corner model projects ${corners.expectedCorners.toFixed(1)} total corners from team corners for and against ratings.`,
+      [8.5, 9.5, 10.5, 11.5].forEach(cLine => {
+        const dist = corners.overUnderLines[cLine];
+        const codeSuf = String(cLine).replace('.', '');
+        if (dist) {
+          list.push({
+            marketCode: `CORNERS_O${codeSuf}`,
+            optionType: 'corners',
+            marketCategory: 'total_corners',
+            marketName: `Total Corners Over ${cLine}`,
+            selection: `Over ${cLine} corners`,
+            line: cLine,
+            period: 'REGULAR_TIME',
+            settlementRule: `Full match corners > ${cLine}.`,
+            rawProb: dist.over,
+            marketOdds: cLine === 9.5 ? odds.over95Corners : undefined,
+            plainEnglishReason: `Negative Binomial corner model projects ${corners.expectedCorners.toFixed(1)} total corners from team corners for and against ratings.`,
+          });
+          list.push({
+            marketCode: `CORNERS_U${codeSuf}`,
+            optionType: 'corners',
+            marketCategory: 'total_corners',
+            marketName: `Total Corners Under ${cLine}`,
+            selection: `Under ${cLine} corners`,
+            line: cLine,
+            period: 'REGULAR_TIME',
+            settlementRule: `Full match corners < ${cLine}.`,
+            rawProb: dist.under,
+            marketOdds: cLine === 9.5 ? odds.under95Corners : undefined,
+            plainEnglishReason: `Negative Binomial corner model projects ${corners.expectedCorners.toFixed(1)} total corners from team corners for and against ratings.`,
+          });
+        }
       });
     }
 
-    // 8. Bookings / Disciplinary Cards (Negative Binomial with shrunk referee rate or league baseline + derby flag)
+    // 8. Bookings / Disciplinary Cards (Negative Binomial across [2.5, 3.5, 4.5, 5.5])
     if (cap.hasCards && features.discipline.expectedTotalBookings > 0) {
       const cards = DixonColesV25Engine.calculateCards(features);
       const refReason = features.discipline.refereeExplanation;
-      list.push({
-        marketCode: 'CARDS_O45',
-        optionType: 'bookings',
-        marketCategory: 'bookings',
-        marketName: 'Total Cards Over 4.5',
-        selection: 'Over 4.5 bookings',
-        line: 4.5,
-        period: 'REGULAR_TIME',
-        settlementRule: 'Yellow card = 1, Red card = 2. Total bookings > 4.5.',
-        rawProb: cards.overUnderLines[4.5]?.over ?? 0.45,
-        marketOdds: odds.over45Cards,
-        plainEnglishReason: `Negative Binomial bookings model expects ${cards.expectedCards.toFixed(2)} cards. ${refReason}`,
-      });
-      list.push({
-        marketCode: 'CARDS_U45',
-        optionType: 'bookings',
-        marketCategory: 'bookings',
-        marketName: 'Total Cards Under 4.5',
-        selection: 'Under 4.5 bookings',
-        line: 4.5,
-        period: 'REGULAR_TIME',
-        settlementRule: 'Yellow card = 1, Red card = 2. Total bookings < 4.5.',
-        rawProb: cards.overUnderLines[4.5]?.under ?? 0.55,
-        marketOdds: odds.under45Cards,
-        plainEnglishReason: `Negative Binomial bookings model expects ${cards.expectedCards.toFixed(2)} cards. ${refReason}`,
+      [2.5, 3.5, 4.5, 5.5].forEach(kLine => {
+        const dist = cards.overUnderLines[kLine];
+        const codeSuf = String(kLine).replace('.', '');
+        if (dist) {
+          list.push({
+            marketCode: `CARDS_O${codeSuf}`,
+            optionType: 'bookings',
+            marketCategory: 'bookings',
+            marketName: `Total Cards Over ${kLine}`,
+            selection: `Over ${kLine} bookings`,
+            line: kLine,
+            period: 'REGULAR_TIME',
+            settlementRule: `Yellow card = 1, Red card = 2. Total bookings > ${kLine}.`,
+            rawProb: dist.over,
+            marketOdds: kLine === 4.5 ? odds.over45Cards : undefined,
+            plainEnglishReason: `Negative Binomial bookings model expects ${cards.expectedCards.toFixed(2)} cards. ${refReason}`,
+          });
+          list.push({
+            marketCode: `CARDS_U${codeSuf}`,
+            optionType: 'bookings',
+            marketCategory: 'bookings',
+            marketName: `Total Cards Under ${kLine}`,
+            selection: `Under ${kLine} bookings`,
+            line: kLine,
+            period: 'REGULAR_TIME',
+            settlementRule: `Yellow card = 1, Red card = 2. Total bookings < ${kLine}.`,
+            rawProb: dist.under,
+            marketOdds: kLine === 4.5 ? odds.under45Cards : undefined,
+            plainEnglishReason: `Negative Binomial bookings model expects ${cards.expectedCards.toFixed(2)} cards. ${refReason}`,
+          });
+        }
       });
     }
 
@@ -917,15 +1211,79 @@ export class DixonColesV25Evaluator {
         plainEnglishReason: `Separate 1st half and 2nd half goal rates project ${(matrix.highestScoringHalf.firstHalf * 100).toFixed(1)}% probability of a higher scoring first half.`,
       });
       list.push({
-        marketCode: 'FH_GOALS_O05',
-        optionType: 'first_half_goals',
+        marketCode: 'HSH_EQUAL',
+        optionType: 'highest_scoring_half',
         marketCategory: 'half_time',
-        marketName: '1st Half Over 0.5 Goals',
-        selection: '1st half over 0.5 goals',
-        line: 0.5,
-        period: 'FIRST_HALF',
-        settlementRule: 'At least 1 goal scored in first half.',
-        rawProb: matrix.firstHalfGoals[0.5]?.over ?? 0.70,
+        marketName: 'Highest Scoring Half: Equal',
+        selection: 'Highest scoring half: Equal',
+        period: 'FULL_TIME',
+        settlementRule: 'Equal goals scored in 1st and 2nd halves.',
+        rawProb: matrix.highestScoringHalf.equal,
+        marketOdds: undefined,
+      });
+
+      [0.5, 1.5].forEach(fhLine => {
+        const fh = matrix.firstHalfGoals[fhLine];
+        const codeSuf = String(fhLine).replace('.', '');
+        if (fh) {
+          list.push({
+            marketCode: `FH_GOALS_O${codeSuf}`,
+            optionType: 'first_half_goals',
+            marketCategory: 'half_time',
+            marketName: `1st Half Over ${fhLine} Goals`,
+            selection: `1st half over ${fhLine} goals`,
+            line: fhLine,
+            period: 'FIRST_HALF',
+            settlementRule: `Goals scored in 1st half > ${fhLine}.`,
+            rawProb: fh.over,
+            marketOdds: undefined,
+          });
+          list.push({
+            marketCode: `FH_GOALS_U${codeSuf}`,
+            optionType: 'first_half_goals',
+            marketCategory: 'half_time',
+            marketName: `1st Half Under ${fhLine} Goals`,
+            selection: `1st half under ${fhLine} goals`,
+            line: fhLine,
+            period: 'FIRST_HALF',
+            settlementRule: `Goals scored in 1st half < ${fhLine}.`,
+            rawProb: fh.under,
+            marketOdds: undefined,
+          });
+        }
+      });
+
+      list.push({
+        marketCode: '2H_RESULT_HOME',
+        optionType: 'second_half_result',
+        marketCategory: 'half_time',
+        marketName: '2nd Half Result',
+        selection: `2nd half: ${home} win`,
+        period: 'SECOND_HALF',
+        settlementRule: `${home} scores more goals than ${away} in 2nd half.`,
+        rawProb: matrix.secondHalfResult.homeWin,
+        marketOdds: undefined,
+      });
+      list.push({
+        marketCode: '2H_RESULT_DRAW',
+        optionType: 'second_half_result',
+        marketCategory: 'half_time',
+        marketName: '2nd Half Result',
+        selection: '2nd half: Draw',
+        period: 'SECOND_HALF',
+        settlementRule: 'Equal goals scored by both teams in 2nd half.',
+        rawProb: matrix.secondHalfResult.draw,
+        marketOdds: undefined,
+      });
+      list.push({
+        marketCode: '2H_RESULT_AWAY',
+        optionType: 'second_half_result',
+        marketCategory: 'half_time',
+        marketName: '2nd Half Result',
+        selection: `2nd half: ${away} win`,
+        period: 'SECOND_HALF',
+        settlementRule: `${away} scores more goals than ${home} in 2nd half.`,
+        rawProb: matrix.secondHalfResult.awayWin,
         marketOdds: undefined,
       });
     }

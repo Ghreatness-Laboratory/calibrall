@@ -16,6 +16,8 @@ import { DixonColesV25Evaluator } from '../lib/prediction/v25/v25Evaluator';
 import { DixonColesV25Engine, COVARIATE_COEFFICIENTS } from '../lib/prediction/v25/dixonColesV25';
 import { FeatureLayerEngine } from '../lib/prediction/v25/featureLayer';
 import { getCalibratedParams, getLeagueCapabilities, getLeagueCalibratedConfig } from '../lib/prediction/calibratedParams';
+import { selectDiversifiedSlatePicks } from '../lib/prediction/marketSelection';
+import { checkMarketGating } from '../lib/prediction/marketGating';
 
 function assertNoFirstHalfCorners(predictions: { marketCode: string; marketCategory: string; marketName: string; selection: string; period: string }[], label: string) {
   const fhCornerHits = predictions.filter(p =>
@@ -248,7 +250,123 @@ async function runTests() {
       }
     }
   }
-  console.log('✓ PASS [Math & Global Text Rule]: Separate 1H/2H, NB corners/cards, SQLite rivalries source, zero ASCII -/_ in emitted predictions');
+  // 6. All enabled markets & lines computed (zero missing lines, zero 1H corners)
+  const expectedE0GoalLines = ['05', '15', '25', '35', '45'];
+  for (const sfx of expectedE0GoalLines) {
+    assert(e0Codes.has(`TOTAL_GOALS_O${sfx}`), `Missing TOTAL_GOALS_O${sfx}`);
+    assert(e0Codes.has(`TOTAL_GOALS_U${sfx}`), `Missing TOTAL_GOALS_U${sfx}`);
+  }
+  for (const sfx of ['85', '95', '105', '115']) {
+    assert(e0Codes.has(`CORNERS_O${sfx}`), `Missing CORNERS_O${sfx}`);
+    assert(e0Codes.has(`CORNERS_U${sfx}`), `Missing CORNERS_U${sfx}`);
+  }
+  for (const sfx of ['25', '35', '45', '55']) {
+    assert(e0Codes.has(`CARDS_O${sfx}`), `Missing CARDS_O${sfx}`);
+    assert(e0Codes.has(`CARDS_U${sfx}`), `Missing CARDS_U${sfx}`);
+  }
+  const ahHomeCount = e0Eval.predictions.filter(p => p.marketCode.startsWith('AH_HOME_')).length;
+  const ahAwayCount = e0Eval.predictions.filter(p => p.marketCode.startsWith('AH_AWAY_')).length;
+  assert.strictEqual(ahHomeCount, 13, `Expected all 13 AH Home lines [-1.5..+1.5], got ${ahHomeCount}`);
+  assert.strictEqual(ahAwayCount, 13, `Expected all 13 AH Away lines [-1.5..+1.5], got ${ahAwayCount}`);
+  assert(e0Codes.has('FH_GOALS_O15') && e0Codes.has('FH_GOALS_U05'), 'Missing 1H goals 0.5/1.5 full coverage');
+  console.log('✓ PASS [All Enabled Lines]: Total Goals 0.5..4.5, Team Goals 0.5..2.5, all 13x2 AH lines, Corners 8.5..11.5, Cards 2.5..5.5, 1H Goals 0.5/1.5');
+
+  // 7. Walk-forward Brier Skill Gating per (leagueGroup, market)
+  assert.strictEqual(checkMarketGating('highest_scoring_half', 'E0').isAllowed, false, 'HSH must be blocked in UK_WITH_REF (BSS < 0)');
+  assert.strictEqual(checkMarketGating('both_teams_to_score', 'E0').isAllowed, false, 'BTTS must be blocked in UK_WITH_REF (CI crosses 0)');
+  assert.strictEqual(checkMarketGating('draw', 'E0').isAllowed, false, 'Draw must be blocked in UK_WITH_REF (CI crosses 0)');
+  assert.strictEqual(checkMarketGating('corners', 'D1').isAllowed, false, 'Corners must be blocked in EURO_NO_REF (CI crosses 0)');
+  assert.strictEqual(checkMarketGating('corners', 'E0').isAllowed, true, 'Corners must be allowed in UK_WITH_REF (CI > 0)');
+  assert.strictEqual(checkMarketGating('draw', 'D1').isAllowed, true, 'Draw must be allowed in EURO_NO_REF (CI > 0)');
+
+  const hshInE0 = e0Eval.predictions.find(p => p.marketCode === 'HSH_2ND');
+  assert(hshInE0 && hshInE0.isValidated === false && !hshInE0.isTopPick, 'Unvalidated HSH_2ND computed as probability but never recommended');
+  const d1CornerO95 = d1Eval.predictions.find(p => p.marketCode === 'CORNERS_O95');
+  assert(d1CornerO95 && d1CornerO95.isValidated === false && !d1CornerO95.isTopPick, 'EURO_NO_REF CORNERS_O95 blocked from recommendations');
+  console.log('✓ PASS [Walk-Forward Brier Skill Gate]: Only markets with BSS > 0 and 95% CI > 0 are allowed for recommendations');
+
+  // 8. >=70% threshold, highest clearing line on ladder, EV ranking
+  if (e0Eval.topPick) {
+    const tpProb = e0Eval.topPick.calibratedProbability ?? e0Eval.topPick.modelProbability;
+    assert(tpProb >= 0.70, `Top pick must clear 70% threshold, got ${(tpProb * 100).toFixed(1)}%`);
+    assert(e0Eval.topPick.evidence !== undefined, 'Top pick must attach full PickEvidence');
+    assert(Boolean(e0Eval.topPick.evidence?.whyLineChosen), 'Top pick must explain why this line was chosen');
+  }
+  const o05 = e0Eval.predictions.find(p => p.marketCode === 'TOTAL_GOALS_O05');
+  const o15 = e0Eval.predictions.find(p => p.marketCode === 'TOTAL_GOALS_O15');
+  if (o05 && o15 && (o15.calibratedProbability ?? o15.modelProbability) >= 0.70) {
+    assert.strictEqual(o05.rankingScore, 0, 'TOTAL_GOALS_O05 must be suppressed when Over 1.5 clears 70%');
+    assert.strictEqual(o05.isTopPick, false, 'TOTAL_GOALS_O05 cannot be topPick when Over 1.5 clears 70%');
+  }
+
+  // Test EV priority ranking when real odds are quoted with +EV
+  const evPriorityCtx: FixtureContext = {
+    ...e0DerbyContext,
+    fixtureId: 'test_ev_priority',
+    verifiedOdds: {
+      homeWin: 1.85,
+      draw: 3.70,
+      awayWin: 4.20,
+      over25Goals: 1.50, // high probability + positive EV if prob ~72% -> 0.72 * 1.50 - 1 = +0.08
+      under25Goals: 2.75,
+    },
+    homeXg: 2.40,
+    awayXg: 1.25,
+  };
+  const evPriorityEval = DixonColesV25Evaluator.evaluateFixture(evPriorityCtx);
+  if (evPriorityEval.topPick?.marketOdds) {
+    assert((evPriorityEval.topPick.expectedValue ?? 0) > 0, 'Priced top pick must have positive EV');
+    assert(evPriorityEval.topPick.deviggedMarketProb !== undefined && evPriorityEval.topPick.deviggedMarketProb > 0, 'Priced top pick must include devigged market probability');
+  }
+  console.log('✓ PASS [Threshold, Ladder & EV Ranking]: 70% threshold, highest clearing line selection, devigged probability + EV ordering verified');
+
+  // 9. Diversity Cap: <= 40% per market family across multi-fixture slate
+  const slateInputs = Array.from({ length: 10 }, (_, idx) => {
+    const ctx: FixtureContext = {
+      ...e0DerbyContext,
+      fixtureId: `test_slate_${idx}`,
+      homeTeamName: `HomeClub ${idx + 1}`,
+      awayTeamName: `AwayClub ${idx + 1}`,
+      homeXg: 2.15 + (idx % 3) * 0.15,
+      awayXg: 0.75 + (idx % 2) * 0.10,
+      expectedCornersHome: 6.8,
+      expectedCornersAway: 4.1,
+      expectedCards: 4.8,
+      verifiedOdds: {},
+    };
+    const res = DixonColesV25Evaluator.evaluateFixture(ctx);
+    return {
+      fixtureId: ctx.fixtureId,
+      topPick: res.topPick,
+      predictions: res.predictions,
+      noRecommendationReason: res.noRecommendationReason,
+    };
+  });
+
+  const diversified = selectDiversifiedSlatePicks(slateInputs, 0.40);
+  const activeDiv = diversified.filter(d => d.topPick !== null);
+  assert(activeDiv.length >= 6, `Expected diversified slate to retain >=6 active picks, got ${activeDiv.length}`);
+  const divCounts: Record<string, number> = {};
+  activeDiv.forEach(d => {
+    const fam = d.topPick!.marketFamily || d.topPick!.marketCategory;
+    divCounts[fam] = (divCounts[fam] || 0) + 1;
+    assert((d.topPick!.calibratedProbability ?? d.topPick!.modelProbability) >= 0.70, 'Diversified pick must still clear 70% threshold');
+    assert.strictEqual(d.topPick!.isValidated, true, 'Diversified pick must pass walk-forward validation');
+  });
+  Object.entries(divCounts).forEach(([fam, count]) => {
+    const share = count / activeDiv.length;
+    assert(share <= 0.40 + 1e-9, `Diversity cap violated: ${fam} has ${count}/${activeDiv.length} (${(share * 100).toFixed(1)}% > 40%)`);
+  });
+  console.log(`✓ PASS [40% Diversity Cap]: ${activeDiv.length}/10 picks active across ${Object.keys(divCounts).length} families: ${JSON.stringify(divCounts)}`);
+
+  // 10. Verify zero ASCII -/_ inside PickEvidence display strings
+  if (e0Eval.topPick?.evidence) {
+    const ev = e0Eval.topPick.evidence;
+    for (const s of [ev.whyLineChosen, ev.referee.explanation, ev.h2h.summary, ev.derby.name || '', ev.derby.source || '']) {
+      assert(!s.includes('-') && !s.includes('_'), `PickEvidence field violates Global Text Rule: ${s}`);
+    }
+  }
+  console.log('✓ PASS [PickEvidence Integrity]: Structured evidence populated cleanly with zero ASCII -/_');
   console.log('--- ALL QUANTITATIVE MODELS & GATING TESTS PASSED ---');
 }
 

@@ -106,6 +106,89 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
       </div>
 
       <div className="p-3.5 space-y-3.5 text-[12px]">
+        {/* Structured Pick Evidence */}
+        {prediction.evidence && (
+          <div className="bg-[#151E19] border border-[#B6E63B]/25 rounded-[11px] p-3 space-y-2.5 text-[11px]">
+            <div className="flex items-center justify-between border-b border-white/[0.06] pb-1.5">
+              <span className="font-semibold text-[#ECF1EE]">Pick Evidence Breakdown</span>
+              <span className="font-mono text-[10px] text-[#B6E63B]">
+                {cleanDisplayText(prediction.evidence.walkForwardValidation.leagueGroup)} · BSS{' '}
+                {prediction.evidence.walkForwardValidation.brierSkill >= 0 ? '+' : '\u2212'}
+                {Math.abs(prediction.evidence.walkForwardValidation.brierSkill).toFixed(4)}
+              </span>
+            </div>
+
+            <div className="text-[#ECF1EE]/90 leading-relaxed">
+              <span className="text-[#B6E63B] font-semibold">Line rationale: </span>
+              {cleanDisplayText(prediction.evidence.whyLineChosen)}
+            </div>
+
+            <div className="grid grid-cols-1 gap-1.5 text-[#8B9890] tabular-nums">
+              <div className="bg-[#101713] px-2.5 py-1.5 rounded-[7px] border border-white/[0.05]">
+                <span className="text-[#ECF1EE] font-medium">Fitted strengths: </span>
+                {cleanDisplayText(
+                  `Home Att ${prediction.evidence.fittedStrengths.homeAttack.toFixed(2)} / Def ${prediction.evidence.fittedStrengths.homeDefense.toFixed(2)} (${prediction.evidence.fittedStrengths.homeXg.toFixed(2)} xG) | Away Att ${prediction.evidence.fittedStrengths.awayAttack.toFixed(2)} / Def ${prediction.evidence.fittedStrengths.awayDefense.toFixed(2)} (${prediction.evidence.fittedStrengths.awayXg.toFixed(2)} xG)`
+                )}
+                {prediction.evidence.fittedStrengths.expectedCornersHome !== undefined && (
+                  <span>
+                    {cleanDisplayText(
+                      ` | Corners ${prediction.evidence.fittedStrengths.expectedCornersHome.toFixed(1)} + ${(prediction.evidence.fittedStrengths.expectedCornersAway ?? 0).toFixed(1)}`
+                    )}
+                  </span>
+                )}
+                {prediction.evidence.fittedStrengths.expectedCards !== undefined && (
+                  <span>
+                    {cleanDisplayText(` | Cards ${prediction.evidence.fittedStrengths.expectedCards.toFixed(2)}`)}
+                  </span>
+                )}
+              </div>
+
+              <div className="bg-[#101713] px-2.5 py-1.5 rounded-[7px] border border-white/[0.05]">
+                <span className="text-[#ECF1EE] font-medium">Bookmaker &amp; EV: </span>
+                {prediction.marketOdds && prediction.evidence.expectedValue !== null && prediction.evidence.expectedValue !== undefined ? (
+                  <span className="text-[#B6E63B]">
+                    {cleanDisplayText(
+                      `@${prediction.marketOdds.toFixed(2)} | De vigged prob ${((prediction.evidence.deviggedMarketProb ?? 0) * 100).toFixed(1)}% | EV ${prediction.evidence.expectedValue >= 0 ? '+' : '\u2212'}${Math.abs(prediction.evidence.expectedValue * 100).toFixed(1)}%`
+                    )}
+                  </span>
+                ) : (
+                  <span>No real bookmaker odds stored for this line (no EV calculated)</span>
+                )}
+              </div>
+
+              <div className="bg-[#101713] px-2.5 py-1.5 rounded-[7px] border border-white/[0.05]">
+                <span className="text-[#ECF1EE] font-medium">Sample sizes: </span>
+                {cleanDisplayText(
+                  `Home ${prediction.evidence.sampleSizes.homeMatches} matches | Away ${prediction.evidence.sampleSizes.awayMatches} matches | League ${prediction.evidence.sampleSizes.leagueMatches} matches | Walk forward ${prediction.evidence.sampleSizes.walkForwardMatches} matches | H2H ${prediction.evidence.sampleSizes.h2hMeetings} meetings`
+                )}
+              </div>
+
+              <div className="bg-[#101713] px-2.5 py-1.5 rounded-[7px] border border-white/[0.05]">
+                <span className="text-[#ECF1EE] font-medium">Referee: </span>
+                {cleanDisplayText(prediction.evidence.referee.explanation)}
+              </div>
+
+              <div className="bg-[#101713] px-2.5 py-1.5 rounded-[7px] border border-white/[0.05]">
+                <span className="text-[#ECF1EE] font-medium">H2H &amp; Derby: </span>
+                {cleanDisplayText(
+                  `${prediction.evidence.h2h.summary} (weight ${prediction.evidence.h2h.weightApplied.toFixed(2)}) | ${
+                    prediction.evidence.derby.isDerby
+                      ? `Derby: ${prediction.evidence.derby.name || 'Rivalry'} (Source: ${prediction.evidence.derby.source || 'stored DB'}, cards x${prediction.evidence.derby.cardsMultiplierApplied.toFixed(2)})`
+                      : 'Non derby match (multiplier 1.00)'
+                  }`
+                )}
+              </div>
+
+              <div className="bg-[#101713] px-2.5 py-1.5 rounded-[7px] border border-white/[0.05]">
+                <span className="text-[#ECF1EE] font-medium">Walk forward CI: </span>
+                {cleanDisplayText(
+                  `95% Bootstrap CI [${prediction.evidence.walkForwardValidation.ci95Lower.toFixed(4)}, ${prediction.evidence.walkForwardValidation.ci95Upper.toFixed(4)}] (${prediction.evidence.walkForwardValidation.allowed ? 'Allowed' : 'Blocked'})`
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* v2.5 WHY PANEL: Top 3 factors for, top 3 against, active risk flags, uncertainty summary */}
         {whyPanel && (
           <div className="bg-[#151E19] border border-white/[0.08] rounded-[11px] p-3 space-y-3">

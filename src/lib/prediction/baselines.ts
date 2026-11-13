@@ -308,6 +308,16 @@ export function getMarketBaseline(
     compRate = 1 - comp.drawRate;
     const hDraw = teamStats?.homeTeamDrawRate ?? comp.drawRate;
     teamRate = Number((1 - ((hDraw + comp.drawRate) / 2)).toFixed(3));
+  } else if (marketCode === 'COMBO_DRAW_OR_O25') {
+    marketFamily = 'double_chance';
+    // Inclusion-exclusion: Draw OR Over 2.5 (~18.5% of draws are 2-2+ which are already in o25Rate)
+    compRate = Number(Math.min(0.85, Math.max(0.35, 0.815 * comp.drawRate + comp.o25Rate)).toFixed(3));
+    const hDraw = teamStats?.homeTeamDrawRate ?? comp.drawRate;
+    const adjDraw = (hDraw + comp.drawRate) / 2;
+    const avgTeamO25 = (teamStats?.homeTeamHomeO25Rate !== undefined && teamStats?.awayTeamAwayO25Rate !== undefined)
+      ? (teamStats.homeTeamHomeO25Rate + teamStats.awayTeamAwayO25Rate) / 2
+      : comp.o25Rate;
+    teamRate = Number(Math.min(0.85, Math.max(0.35, 0.815 * adjDraw + avgTeamO25)).toFixed(3));
   }
 
   // 2b. Team Totals Over / Under Goals (Home or Away 0.5, 1.5, 2.5)

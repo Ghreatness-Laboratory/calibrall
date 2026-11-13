@@ -499,7 +499,7 @@ export class DixonColesV25Engine {
     const alpha = overdispersionAlpha ??
       getLeagueCalibratedConfig(features.competitionCode)?.cards?.overdispersionAlpha ??
       0.045;
-    const lines = [3.5, 4.5, 5.5];
+    const lines = [2.5, 3.5, 4.5, 5.5];
     const overUnderLines: Record<number, { over: number; under: number }> = {};
 
     lines.forEach(l => {
@@ -529,7 +529,8 @@ export class DixonColesV25Engine {
     marketCategory: MarketCategory,
     marketOdds?: number,
     features?: V25FixtureFeatures,
-    riskFlagsCount: number = 0
+    riskFlagsCount: number = 0,
+    explicitDeviggedMarketProb?: number
   ): V25CalibratedPrediction {
     const plattParams = PLATT_CALIBRATION_PARAMS[marketCategory] || { a: 0.95, b: 0.0, marketBlendWeight: 0.60 };
 
@@ -538,9 +539,10 @@ export class DixonColesV25Engine {
 
     // Logit blend with de-vigged market probability if market odds exist
     if (marketOdds && marketOdds > 1.0) {
-      // Basic devigged estimate (margin ~ 5% across books)
       const implied = 1 / marketOdds;
-      deviggedMarketProb = Math.max(0.02, Math.min(0.98, implied / 1.05));
+      deviggedMarketProb = explicitDeviggedMarketProb !== undefined
+        ? Math.max(0.02, Math.min(0.98, explicitDeviggedMarketProb))
+        : Math.max(0.02, Math.min(0.98, implied / 1.05));
 
       const w = plattParams.marketBlendWeight;
       const logitModel = this.logit(rawModelProb);

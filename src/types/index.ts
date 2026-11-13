@@ -206,6 +206,8 @@ export interface FixtureContext {
   uncertaintyScore: number | null;
   dataCoverageScore: number | null;
   sampleSizeMatches: number;
+  homeSampleMatches?: number;
+  awaySampleMatches?: number;
   hasRealTeamStrength?: boolean;
   insufficientData?: boolean;
   stateTags?: StateTag[];
@@ -317,6 +319,8 @@ export interface Fixture {
     uncertaintyScore: number | null;
     dataCoverageScore: number | null;
     sampleSizeMatches: number;
+    homeSampleMatches?: number;
+    awaySampleMatches?: number;
     hasRealTeamStrength?: boolean;
     insufficientData?: boolean;
     stateTags?: StateTag[];
@@ -506,6 +510,62 @@ export interface MarketPrediction {
   skillVsDeviggedMarket?: number | null;
   deviggedMarketProb?: number;
   equivalentCanonicalKey?: string;
+  evidence?: PickEvidence;
+}
+
+export interface PickEvidence {
+  fittedStrengths: {
+    homeAttack: number;
+    homeDefense: number;
+    awayAttack: number;
+    awayDefense: number;
+    homeXg: number;
+    awayXg: number;
+    expectedCornersHome?: number;
+    expectedCornersAway?: number;
+    expectedCards?: number;
+  };
+  expectedValue: number | null;
+  deviggedMarketProb: number | null;
+  sampleSizes: {
+    homeMatches: number;
+    awayMatches: number;
+    leagueMatches: number;
+    walkForwardMatches: number;
+    h2hMeetings: number;
+    cornersMatches?: number;
+    cardsMatches?: number;
+    refereeMatches?: number;
+  };
+  referee: {
+    announced: boolean;
+    name?: string;
+    shrunkCardsPerMatch?: number;
+    leagueBaseline?: number;
+    explanation: string;
+  };
+  h2h: {
+    meetingsCount: number;
+    shrunkGoalDiff: number;
+    weightApplied: number;
+    summary: string;
+  };
+  derby: {
+    isDerby: boolean;
+    name?: string;
+    source?: string;
+    cardsMultiplierApplied: number;
+  };
+  whyLineChosen: string;
+  walkForwardValidation: {
+    leagueGroup: string;
+    market: string;
+    brierSkill: number;
+    ci95Lower: number;
+    ci95Upper: number;
+    matches: number;
+    allowed: boolean;
+  };
 }
 
 export type FixtureProfile = 

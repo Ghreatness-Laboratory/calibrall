@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-13T09:04:00.936Z",
+  "generatedAt": "2026-11-13T09:17:00.731Z",
   "totalFinishedMatches": 79060,
   "totalRivalriesSeeded": 90,
   "aliasToCanonical": {
@@ -93,64 +93,64 @@
   "h2hAblation": {
     "enabled": true,
     "selectedWeight": 0.08,
-    "baseCombinedBrier": 0.23173,
-    "selectedCombinedBrier": 0.231391,
-    "deltaBrier": -0.0003397,
+    "baseCombinedBrier": 0.231713,
+    "selectedCombinedBrier": 0.231378,
+    "deltaBrier": -0.000335,
     "heldOutMatchesTested": 19324,
     "candidates": [
       {
         "weight": 0,
         "n": 19324,
-        "brier1X2": 0.205335,
-        "brierO25": 0.244138,
-        "brierBtts": 0.245718,
-        "combinedBrier": 0.23173,
+        "brier1X2": 0.205413,
+        "brierO25": 0.244054,
+        "brierBtts": 0.245671,
+        "combinedBrier": 0.231713,
         "deltaVsBase": 0
       },
       {
         "weight": 0.02,
         "n": 19324,
-        "brier1X2": 0.204929,
-        "brierO25": 0.244043,
-        "brierBtts": 0.245724,
-        "combinedBrier": 0.231565,
-        "deltaVsBase": -0.0001651
+        "brier1X2": 0.205009,
+        "brierO25": 0.243961,
+        "brierBtts": 0.245677,
+        "combinedBrier": 0.231549,
+        "deltaVsBase": -0.0001641
       },
       {
         "weight": 0.04,
         "n": 19324,
-        "brier1X2": 0.204666,
-        "brierO25": 0.243952,
-        "brierBtts": 0.245741,
-        "combinedBrier": 0.231453,
-        "deltaVsBase": -0.0002773
+        "brier1X2": 0.204748,
+        "brierO25": 0.243872,
+        "brierBtts": 0.245693,
+        "combinedBrier": 0.231438,
+        "deltaVsBase": -0.0002751
       },
       {
         "weight": 0.06,
         "n": 19324,
-        "brier1X2": 0.204543,
-        "brierO25": 0.24387,
-        "brierBtts": 0.24577,
-        "combinedBrier": 0.231395,
-        "deltaVsBase": -0.0003357
+        "brier1X2": 0.204627,
+        "brierO25": 0.243792,
+        "brierBtts": 0.245722,
+        "combinedBrier": 0.23138,
+        "deltaVsBase": -0.0003323
       },
       {
         "weight": 0.08,
         "n": 19324,
-        "brier1X2": 0.204556,
-        "brierO25": 0.243801,
-        "brierBtts": 0.245814,
-        "combinedBrier": 0.231391,
-        "deltaVsBase": -0.0003397
+        "brier1X2": 0.204642,
+        "brierO25": 0.243725,
+        "brierBtts": 0.245766,
+        "combinedBrier": 0.231378,
+        "deltaVsBase": -0.000335
       },
       {
         "weight": 0.12,
         "n": 19324,
-        "brier1X2": 0.204969,
-        "brierO25": 0.243722,
-        "brierBtts": 0.245952,
-        "combinedBrier": 0.231548,
-        "deltaVsBase": -0.0001827
+        "brier1X2": 0.205059,
+        "brierO25": 0.243652,
+        "brierBtts": 0.245902,
+        "combinedBrier": 0.231538,
+        "deltaVsBase": -0.000175
       }
     ]
   },
@@ -161,44 +161,44 @@
       {
         "kHalves": 14,
         "n": 11958,
-        "sepHshBrier": 0.249304,
-        "flatHshBrier": 0.247388,
-        "sepFhO05Brier": 0.204553,
-        "flatFhO05Brier": 0.204539
+        "sepHshBrier": 0.249298,
+        "flatHshBrier": 0.247391,
+        "sepFhO05Brier": 0.204531,
+        "flatFhO05Brier": 0.2045
       },
       {
         "kHalves": 25,
         "n": 11958,
-        "sepHshBrier": 0.248324,
-        "flatHshBrier": 0.247388,
-        "sepFhO05Brier": 0.20412,
-        "flatFhO05Brier": 0.204539
+        "sepHshBrier": 0.248359,
+        "flatHshBrier": 0.247391,
+        "sepFhO05Brier": 0.204151,
+        "flatFhO05Brier": 0.2045
       },
       {
         "kHalves": 40,
         "n": 11958,
-        "sepHshBrier": 0.247767,
-        "flatHshBrier": 0.247388,
-        "sepFhO05Brier": 0.203998,
-        "flatFhO05Brier": 0.204539
+        "sepHshBrier": 0.247838,
+        "flatHshBrier": 0.247391,
+        "sepFhO05Brier": 0.204075,
+        "flatFhO05Brier": 0.2045
       },
       {
         "kHalves": 60,
         "n": 11958,
-        "sepHshBrier": 0.247461,
-        "flatHshBrier": 0.247388,
-        "sepFhO05Brier": 0.204025,
-        "flatFhO05Brier": 0.204539
+        "sepHshBrier": 0.247561,
+        "flatHshBrier": 0.247391,
+        "sepFhO05Brier": 0.204143,
+        "flatFhO05Brier": 0.2045
       }
     ]
   },
   "cornersValidation": {
-    "heldOutMatchesTested": 11214,
-    "negBinomialO95Brier": 0.248032,
-    "poissonO95Brier": 0.24842,
-    "leagueBaselineO95Brier": 0.248819,
-    "negBinomialO95LogLoss": 0.689342,
-    "poissonO95LogLoss": 0.690198
+    "heldOutMatchesTested": 11211,
+    "negBinomialO95Brier": 0.247977,
+    "poissonO95Brier": 0.248357,
+    "leagueBaselineO95Brier": 0.24927,
+    "negBinomialO95LogLoss": 0.689226,
+    "poissonO95LogLoss": 0.690067
   },
   "cardsAndRefereeValidation": {
     "optimalRefShrinkageK": 5,
@@ -206,49 +206,49 @@
       {
         "k": 3,
         "n": 5178,
-        "nbRefBrier": 0.229846,
-        "poisRefBrier": 0.229861,
-        "nbLeagueBaseBrier": 0.232189
+        "nbRefBrier": 0.230045,
+        "poisRefBrier": 0.230067,
+        "nbLeagueBaseBrier": 0.232722
       },
       {
         "k": 5,
         "n": 5178,
-        "nbRefBrier": 0.229782,
-        "poisRefBrier": 0.229777,
-        "nbLeagueBaseBrier": 0.232189
+        "nbRefBrier": 0.230021,
+        "poisRefBrier": 0.230024,
+        "nbLeagueBaseBrier": 0.232722
       },
       {
         "k": 8,
         "n": 5178,
-        "nbRefBrier": 0.22987,
-        "poisRefBrier": 0.229854,
-        "nbLeagueBaseBrier": 0.232189
+        "nbRefBrier": 0.230146,
+        "poisRefBrier": 0.23014,
+        "nbLeagueBaseBrier": 0.232722
       },
       {
         "k": 10,
         "n": 5178,
-        "nbRefBrier": 0.229952,
-        "poisRefBrier": 0.229934,
-        "nbLeagueBaseBrier": 0.232189
+        "nbRefBrier": 0.230245,
+        "poisRefBrier": 0.230238,
+        "nbLeagueBaseBrier": 0.232722
       },
       {
         "k": 15,
         "n": 5178,
-        "nbRefBrier": 0.230143,
-        "poisRefBrier": 0.230125,
-        "nbLeagueBaseBrier": 0.232189
+        "nbRefBrier": 0.230465,
+        "poisRefBrier": 0.230459,
+        "nbLeagueBaseBrier": 0.232722
       },
       {
         "k": 20,
         "n": 5178,
-        "nbRefBrier": 0.230295,
-        "poisRefBrier": 0.23028,
-        "nbLeagueBaseBrier": 0.232189
+        "nbRefBrier": 0.230634,
+        "poisRefBrier": 0.230632,
+        "nbLeagueBaseBrier": 0.232722
       }
     ],
     "noRefereeHeldOutMatches": 6780,
-    "noRefereeNegBinomialBrier": 0.236307,
-    "noRefereePoissonBrier": 0.236824
+    "noRefereeNegBinomialBrier": 0.236999,
+    "noRefereePoissonBrier": 0.23763
   },
   "derbySignificance": {
     "rivalriesTableCount": 90,
@@ -301,6 +301,443 @@
     "applyGoalsAdjustment": false,
     "applyDrawAdjustment": false,
     "applyCornersAdjustment": false
+  },
+  "walkForwardMarketValidation": {
+    "UK_WITH_REF": {
+      "result": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "result",
+        "matches": 5178,
+        "samples": 10356,
+        "modelBrier": 0.21782,
+        "baseBrier": 0.22963,
+        "brierSkill": 0.0514,
+        "ci95Lower": 0.0419,
+        "ci95Upper": 0.0618,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0514 (95% CI [+0.0419, +0.0618] > 0 across 5178 held-out matches)."
+      },
+      "draw": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "draw",
+        "matches": 5178,
+        "samples": 5178,
+        "modelBrier": 0.19089,
+        "baseBrier": 0.19123,
+        "brierSkill": 0.0018,
+        "ci95Lower": -0.001,
+        "ci95Upper": 0.0048,
+        "allowed": false,
+        "reason": "Rejected: BSS +0.0018 (95% CI [-0.0010, 0.0048]) does not exceed 0 with CI lower > 0."
+      },
+      "double_chance": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "double_chance",
+        "matches": 5178,
+        "samples": 15534,
+        "modelBrier": 0.20884,
+        "baseBrier": 0.21683,
+        "brierSkill": 0.0368,
+        "ci95Lower": 0.0301,
+        "ci95Upper": 0.0442,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0368 (95% CI [+0.0301, +0.0442] > 0 across 5178 held-out matches)."
+      },
+      "goals_over_under": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "goals_over_under",
+        "matches": 5178,
+        "samples": 56958,
+        "modelBrier": 0.17235,
+        "baseBrier": 0.17534,
+        "brierSkill": 0.017,
+        "ci95Lower": 0.0125,
+        "ci95Upper": 0.0218,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0170 (95% CI [+0.0125, +0.0218] > 0 across 5178 held-out matches)."
+      },
+      "both_teams_to_score": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "both_teams_to_score",
+        "matches": 5178,
+        "samples": 5178,
+        "modelBrier": 0.24773,
+        "baseBrier": 0.24887,
+        "brierSkill": 0.0046,
+        "ci95Lower": -0.0013,
+        "ci95Upper": 0.0104,
+        "allowed": false,
+        "reason": "Rejected: BSS +0.0046 (95% CI [-0.0013, 0.0104]) does not exceed 0 with CI lower > 0."
+      },
+      "handicap": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "handicap",
+        "matches": 5178,
+        "samples": 67314,
+        "modelBrier": 0.16295,
+        "baseBrier": 0.17192,
+        "brierSkill": 0.0521,
+        "ci95Lower": 0.0422,
+        "ci95Upper": 0.0615,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0521 (95% CI [+0.0422, +0.0615] > 0 across 5178 held-out matches)."
+      },
+      "highest_scoring_half": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "highest_scoring_half",
+        "matches": 5178,
+        "samples": 15534,
+        "modelBrier": 0.21681,
+        "baseBrier": 0.2166,
+        "brierSkill": -0.001,
+        "ci95Lower": -0.0034,
+        "ci95Upper": 0.0012,
+        "allowed": false,
+        "reason": "Rejected: BSS -0.0010 (95% CI [-0.0034, 0.0012]) does not exceed 0 with CI lower > 0."
+      },
+      "first_half_goals": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "first_half_goals",
+        "matches": 5178,
+        "samples": 10356,
+        "modelBrier": 0.21428,
+        "baseBrier": 0.2154,
+        "brierSkill": 0.0052,
+        "ci95Lower": 0.0016,
+        "ci95Upper": 0.0084,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0052 (95% CI [+0.0016, +0.0084] > 0 across 5178 held-out matches)."
+      },
+      "second_half_result": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "second_half_result",
+        "matches": 5178,
+        "samples": 15534,
+        "modelBrier": 0.21899,
+        "baseBrier": 0.22143,
+        "brierSkill": 0.011,
+        "ci95Lower": 0.0077,
+        "ci95Upper": 0.0141,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0110 (95% CI [+0.0077, +0.0141] > 0 across 5178 held-out matches)."
+      },
+      "corners": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "corners",
+        "matches": 4431,
+        "samples": 17724,
+        "modelBrier": 0.23096,
+        "baseBrier": 0.23287,
+        "brierSkill": 0.0082,
+        "ci95Lower": 0.0006,
+        "ci95Upper": 0.016,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0082 (95% CI [+0.0006, +0.0160] > 0 across 4431 held-out matches)."
+      },
+      "bookings": {
+        "leagueGroup": "UK_WITH_REF",
+        "market": "bookings",
+        "matches": 5178,
+        "samples": 20712,
+        "modelBrier": 0.20759,
+        "baseBrier": 0.21089,
+        "brierSkill": 0.0156,
+        "ci95Lower": 0.0126,
+        "ci95Upper": 0.0182,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0156 (95% CI [+0.0126, +0.0182] > 0 across 5178 held-out matches)."
+      }
+    },
+    "EURO_NO_REF": {
+      "result": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "result",
+        "matches": 6781,
+        "samples": 13562,
+        "modelBrier": 0.20768,
+        "baseBrier": 0.22972,
+        "brierSkill": 0.096,
+        "ci95Lower": 0.0866,
+        "ci95Upper": 0.1048,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0960 (95% CI [+0.0866, +0.1048] > 0 across 6781 held-out matches)."
+      },
+      "draw": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "draw",
+        "matches": 6781,
+        "samples": 6781,
+        "modelBrier": 0.18758,
+        "baseBrier": 0.18949,
+        "brierSkill": 0.0101,
+        "ci95Lower": 0.0063,
+        "ci95Upper": 0.0137,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0101 (95% CI [+0.0063, +0.0137] > 0 across 6781 held-out matches)."
+      },
+      "double_chance": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "double_chance",
+        "matches": 6781,
+        "samples": 20343,
+        "modelBrier": 0.20098,
+        "baseBrier": 0.21631,
+        "brierSkill": 0.0709,
+        "ci95Lower": 0.0642,
+        "ci95Upper": 0.078,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0709 (95% CI [+0.0642, +0.0780] > 0 across 6781 held-out matches)."
+      },
+      "goals_over_under": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "goals_over_under",
+        "matches": 6781,
+        "samples": 74591,
+        "modelBrier": 0.17172,
+        "baseBrier": 0.17835,
+        "brierSkill": 0.0372,
+        "ci95Lower": 0.0321,
+        "ci95Upper": 0.042,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0372 (95% CI [+0.0321, +0.0420] > 0 across 6781 held-out matches)."
+      },
+      "both_teams_to_score": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "both_teams_to_score",
+        "matches": 6781,
+        "samples": 6781,
+        "modelBrier": 0.24697,
+        "baseBrier": 0.24801,
+        "brierSkill": 0.0042,
+        "ci95Lower": -0.0012,
+        "ci95Upper": 0.0098,
+        "allowed": false,
+        "reason": "Rejected: BSS +0.0042 (95% CI [-0.0012, 0.0098]) does not exceed 0 with CI lower > 0."
+      },
+      "handicap": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "handicap",
+        "matches": 6781,
+        "samples": 88153,
+        "modelBrier": 0.15483,
+        "baseBrier": 0.17229,
+        "brierSkill": 0.1013,
+        "ci95Lower": 0.0915,
+        "ci95Upper": 0.1112,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.1013 (95% CI [+0.0915, +0.1112] > 0 across 6781 held-out matches)."
+      },
+      "highest_scoring_half": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "highest_scoring_half",
+        "matches": 6780,
+        "samples": 20340,
+        "modelBrier": 0.21536,
+        "baseBrier": 0.21502,
+        "brierSkill": -0.0016,
+        "ci95Lower": -0.0035,
+        "ci95Upper": 0.0003,
+        "allowed": false,
+        "reason": "Rejected: BSS -0.0016 (95% CI [-0.0035, 0.0003]) does not exceed 0 with CI lower > 0."
+      },
+      "first_half_goals": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "first_half_goals",
+        "matches": 6780,
+        "samples": 13560,
+        "modelBrier": 0.21516,
+        "baseBrier": 0.21638,
+        "brierSkill": 0.0056,
+        "ci95Lower": 0.0031,
+        "ci95Upper": 0.0088,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0056 (95% CI [+0.0031, +0.0088] > 0 across 6780 held-out matches)."
+      },
+      "second_half_result": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "second_half_result",
+        "matches": 6780,
+        "samples": 20340,
+        "modelBrier": 0.21639,
+        "baseBrier": 0.22052,
+        "brierSkill": 0.0187,
+        "ci95Lower": 0.0159,
+        "ci95Upper": 0.0214,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0187 (95% CI [+0.0159, +0.0214] > 0 across 6780 held-out matches)."
+      },
+      "corners": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "corners",
+        "matches": 6780,
+        "samples": 27120,
+        "modelBrier": 0.22833,
+        "baseBrier": 0.22948,
+        "brierSkill": 0.005,
+        "ci95Lower": -0.0015,
+        "ci95Upper": 0.0114,
+        "allowed": false,
+        "reason": "Rejected: BSS +0.0050 (95% CI [-0.0015, 0.0114]) does not exceed 0 with CI lower > 0."
+      },
+      "bookings": {
+        "leagueGroup": "EURO_NO_REF",
+        "market": "bookings",
+        "matches": 6780,
+        "samples": 27120,
+        "modelBrier": 0.20644,
+        "baseBrier": 0.20815,
+        "brierSkill": 0.0082,
+        "ci95Lower": 0.007,
+        "ci95Upper": 0.0094,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0082 (95% CI [+0.0070, +0.0094] > 0 across 6780 held-out matches)."
+      }
+    },
+    "EXTRA_GOALS_ONLY": {
+      "result": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "result",
+        "matches": 7365,
+        "samples": 14730,
+        "modelBrier": 0.2126,
+        "baseBrier": 0.22769,
+        "brierSkill": 0.0663,
+        "ci95Lower": 0.0586,
+        "ci95Upper": 0.0745,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0663 (95% CI [+0.0586, +0.0745] > 0 across 7365 held-out matches)."
+      },
+      "draw": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "draw",
+        "matches": 7365,
+        "samples": 7365,
+        "modelBrier": 0.19083,
+        "baseBrier": 0.19182,
+        "brierSkill": 0.0052,
+        "ci95Lower": 0.002,
+        "ci95Upper": 0.0083,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0052 (95% CI [+0.0020, +0.0083] > 0 across 7365 held-out matches)."
+      },
+      "double_chance": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "double_chance",
+        "matches": 7365,
+        "samples": 22095,
+        "modelBrier": 0.20534,
+        "baseBrier": 0.21573,
+        "brierSkill": 0.0482,
+        "ci95Lower": 0.0422,
+        "ci95Upper": 0.0543,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0482 (95% CI [+0.0422, +0.0543] > 0 across 7365 held-out matches)."
+      },
+      "goals_over_under": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "goals_over_under",
+        "matches": 7365,
+        "samples": 81015,
+        "modelBrier": 0.1723,
+        "baseBrier": 0.17712,
+        "brierSkill": 0.0272,
+        "ci95Lower": 0.0225,
+        "ci95Upper": 0.0321,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0272 (95% CI [+0.0225, +0.0321] > 0 across 7365 held-out matches)."
+      },
+      "both_teams_to_score": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "both_teams_to_score",
+        "matches": 7365,
+        "samples": 7365,
+        "modelBrier": 0.24309,
+        "baseBrier": 0.24419,
+        "brierSkill": 0.0045,
+        "ci95Lower": -0.0006,
+        "ci95Upper": 0.0099,
+        "allowed": false,
+        "reason": "Rejected: BSS +0.0045 (95% CI [-0.0006, 0.0099]) does not exceed 0 with CI lower > 0."
+      },
+      "handicap": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "handicap",
+        "matches": 7365,
+        "samples": 95745,
+        "modelBrier": 0.15745,
+        "baseBrier": 0.16946,
+        "brierSkill": 0.0709,
+        "ci95Lower": 0.0618,
+        "ci95Upper": 0.0794,
+        "allowed": true,
+        "reason": "Allowed: BSS +0.0709 (95% CI [+0.0618, +0.0794] > 0 across 7365 held-out matches)."
+      },
+      "highest_scoring_half": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "highest_scoring_half",
+        "matches": 0,
+        "samples": 0,
+        "modelBrier": 0,
+        "baseBrier": 0,
+        "brierSkill": 0,
+        "ci95Lower": -1,
+        "ci95Upper": 1,
+        "allowed": false,
+        "reason": "Disabled: no stored column data for highest_scoring_half in EXTRA_GOALS_ONLY."
+      },
+      "first_half_goals": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "first_half_goals",
+        "matches": 0,
+        "samples": 0,
+        "modelBrier": 0,
+        "baseBrier": 0,
+        "brierSkill": 0,
+        "ci95Lower": -1,
+        "ci95Upper": 1,
+        "allowed": false,
+        "reason": "Disabled: no stored column data for first_half_goals in EXTRA_GOALS_ONLY."
+      },
+      "second_half_result": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "second_half_result",
+        "matches": 0,
+        "samples": 0,
+        "modelBrier": 0,
+        "baseBrier": 0,
+        "brierSkill": 0,
+        "ci95Lower": -1,
+        "ci95Upper": 1,
+        "allowed": false,
+        "reason": "Disabled: no stored column data for second_half_result in EXTRA_GOALS_ONLY."
+      },
+      "corners": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "corners",
+        "matches": 0,
+        "samples": 0,
+        "modelBrier": 0,
+        "baseBrier": 0,
+        "brierSkill": 0,
+        "ci95Lower": -1,
+        "ci95Upper": 1,
+        "allowed": false,
+        "reason": "Disabled: no stored column data for corners in EXTRA_GOALS_ONLY."
+      },
+      "bookings": {
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "market": "bookings",
+        "matches": 0,
+        "samples": 0,
+        "modelBrier": 0,
+        "baseBrier": 0,
+        "brierSkill": 0,
+        "ci95Lower": -1,
+        "ci95Upper": 1,
+        "allowed": false,
+        "reason": "Disabled: no stored column data for bookings in EXTRA_GOALS_ONLY."
+      }
+    }
   },
   "leagues": {
     "ARG": {

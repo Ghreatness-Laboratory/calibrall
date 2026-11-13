@@ -67,6 +67,20 @@ export interface CalibratedLeagueConfig {
   cards: CalibratedCardsConfig | null;
 }
 
+export interface WalkForwardMarketValidation {
+  leagueGroup: 'UK_WITH_REF' | 'EURO_NO_REF' | 'EXTRA_GOALS_ONLY';
+  market: string;
+  matches: number;
+  samples: number;
+  modelBrier: number;
+  baseBrier: number;
+  brierSkill: number;
+  ci95Lower: number;
+  ci95Upper: number;
+  allowed: boolean;
+  reason: string;
+}
+
 export interface CalibratedParamsData {
   generatedAt: string;
   totalFinishedMatches: number;
@@ -148,6 +162,10 @@ export interface CalibratedParamsData {
       significant05: boolean;
     };
   };
+  walkForwardMarketValidation: Record<
+    'UK_WITH_REF' | 'EURO_NO_REF' | 'EXTRA_GOALS_ONLY',
+    Record<string, WalkForwardMarketValidation>
+  >;
   leagues: Record<string, CalibratedLeagueConfig>;
 }
 
@@ -195,6 +213,15 @@ export function getLeagueCapabilities(compCode?: string | null): LeagueColumnCap
   };
 }
 
+export function getWalkForwardMarketValidation(
+  compCode?: string | null,
+  market?: string
+): WalkForwardMarketValidation | null {
+  const grp = getLeagueCapabilities(compCode).leagueGroup;
+  if (!market) return null;
+  return DATA.walkForwardMarketValidation?.[grp]?.[market] || null;
+}
+
 export function resolveLeagueGoalMeans(compCode?: string | null): {
   avgHomeGoals: number;
   avgAwayGoals: number;
@@ -212,7 +239,7 @@ export function resolveLeagueGoalMeans(compCode?: string | null): {
       sampleSize: cfg.goals.sampleSize,
     };
   }
-  // Empirical global average across all 79,060 finished database matches
+  // Empirical global average across all 79,061 finished database matches
   return {
     avgHomeGoals: 1.44,
     avgAwayGoals: 1.14,

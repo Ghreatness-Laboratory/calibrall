@@ -2009,3 +2009,113 @@ function generateGroundedExplanation(params: {
     generatedAt: new Date().toISOString()
   };
 }
+
+export interface SlatePickCandidate {
+  fixtureId: string;
+  topPick: MarketPrediction | null;
+  predictions: MarketPrediction[];
+  noRecommendationReason?: string;
+}
+
+/**
+ * Enforces the slate diversity cap: no more than 40% of active picks may come from one market family.
+ * Over-represented families demote/swap the weakest marginal picks (lowest EV/edge) to their next
+ * highest-ranked eligible alternative in an uncapped family, or abstain if none exists.
+ */
+export function selectDiversifiedSlatePicks<T extends SlatePickCandidate>(
+  items: T[],
+  maxFamilyShare: number = 0.40
+): T[] {
+  const result = items.map(item => ({
+    ...item,
+    topPick: item.topPick,
+    predictions: item.predictions,
+    noRecommendationReason: item.noRecommendationReason,
+  }));
+
+  const getFamily = (p: MarketPrediction): MarketFamily =>
+    (p.marketFamily as MarketFamily) || getMarketFamily(p.optionType, p.marketCode, p.marketCategory);
+
+  const pickStrength = (p: MarketPrediction): number => {
+    const hasOddsEv = Boolean(p.marketOdds && p.expectedValue !== null && p.expectedValue !== undefined && p.expectedValue > 0);
+    if (hasOddsEv) {
+      return 1000 + (p.expectedValue ?? 0) * 1000 + (p.edgeOverBaseline ?? 0) * 10;
+    }
+    return (p.edgeOverBaseline ?? 0) * 100 + (p.calibratedProbability ?? p.modelProbability);
+  };
+
+  const isEligibleAlternative = (p: MarketPrediction): boolean => {
+    if (!p.isValidated || p.sanityTripwire) return false;
+    if (p.optionType === 'asian_handicap' && (p.handicapLine ?? 0) >= 1.5) return false;
+    if ((p.rankingScore ?? 0) <= 0) return false;
+    const prob = p.calibratedProbability ?? p.modelProbability;
+    if (prob < 0.70) return false;
+    if (p.marketOdds && p.marketOdds > 1.0) {
+      return (p.expectedValue ?? 0) > 0 && (p.skillVsDeviggedMarket ?? 0) > 0;
+    }
+    return !p.isGenericPick && (p.edgeOverBaseline ?? 0) > 0.010;
+  };
+
+  for (let iter = 0; iter < result.length * 4 + 10; iter++) {
+    const active = result.filter(r => r.topPick !== null);
+    if (active.length <= 1) break;
+
+    const cap = Math.max(1, Math.floor(active.length * maxFamilyShare));
+    const counts = new Map<string, number>();
+    for (const r of active) {
+      const fam = getFamily(r.topPick!);
+      counts.set(fam, (counts.get(fam) || 0) + 1);
+    }
+
+    let overFam: string | null = null;
+    let maxExcess = 0;
+    for (const [fam, count] of counts.entries()) {
+      const excess = count - cap;
+      if (excess > maxExcess) {
+        maxExcess = excess;
+        overFam = fam;
+      }
+    }
+
+    if (!overFam) break;
+
+    const holders = active
+      .filter(r => getFamily(r.topPick!) === overFam)
+      .sort((a, b) => pickStrength(a.topPick!) - pickStrength(b.topPick!));
+
+    let swapped = false;
+    for (const holder of holders) {
+      const currentCode = holder.topPick!.marketCode;
+      const alternatives = holder.predictions
+        .filter(p => {
+          if (p.marketCode === currentCode) return false;
+          if (!isEligibleAlternative(p)) return false;
+          const altFam = getFamily(p);
+          return (counts.get(altFam) || 0) < cap;
+        })
+        .sort((a, b) => pickStrength(b) - pickStrength(a));
+
+      if (alternatives.length > 0) {
+        const chosen = alternatives[0];
+        holder.predictions = holder.predictions.map(p => ({
+          ...p,
+          isTopPick: p.marketCode === chosen.marketCode,
+        }));
+        holder.topPick = holder.predictions.find(p => p.marketCode === chosen.marketCode) || chosen;
+        swapped = true;
+        break;
+      }
+    }
+
+    if (!swapped) {
+      const weakest = holders[0];
+      if (!weakest) break;
+      weakest.predictions = weakest.predictions.map(p => ({ ...p, isTopPick: false }));
+      weakest.topPick = null;
+      weakest.noRecommendationReason = `Withheld by ${Math.round(maxFamilyShare * 100)}% market family diversity cap across slate`;
+    }
+  }
+
+  return result;
+}
+

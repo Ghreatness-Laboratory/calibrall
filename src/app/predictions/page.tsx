@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
-import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
 import { MarketPrediction, Team } from '@/types';
 import CompetitionFilter from '@/components/CompetitionFilter';
 import { CountryCompetitionGroup } from '@/lib/data/canonicalCompetitions';
@@ -89,6 +89,22 @@ export default function PredictionsPage() {
 
     const now = Date.now();
 
+    const footballEvaluations: {
+      fixtureId: string;
+      fixtureName: string;
+      homeTeam: Team;
+      awayTeam: Team;
+      compId: string;
+      compCode: string;
+      compName: string;
+      kickoff: string;
+      isDerby?: boolean;
+      derbyName?: string;
+      topPick: MarketPrediction | null;
+      predictions: MarketPrediction[];
+      noRecommendationReason?: string;
+    }[] = [];
+
     fixtures.forEach(fixture => {
       // Filter out finished or already started matches
       if (fixture.status === 'FINISHED' || fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED') return;
@@ -126,18 +142,37 @@ export default function PredictionsPage() {
 
       const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
 
-      evalResult.predictions.forEach(p => {
+      footballEvaluations.push({
+        fixtureId: fixture.id,
+        fixtureName: `${displayName(fixture.homeTeam)} vs ${displayName(fixture.awayTeam)}`,
+        homeTeam: fixture.homeTeam,
+        awayTeam: fixture.awayTeam,
+        compId: fixture.competitionId || fixture.competition.id,
+        compCode: fixture.competition.code,
+        compName: fixture.competition.name,
+        kickoff: fixture.kickoffTime,
+        isDerby: !!derbyInfo,
+        derbyName: derbyInfo?.name,
+        topPick: evalResult.topPick,
+        predictions: evalResult.predictions,
+        noRecommendationReason: evalResult.noRecommendationReason,
+      });
+    });
+
+    const diversifiedFootball = selectDiversifiedSlatePicks(footballEvaluations, 0.40);
+    diversifiedFootball.forEach(item => {
+      item.predictions.forEach(p => {
         list.push({
-          fixtureId: fixture.id,
-          fixtureName: `${displayName(fixture.homeTeam)} vs ${displayName(fixture.awayTeam)}`,
-          homeTeam: fixture.homeTeam,
-          awayTeam: fixture.awayTeam,
-          compId: fixture.competitionId || fixture.competition.id,
-          compCode: fixture.competition.code,
-          compName: fixture.competition.name,
-          kickoff: fixture.kickoffTime,
-          isDerby: !!derbyInfo,
-          derbyName: derbyInfo?.name,
+          fixtureId: item.fixtureId,
+          fixtureName: item.fixtureName,
+          homeTeam: item.homeTeam,
+          awayTeam: item.awayTeam,
+          compId: item.compId,
+          compCode: item.compCode,
+          compName: item.compName,
+          kickoff: item.kickoff,
+          isDerby: item.isDerby,
+          derbyName: item.derbyName,
           prediction: p,
         });
       });

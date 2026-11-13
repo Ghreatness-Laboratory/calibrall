@@ -223,9 +223,12 @@ export function runNoIdenticalHandicapBugTests(): { passed: boolean; failures: s
   const evalComp = DixonColesV25Evaluator.evaluateFixture(fixtureCompetitive);
   const zeroHandicap = evalComp.predictions.find(p => p.marketCategory === 'handicap' && p.handicapLine === 0.0);
   assert(zeroHandicap !== undefined, 'Dynamic handicap generates level line 0.0 for evenly matched fixtures');
-  // Confirm that fixed +1.5 was NOT forced as the only handicap
-  const plusOnePointFive = evalComp.predictions.find(p => p.marketCategory === 'handicap' && p.handicapLine === 1.5);
-  assert(plusOnePointFive === undefined, 'Evenly matched fixture does not generate wide +1.5 cushion handicap line');
+  // Confirm that fixed +1.5 is never selected as topPick on an evenly matched fixture (tighter lines/other markets beat it)
+  assert(
+    evalComp.topPick?.handicapLine !== 1.5 && !evalComp.predictions.some(p => p.isTopPick && p.handicapLine === 1.5),
+    'Evenly matched fixture never recommends wide +1.5 cushion handicap line as top pick',
+    `topPick was ${evalComp.topPick?.selection} (line ${evalComp.topPick?.handicapLine})`
+  );
 
   // Wide handicaps (>=1.5 cushion) must NOT receive high probability ranking bonus as top pick
   const wideHandicapFixture: FixtureContext = {

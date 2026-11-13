@@ -16,7 +16,7 @@ import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { getFixtureStatistics, buildFixtureContextFromStats, VERIFIED_PERFORMANCE_REPORT } from '@/lib/data/seedData';
 import { VERIFIED_NBA_PERFORMANCE_REPORT } from '@/lib/data/nbaSeedData';
-import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import NBAScoreProjectionTool from '@/components/nba/NBAScoreProjectionTool';
@@ -29,16 +29,21 @@ export default function HomeClient() {
 
   const isBasketball = sport === 'basketball';
 
-  // Football evaluated fixtures
-  const showcaseFootballFixtures = fixtures.slice(0, 3).map(fixture => {
-    const stats = getFixtureStatistics(fixture);
-    const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
-    return {
-      fixture,
-      topPick: evalResult.topPick,
-      noRecommendationReason: evalResult.noRecommendationReason,
-    };
-  });
+  // Football evaluated fixtures with 40% family diversity cap
+  const showcaseFootballFixtures = selectDiversifiedSlatePicks(
+    fixtures.slice(0, 3).map(fixture => {
+      const stats = getFixtureStatistics(fixture);
+      const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
+      return {
+        fixtureId: fixture.id,
+        fixture,
+        topPick: evalResult.topPick,
+        predictions: evalResult.predictions,
+        noRecommendationReason: evalResult.noRecommendationReason,
+      };
+    }),
+    0.40
+  );
 
   const brierValue = isBasketball 
     ? VERIFIED_NBA_PERFORMANCE_REPORT.brierScore.toFixed(3) 

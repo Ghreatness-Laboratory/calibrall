@@ -279,12 +279,12 @@ export default function MarketComparisonTable({
               <div>
                 <span>Market status: </span>
                 <span className="text-[#8B9890]">
-                  {pred.marketOdds && pred.marketOdds > 1.0 ? `Bookmaker price active (EV ${cleanDisplayText(evFormatted.text)})` : 'Probability analysis only'}
+                  {pred.marketOdds && pred.marketOdds > 1.0
+                    ? cleanDisplayText(
+                        `Price active${pred.deviggedMarketProb !== undefined ? ` (Devigged ${(pred.deviggedMarketProb * 100).toFixed(1)}%)` : ''}${pred.expectedValue !== null && pred.expectedValue !== undefined ? ` EV ${evFormatted.text}` : ''}`
+                      )
+                    : 'Probability analysis only (no EV)'}
                 </span>
-              </div>
-              <div>
-                <span>Data coverage: </span>
-                <span className="text-[#ECF1EE]">Standard</span>
               </div>
               <div>
                 <span>Confidence: </span>
@@ -299,6 +299,24 @@ export default function MarketComparisonTable({
                 </div>
               )}
             </div>
+
+            {pred.evidence && (
+              <div className="p-2.5 rounded-[8px] bg-[#101713] border border-white/[0.06] text-[10.5px] text-[#8B9890] space-y-1">
+                <div className="text-[#ECF1EE]">{cleanDisplayText(pred.evidence.whyLineChosen)}</div>
+                <div>
+                  {cleanDisplayText(
+                    `Strengths: Home ${pred.evidence.fittedStrengths.homeAttack.toFixed(2)}/${pred.evidence.fittedStrengths.homeDefense.toFixed(2)} (${pred.evidence.fittedStrengths.homeXg.toFixed(2)} xG), Away ${pred.evidence.fittedStrengths.awayAttack.toFixed(2)}/${pred.evidence.fittedStrengths.awayDefense.toFixed(2)} (${pred.evidence.fittedStrengths.awayXg.toFixed(2)} xG) · Samples H${pred.evidence.sampleSizes.homeMatches}/A${pred.evidence.sampleSizes.awayMatches}/WF${pred.evidence.sampleSizes.walkForwardMatches}`
+                  )}
+                </div>
+                <div>
+                  {cleanDisplayText(
+                    `${pred.evidence.referee.explanation} · ${pred.evidence.h2h.summary} · ${
+                      pred.evidence.derby.isDerby ? `Derby: ${pred.evidence.derby.name}` : 'Non derby'
+                    }`
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
