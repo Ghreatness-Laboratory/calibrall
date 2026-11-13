@@ -1403,7 +1403,14 @@ function main() {
   if (byLeague.size < 30 && fs.existsSync(outPath)) {
     try {
       const existing = JSON.parse(fs.readFileSync(outPath, 'utf8'));
-      const mergedLeagues = { ...(existing.leagues || {}), ...leaguesOutput };
+      const mergedLeagues: Record<string, any> = { ...(existing.leagues || {}) };
+      for (const [comp, cfg] of Object.entries(leaguesOutput)) {
+        const existingSample = existing.leagues?.[comp]?.capabilities?.sampleSizeMatches || 0;
+        const newSample = cfg?.capabilities?.sampleSizeMatches || 0;
+        if (!existing.leagues?.[comp] || newSample >= 20 || newSample >= existingSample) {
+          mergedLeagues[comp] = cfg;
+        }
+      }
       const mergedGroupSampleSizes: Record<string, any> = { ...(existing.groupSampleSizes || {}) };
       const mergedWalkForward: Record<string, any> = { ...(existing.walkForwardMarketValidation || {}) };
 

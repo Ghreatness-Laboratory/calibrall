@@ -3,7 +3,13 @@
 import { Fixture } from '@/types';
 
 // MOCKED — in-memory, data lost on container sleep
-const store = new Map<string, { value: any; expiresAt: number }>();
+const globalForCache = globalThis as unknown as {
+  __calibrall_redis_store?: Map<string, { value: any; expiresAt: number }>;
+  __calibrall_server_cache_store?: Map<string, CacheEntry<any>>;
+};
+const store: Map<string, { value: any; expiresAt: number }> =
+  globalForCache.__calibrall_redis_store ??
+  (globalForCache.__calibrall_redis_store = new Map());
 export const redis = {
   get: async (k: string) => {
     const entry = store.get(k);
@@ -55,7 +61,9 @@ interface CacheEntry<T> {
 }
 
 class ServerCache {
-  private inMemoryStore = new Map<string, CacheEntry<any>>();
+  private inMemoryStore: Map<string, CacheEntry<any>> =
+    globalForCache.__calibrall_server_cache_store ??
+    (globalForCache.__calibrall_server_cache_store = new Map<string, CacheEntry<any>>());
 
   // Dynamic TTL rules
   static readonly FIXTURE_DEFAULT_TTL_SEC = 300;      // 5 minutes

@@ -879,5 +879,19 @@
   "Fatih Karagümrük": "team_karagumruk",
   "MKE Ankaragücü": "team_ankaragucu",
   "Ümraniyespor": "team_umraniyespor",
-  "Erzurum BB": "team_erzurumspor"
+  "Erzurum BB": "team_erzurumspor",
+  "USA::Chicago": "team_chicago_fire",
+  "Chicago": "team_chicago_fire",
+  "USA::Houston": "team_houston_dynamo",
+  "Houston": "team_houston_dynamo",
+  "USA::Miami": "team_inter_miami",
+  "Miami": "team_inter_miami",
+  "USA::Orlando": "team_orlando_city",
+  "Orlando": "team_orlando_city",
+  "USA::Seattle": "team_seattle_sounders",
+  "Seattle": "team_seattle_sounders",
+  "USA::St. Louis": "team_st_louis_city",
+  "St. Louis": "team_st_louis_city",
+  "MEX::UNAM": "team_unam_pumas",
+  "UNAM": "team_unam_pumas"
 }

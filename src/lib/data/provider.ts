@@ -1043,10 +1043,19 @@ export class LiveFootballDataProvider implements FootballDataProvider {
   }
 }
 
-export const liveFootballDataProvider = new LiveFootballDataProvider();
+declare global {
+  var __footballProviderInstance: LiveFootballDataProvider | undefined;
+}
+
+export const liveFootballDataProvider: LiveFootballDataProvider =
+  globalThis.__footballProviderInstance ??
+  (globalThis.__footballProviderInstance = new LiveFootballDataProvider());
 
 export function getFootballDataProvider(): LiveFootballDataProvider {
-  return liveFootballDataProvider;
+  if (!globalThis.__footballProviderInstance) {
+    globalThis.__footballProviderInstance = new LiveFootballDataProvider();
+  }
+  return globalThis.__footballProviderInstance;
 }
 
 export async function getEvaluatedFixture(fixtureId: string) {

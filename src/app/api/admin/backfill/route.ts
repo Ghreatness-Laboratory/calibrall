@@ -124,9 +124,9 @@ export async function POST(req: NextRequest) {
         : season === '2021' ? '2020'
         : season;
 
-      for (const row of records) {
+      const seasonRows = records.filter(row => {
         const rowSeason = row['Season']?.trim() || '';
-        const matchesSeason = (
+        return (
           rowSeason === season ||
           rowSeason === targetSeasonYear ||
           rowSeason.replace('/', '') === season ||
@@ -138,7 +138,65 @@ export async function POST(req: NextRequest) {
           ((season === '2122' || season === '2021') && (rowSeason === '2021' || rowSeason === '2021/2022' || rowSeason === '2122')) ||
           ((season === '2021' || season === '2020') && (rowSeason === '2020' || rowSeason === '2020/2021' || rowSeason === '2021'))
         );
-        if (!matchesSeason) continue;
+      });
+
+      const rowMeta: Array<{ tournament: string | null; isPlayoff: number }> = seasonRows.map(() => ({
+        tournament: null,
+        isPlayoff: 0,
+      }));
+
+      if (league === 'MEX') {
+        let inClausura = false;
+        const tourneyBuckets = new Map<string, Array<{ rowIdx: number; home: string; away: string }>>();
+        for (let i = 0; i < seasonRows.length; i++) {
+          const rawDate = seasonRows[i]['Date']?.trim() || '';
+          const mm = parseInt(rawDate.split('/')[1] || '0', 10);
+          if (!inClausura && i > 40 && mm >= 1 && mm <= 5) {
+            inClausura = true;
+          }
+          const tourney = inClausura ? 'Clausura' : 'Apertura';
+          rowMeta[i].tournament = tourney;
+          if (!tourneyBuckets.has(tourney)) tourneyBuckets.set(tourney, []);
+          tourneyBuckets.get(tourney)!.push({
+            rowIdx: i,
+            home: seasonRows[i]['Home']?.trim() || '',
+            away: seasonRows[i]['Away']?.trim() || '',
+          });
+        }
+        for (const list of tourneyBuckets.values()) {
+          const clubs = new Set<string>();
+          for (const item of list) {
+            if (item.home) clubs.add(item.home);
+            if (item.away) clubs.add(item.away);
+          }
+          const tCount = clubs.size;
+          const regCount = Math.floor((tCount * (tCount - 1)) / 2);
+          for (let k = 0; k < list.length; k++) {
+            rowMeta[list[k].rowIdx].isPlayoff = k >= regCount ? 1 : 0;
+          }
+        }
+      } else if (league === 'USA') {
+        const clubs = new Set<string>();
+        for (const r of seasonRows) {
+          if (r['Home']?.trim()) clubs.add(r['Home'].trim());
+          if (r['Away']?.trim()) clubs.add(r['Away'].trim());
+        }
+        const regCount = Math.floor((clubs.size * 34) / 2);
+        for (let i = 0; i < seasonRows.length; i++) {
+          const rawDate = seasonRows[i]['Date']?.trim() || '';
+          const rawTime = seasonRows[i]['Time']?.trim() || null;
+          const iso = parseLondonCsvDateTime(rawDate, rawTime) || parseBrazilCsvDate(rawDate) || '';
+          const isPo = (season === '2020' || targetSeasonYear === '2020')
+            ? (iso.slice(0, 10) >= '2020-11-20' ? 1 : 0)
+            : (i >= regCount ? 1 : 0);
+          rowMeta[i].isPlayoff = isPo;
+          rowMeta[i].tournament = isPo === 1 ? 'MLS Cup Playoffs' : 'Regular Season';
+        }
+      }
+
+      for (let i = 0; i < seasonRows.length; i++) {
+        const row = seasonRows[i];
+        const meta = rowMeta[i];
 
         const rawHome = row['Home']?.trim();
         const rawAway = row['Away']?.trim();
@@ -206,6 +264,8 @@ export async function POST(req: NextRequest) {
           away_fouls: row['AF'] !== undefined && !isNaN(parseInt(row['AF'], 10)) ? parseInt(row['AF'], 10) : null,
           referee: row['Referee'] ? row['Referee'].trim() : null,
           result: row['FTR'] ? row['FTR'].trim() : (isFinished ? (hg > ag ? 'H' : hg === ag ? 'D' : 'A') : null),
+          tournament: meta.tournament,
+          is_playoff: meta.isPlayoff,
           source: `football-data.co.uk:${extraFileCode.toLowerCase()}`,
         });
 

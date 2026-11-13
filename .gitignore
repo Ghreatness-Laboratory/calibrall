@@ -1,6 +1,7 @@
 # Next.js
 .next/
 .next-dev/
+.next_dev/
 out/
 
 # Node

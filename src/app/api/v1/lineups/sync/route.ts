@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LiveFootballDataProvider } from '@/lib/data/provider';
+import { getFootballDataProvider } from '@/lib/data/provider';
 import { syncActiveWindowLineups } from '@/lib/data/lineupsService';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const provider = new LiveFootballDataProvider();
+    const provider = getFootballDataProvider();
     const liveResult = await provider.getLiveFixtures({ status: 'ALL' });
     const fixtures = liveResult.fixtures || [];
 

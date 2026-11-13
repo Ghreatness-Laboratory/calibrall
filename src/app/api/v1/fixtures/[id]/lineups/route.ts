@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LiveFootballDataProvider } from '@/lib/data/provider';
+import { getFootballDataProvider } from '@/lib/data/provider';
 import { getFixtureLineupState } from '@/lib/data/lineupsService';
 import { forwardPickLedger } from '@/lib/prediction/forwardPickLedger';
 
@@ -15,7 +15,7 @@ export async function GET(
       return NextResponse.json({ error: 'Fixture ID is required' }, { status: 400 });
     }
 
-    const provider = new LiveFootballDataProvider();
+    const provider = getFootballDataProvider();
     const fixture = await provider.getFixtureById(fixtureId);
 
     if (!fixture) {

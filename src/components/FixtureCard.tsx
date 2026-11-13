@@ -412,8 +412,8 @@ export default function FixtureCard({
                   noRecommendationReason && noRecommendationReason !== 'Not enough data'
                     ? noRecommendationReason
                     : (() => {
-                        const hCount = matchesStore.getTeamMatchCountSync(fixture.homeTeam.id || fixture.homeTeam.name);
-                        const aCount = matchesStore.getTeamMatchCountSync(fixture.awayTeam.id || fixture.awayTeam.name);
+                        const hCount = fixture.homeTeam.storedMatchCount ?? matchesStore.getTeamMatchCountSync(fixture.homeTeam.id || fixture.homeTeam.name);
+                        const aCount = fixture.awayTeam.storedMatchCount ?? matchesStore.getTeamMatchCountSync(fixture.awayTeam.id || fixture.awayTeam.name);
                         return `Abstained: ${homeName} (${hCount} matches) & ${awayName} (${aCount} matches) lack qualifying predictive edge.`;
                       })()
                 )}
