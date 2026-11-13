@@ -552,12 +552,15 @@ export class DixonColesV25Evaluator {
         },
       };
 
+      const homeLabel = displayName(context.homeTeamName);
+      const awayLabel = displayName(context.awayTeamName);
+      const teamContextPrefix = `${homeLabel} (${homeSamples} matches stored) vs ${awayLabel} (${awaySamples} matches stored)`;
       const abstainReasonText = !gate.isAllowed
-        ? gate.statusText
+        ? `${teamContextPrefix}: ${gate.statusText}`
         : confAssessment.disqualificationReason
-        ? confAssessment.disqualificationReason
+        ? `${teamContextPrefix}: ${confAssessment.disqualificationReason}`
         : calProb < PICK_CONFIDENCE_THRESHOLD
-        ? `Calibrated probability ${(calProb * 100).toFixed(1)}% below 70.0% threshold.`
+        ? `${teamContextPrefix}: Calibrated probability ${(calProb * 100).toFixed(1)}% below 70.0% threshold.`
         : undefined;
 
       const prediction: MarketPrediction = {

@@ -1440,9 +1440,15 @@ export interface UnresolvedTeamLogEntry {
 
 const UNRESOLVED_TEAMS_MAP = new Map<string, UnresolvedTeamLogEntry>();
 
+function isPlaceholderName(name: string): boolean {
+  const n = name.trim().toLowerCase();
+  return !n || n === 'tbd' || n === 'tba' || n === 'tbd home' || n === 'tbd away' || n === 'to be determined' || n === 'to be announced' || /^tbd\b/i.test(n);
+}
+
 export function recordUnresolvedTeam(sourceName: string, provider: string = 'football-data.co.uk'): void {
   if (!sourceName || !sourceName.trim()) return;
   const name = sourceName.trim();
+  if (isPlaceholderName(name)) return;
   const key = `${name.toLowerCase()}:${provider.toLowerCase()}`;
   const now = new Date().toISOString();
   const existing = UNRESOLVED_TEAMS_MAP.get(key);
@@ -1655,8 +1661,8 @@ export function lookupCanonicalTeam(rawNameOrId: string | any, competitionCode?:
     };
   }
 
-  // Log unmatched real team names (never pollute unresolved_teams with synthetic numeric fallback IDs like team_3266)
-  if (!/^team_\d+$/.test(input)) {
+  // Log unmatched real team names (never pollute unresolved_teams with synthetic numeric fallback IDs or TBD placeholders)
+  if (!/^team_\d+$/.test(input) && !isPlaceholderName(input)) {
     UNMATCHED_NAMES_LOG.add(input);
     recordUnresolvedTeam(input, 'canonical-lookup');
   }

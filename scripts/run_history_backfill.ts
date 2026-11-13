@@ -546,13 +546,13 @@ function parseExtraLeagueSeasons(competitionCode: string, fileCode: string, csvT
   const columnsDetected = {
     goals: headerSet.has('HG') && headerSet.has('AG'),
     results: headerSet.has('Res'),
-    halfTimeGoals: false,
-    corners: false,
-    cards: false,
-    shots: false,
-    fouls: false,
-    referee: false,
-    asianHandicapPrices: false,
+    halfTimeGoals: headerSet.has('HTHG') && headerSet.has('HTAG'),
+    corners: headerSet.has('HC') && headerSet.has('AC'),
+    cards: headerSet.has('HY') || headerSet.has('AY') || headerSet.has('HR') || headerSet.has('AR'),
+    shots: headerSet.has('HS') && headerSet.has('AS'),
+    fouls: headerSet.has('HF') && headerSet.has('AF'),
+    referee: headerSet.has('Referee'),
+    asianHandicapPrices: headerSet.has('AHh') || headerSet.has('B365AHH') || headerSet.has('AvgAHH') || headerSet.has('PCAHH'),
     oddsPreMatch: headerSet.has('B365H') || headerSet.has('AvgH') || headerSet.has('PH'),
     oddsClosing: headerSet.has('PSCH') || headerSet.has('AvgCH') || headerSet.has('MaxCH'),
   };
@@ -976,7 +976,7 @@ async function main() {
   }
 
   // Ensure all Brazil 2026 Série B promoted clubs have explicit is_promoted = 1 in teams table
-  if (supabase) {
+  if (supabase && (!targetLeagueSet || targetLeagueSet.has('BSA'))) {
     const promotedRows = Array.from(PROMOTED_BRAZIL_2026_IDS).map(id => {
       const canon = CANONICAL_TEAMS[id];
       return {
@@ -997,7 +997,9 @@ async function main() {
   console.log(`  Total Matches Upserted:        ${totalInsertedMatches}`);
   console.log(`  Total Odds Snapshots Upserted: ${totalInsertedOdds}`);
   console.log(`  Total Errors:                  ${totalInsertedErrors}`);
-  console.log(`  Brazil 2026 Promoted Flagged:  ${Array.from(PROMOTED_BRAZIL_2026_IDS).join(', ')}`);
+  if (!targetLeagueSet || targetLeagueSet.has('BSA')) {
+    console.log(`  Brazil 2026 Promoted Flagged:  ${Array.from(PROMOTED_BRAZIL_2026_IDS).join(', ')}`);
+  }
 
   console.log('\n==============================================================================================================');
   console.log('DATA-STATUS OUTPUT (READ EXCLUSIVELY FROM SUPABASE)');

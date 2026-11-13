@@ -382,7 +382,7 @@ export interface FixtureStatisticalContext {
   leagueCapabilities?: LeagueColumnCapabilities;
 }
 
-import { displayName } from '../utils/formatText';
+import { cleanDisplayText, displayName } from '../utils/formatText';
 import { matchesStore } from './matchesStore';
 
 export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContext {
@@ -407,9 +407,9 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   if (homeNeeds || awayNeeds) {
     let reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored, ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`;
     if (homeNeeds && !awayNeeds) {
-      reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored in database (needs history backfill)`;
+      reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored in database (${awayTeamDisplayName} has ${awayStoredCount} matches stored; needs history backfill)`;
     } else if (!homeNeeds && awayNeeds) {
-      reason = `Insufficient data: ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`;
+      reason = `Insufficient data: ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (${homeTeamDisplayName} has ${homeStoredCount} matches stored; needs history backfill)`;
     }
     return {
       homeXg: 0,
@@ -420,12 +420,14 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       uncertaintyScore: null,
       dataCoverageScore: null,
       sampleSizeMatches: Math.min(homeStoredCount, awayStoredCount),
+      homeSampleMatches: homeStoredCount,
+      awaySampleMatches: awayStoredCount,
       hasRealTeamStrength: false,
       insufficientData: true,
       stateTags: [] as StateTag[],
       lineupConfirmed: false,
       verifiedOdds: undefined,
-      noRecommendationReason: reason,
+      noRecommendationReason: cleanDisplayText(reason),
     };
   }
 
@@ -451,12 +453,14 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       uncertaintyScore: null,
       dataCoverageScore: null,
       sampleSizeMatches: homeStoredCount,
+      homeSampleMatches: homeStoredCount,
+      awaySampleMatches: awayStoredCount,
       hasRealTeamStrength: true,
       insufficientData: true,
       stateTags: ['low-sample'] as StateTag[],
       lineupConfirmed: false,
       verifiedOdds: fixture.verifiedOdds,
-      noRecommendationReason: reason,
+      noRecommendationReason: cleanDisplayText(reason),
     };
   }
 
@@ -475,12 +479,14 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
       uncertaintyScore: null,
       dataCoverageScore: null,
       sampleSizeMatches: awayStoredCount,
+      homeSampleMatches: homeStoredCount,
+      awaySampleMatches: awayStoredCount,
       hasRealTeamStrength: true,
       insufficientData: true,
       stateTags: ['low-sample'] as StateTag[],
       lineupConfirmed: false,
       verifiedOdds: fixture.verifiedOdds,
-      noRecommendationReason: reason,
+      noRecommendationReason: cleanDisplayText(reason),
     };
   }
 

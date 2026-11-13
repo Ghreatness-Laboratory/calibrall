@@ -380,7 +380,11 @@ export function getCanonicalTeamForCsv(league: string, rawCsvName: string): Cano
     };
   }
   const lookup = lookupTeamStrength(cleanName);
-  if (lookup.found && lookup.data) {
+  const normLeague = league.toUpperCase() === 'TSL' ? 'T1' : league.toUpperCase();
+  const normFoundComp = lookup.data?.competitionCode?.toUpperCase() === 'TSL'
+    ? 'T1'
+    : lookup.data?.competitionCode?.toUpperCase();
+  if (lookup.found && lookup.data && normFoundComp === normLeague) {
     return {
       id: lookup.data.id,
       name: lookup.data.name,
