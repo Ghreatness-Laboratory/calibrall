@@ -109,6 +109,8 @@ export interface StoredMatch {
   away_fouls?: number | null;
   referee?: string | null;
   result?: string | null;
+  tournament?: string | null;
+  is_playoff?: number | null;
   source: string;
   created_at?: string;
   updated_at?: string;
@@ -137,6 +139,11 @@ export interface LeagueFeatureCoverage {
   halfTimeGoalsCount: number;
   refereeCount: number;
   asianHandicapCount: number;
+  cardsSeasons?: number;
+  cornersSeasons?: number;
+  halfTimeGoalsSeasons?: number;
+  refereeSeasons?: number;
+  asianHandicapSeasons?: number;
 }
 
 export interface LeagueLatestDateInfo {
@@ -348,7 +355,10 @@ class MatchesStore {
     return rawId;
   }
 
-  private resolveCanonicalAndAliases(teamIdOrName: string | { id?: string; name?: string }): {
+  private resolveCanonicalAndAliases(
+    teamIdOrName: string | { id?: string; name?: string },
+    competitionCodeHint?: string
+  ): {
     canonicalId: string;
     teamName: string;
     normName: string;
@@ -357,8 +367,8 @@ class MatchesStore {
     const rawInput = typeof teamIdOrName === 'string' ? teamIdOrName : (teamIdOrName?.id || teamIdOrName?.name || '');
     const rawName = typeof teamIdOrName === 'string' ? teamIdOrName : (teamIdOrName?.name || '');
     const canon =
-      (rawInput ? lookupCanonicalTeam(rawInput) : null) ||
-      (rawName ? lookupCanonicalTeam(rawName) : null);
+      (rawInput ? lookupCanonicalTeam(rawInput, competitionCodeHint) : null) ||
+      (rawName ? lookupCanonicalTeam(rawName, competitionCodeHint) : null);
 
     const canonicalId = canon
       ? canon.canonicalId
@@ -406,6 +416,7 @@ class MatchesStore {
   private rebuildTeamCounts() {
     this.teamMatchCounts.clear();
     for (const match of Array.from(this.inMemoryMatches.values())) {
+      if (match.is_playoff === 1) continue;
       if (match.status === 'FINISHED' || match.home_score !== null) {
         const homeId = this.canonicalizeTeamId(match.home_team_id);
         const awayId = this.canonicalizeTeamId(match.away_team_id);
@@ -749,8 +760,9 @@ class MatchesStore {
       }
     }
 
-    // Filter to finished matches with scores, respecting asOfDate if provided
+    // Filter to regular-season finished matches with scores, respecting asOfDate if provided
     const finished = candidateMatches.filter(m => {
+      if (m.is_playoff === 1) return false;
       if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
       const isFinished = m.status === 'FINISHED' || m.status === 'IN_PLAY';
       if (!isFinished && m.home_score === null) return false;
@@ -970,11 +982,12 @@ class MatchesStore {
     competitionCodeHint?: string
   ): DbTeamStatsSummary {
     this.ensureHydratedFromDbSync();
-    const { canonicalId, teamName, normName, idVariants } = this.resolveCanonicalAndAliases(teamIdOrName);
+    const { canonicalId, teamName, normName, idVariants } = this.resolveCanonicalAndAliases(teamIdOrName, competitionCodeHint);
     const isPromoted = PROMOTED_BRAZIL_2026_IDS.has(canonicalId) || this.promotedTeamIds.has(canonicalId);
 
     const matches = Array.from(this.inMemoryMatches.values())
       .filter(m => {
+        if (m.is_playoff === 1) return false;
         if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
         if (asOfDate && m.kickoff_time > asOfDate) return false;
         if (m.source === 'championshipMatchArchive:historical') return false;
@@ -1385,6 +1398,7 @@ class MatchesStore {
     const { normName, idVariants } = this.resolveCanonicalAndAliases(teamIdOrName);
 
     const matches = Array.from(this.inMemoryMatches.values()).filter(m => {
+      if (m.is_playoff === 1) return false;
       if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
       if (asOfDate && m.kickoff_time > asOfDate) return false;
       if (m.source === 'championshipMatchArchive:historical') return false;
@@ -1804,7 +1818,7 @@ class MatchesStore {
       try {
         const { data: matchData, error: matchErr } = await supabase
           .from('matches')
-          .select('id, provider_id, competition_code, season, kickoff_time, home_team_id, away_team_id, status, home_score, home_half_time_score, away_half_time_score, home_corners, away_corners, home_yellow_cards, away_yellow_cards, home_red_cards, away_red_cards, referee')
+          .select('id, provider_id, competition_code, season, tournament, is_playoff, kickoff_time, home_team_id, away_team_id, status, home_score, home_half_time_score, away_half_time_score, home_corners, away_corners, home_yellow_cards, away_yellow_cards, home_red_cards, away_red_cards, referee')
           .order('kickoff_time', { ascending: true });
         
         if (matchErr) {
@@ -1914,8 +1928,13 @@ class MatchesStore {
       cornersCount: number;
       halfTimeGoalsCount: number;
       refereeCount: number;
+      cardsSeasons: Set<string>;
+      cornersSeasons: Set<string>;
+      halfTimeGoalsSeasons: Set<string>;
+      refereeSeasons: Set<string>;
     }>();
     const leagueAhCountMap = new Map<string, number>();
+    const leagueAhSeasonsMap = new Map<string, Set<string>>();
     const teamMatchesMap = new Map<string, { count: number; earliestDate: string | null; latestDate: string | null }>();
 
     let earliestDate: string | null = null;
@@ -1960,32 +1979,40 @@ class MatchesStore {
         cornersCount: 0,
         halfTimeGoalsCount: 0,
         refereeCount: 0,
+        cardsSeasons: new Set<string>(),
+        cornersSeasons: new Set<string>(),
+        halfTimeGoalsSeasons: new Set<string>(),
+        refereeSeasons: new Set<string>(),
       };
       lStat.count++;
       if (!lStat.earliestDate || kDate < lStat.earliestDate) lStat.earliestDate = kDate;
       if (!lStat.latestDate || kDate > lStat.latestDate) lStat.latestDate = kDate;
       if (
-        m.home_yellow_cards !== null && m.home_yellow_cards !== undefined ||
-        m.away_yellow_cards !== null && m.away_yellow_cards !== undefined ||
-        m.home_red_cards !== null && m.home_red_cards !== undefined ||
-        m.away_red_cards !== null && m.away_red_cards !== undefined
+        (m.home_yellow_cards !== null && m.home_yellow_cards !== undefined) ||
+        (m.away_yellow_cards !== null && m.away_yellow_cards !== undefined) ||
+        (m.home_red_cards !== null && m.home_red_cards !== undefined) ||
+        (m.away_red_cards !== null && m.away_red_cards !== undefined)
       ) {
         lStat.cardsCount++;
+        if (m.season) lStat.cardsSeasons.add(m.season);
       }
       if (
         (m.home_corners !== null && m.home_corners !== undefined) ||
         (m.away_corners !== null && m.away_corners !== undefined)
       ) {
         lStat.cornersCount++;
+        if (m.season) lStat.cornersSeasons.add(m.season);
       }
       if (
         (m.home_half_time_score !== null && m.home_half_time_score !== undefined) ||
         (m.away_half_time_score !== null && m.away_half_time_score !== undefined)
       ) {
         lStat.halfTimeGoalsCount++;
+        if (m.season) lStat.halfTimeGoalsSeasons.add(m.season);
       }
       if (typeof m.referee === 'string' && m.referee.trim().length > 0) {
         lStat.refereeCount++;
+        if (m.season) lStat.refereeSeasons.add(m.season);
       }
       leagueStatsMap.set(lCode, lStat);
 
@@ -2003,21 +2030,37 @@ class MatchesStore {
       teamMatchesMap.set(canonAwayId, awayStat);
     }
 
-    // Empirical Asian handicap prices count per league from odds_snapshots
+    // Empirical Asian handicap prices count & distinct seasons per league from odds_snapshots
     let ahQueried = false;
     if (typeof window === 'undefined' && storeUsed === 'supabase') {
       try {
         const db = getLocalDatabase();
         if (db) {
           const ahRows = db.prepare(`
-            SELECT UPPER(m.competition_code) AS comp_code, COUNT(DISTINCT o.match_id) AS ah_matches
+            SELECT UPPER(m.competition_code) AS comp_code, o.match_id, m.season
             FROM odds_snapshots o
             JOIN matches m ON m.provider_id = o.match_id
             WHERE o.market_code LIKE 'ASIAN_HANDICAP%'
-            GROUP BY UPPER(m.competition_code)
-          `).all() as Array<{ comp_code: string; ah_matches: number }>;
+          `).all() as Array<{ comp_code: string; match_id: string; season: string }>;
+          const ahMatchesByComp = new Map<string, Set<string>>();
           for (const r of ahRows) {
-            leagueAhCountMap.set(r.comp_code, r.ah_matches);
+            let mSet = ahMatchesByComp.get(r.comp_code);
+            if (!mSet) {
+              mSet = new Set<string>();
+              ahMatchesByComp.set(r.comp_code, mSet);
+            }
+            mSet.add(r.match_id);
+            if (r.season) {
+              let sSet = leagueAhSeasonsMap.get(r.comp_code);
+              if (!sSet) {
+                sSet = new Set<string>();
+                leagueAhSeasonsMap.set(r.comp_code, sSet);
+              }
+              sSet.add(r.season);
+            }
+          }
+          for (const [comp, mSet] of ahMatchesByComp.entries()) {
+            leagueAhCountMap.set(comp, mSet.size);
           }
           ahQueried = true;
         }
@@ -2025,9 +2068,9 @@ class MatchesStore {
     }
 
     if (!ahQueried) {
-      const matchCompById = new Map<string, string>();
+      const matchCompById = new Map<string, { comp: string; season: string }>();
       for (const m of allMatches) {
-        matchCompById.set(m.provider_id, m.competition_code.toUpperCase());
+        matchCompById.set(m.provider_id, { comp: m.competition_code.toUpperCase(), season: m.season });
       }
       const ahMatchIdsByComp = new Map<string, Set<string>>();
       if (isSupabaseConfigured && supabase && storeUsed === 'supabase') {
@@ -2037,28 +2080,44 @@ class MatchesStore {
             .select('match_id, market_code')
             .in('market_code', ['ASIAN_HANDICAP_HOME', 'ASIAN_HANDICAP_AWAY']);
           for (const r of (ahRows || []) as Array<{ match_id: string; market_code: string }>) {
-            const comp = matchCompById.get(r.match_id);
-            if (comp) {
-              let set = ahMatchIdsByComp.get(comp);
+            const meta = matchCompById.get(r.match_id);
+            if (meta) {
+              let set = ahMatchIdsByComp.get(meta.comp);
               if (!set) {
                 set = new Set<string>();
-                ahMatchIdsByComp.set(comp, set);
+                ahMatchIdsByComp.set(meta.comp, set);
               }
               set.add(r.match_id);
+              if (meta.season) {
+                let sSet = leagueAhSeasonsMap.get(meta.comp);
+                if (!sSet) {
+                  sSet = new Set<string>();
+                  leagueAhSeasonsMap.set(meta.comp, sSet);
+                }
+                sSet.add(meta.season);
+              }
             }
           }
         } catch (_) {}
       } else {
         for (const o of Array.from(this.inMemoryOdds.values())) {
           if (o.market_code.startsWith('ASIAN_HANDICAP')) {
-            const comp = matchCompById.get(o.match_id);
-            if (comp) {
-              let set = ahMatchIdsByComp.get(comp);
+            const meta = matchCompById.get(o.match_id);
+            if (meta) {
+              let set = ahMatchIdsByComp.get(meta.comp);
               if (!set) {
                 set = new Set<string>();
-                ahMatchIdsByComp.set(comp, set);
+                ahMatchIdsByComp.set(meta.comp, set);
               }
               set.add(o.match_id);
+              if (meta.season) {
+                let sSet = leagueAhSeasonsMap.get(meta.comp);
+                if (!sSet) {
+                  sSet = new Set<string>();
+                  leagueAhSeasonsMap.set(meta.comp, sSet);
+                }
+                sSet.add(meta.season);
+              }
             }
           }
         }
@@ -2082,6 +2141,11 @@ class MatchesStore {
       let halfTimeGoalsCount = 0;
       let refereeCount = 0;
       let asianHandicapCount = 0;
+      const cardsSeasonsSet = new Set<string>();
+      const cornersSeasonsSet = new Set<string>();
+      const htSeasonsSet = new Set<string>();
+      const refSeasonsSet = new Set<string>();
+      const ahSeasonsSet = new Set<string>();
 
       for (const code of altCodes) {
         const stat = leagueStatsMap.get(code);
@@ -2093,8 +2157,14 @@ class MatchesStore {
           cornersCount += stat.cornersCount;
           halfTimeGoalsCount += stat.halfTimeGoalsCount;
           refereeCount += stat.refereeCount;
+          stat.cardsSeasons.forEach(s => cardsSeasonsSet.add(s));
+          stat.cornersSeasons.forEach(s => cornersSeasonsSet.add(s));
+          stat.halfTimeGoalsSeasons.forEach(s => htSeasonsSet.add(s));
+          stat.refereeSeasons.forEach(s => refSeasonsSet.add(s));
         }
         asianHandicapCount += leagueAhCountMap.get(code) || 0;
+        const ahS = leagueAhSeasonsMap.get(code);
+        if (ahS) ahS.forEach(s => ahSeasonsSet.add(s));
       }
 
       const daysAgo = latest
@@ -2113,8 +2183,8 @@ class MatchesStore {
         isStale,
         isStale7d,
         features: {
-          cards: cardsCount > 0,
-          corners: cornersCount > 0,
+          cards: cardsCount > 0 && cardsSeasonsSet.size >= 2,
+          corners: cornersCount > 0 && cornersSeasonsSet.size >= 2,
           halfTimeGoals: halfTimeGoalsCount > 0,
           referee: refereeCount > 0,
           asianHandicapPrices: asianHandicapCount > 0,
@@ -2123,6 +2193,11 @@ class MatchesStore {
           halfTimeGoalsCount,
           refereeCount,
           asianHandicapCount,
+          cardsSeasons: cardsSeasonsSet.size,
+          cornersSeasons: cornersSeasonsSet.size,
+          halfTimeGoalsSeasons: htSeasonsSet.size,
+          refereeSeasons: refSeasonsSet.size,
+          asianHandicapSeasons: ahSeasonsSet.size,
         },
       };
     });

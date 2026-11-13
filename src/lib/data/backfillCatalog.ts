@@ -369,7 +369,7 @@ export interface CanonicalCsvTeamResolution {
  */
 export function getCanonicalTeamForCsv(league: string, rawCsvName: string): CanonicalCsvTeamResolution | null {
   const cleanName = rawCsvName.trim();
-  const canon = lookupCanonicalTeam(cleanName);
+  const canon = lookupCanonicalTeam(cleanName, league);
   if (canon) {
     return {
       id: canon.canonicalId,

@@ -63,8 +63,8 @@ export function mapDbRowToFixture(row: any): Fixture | null {
     return null;
   }
 
-  const homeCanon = lookupCanonicalTeam(row.home_team_id) || lookupCanonicalTeam(row.home_team_name);
-  const awayCanon = lookupCanonicalTeam(row.away_team_id) || lookupCanonicalTeam(row.away_team_name);
+  const homeCanon = lookupCanonicalTeam(row.home_team_id, comp.code) || lookupCanonicalTeam(row.home_team_name, comp.code);
+  const awayCanon = lookupCanonicalTeam(row.away_team_id, comp.code) || lookupCanonicalTeam(row.away_team_name, comp.code);
   const homeLookup = lookupTeamStrength(row.home_team_name || row.home_team_id);
   const awayLookup = lookupTeamStrength(row.away_team_name || row.away_team_id);
 

@@ -645,17 +645,39 @@ export async function getCompetitionsFromDatabase(
           countsByCompId.set(compId, (countsByCompId.get(compId) || 0) + 1);
         }
       }
+
+      // Include canonical competitions present in stored historical matches (even if 0 upcoming fixtures, e.g. CHN)
+      if ((!options?.day || options.day === 'ALL') && sport !== 'basketball') {
+        const { data: dbMatches, error: matchErr } = await supabase
+          .from('matches')
+          .select('competition_code');
+
+        if (!matchErr && dbMatches && Array.isArray(dbMatches)) {
+          const seenCodes = new Set<string>();
+          for (const row of dbMatches) {
+            const rawCode = String(row.competition_code || '').trim().toUpperCase();
+            if (!rawCode || seenCodes.has(rawCode)) continue;
+            seenCodes.add(rawCode);
+            const mapped = getCanonicalCompetition(rawCode);
+            if (!mapped || !isCanonicalCompetitionId(mapped.id)) continue;
+            if (mapped.id === 'comp_nba') continue;
+            if (!countsByCompId.has(mapped.id)) {
+              countsByCompId.set(mapped.id, 0);
+            }
+          }
+        }
+      }
     } catch (err: any) {
       console.error('[Competitions Service Error]:', err?.message || err);
     }
   }
 
-  // Construct active competitions list with counts (only competitions with >= 1 fixture in DB)
+  // Construct active competitions list with counts (all DB competitions with fixtures or stored matches)
   const activeCompetitions: CompetitionWithCount[] = [];
   let totalFixtures = 0;
 
   for (const [compId, count] of countsByCompId.entries()) {
-    if (count <= 0) continue;
+    if (count < 0) continue;
     const canonical = getCanonicalCompetition(compId);
     if (!canonical) {
       logCompetitionIntegrityError('aggregate', compId, 'db:fixtures');

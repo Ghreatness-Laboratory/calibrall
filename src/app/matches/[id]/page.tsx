@@ -117,7 +117,7 @@ export default function MatchAnalysisPage() {
     });
   }, [isBasketball, basketballPredictions, footballEvaluation, matchStats]);
 
-  const topPick = isBasketball ? (predictions[0] || null) : (predictions.find(p => p.isTopPick) || predictions[0] || null);
+  const topPick = isBasketball ? (predictions[0] || null) : (predictions.find(p => p.isTopPick) || (footballEvaluation?.noRecommendationReason ? null : predictions[0]) || null);
   const noRecommendationReason = isBasketball ? undefined : footballEvaluation?.noRecommendationReason;
 
   // Live match state tracking
@@ -424,7 +424,7 @@ export default function MatchAnalysisPage() {
             {noRecommendationReason || (() => {
               const hCount = fixture.homeTeam.storedMatchCount ?? matchesStore.getTeamMatchCountSync(fixture.homeTeam.id || fixture.homeTeam.name);
               const aCount = fixture.awayTeam.storedMatchCount ?? matchesStore.getTeamMatchCountSync(fixture.awayTeam.id || fixture.awayTeam.name);
-              return `Model projection withheld: ${homeName} (${hCount} matches stored) & ${awayName} (${aCount} matches stored) have insufficient statistical depth or staleness exceeding the 21-day threshold. Rather than inventing a projection, the engine abstains to preserve calibration integrity.`;
+              return `Model projection withheld: ${homeName} (${hCount} matches stored) & ${awayName} (${aCount} matches stored) have insufficient statistical depth or staleness exceeding the 21 day threshold. Rather than inventing a projection, the engine abstains to preserve calibration integrity.`;
             })()}
           </p>
         </div>

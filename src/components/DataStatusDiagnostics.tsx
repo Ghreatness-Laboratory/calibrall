@@ -31,6 +31,11 @@ interface LeagueFeatureCoverage {
   halfTimeGoalsCount: number;
   refereeCount: number;
   asianHandicapCount: number;
+  cardsSeasons?: number;
+  cornersSeasons?: number;
+  halfTimeGoalsSeasons?: number;
+  refereeSeasons?: number;
+  asianHandicapSeasons?: number;
 }
 
 interface LeagueLatestDate {

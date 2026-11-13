@@ -202,7 +202,7 @@ export class DixonColesV25Evaluator {
         predictions: [],
         topPick: null,
         alternativePicks: [],
-        noRecommendationReason: context.noRecommendationReason || 'Not enough data',
+        noRecommendationReason: context.noRecommendationReason || cleanDisplayText(`Insufficient data: ${displayName(context.homeTeamName)} (${context.homeSampleMatches ?? context.sampleSizeMatches ?? 0} matches stored) and ${displayName(context.awayTeamName)} (${context.awaySampleMatches ?? context.sampleSizeMatches ?? 0} matches stored) lack sufficient historical match depth for projection.`),
         dataCompletenessScore: 0,
       };
     }
@@ -799,7 +799,7 @@ export class DixonColesV25Evaluator {
         }
       }
     } else {
-      noRecommendationReason = 'No pick clears 70.0% confidence and walk forward validation';
+      noRecommendationReason = cleanDisplayText(`No pick selected for ${displayName(context.homeTeamName)} (${homeSamples} matches stored) vs ${displayName(context.awayTeamName)} (${awaySamples} matches stored): no evaluated market cleared both the 70.0% calibrated probability hurdle and walk forward Brier skill validation.`);
     }
 
     // Sort all processed predictions: eligible first in exact EV/edge rank, then remaining by calProb

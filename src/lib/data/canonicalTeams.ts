@@ -1339,6 +1339,8 @@ export const CANONICAL_ID_ALIASES: Record<string, string> = {
   team_len: 'team_lens',
   team_tro: 'team_troyes',
   team_lem: 'team_lemans',
+  team_ham_kam: 'team_hamkam',
+  team_erzurum_bb: 'team_erzurumspor',
 };
 
 for (const [id, team] of Object.entries(EXPANDED_CANONICAL_TEAMS)) {
@@ -1374,10 +1376,35 @@ export function normalizeLookupKey(name: string): string {
     .trim();
 }
 
+const COMP_CODE_ALIASES: Record<string, string> = {
+  PL: 'E0',
+  ELC: 'E1',
+  PD: 'SP1',
+  SA: 'I1',
+  BL1: 'D1',
+  FL1: 'F1',
+  DED: 'N1',
+  PPL: 'P1',
+  TSL: 'T1',
+  BRA: 'BSA',
+  ROM: 'ROU',
+  SUI: 'SWZ',
+  SP: 'SC0',
+};
+
+function normalizeCompLookupCode(code?: string): string {
+  if (!code || typeof code !== 'string') return '';
+  const up = code.trim().toUpperCase();
+  return COMP_CODE_ALIASES[up] || up;
+}
+
 // O(1) lookup indexes built after all canonical teams are registered
 const EXACT_TEAM_INDEX = new Map<string, CanonicalTeam>();
 const NORM_TEAM_INDEX = new Map<string, CanonicalTeam>();
+const EXACT_SCOPED_INDEX = new Map<string, CanonicalTeam>();
+const NORM_SCOPED_INDEX = new Map<string, CanonicalTeam>();
 for (const team of Object.values(CANONICAL_TEAMS)) {
+  const teamComp = normalizeCompLookupCode(team.competitionCode);
   const exactCandidates = [
     team.canonicalId,
     team.canonicalName,
@@ -1388,8 +1415,16 @@ for (const team of Object.values(CANONICAL_TEAMS)) {
   for (const cand of exactCandidates) {
     const low = cand.toLowerCase();
     if (!EXACT_TEAM_INDEX.has(low)) EXACT_TEAM_INDEX.set(low, team);
+    if (teamComp) {
+      const scopedKey = `${teamComp}::${low}`;
+      if (!EXACT_SCOPED_INDEX.has(scopedKey)) EXACT_SCOPED_INDEX.set(scopedKey, team);
+    }
     const norm = normalizeLookupKey(cand);
     if (norm && !NORM_TEAM_INDEX.has(norm)) NORM_TEAM_INDEX.set(norm, team);
+    if (norm && teamComp) {
+      const scopedNormKey = `${teamComp}::${norm}`;
+      if (!NORM_SCOPED_INDEX.has(scopedNormKey)) NORM_SCOPED_INDEX.set(scopedNormKey, team);
+    }
   }
 }
 
@@ -1515,13 +1550,15 @@ export function clearUnresolvedTeamsLog(): void {
   }
 }
 
-export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | null {
+export function lookupCanonicalTeam(rawNameOrId: string | any, competitionCode?: string): CanonicalTeam | null {
   if (!rawNameOrId) return null;
   const input = typeof rawNameOrId === 'string'
     ? rawNameOrId.trim()
     : (rawNameOrId.name || rawNameOrId.shortName || rawNameOrId.id || '').toString().trim();
   if (!input) return null;
   const inputLower = input.toLowerCase();
+  const norm = normalizeLookupKey(input);
+  const compKey = normalizeCompLookupCode(competitionCode);
 
   // 1. Explicit canonical ID & legacy ID alias match
   const aliasedInput = CANONICAL_ID_ALIASES[input] || CANONICAL_ID_ALIASES[inputLower];
@@ -1532,14 +1569,41 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
     return CANONICAL_TEAMS[input];
   }
 
-  // 2. Direct manual override (exact and lowercase trimmed)
+  // 2. Scoped manual override (exact e.g. "MEX::Santos" -> team_santos_laguna) BEFORE global lookup
   const manualMap = manualOverrides as Record<string, string>;
-  let overrideId = manualMap[input];
-  if (!overrideId) {
+  let overrideId: string | undefined;
+  if (compKey) {
+    const compLow = compKey.toLowerCase();
+    const scopedExact = `${compLow}::${inputLower}`;
+    const scopedNorm = norm ? `${compLow}::${norm}` : '';
     for (const [k, v] of Object.entries(manualMap)) {
-      if (k.toLowerCase() === inputLower) {
+      const kLow = k.toLowerCase();
+      if (kLow === scopedExact || (scopedNorm && kLow === scopedNorm)) {
         overrideId = v;
         break;
+      }
+    }
+  }
+
+  // 2b. Scoped index check when competitionCode is provided (prevents cross-league collisions like MEX Santos vs BSA Santos)
+  if (!overrideId && compKey) {
+    const scopedHit = EXACT_SCOPED_INDEX.get(`${compKey}::${inputLower}`);
+    if (scopedHit) return scopedHit;
+    if (norm) {
+      const scopedNormHit = NORM_SCOPED_INDEX.get(`${compKey}::${norm}`);
+      if (scopedNormHit) return scopedNormHit;
+    }
+  }
+
+  // 3. Direct unscoped manual override (exact and lowercase trimmed)
+  if (!overrideId) {
+    overrideId = manualMap[input];
+    if (!overrideId) {
+      for (const [k, v] of Object.entries(manualMap)) {
+        if (!k.includes('::') && k.toLowerCase() === inputLower) {
+          overrideId = v;
+          break;
+        }
       }
     }
   }
@@ -1564,12 +1628,11 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
     }
   }
 
-  // 3. Exact alias match across all registered clubs (no token stripping or substring matching)
+  // 4. Global exact alias match across all registered clubs (no token stripping or substring matching)
   const exactHit = EXACT_TEAM_INDEX.get(inputLower);
   if (exactHit) {
     return exactHit;
   }
-  const norm = normalizeLookupKey(input);
   if (norm) {
     const normHit = NORM_TEAM_INDEX.get(norm);
     if (normHit) {
@@ -1577,7 +1640,7 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
     }
   }
 
-  // 4. Exact alias check against team strength database
+  // 5. Exact alias check against team strength database
   const strengthRes = lookupTeamStrength(input);
   if (strengthRes.found && strengthRes.data) {
     return {

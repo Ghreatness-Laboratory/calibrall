@@ -142,7 +142,7 @@ export function evaluateFixtureMarkets(
       predictions: [],
       rankedOptions: [],
       topPick: null,
-      noRecommendationReason: context.noRecommendationReason || `Insufficient data: ${context.homeTeamName} (${context.sampleSizeMatches ?? 0} matches stored) and ${context.awayTeamName} have insufficient verified historical data for reliable projection`,
+      noRecommendationReason: context.noRecommendationReason || `Insufficient data: ${context.homeTeamName} (${context.homeSampleMatches ?? context.sampleSizeMatches ?? 0} matches stored) and ${context.awayTeamName} (${context.awaySampleMatches ?? context.sampleSizeMatches ?? 0} matches stored) have insufficient verified historical data for reliable projection`,
       contextEvaluation: {
         stateTags: context.stateTags || [],
         lineupStatus: 'confirmed',

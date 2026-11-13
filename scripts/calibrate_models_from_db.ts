@@ -203,7 +203,10 @@ function main() {
       home_red_cards, away_red_cards,
       referee
     FROM matches
-    WHERE status = 'FINISHED' AND home_score IS NOT NULL AND away_score IS NOT NULL
+    WHERE status = 'FINISHED'
+      AND home_score IS NOT NULL
+      AND away_score IS NOT NULL
+      AND COALESCE(is_playoff, 0) = 0
     ORDER BY kickoff_time ASC
   `).all() as RawMatchRow[];
 
@@ -267,9 +270,11 @@ function main() {
     let fhO05 = 0, fhU15 = 0, hsh1 = 0, hsh2 = 0, hshEq = 0, shH = 0, shD = 0, shA = 0;
 
     const cornerTotals: number[] = [];
+    const cornerSeasons = new Set<string>();
     let sumHC = 0, sumAC = 0, cO85 = 0, cO95 = 0, cO105 = 0, cO115 = 0;
 
     const cardTotals: number[] = [];
+    const cardSeasons = new Set<string>();
     let cO35 = 0, cO45 = 0, cO55 = 0;
 
     let refN = 0;
@@ -313,6 +318,7 @@ function main() {
       if (m.home_corners !== null && m.away_corners !== null) {
         const tc = m.home_corners + m.away_corners;
         cornerTotals.push(tc);
+        if (m.season) cornerSeasons.add(m.season);
         sumHC += m.home_corners;
         sumAC += m.away_corners;
         if (tc > 8.5) cO85++;
@@ -324,6 +330,7 @@ function main() {
       if (m.home_yellow_cards !== null && m.away_yellow_cards !== null) {
         const tCards = m.home_yellow_cards + m.away_yellow_cards + (m.home_red_cards ?? 0) + (m.away_red_cards ?? 0);
         cardTotals.push(tCards);
+        if (m.season) cardSeasons.add(m.season);
         if (tCards > 3.5) cO35++;
         if (tCards > 4.5) cO45++;
         if (tCards > 5.5) cO55++;
@@ -378,8 +385,8 @@ function main() {
 
     const ahOddsN = ahCountByLeague.get(comp) || 0;
     const hasHalfTimeGoals = htN > 0;
-    const hasCorners = cornersN >= 50; // EC has 189 (2627 only); Group 3 has 0
-    const hasCards = cardsN > 0;
+    const hasCorners = cornersN >= 50 && cornerSeasons.size >= 2;
+    const hasCards = cardsN > 0 && cardSeasons.size >= 2;
     const hasReferee = refN > 0;
     const hasAsianHandicapPrices = ahOddsN > 0;
 
@@ -1101,15 +1108,16 @@ function main() {
 
   // Pick optimal H2H weight ONLY if held-out Brier strictly improves vs 0.0
   const baseH2h = h2hBrierSums[0.0];
-  const baseCombinedBrier = (baseH2h.sum1X2 + baseH2h.sumO25 + baseH2h.sumBtts) / (3 * baseH2h.n);
+  const baseDenom = Math.max(1, 3 * baseH2h.n);
+  const baseCombinedBrier = (baseH2h.sum1X2 + baseH2h.sumO25 + baseH2h.sumBtts) / baseDenom;
   let bestH2hWeight = 0.0;
   let bestH2hBrier = baseCombinedBrier;
   const h2hResultsTable: Array<{ weight: number; n: number; brier1X2: number; brierO25: number; brierBtts: number; combinedBrier: number; deltaVsBase: number }> = [];
   for (const w of H2H_WEIGHTS) {
     const r = h2hBrierSums[w];
-    const b1x2 = r.sum1X2 / r.n;
-    const bo25 = r.sumO25 / r.n;
-    const bbtts = r.sumBtts / r.n;
+    const b1x2 = r.sum1X2 / Math.max(1, r.n);
+    const bo25 = r.sumO25 / Math.max(1, r.n);
+    const bbtts = r.sumBtts / Math.max(1, r.n);
     const comb = (b1x2 + bo25 + bbtts) / 3;
     h2hResultsTable.push({
       weight: w,
@@ -1133,9 +1141,9 @@ function main() {
   const refTable: Array<{ k: number; n: number; nbRefBrier: number; poisRefBrier: number; nbLeagueBaseBrier: number }> = [];
   for (const k of REF_KS) {
     const r = cardsRefBrier[k];
-    const nbB = r.nbRefBrier / r.n;
-    const poB = r.poisRefBrier / r.n;
-    const baB = r.nbBaseBrier / r.n;
+    const nbB = r.nbRefBrier / Math.max(1, r.n);
+    const poB = r.poisRefBrier / Math.max(1, r.n);
+    const baB = r.nbBaseBrier / Math.max(1, r.n);
     refTable.push({
       k,
       n: r.n,
@@ -1143,7 +1151,7 @@ function main() {
       poisRefBrier: Number(poB.toFixed(6)),
       nbLeagueBaseBrier: Number(baB.toFixed(6)),
     });
-    if (nbB < bestRefBrier) {
+    if (r.n > 0 && nbB < bestRefBrier) {
       bestRefBrier = nbB;
       bestRefK = k;
     }
@@ -1338,7 +1346,8 @@ function main() {
     }
   }
 
-  const output = {
+  const outPath = path.join(process.cwd(), 'src/lib/prediction/calibratedParams.json');
+  let finalOutput: any = {
     generatedAt: new Date().toISOString(),
     totalFinishedMatches: matches.length,
     totalRivalriesSeeded: rivalryRows.length,
@@ -1389,8 +1398,46 @@ function main() {
     leagues: leaguesOutput,
   };
 
-  const outPath = path.join(process.cwd(), 'src/lib/prediction/calibratedParams.json');
-  fs.writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf8');
+  // Partial-DB safeguard: when SQLite only holds a subset of leagues (e.g. target league backfill),
+  // preserve untouched leagues and unrepresented group baselines from existing calibratedParams.json.
+  if (byLeague.size < 30 && fs.existsSync(outPath)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+      const mergedLeagues = { ...(existing.leagues || {}), ...leaguesOutput };
+      const mergedGroupSampleSizes: Record<string, any> = { ...(existing.groupSampleSizes || {}) };
+      const mergedWalkForward: Record<string, any> = { ...(existing.walkForwardMarketValidation || {}) };
+
+      for (const grp of GROUPS) {
+        const allGroupPresent = GROUP_LEAGUES[grp].every(code => byLeague.has(code));
+        if (allGroupPresent || (grp === 'EXTRA_GOALS_ONLY' && groupSampleSizes[grp].goalsMatches >= 10000)) {
+          mergedGroupSampleSizes[grp] = groupSampleSizes[grp];
+          mergedWalkForward[grp] = walkForwardMarketValidation[grp];
+        } else if (groupSampleSizes[grp].goalsMatches > 0 && !mergedWalkForward[grp]) {
+          mergedGroupSampleSizes[grp] = groupSampleSizes[grp];
+          mergedWalkForward[grp] = walkForwardMarketValidation[grp];
+        }
+      }
+
+      const mergedTotalMatches = Object.values(mergedLeagues).reduce(
+        (sum: number, l: any) => sum + (l?.capabilities?.sampleSizeMatches || 0),
+        0
+      );
+
+      finalOutput = {
+        ...existing,
+        generatedAt: new Date().toISOString(),
+        totalFinishedMatches: mergedTotalMatches,
+        groupSampleSizes: mergedGroupSampleSizes,
+        walkForwardMarketValidation: mergedWalkForward,
+        leagues: mergedLeagues,
+      };
+      console.log(`[Partial-DB Merge] Merged ${Object.keys(leaguesOutput).length} calibrated DB leagues into full ${Object.keys(mergedLeagues).length}-league calibratedParams.json (totalFinishedMatches=${mergedTotalMatches}).`);
+    } catch (err: any) {
+      console.warn('[Partial-DB Merge] Warning: could not read existing calibratedParams.json:', err?.message || err);
+    }
+  }
+
+  fs.writeFileSync(outPath, JSON.stringify(finalOutput, null, 2), 'utf8');
 
   console.log('====================================================================');
   console.log('EMPIRICAL CALIBRATION, H2H ABLATION & WALK-FORWARD MARKET GATING');
@@ -1423,19 +1470,19 @@ function main() {
   }
 
   console.log('\n--- 3. HELD-OUT H2H BRIER SCORE ABLATION ---');
-  console.log(JSON.stringify(output.h2hAblation, null, 2));
+  console.log(JSON.stringify(finalOutput.h2hAblation, null, 2));
 
   console.log('\n--- 4. HALVES SEPARATE RATES vs FLAT SPLIT (HELD-OUT) ---');
-  console.log(JSON.stringify(output.halvesValidation, null, 2));
+  console.log(JSON.stringify(finalOutput.halvesValidation, null, 2));
 
   console.log('\n--- 5. CORNERS NEGBINOMIAL (FOR+AGAINST) vs POISSON (HELD-OUT) ---');
-  console.log(JSON.stringify(output.cornersValidation, null, 2));
+  console.log(JSON.stringify(finalOutput.cornersValidation, null, 2));
 
   console.log('\n--- 6. CARDS NEGBINOMIAL & REFEREE SHRINKAGE vs BASELINE (HELD-OUT) ---');
-  console.log(JSON.stringify(output.cardsAndRefereeValidation, null, 2));
+  console.log(JSON.stringify(finalOutput.cardsAndRefereeValidation, null, 2));
 
   console.log('\n--- 7. DERBY STATISTICAL SIGNIFICANCE (LEAGUE-MATCHED WELCH T-TEST) ---');
-  console.log(JSON.stringify(output.derbySignificance, null, 2));
+  console.log(JSON.stringify(finalOutput.derbySignificance, null, 2));
   console.log(`\nWrote calibrated parameters to ${outPath}`);
 }
 

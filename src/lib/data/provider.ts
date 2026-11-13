@@ -135,8 +135,8 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
     return null;
   }
 
-  const homeCanon = lookupCanonicalTeam(m.homeTeam?.name) || lookupCanonicalTeam(m.homeTeam?.shortName);
-  const awayCanon = lookupCanonicalTeam(m.awayTeam?.name) || lookupCanonicalTeam(m.awayTeam?.shortName);
+  const homeCanon = lookupCanonicalTeam(m.homeTeam?.name, comp.code) || lookupCanonicalTeam(m.homeTeam?.shortName, comp.code);
+  const awayCanon = lookupCanonicalTeam(m.awayTeam?.name, comp.code) || lookupCanonicalTeam(m.awayTeam?.shortName, comp.code);
   const homeLookup = lookupTeamStrength(m.homeTeam);
   const awayLookup = lookupTeamStrength(m.awayTeam);
 
@@ -231,8 +231,8 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture | null {
     return null;
   }
 
-  const homeCanon = lookupCanonicalTeam(home.name);
-  const awayCanon = lookupCanonicalTeam(away.name);
+  const homeCanon = lookupCanonicalTeam(home.name, comp.code);
+  const awayCanon = lookupCanonicalTeam(away.name, comp.code);
   const homeLookup = lookupTeamStrength(home);
   const awayLookup = lookupTeamStrength(away);
 
@@ -323,13 +323,13 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
   }
 
   const homeCanon =
-    lookupCanonicalTeam(homeComp.team?.displayName) ||
-    lookupCanonicalTeam(homeComp.team?.name) ||
-    lookupCanonicalTeam(homeComp.team?.shortDisplayName);
+    lookupCanonicalTeam(homeComp.team?.displayName, comp.code) ||
+    lookupCanonicalTeam(homeComp.team?.name, comp.code) ||
+    lookupCanonicalTeam(homeComp.team?.shortDisplayName, comp.code);
   const awayCanon =
-    lookupCanonicalTeam(awayComp.team?.displayName) ||
-    lookupCanonicalTeam(awayComp.team?.name) ||
-    lookupCanonicalTeam(awayComp.team?.shortDisplayName);
+    lookupCanonicalTeam(awayComp.team?.displayName, comp.code) ||
+    lookupCanonicalTeam(awayComp.team?.name, comp.code) ||
+    lookupCanonicalTeam(awayComp.team?.shortDisplayName, comp.code);
   const homeLookup = lookupTeamStrength(homeComp.team);
   const awayLookup = lookupTeamStrength(awayComp.team);
 
@@ -475,35 +475,37 @@ function mapDbMatchToFixture(m: any, fetchTime: string): Fixture | null {
     return null;
   }
 
+  const homeCanon = lookupCanonicalTeam(m.home_team_id, comp.code) || lookupCanonicalTeam(m.home_team_name, comp.code);
+  const awayCanon = lookupCanonicalTeam(m.away_team_id, comp.code) || lookupCanonicalTeam(m.away_team_name, comp.code);
   const homeLookup = lookupTeamStrength(m.home_team_id) || lookupTeamStrength(m.home_team_name);
   const awayLookup = lookupTeamStrength(m.away_team_id) || lookupTeamStrength(m.away_team_name);
 
   const homeTeam: Team = {
-    id: m.home_team_id,
+    id: homeCanon?.canonicalId || m.home_team_id,
     name: m.home_team_name,
-    shortName: homeLookup?.data?.shortName || displayName(m.home_team_name),
-    tla: homeLookup?.data?.tla || m.home_team_name.slice(0, 3).toUpperCase(),
-    crestUrl: homeLookup?.data?.crestUrl || `https://crests.football-data.org/${m.competition_code}.png`,
+    shortName: homeCanon?.shortName || homeLookup?.data?.shortName || displayName(m.home_team_name),
+    tla: homeCanon?.tla || homeLookup?.data?.tla || m.home_team_name.slice(0, 3).toUpperCase(),
+    crestUrl: homeCanon?.crestUrl || homeLookup?.data?.crestUrl || '',
     attackRating: homeLookup?.data?.attackRating,
     defenseRating: homeLookup?.data?.defenseRating,
     cornerAttackRating: homeLookup?.data?.cornerAttackRating,
     disciplineRating: homeLookup?.data?.disciplineRating,
     recentForm: homeLookup?.data?.recentForm,
-    hasRealTeamStrength: homeLookup?.found ?? false,
+    hasRealTeamStrength: Boolean(homeCanon || homeLookup?.found),
   };
 
   const awayTeam: Team = {
-    id: m.away_team_id,
+    id: awayCanon?.canonicalId || m.away_team_id,
     name: m.away_team_name,
-    shortName: awayLookup?.data?.shortName || displayName(m.away_team_name),
-    tla: awayLookup?.data?.tla || m.away_team_name.slice(0, 3).toUpperCase(),
-    crestUrl: awayLookup?.data?.crestUrl || `https://crests.football-data.org/${m.competition_code}.png`,
+    shortName: awayCanon?.shortName || awayLookup?.data?.shortName || displayName(m.away_team_name),
+    tla: awayCanon?.tla || awayLookup?.data?.tla || m.away_team_name.slice(0, 3).toUpperCase(),
+    crestUrl: awayCanon?.crestUrl || awayLookup?.data?.crestUrl || '',
     attackRating: awayLookup?.data?.attackRating,
     defenseRating: awayLookup?.data?.defenseRating,
     cornerAttackRating: awayLookup?.data?.cornerAttackRating,
     disciplineRating: awayLookup?.data?.disciplineRating,
     recentForm: awayLookup?.data?.recentForm,
-    hasRealTeamStrength: awayLookup?.found ?? false,
+    hasRealTeamStrength: Boolean(awayCanon || awayLookup?.found),
   };
 
   return {

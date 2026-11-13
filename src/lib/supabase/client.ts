@@ -329,6 +329,8 @@ export function getLocalDatabase(): any {
         away_fouls INTEGER,
         referee TEXT,
         result TEXT,
+        tournament TEXT,
+        is_playoff INTEGER DEFAULT 0,
         source TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -405,6 +407,8 @@ export function getLocalDatabase(): any {
     try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN result TEXT;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN home_fouls INTEGER;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN away_fouls INTEGER;'); } catch (_) {}
+    try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN tournament TEXT;'); } catch (_) {}
+    try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN is_playoff INTEGER DEFAULT 0;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN competition_id TEXT;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN home_score INTEGER;'); } catch (_) {}
     try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN away_score INTEGER;'); } catch (_) {}
