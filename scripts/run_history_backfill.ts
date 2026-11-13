@@ -1,8 +1,7 @@
 // CALIBRALL: Comprehensive Football-Data.co.uk Historical Backfill Runner
-// First tiers: E0 (PL), SP1 (PD), I1 (SA), D1 (BL1), F1 (FL1), BRA (BSA 2021-2026)
-// Second tiers: E1, E2, SP2, I2, D2, F2
-// European Seasons: 2021/22 to 2026/27 (2122, 2223, 2324, 2425, 2526, 2627) - 66 files
-// Brazil Série A: 2021 to 2026 from https://football-data.co.uk/new/BRA.csv
+// Seasonal divisions (22): E0, E1, E2, E3, EC, SC0, SC1, SC2, SC3, SP1, SP2, I1, I2, D1, D2, F1, F2, N1, B1, P1, T1, G1
+// Seasonal windows (7): 2021, 2122, 2223, 2324, 2425, 2526, 2627 (154 CSVs)
+// Extra leagues (16): ARG, AUT, BSA (BRA), CHN, DNK, FIN, IRL, JPN, MEX, NOR, POL, ROU, RUS, SWE, SWZ, USA (2020..2026 / 2020/2021..2026/2027)
 // Usage:
 //   npx tsx scripts/run_history_backfill.ts --dry-run
 //   npx tsx scripts/run_history_backfill.ts
@@ -26,14 +25,41 @@ import {
 } from '../src/lib/data/canonicalTeams';
 
 const DIVISIONS = [
-  // European Tier 1
-  'E0', 'SP1', 'I1', 'D1', 'F1',
-  // European Tier 2 / English Tier 3
-  'E1', 'E2', 'SP2', 'I2', 'D2', 'F2',
+  // England
+  'E0', 'E1', 'E2', 'E3', 'EC',
+  // Scotland
+  'SC0', 'SC1', 'SC2', 'SC3',
+  // Spain, Italy, Germany, France
+  'SP1', 'SP2', 'I1', 'I2', 'D1', 'D2', 'F1', 'F2',
+  // Netherlands, Belgium, Portugal, Turkey, Greece
+  'N1', 'B1', 'P1', 'T1', 'G1',
 ];
 
-const SEASONS = ['2122', '2223', '2324', '2425', '2526', '2627'];
-const BRA_SEASONS = ['2021', '2022', '2023', '2024', '2025', '2026'];
+const SEASONS = ['2021', '2122', '2223', '2324', '2425', '2526', '2627'];
+
+const EXTRA_LEAGUES: Array<{ competitionCode: string; fileCode: string }> = [
+  { competitionCode: 'ARG', fileCode: 'ARG' },
+  { competitionCode: 'AUT', fileCode: 'AUT' },
+  { competitionCode: 'BSA', fileCode: 'BRA' },
+  { competitionCode: 'CHN', fileCode: 'CHN' },
+  { competitionCode: 'DNK', fileCode: 'DNK' },
+  { competitionCode: 'FIN', fileCode: 'FIN' },
+  { competitionCode: 'IRL', fileCode: 'IRL' },
+  { competitionCode: 'JPN', fileCode: 'JPN' },
+  { competitionCode: 'MEX', fileCode: 'MEX' },
+  { competitionCode: 'NOR', fileCode: 'NOR' },
+  { competitionCode: 'POL', fileCode: 'POL' },
+  { competitionCode: 'ROU', fileCode: 'ROU' },
+  { competitionCode: 'RUS', fileCode: 'RUS' },
+  { competitionCode: 'SWE', fileCode: 'SWE' },
+  { competitionCode: 'SWZ', fileCode: 'SWZ' },
+  { competitionCode: 'USA', fileCode: 'USA' },
+];
+
+const VALID_EXTRA_SEASONS = new Set([
+  '2020', '2021', '2022', '2023', '2024', '2025', '2026',
+  '2020/2021', '2021/2022', '2022/2023', '2023/2024', '2024/2025', '2025/2026', '2026/2027',
+]);
 
 const CACHE_DIR = path.join('/tmp', 'fdco_cache');
 if (!fs.existsSync(CACHE_DIR)) {
@@ -59,6 +85,7 @@ interface ParsedFile {
     shots: boolean;
     fouls: boolean;
     referee: boolean;
+    asianHandicapPrices: boolean;
     oddsPreMatch: boolean;
     oddsClosing: boolean;
   };
@@ -84,13 +111,13 @@ async function fetchCsvWithCache(division: string, season: string): Promise<stri
   return text;
 }
 
-async function fetchBrazilCsvWithCache(): Promise<string> {
-  const cachePath = path.join(CACHE_DIR, 'BRA.csv');
+async function fetchExtraCsvWithCache(fileCode: string): Promise<string> {
+  const cachePath = path.join(CACHE_DIR, `${fileCode}.csv`);
   if (fs.existsSync(cachePath)) {
     return fs.readFileSync(cachePath, 'utf-8');
   }
 
-  const url = 'https://football-data.co.uk/new/BRA.csv';
+  const url = `https://football-data.co.uk/new/${fileCode}.csv`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Calibrall/1.0 (History Ingestion Engine)' },
   });
@@ -104,7 +131,7 @@ async function fetchBrazilCsvWithCache(): Promise<string> {
   return text;
 }
 
-function parseFile(division: string, season: string, csvText: string): ParsedFile {
+function parseSeasonalFile(division: string, season: string, csvText: string): ParsedFile {
   const url = `https://football-data.co.uk/mmz4281/${season}/${division}.csv`;
   const cleanCsvText = csvText.replace(/^\uFEFF/, '').trim();
 
@@ -118,7 +145,7 @@ function parseFile(division: string, season: string, csvText: string): ParsedFil
     to_line: 1,
   });
 
-  const headers = rawParsed[0] || [];
+  const headers = (rawParsed[0] || []).filter(Boolean);
   const headerSet = new Set(headers.map(h => h.trim()));
 
   const columnsDetected = {
@@ -130,6 +157,7 @@ function parseFile(division: string, season: string, csvText: string): ParsedFil
     shots: headerSet.has('HS') && headerSet.has('AS') && headerSet.has('HST') && headerSet.has('AST'),
     fouls: headerSet.has('HF') && headerSet.has('AF'),
     referee: headerSet.has('Referee'),
+    asianHandicapPrices: headerSet.has('AHh') || headerSet.has('B365AHH') || headerSet.has('AvgAHH') || headerSet.has('PCAHH'),
     oddsPreMatch: headerSet.has('B365H') || headerSet.has('AvgH') || headerSet.has('MaxH'),
     oddsClosing: headerSet.has('PSCH') || headerSet.has('AvgCH') || headerSet.has('MaxCH'),
   };
@@ -410,6 +438,71 @@ function parseFile(division: string, season: string, csvText: string): ParsedFil
         source: `football-data.co.uk:${season}:closing`,
       });
     }
+
+    // Asian Handicap Pre-Match & Closing Odds
+    const ahLine = parseFloat(row['AHh']);
+    const ahPreH = parseFloat(row['AvgAHH'] || row['PAHH'] || row['B365AHH']);
+    const ahPreA = parseFloat(row['AvgAHA'] || row['PAHA'] || row['B365AHA']);
+    const ahPreBook = row['AvgAHH'] ? 'MarketAvg' : row['PAHH'] ? 'Pinnacle' : 'Bet365';
+    const ahHomeLabel = !isNaN(ahLine) ? `${ahLine > 0 ? '+' : ''}${ahLine}` : 'Line';
+    const ahAwayLabel = !isNaN(ahLine) ? `${-ahLine > 0 ? '+' : ''}${-ahLine}` : 'Line';
+
+    if (!isNaN(ahPreH) && ahPreH >= 1.01) {
+      oddsSnapshots.push({
+        match_id: providerId,
+        bookmaker: ahPreBook,
+        market_code: 'ASIAN_HANDICAP_HOME',
+        selection: `${homeResolved.shortName} AH ${ahHomeLabel}`,
+        decimal_odds: ahPreH,
+        observed_at: null,
+        snapshot_type: 'csv_pre_match',
+        source: `football-data.co.uk:${season}`,
+      });
+    }
+    if (!isNaN(ahPreA) && ahPreA >= 1.01) {
+      oddsSnapshots.push({
+        match_id: providerId,
+        bookmaker: ahPreBook,
+        market_code: 'ASIAN_HANDICAP_AWAY',
+        selection: `${awayResolved.shortName} AH ${ahAwayLabel}`,
+        decimal_odds: ahPreA,
+        observed_at: null,
+        snapshot_type: 'csv_pre_match',
+        source: `football-data.co.uk:${season}`,
+      });
+    }
+
+    const ahCloseLine = parseFloat(row['AHCh']);
+    const ahCloseH = parseFloat(row['PCAHH'] || row['AvgCAHH'] || row['B365CAHH']);
+    const ahCloseA = parseFloat(row['PCAHA'] || row['AvgCAHA'] || row['B365CAHA']);
+    const ahCloseBook = row['PCAHH'] ? 'Pinnacle' : row['AvgCAHH'] ? 'MarketAvg' : 'Bet365';
+    const ahCloseHomeLabel = !isNaN(ahCloseLine) ? `${ahCloseLine > 0 ? '+' : ''}${ahCloseLine}` : 'Line';
+    const ahCloseAwayLabel = !isNaN(ahCloseLine) ? `${-ahCloseLine > 0 ? '+' : ''}${-ahCloseLine}` : 'Line';
+
+    if (!isNaN(ahCloseH) && ahCloseH >= 1.01) {
+      oddsSnapshots.push({
+        match_id: providerId,
+        bookmaker: ahCloseBook,
+        market_code: 'ASIAN_HANDICAP_HOME',
+        selection: `${homeResolved.shortName} AH ${ahCloseHomeLabel}`,
+        decimal_odds: ahCloseH,
+        observed_at: null,
+        snapshot_type: 'csv_closing',
+        source: `football-data.co.uk:${season}:closing`,
+      });
+    }
+    if (!isNaN(ahCloseA) && ahCloseA >= 1.01) {
+      oddsSnapshots.push({
+        match_id: providerId,
+        bookmaker: ahCloseBook,
+        market_code: 'ASIAN_HANDICAP_AWAY',
+        selection: `${awayResolved.shortName} AH ${ahCloseAwayLabel}`,
+        decimal_odds: ahCloseA,
+        observed_at: null,
+        snapshot_type: 'csv_closing',
+        source: `football-data.co.uk:${season}:closing`,
+      });
+    }
   }
 
   return {
@@ -426,8 +519,8 @@ function parseFile(division: string, season: string, csvText: string): ParsedFil
   };
 }
 
-function parseBrazilSeasons(csvText: string): ParsedFile[] {
-  const url = 'https://football-data.co.uk/new/BRA.csv';
+function parseExtraLeagueSeasons(competitionCode: string, fileCode: string, csvText: string): ParsedFile[] {
+  const url = `https://football-data.co.uk/new/${fileCode}.csv`;
   const cleanCsvText = csvText.replace(/^\uFEFF/, '').trim();
 
   const rawParsed: string[][] = parse(cleanCsvText, {
@@ -452,6 +545,7 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
     shots: false,
     fouls: false,
     referee: false,
+    asianHandicapPrices: false,
     oddsPreMatch: headerSet.has('B365H') || headerSet.has('AvgH') || headerSet.has('PH'),
     oddsClosing: headerSet.has('PSCH') || headerSet.has('AvgCH') || headerSet.has('MaxCH'),
   };
@@ -465,10 +559,25 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
     relax_column_count: true,
   });
 
+  // Group records by valid target seasons (2020..2026 and 2020/2021..2026/2027)
+  const seasonsOrder: string[] = [];
+  const rowsBySeason = new Map<string, Record<string, string>[]>();
+  for (const r of records) {
+    const s = r['Season']?.trim() || '';
+    if (!VALID_EXTRA_SEASONS.has(s)) continue;
+    let bucket = rowsBySeason.get(s);
+    if (!bucket) {
+      bucket = [];
+      rowsBySeason.set(s, bucket);
+      seasonsOrder.push(s);
+    }
+    bucket.push(r);
+  }
+
   const filesBySeason: ParsedFile[] = [];
 
-  for (const season of BRA_SEASONS) {
-    const seasonRows = records.filter(r => r['Season']?.trim() === season);
+  for (const season of seasonsOrder) {
+    const seasonRows = rowsBySeason.get(season) || [];
     const validMatches: StoredMatch[] = [];
     const oddsSnapshots: StoredOddsSnapshot[] = [];
     const unresolvedSet = new Set<string>();
@@ -483,14 +592,17 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
       }
 
       const rawDate = row['Date']?.trim();
-      const isoKickoff = parseBrazilCsvDate(rawDate);
+      const rawTime = row['Time']?.trim() || null;
+      const isoKickoff = fileCode === 'BRA'
+        ? parseBrazilCsvDate(rawDate)
+        : (parseLondonCsvDateTime(rawDate, rawTime) || parseBrazilCsvDate(rawDate));
       if (!isoKickoff) {
         skippedRows++;
         continue;
       }
 
-      const homeResolved = getCanonicalTeamForCsv('BSA', rawHome);
-      const awayResolved = getCanonicalTeamForCsv('BSA', rawAway);
+      const homeResolved = getCanonicalTeamForCsv(competitionCode, rawHome);
+      const awayResolved = getCanonicalTeamForCsv(competitionCode, rawAway);
       if (!homeResolved || !awayResolved) {
         if (!homeResolved) unresolvedSet.add(rawHome);
         if (!awayResolved) unresolvedSet.add(rawAway);
@@ -503,14 +615,15 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
       const isFinished = !isNaN(hg) && !isNaN(ag);
 
       const cleanDateStr = rawDate.replace(/\//g, '');
-      const providerId = `fdco:bra:${season}:${cleanDateStr}:${sanitizeRawTeamForId(rawHome)}:${sanitizeRawTeamForId(rawAway)}`;
+      const cleanSeasonKey = season.replace(/\//g, '_');
+      const providerId = `fdco:${fileCode.toLowerCase()}:${cleanSeasonKey}:${cleanDateStr}:${sanitizeRawTeamForId(rawHome)}:${sanitizeRawTeamForId(rawAway)}`;
       const resCode = row['Res']?.trim();
       const resultOutcome = resCode ? resCode : (isFinished ? (hg > ag ? 'H' : hg === ag ? 'D' : 'A') : null);
 
       validMatches.push({
         id: providerId,
         provider_id: providerId,
-        competition_code: 'BSA',
+        competition_code: competitionCode,
         season,
         matchday: null,
         home_team_id: homeResolved.id,
@@ -539,7 +652,7 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
         away_fouls: null,
         referee: null,
         result: resultOutcome,
-        source: 'football-data.co.uk:BRA',
+        source: `football-data.co.uk:${fileCode}`,
       });
 
       const psCH = parseFloat(row['PSCH']);
@@ -554,7 +667,7 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
           decimal_odds: psCH,
           observed_at: null,
           snapshot_type: 'csv_closing',
-          source: `football-data.co.uk:BRA:${season}:closing`,
+          source: `football-data.co.uk:${fileCode}:${season}:closing`,
         });
       }
       if (!isNaN(psCD) && psCD >= 1.01) {
@@ -566,7 +679,7 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
           decimal_odds: psCD,
           observed_at: null,
           snapshot_type: 'csv_closing',
-          source: `football-data.co.uk:BRA:${season}:closing`,
+          source: `football-data.co.uk:${fileCode}:${season}:closing`,
         });
       }
       if (!isNaN(psCA) && psCA >= 1.01) {
@@ -578,7 +691,7 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
           decimal_odds: psCA,
           observed_at: null,
           snapshot_type: 'csv_closing',
-          source: `football-data.co.uk:BRA:${season}:closing`,
+          source: `football-data.co.uk:${fileCode}:${season}:closing`,
         });
       }
 
@@ -594,7 +707,7 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
           decimal_odds: avgCH,
           observed_at: null,
           snapshot_type: 'csv_closing',
-          source: `football-data.co.uk:BRA:${season}:closing`,
+          source: `football-data.co.uk:${fileCode}:${season}:closing`,
         });
       }
       if (!isNaN(avgCD) && avgCD >= 1.01) {
@@ -606,7 +719,7 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
           decimal_odds: avgCD,
           observed_at: null,
           snapshot_type: 'csv_closing',
-          source: `football-data.co.uk:BRA:${season}:closing`,
+          source: `football-data.co.uk:${fileCode}:${season}:closing`,
         });
       }
       if (!isNaN(avgCA) && avgCA >= 1.01) {
@@ -618,13 +731,13 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
           decimal_odds: avgCA,
           observed_at: null,
           snapshot_type: 'csv_closing',
-          source: `football-data.co.uk:BRA:${season}:closing`,
+          source: `football-data.co.uk:${fileCode}:${season}:closing`,
         });
       }
     }
 
     filesBySeason.push({
-      division: 'BSA',
+      division: competitionCode,
       season,
       url,
       headers,
@@ -642,32 +755,36 @@ function parseBrazilSeasons(csvText: string): ParsedFile[] {
 
 async function main() {
   const isDryRun = process.argv.includes('--dry-run');
-  clearUnresolvedTeamsLog();
+  if (!isDryRun) {
+    clearUnresolvedTeamsLog();
+  }
 
-  console.log('='.repeat(90));
+  console.log('='.repeat(110));
   console.log(`CALIBRALL HISTORICAL FOOTBALL-DATA.CO.UK INGESTION PIPELINE (${isDryRun ? 'DRY RUN' : 'REAL BACKFILL'})`);
-  console.log('Tier 1 Leagues: E0 (PL), SP1 (PD), I1 (SA), D1 (BL1), F1 (FL1), BRA (BSA)');
-  console.log('Tier 2/3 Leagues: E1, E2, SP2, I2, D2, F2');
-  console.log('Seasons: European 2122..2627 (66 CSVs) + Brazil BRA.csv 2021..2026 (6 seasons)');
-  console.log('='.repeat(90));
+  console.log(`Seasonal Divisions (22): ${DIVISIONS.join(', ')}`);
+  console.log(`Seasonal Windows (7):    ${SEASONS.join(', ')} (${DIVISIONS.length * SEASONS.length} CSVs)`);
+  console.log(`Extra Leagues (16):      ${EXTRA_LEAGUES.map(e => `${e.competitionCode}(${e.fileCode}.csv)`).join(', ')}`);
+  console.log('='.repeat(110));
 
   const parsedFiles: ParsedFile[] = [];
 
   for (const div of DIVISIONS) {
     for (const season of SEASONS) {
       const csvText = await fetchCsvWithCache(div, season);
-      const parsed = parseFile(div, season, csvText);
+      const parsed = parseSeasonalFile(div, season, csvText);
       parsedFiles.push(parsed);
     }
   }
 
-  const braCsvText = await fetchBrazilCsvWithCache();
-  const braParsed = parseBrazilSeasons(braCsvText);
-  parsedFiles.push(...braParsed);
+  for (const extra of EXTRA_LEAGUES) {
+    const csvText = await fetchExtraCsvWithCache(extra.fileCode);
+    const extraParsed = parseExtraLeagueSeasons(extra.competitionCode, extra.fileCode, csvText);
+    parsedFiles.push(...extraParsed);
+  }
 
-  console.log('\n==========================================================================================');
+  console.log('\n==============================================================================================================');
   console.log('DRY RUN PREVIEW (PARSED METRICS PER DIVISION & SEASON)');
-  console.log('==========================================================================================\n');
+  console.log('==============================================================================================================\n');
 
   let totalDryMatches = 0;
   let totalDryOdds = 0;
@@ -675,9 +792,9 @@ async function main() {
   const allUnresolved = new Set<string>();
 
   console.log(
-    'Division | Season | Rows Fetched | Valid Matches | Odds Snapshots | Skipped | Date Range'
+    'Division | Season    | Rows Fetched | Valid Matches | Odds Snapshots | Skipped | Date Range'
   );
-  console.log('-'.repeat(88));
+  console.log('-'.repeat(95));
 
   for (const f of parsedFiles) {
     const dates = f.validMatches.map(m => m.kickoff_time).sort();
@@ -690,13 +807,13 @@ async function main() {
     for (const u of f.unresolvedNames) allUnresolved.add(u);
 
     console.log(
-      `${f.division.padEnd(8)} | ${f.season.padEnd(6)} | ${String(f.rawRowsCount).padStart(12)} | ${String(f.validMatches.length).padStart(13)} | ${String(f.oddsSnapshots.length).padStart(14)} | ${String(f.skippedRows).padStart(7)} | ${earliest} to ${latest}`
+      `${f.division.padEnd(8)} | ${f.season.padEnd(9)} | ${String(f.rawRowsCount).padStart(12)} | ${String(f.validMatches.length).padStart(13)} | ${String(f.oddsSnapshots.length).padStart(14)} | ${String(f.skippedRows).padStart(7)} | ${earliest} to ${latest}`
     );
   }
 
-  console.log('-'.repeat(88));
+  console.log('-'.repeat(95));
   console.log('DRY RUN TOTALS:');
-  console.log(`  Partitions Parsed:     ${parsedFiles.length} (66 Euro CSVs + 6 Brazil seasons)`);
+  console.log(`  Partitions Parsed:     ${parsedFiles.length}`);
   console.log(`  Total Matches Valid:   ${totalDryMatches}`);
   console.log(`  Total Odds Snapshots:  ${totalDryOdds}`);
   console.log(`  Total Rows Skipped:    ${totalDrySkipped}`);
@@ -704,22 +821,22 @@ async function main() {
 
   if (isDryRun) {
     console.log('  Persistence Target:    DRY RUN ONLY — No database writes performed.');
-    console.log('='.repeat(90));
+    console.log('='.repeat(110));
     return;
   }
 
-  console.log('\n==========================================================================================');
+  console.log('\n==============================================================================================================');
   console.log('REAL BACKFILL OUTPUT (WRITING TO SUPABASE)');
-  console.log('==========================================================================================\n');
+  console.log('==============================================================================================================\n');
 
   let totalInsertedMatches = 0;
   let totalInsertedOdds = 0;
   let totalInsertedErrors = 0;
 
   console.log(
-    'Division | Season | Matches Upserted | Odds Snapshots Upserted | Status'
+    'Division | Season    | Matches Upserted | Odds Snapshots Upserted | Status'
   );
-  console.log('-'.repeat(78));
+  console.log('-'.repeat(85));
 
   for (const f of parsedFiles) {
     const res = await matchesStore.upsertMatches(f.validMatches, f.oddsSnapshots);
@@ -734,7 +851,7 @@ async function main() {
       : 'SUCCESS (Supabase)';
 
     console.log(
-      `${f.division.padEnd(8)} | ${f.season.padEnd(6)} | ${String(res.inserted).padStart(16)} | ${String(f.oddsSnapshots.length).padStart(23)} | ${statusStr}`
+      `${f.division.padEnd(8)} | ${f.season.padEnd(9)} | ${String(res.inserted).padStart(16)} | ${String(f.oddsSnapshots.length).padStart(23)} | ${statusStr}`
     );
   }
 
@@ -755,16 +872,16 @@ async function main() {
     await supabase.from('teams').upsert(promotedRows, { onConflict: 'id' });
   }
 
-  console.log('-'.repeat(78));
+  console.log('-'.repeat(85));
   console.log('REAL BACKFILL TOTALS:');
   console.log(`  Total Matches Upserted:        ${totalInsertedMatches}`);
   console.log(`  Total Odds Snapshots Upserted: ${totalInsertedOdds}`);
   console.log(`  Total Errors:                  ${totalInsertedErrors}`);
   console.log(`  Brazil 2026 Promoted Flagged:  ${Array.from(PROMOTED_BRAZIL_2026_IDS).join(', ')}`);
 
-  console.log('\n==========================================================================================');
+  console.log('\n==============================================================================================================');
   console.log('DATA-STATUS OUTPUT (READ EXCLUSIVELY FROM SUPABASE)');
-  console.log('==========================================================================================\n');
+  console.log('==============================================================================================================\n');
 
   const statusReport = await matchesStore.getDataStatus();
   const unresolvedLog = getUnresolvedTeamsLog();
@@ -778,22 +895,22 @@ async function main() {
   console.log(`Unresolved Teams Log:  ${unresolvedLog.length}`);
 
   console.log('\n--- MATCHES PER LEAGUE AND SEASON ---');
-  console.log('League | Season | Match Count | Earliest Match       | Latest Match');
-  console.log('-'.repeat(75));
+  console.log('League | Season    | Match Count | Earliest Match       | Latest Match');
+  console.log('-'.repeat(80));
   for (const row of statusReport.matchesPerLeagueAndSeason.sort((a, b) => a.league.localeCompare(b.league) || a.season.localeCompare(b.season))) {
     console.log(
-      `${row.league.padEnd(6)} | ${row.season.padEnd(6)} | ${String(row.count).padStart(11)} | ${row.earliestDate.padEnd(20)} | ${row.latestDate}`
+      `${row.league.padEnd(6)} | ${row.season.padEnd(9)} | ${String(row.count).padStart(11)} | ${row.earliestDate.padEnd(20)} | ${row.latestDate}`
     );
   }
 
-  console.log('\n--- LATEST MATCH DATE PER LEAGUE (7-DAY & 21-DAY STALENESS CHECK) ---');
-  console.log('League | League Name                     | Match Count | Earliest Date        | Latest Date          | Days Ago | >7d Stale | >21d Stale');
-  console.log('-'.repeat(120));
-  for (const row of statusReport.leagueLatestDates.filter(l => l.count > 0)) {
-    const stale7dLabel = row.isStale7d ? 'YES (>7d)' : 'NO (<=7d)';
-    const stale21dLabel = row.isStale ? 'YES (>21d)' : 'NO (<=21d)';
+  console.log('\n--- LATEST MATCH DATE & EMPIRICAL FEATURE COVERAGE PER LEAGUE ---');
+  console.log('League | League Name                     | Matches | Earliest   | Latest     | Cards       | Corners     | HT Goals    | Referee     | AH Prices');
+  console.log('-'.repeat(156));
+  for (const row of statusReport.leagueLatestDates.slice().sort((a, b) => a.league.localeCompare(b.league))) {
+    const f = row.features;
+    const fmt = (flag: boolean, count: number) => `${flag ? 'YES' : 'NO '} (${String(count).padStart(4)})`;
     console.log(
-      `${row.league.padEnd(6)} | ${row.leagueName.padEnd(31)} | ${String(row.count).padStart(11)} | ${(row.earliestDate || 'N/A').padEnd(20)} | ${(row.latestDate || 'N/A').padEnd(20)} | ${String(row.daysAgo ?? 'N/A').padStart(8)} | ${stale7dLabel.padEnd(9)} | ${stale21dLabel}`
+      `${row.league.padEnd(6)} | ${row.leagueName.padEnd(31)} | ${String(row.count).padStart(7)} | ${(row.earliestDate?.slice(0, 10) || 'N/A').padEnd(10)} | ${(row.latestDate?.slice(0, 10) || 'N/A').padEnd(10)} | ${fmt(f.cards, f.cardsCount).padEnd(11)} | ${fmt(f.corners, f.cornersCount).padEnd(11)} | ${fmt(f.halfTimeGoals, f.halfTimeGoalsCount).padEnd(11)} | ${fmt(f.referee, f.refereeCount).padEnd(11)} | ${fmt(f.asianHandicapPrices, f.asianHandicapCount)}`
     );
   }
 
@@ -805,7 +922,7 @@ async function main() {
   console.log(`  teams table count:          ${teamsCount}`);
   console.log(`  matches table count:        ${matchesCount}`);
   console.log(`  odds_snapshots table count: ${oddsCount}`);
-  console.log('='.repeat(90));
+  console.log('='.repeat(110));
 }
 
 main().catch(err => {

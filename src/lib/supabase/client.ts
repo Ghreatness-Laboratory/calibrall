@@ -162,6 +162,7 @@ class LocalSupabaseQueryBuilder {
       const onConflictCols = options?.onConflict ? options.onConflict.split(',').map(c => c.trim()) : ['id'];
 
       const useTx = rows.length > 1;
+      const stmtCache = new Map<string, any>();
       if (useTx) this.db.exec('BEGIN');
       try {
         for (const row of rows) {
@@ -186,7 +187,11 @@ class LocalSupabaseQueryBuilder {
             return val;
           });
 
-          const stmt = this.db.prepare(sql);
+          let stmt = stmtCache.get(sql);
+          if (!stmt) {
+            stmt = this.db.prepare(sql);
+            stmtCache.set(sql, stmt);
+          }
           stmt.run(...values);
         }
         if (useTx) this.db.exec('COMMIT');
@@ -271,6 +276,7 @@ export function getLocalDatabase(): any {
     }
     const dbPath = path.join(dataDir, 'supabase.db');
     localDbInstance = new DatabaseSync(dbPath);
+    localDbInstance.exec('PRAGMA busy_timeout = 5000;');
 
     // Initialize Schema
     localDbInstance.exec(`

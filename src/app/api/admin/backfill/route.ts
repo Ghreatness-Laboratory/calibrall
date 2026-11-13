@@ -135,7 +135,8 @@ export async function POST(req: NextRequest) {
           ((season === '2425' || season === '2024') && (rowSeason === '2024' || rowSeason === '2024/2025' || rowSeason === '2425')) ||
           ((season === '2324' || season === '2023') && (rowSeason === '2023' || rowSeason === '2023/2024' || rowSeason === '2324')) ||
           ((season === '2223' || season === '2022') && (rowSeason === '2022' || rowSeason === '2022/2023' || rowSeason === '2223')) ||
-          ((season === '2122' || season === '2021') && (rowSeason === '2021' || rowSeason === '2021/2022' || rowSeason === '2122'))
+          ((season === '2122' || season === '2021') && (rowSeason === '2021' || rowSeason === '2021/2022' || rowSeason === '2122')) ||
+          ((season === '2021' || season === '2020') && (rowSeason === '2020' || rowSeason === '2020/2021' || rowSeason === '2021'))
         );
         if (!matchesSeason) continue;
 
@@ -148,7 +149,9 @@ export async function POST(req: NextRequest) {
 
         const rawDate = row['Date']?.trim();
         const rawTime = row['Time']?.trim() || null;
-        const isoKickoff = parseLondonCsvDateTime(rawDate, rawTime) || parseBrazilCsvDate(rawDate);
+        const isoKickoff = extraFileCode === 'BRA'
+          ? parseBrazilCsvDate(rawDate)
+          : (parseLondonCsvDateTime(rawDate, rawTime) || parseBrazilCsvDate(rawDate));
         if (!isoKickoff) {
           rowsSkipped++;
           continue; // Skip invalid date row
@@ -593,6 +596,71 @@ export async function POST(req: NextRequest) {
             market_code: '1X2_AWAY',
             selection: `${awayResolved.shortName} Win`,
             decimal_odds: avgCA,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: `football-data.co.uk:${season}:closing`,
+          });
+        }
+
+        // 4. Asian Handicap Pre-Match & Closing Odds
+        const ahLine = parseFloat(row['AHh']);
+        const ahPreH = parseFloat(row['AvgAHH'] || row['PAHH'] || row['B365AHH']);
+        const ahPreA = parseFloat(row['AvgAHA'] || row['PAHA'] || row['B365AHA']);
+        const ahPreBook = row['AvgAHH'] ? 'MarketAvg' : row['PAHH'] ? 'Pinnacle' : 'Bet365';
+        const ahHomeLabel = !isNaN(ahLine) ? `${ahLine > 0 ? '+' : ''}${ahLine}` : 'Line';
+        const ahAwayLabel = !isNaN(ahLine) ? `${-ahLine > 0 ? '+' : ''}${-ahLine}` : 'Line';
+
+        if (!isNaN(ahPreH) && ahPreH >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: ahPreBook,
+            market_code: 'ASIAN_HANDICAP_HOME',
+            selection: `${homeResolved.shortName} AH ${ahHomeLabel}`,
+            decimal_odds: ahPreH,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
+            source: `football-data.co.uk:${season}`,
+          });
+        }
+        if (!isNaN(ahPreA) && ahPreA >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: ahPreBook,
+            market_code: 'ASIAN_HANDICAP_AWAY',
+            selection: `${awayResolved.shortName} AH ${ahAwayLabel}`,
+            decimal_odds: ahPreA,
+            observed_at: null,
+            snapshot_type: 'csv_pre_match',
+            source: `football-data.co.uk:${season}`,
+          });
+        }
+
+        const ahCloseLine = parseFloat(row['AHCh']);
+        const ahCloseH = parseFloat(row['PCAHH'] || row['AvgCAHH'] || row['B365CAHH']);
+        const ahCloseA = parseFloat(row['PCAHA'] || row['AvgCAHA'] || row['B365CAHA']);
+        const ahCloseBook = row['PCAHH'] ? 'Pinnacle' : row['AvgCAHH'] ? 'MarketAvg' : 'Bet365';
+        const ahCloseHomeLabel = !isNaN(ahCloseLine) ? `${ahCloseLine > 0 ? '+' : ''}${ahCloseLine}` : 'Line';
+        const ahCloseAwayLabel = !isNaN(ahCloseLine) ? `${-ahCloseLine > 0 ? '+' : ''}${-ahCloseLine}` : 'Line';
+
+        if (!isNaN(ahCloseH) && ahCloseH >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: ahCloseBook,
+            market_code: 'ASIAN_HANDICAP_HOME',
+            selection: `${homeResolved.shortName} AH ${ahCloseHomeLabel}`,
+            decimal_odds: ahCloseH,
+            observed_at: null,
+            snapshot_type: 'csv_closing',
+            source: `football-data.co.uk:${season}:closing`,
+          });
+        }
+        if (!isNaN(ahCloseA) && ahCloseA >= 1.01) {
+          oddsSnapshots.push({
+            match_id: providerId,
+            bookmaker: ahCloseBook,
+            market_code: 'ASIAN_HANDICAP_AWAY',
+            selection: `${awayResolved.shortName} AH ${ahCloseAwayLabel}`,
+            decimal_odds: ahCloseA,
             observed_at: null,
             snapshot_type: 'csv_closing',
             source: `football-data.co.uk:${season}:closing`,

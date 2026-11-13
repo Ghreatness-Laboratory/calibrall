@@ -1306,6 +1306,7 @@ export const CANONICAL_TEAMS: Record<string, CanonicalTeam> = {
 import manualOverrides from './teamNameOverrides.json';
 import { TEAM_STRENGTH_DATABASE, lookupTeamStrength } from './teamDatabase';
 import { getLocalDatabase } from '../supabase/client';
+import { EXPANDED_CANONICAL_TEAMS } from './expandedTeams';
 
 export const CANONICAL_ID_ALIASES: Record<string, string> = {
   team_mancity: 'team_man_city',
@@ -1340,6 +1341,12 @@ export const CANONICAL_ID_ALIASES: Record<string, string> = {
   team_lem: 'team_lemans',
 };
 
+for (const [id, team] of Object.entries(EXPANDED_CANONICAL_TEAMS)) {
+  if (!CANONICAL_TEAMS[id]) {
+    CANONICAL_TEAMS[id] = team;
+  }
+}
+
 for (const rec of Object.values(TEAM_STRENGTH_DATABASE)) {
   if (!CANONICAL_TEAMS[rec.id]) {
     CANONICAL_TEAMS[rec.id] = {
@@ -1365,6 +1372,25 @@ export function normalizeLookupKey(name: string): string {
     .replace(/[^a-z0-9]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// O(1) lookup indexes built after all canonical teams are registered
+const EXACT_TEAM_INDEX = new Map<string, CanonicalTeam>();
+const NORM_TEAM_INDEX = new Map<string, CanonicalTeam>();
+for (const team of Object.values(CANONICAL_TEAMS)) {
+  const exactCandidates = [
+    team.canonicalId,
+    team.canonicalName,
+    team.shortName,
+    ...team.aliases,
+    ...Object.values(team.providerIds).filter((v): v is string => Boolean(v)),
+  ];
+  for (const cand of exactCandidates) {
+    const low = cand.toLowerCase();
+    if (!EXACT_TEAM_INDEX.has(low)) EXACT_TEAM_INDEX.set(low, team);
+    const norm = normalizeLookupKey(cand);
+    if (norm && !NORM_TEAM_INDEX.has(norm)) NORM_TEAM_INDEX.set(norm, team);
+  }
 }
 
 const UNMATCHED_NAMES_LOG = new Set<string>();
@@ -1539,26 +1565,15 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
   }
 
   // 3. Exact alias match across all registered clubs (no token stripping or substring matching)
+  const exactHit = EXACT_TEAM_INDEX.get(inputLower);
+  if (exactHit) {
+    return exactHit;
+  }
   const norm = normalizeLookupKey(input);
-  for (const team of Object.values(CANONICAL_TEAMS)) {
-    if (team.canonicalId.toLowerCase() === inputLower) {
-      return team;
-    }
-    if (team.canonicalName.toLowerCase() === inputLower || (norm && normalizeLookupKey(team.canonicalName) === norm)) {
-      return team;
-    }
-    if (team.shortName.toLowerCase() === inputLower || (norm && normalizeLookupKey(team.shortName) === norm)) {
-      return team;
-    }
-    for (const a of team.aliases) {
-      if (a.toLowerCase() === inputLower || (norm && normalizeLookupKey(a) === norm)) {
-        return team;
-      }
-    }
-    for (const provId of Object.values(team.providerIds)) {
-      if (provId && (provId.toLowerCase() === inputLower || (norm && normalizeLookupKey(provId) === norm))) {
-        return team;
-      }
+  if (norm) {
+    const normHit = NORM_TEAM_INDEX.get(norm);
+    if (normHit) {
+      return normHit;
     }
   }
 
@@ -1577,9 +1592,11 @@ export function lookupCanonicalTeam(rawNameOrId: string | any): CanonicalTeam | 
     };
   }
 
-  // Log unmatched name into both UNMATCHED_NAMES_LOG and UNRESOLVED_TEAMS_MAP (never guess)
-  UNMATCHED_NAMES_LOG.add(input);
-  recordUnresolvedTeam(input, 'canonical-lookup');
+  // Log unmatched real team names (never pollute unresolved_teams with synthetic numeric fallback IDs like team_3266)
+  if (!/^team_\d+$/.test(input)) {
+    UNMATCHED_NAMES_LOG.add(input);
+    recordUnresolvedTeam(input, 'canonical-lookup');
+  }
   return null;
 }
 

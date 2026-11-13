@@ -124,6 +124,19 @@ export interface StoredOddsSnapshot {
   source: string;
 }
 
+export interface LeagueFeatureCoverage {
+  cards: boolean;
+  corners: boolean;
+  halfTimeGoals: boolean;
+  referee: boolean;
+  asianHandicapPrices: boolean;
+  cardsCount: number;
+  cornersCount: number;
+  halfTimeGoalsCount: number;
+  refereeCount: number;
+  asianHandicapCount: number;
+}
+
 export interface LeagueLatestDateInfo {
   league: string;
   leagueName: string;
@@ -133,6 +146,7 @@ export interface LeagueLatestDateInfo {
   daysAgo: number | null;
   isStale: boolean;
   isStale7d: boolean;
+  features: LeagueFeatureCoverage;
 }
 
 export interface DbTeamStatsSummary {
@@ -531,8 +545,8 @@ class MatchesStore {
           }
         }
 
-        // Step 3b: Upsert matches in chunks of 100
-        const chunkSize = 100;
+        // Step 3b: Upsert matches in chunks of 500
+        const chunkSize = 500;
         for (let i = 0; i < matches.length; i += chunkSize) {
           const chunk = matches.slice(i, i + chunkSize);
           const { error: matchErr } = await supabase.from('matches').upsert(chunk, { onConflict: 'provider_id' });
@@ -1394,7 +1408,7 @@ class MatchesStore {
       try {
         const { data: matchData, error: matchErr } = await supabase
           .from('matches')
-          .select('id, provider_id, competition_code, season, kickoff_time, home_team_id, away_team_id, status, home_score')
+          .select('id, provider_id, competition_code, season, kickoff_time, home_team_id, away_team_id, status, home_score, home_half_time_score, away_half_time_score, home_corners, away_corners, home_yellow_cards, away_yellow_cards, home_red_cards, away_red_cards, referee')
           .order('kickoff_time', { ascending: true });
         
         if (matchErr) {
@@ -1455,37 +1469,57 @@ class MatchesStore {
     const leagueSeasonMap = new Map<string, { league: string; season: string; count: number; earliestDate: string; latestDate: string }>();
     const teamFinishedCounts = new Map<string, number>();
 
-    const KNOWN_LEAGUES: { code: string; name: string }[] = [
-      { code: 'E0', name: 'Premier League (England)' },
-      { code: 'E1', name: 'Championship (England)' },
-      { code: 'E2', name: 'League One (England)' },
-      { code: 'SP1', name: 'La Liga (Spain)' },
-      { code: 'SP2', name: 'Segunda División (Spain)' },
-      { code: 'I1', name: 'Serie A (Italy)' },
-      { code: 'I2', name: 'Serie B (Italy)' },
-      { code: 'D1', name: 'Bundesliga (Germany)' },
-      { code: 'D2', name: '2. Bundesliga (Germany)' },
-      { code: 'F1', name: 'Ligue 1 (France)' },
-      { code: 'F2', name: 'Ligue 2 (France)' },
-      { code: 'PL', name: 'Premier League (England)' },
-      { code: 'ELC', name: 'Championship (England)' },
-      { code: 'PD', name: 'La Liga (Spain)' },
-      { code: 'BL1', name: 'Bundesliga (Germany)' },
-      { code: 'SA', name: 'Serie A (Italy)' },
-      { code: 'FL1', name: 'Ligue 1 (France)' },
-      { code: 'DED', name: 'Eredivisie (Netherlands)' },
-      { code: 'P1', name: 'Primeira Liga (Portugal)' },
-      { code: 'T1', name: 'Süper Lig (Turkey)' },
-      { code: 'SC0', name: 'Premiership (Scotland)' },
-      { code: 'DNK', name: 'Superliga (Denmark)' },
-      { code: 'NOR', name: 'Eliteserien (Norway)' },
-      { code: 'FIN', name: 'Veikkausliiga (Finland)' },
-      { code: 'JPN', name: 'J1 League (Japan)' },
-      { code: 'ARG', name: 'Liga Profesional (Argentina)' },
-      { code: 'BSA', name: 'Série A (Brazil)' },
+    const KNOWN_LEAGUES: { code: string; name: string; aliases: string[] }[] = [
+      { code: 'E0', name: 'Premier League (England)', aliases: ['PL'] },
+      { code: 'E1', name: 'Championship (England)', aliases: ['ELC'] },
+      { code: 'E2', name: 'League One (England)', aliases: [] },
+      { code: 'E3', name: 'League Two (England)', aliases: [] },
+      { code: 'EC', name: 'National League (England)', aliases: [] },
+      { code: 'SC0', name: 'Premiership (Scotland)', aliases: ['SP'] },
+      { code: 'SC1', name: 'Championship (Scotland)', aliases: [] },
+      { code: 'SC2', name: 'League One (Scotland)', aliases: [] },
+      { code: 'SC3', name: 'League Two (Scotland)', aliases: [] },
+      { code: 'SP1', name: 'La Liga (Spain)', aliases: ['PD'] },
+      { code: 'SP2', name: 'Segunda División (Spain)', aliases: [] },
+      { code: 'I1', name: 'Serie A (Italy)', aliases: ['SA'] },
+      { code: 'I2', name: 'Serie B (Italy)', aliases: [] },
+      { code: 'D1', name: 'Bundesliga (Germany)', aliases: ['BL1'] },
+      { code: 'D2', name: '2. Bundesliga (Germany)', aliases: [] },
+      { code: 'F1', name: 'Ligue 1 (France)', aliases: ['FL1'] },
+      { code: 'F2', name: 'Ligue 2 (France)', aliases: [] },
+      { code: 'N1', name: 'Eredivisie (Netherlands)', aliases: ['DED'] },
+      { code: 'B1', name: 'Pro League (Belgium)', aliases: [] },
+      { code: 'P1', name: 'Primeira Liga (Portugal)', aliases: ['PPL'] },
+      { code: 'T1', name: 'Süper Lig (Turkey)', aliases: ['TSL'] },
+      { code: 'G1', name: 'Super League (Greece)', aliases: [] },
+      { code: 'ARG', name: 'Liga Profesional (Argentina)', aliases: [] },
+      { code: 'AUT', name: 'Bundesliga (Austria)', aliases: [] },
+      { code: 'BSA', name: 'Série A (Brazil)', aliases: ['BRA'] },
+      { code: 'CHN', name: 'Super League (China)', aliases: [] },
+      { code: 'DNK', name: 'Superliga (Denmark)', aliases: [] },
+      { code: 'FIN', name: 'Veikkausliiga (Finland)', aliases: [] },
+      { code: 'IRL', name: 'Premier Division (Ireland)', aliases: [] },
+      { code: 'JPN', name: 'J1 League (Japan)', aliases: [] },
+      { code: 'MEX', name: 'Liga MX (Mexico)', aliases: [] },
+      { code: 'NOR', name: 'Eliteserien (Norway)', aliases: [] },
+      { code: 'POL', name: 'Ekstraklasa (Poland)', aliases: [] },
+      { code: 'ROU', name: 'Liga I (Romania)', aliases: ['ROM'] },
+      { code: 'RUS', name: 'Premier League (Russia)', aliases: [] },
+      { code: 'SWE', name: 'Allsvenskan (Sweden)', aliases: [] },
+      { code: 'SWZ', name: 'Super League (Switzerland)', aliases: ['SUI'] },
+      { code: 'USA', name: 'Major League Soccer (USA)', aliases: [] },
     ];
 
-    const leagueStatsMap = new Map<string, { count: number; earliestDate: string | null; latestDate: string | null }>();
+    const leagueStatsMap = new Map<string, {
+      count: number;
+      earliestDate: string | null;
+      latestDate: string | null;
+      cardsCount: number;
+      cornersCount: number;
+      halfTimeGoalsCount: number;
+      refereeCount: number;
+    }>();
+    const leagueAhCountMap = new Map<string, number>();
     const teamMatchesMap = new Map<string, { count: number; earliestDate: string | null; latestDate: string | null }>();
 
     let earliestDate: string | null = null;
@@ -1520,12 +1554,43 @@ class MatchesStore {
         teamFinishedCounts.set(canonAwayId, (teamFinishedCounts.get(canonAwayId) || 0) + 1);
       }
 
-      // League stats
+      // League stats + empirical feature coverage from stored match fields
       const lCode = m.competition_code.toUpperCase();
-      const lStat = leagueStatsMap.get(lCode) || { count: 0, earliestDate: null, latestDate: null };
+      const lStat = leagueStatsMap.get(lCode) || {
+        count: 0,
+        earliestDate: null,
+        latestDate: null,
+        cardsCount: 0,
+        cornersCount: 0,
+        halfTimeGoalsCount: 0,
+        refereeCount: 0,
+      };
       lStat.count++;
       if (!lStat.earliestDate || kDate < lStat.earliestDate) lStat.earliestDate = kDate;
       if (!lStat.latestDate || kDate > lStat.latestDate) lStat.latestDate = kDate;
+      if (
+        m.home_yellow_cards !== null && m.home_yellow_cards !== undefined ||
+        m.away_yellow_cards !== null && m.away_yellow_cards !== undefined ||
+        m.home_red_cards !== null && m.home_red_cards !== undefined ||
+        m.away_red_cards !== null && m.away_red_cards !== undefined
+      ) {
+        lStat.cardsCount++;
+      }
+      if (
+        (m.home_corners !== null && m.home_corners !== undefined) ||
+        (m.away_corners !== null && m.away_corners !== undefined)
+      ) {
+        lStat.cornersCount++;
+      }
+      if (
+        (m.home_half_time_score !== null && m.home_half_time_score !== undefined) ||
+        (m.away_half_time_score !== null && m.away_half_time_score !== undefined)
+      ) {
+        lStat.halfTimeGoalsCount++;
+      }
+      if (typeof m.referee === 'string' && m.referee.trim().length > 0) {
+        lStat.refereeCount++;
+      }
       leagueStatsMap.set(lCode, lStat);
 
       // Team match stats (home & away)
@@ -1542,31 +1607,85 @@ class MatchesStore {
       teamMatchesMap.set(canonAwayId, awayStat);
     }
 
+    // Empirical Asian handicap prices count per league from odds_snapshots
+    let ahQueried = false;
+    if (typeof window === 'undefined' && storeUsed === 'supabase') {
+      try {
+        const db = getLocalDatabase();
+        if (db) {
+          const ahRows = db.prepare(`
+            SELECT UPPER(m.competition_code) AS comp_code, COUNT(DISTINCT o.match_id) AS ah_matches
+            FROM odds_snapshots o
+            JOIN matches m ON m.provider_id = o.match_id
+            WHERE o.market_code LIKE 'ASIAN_HANDICAP%'
+            GROUP BY UPPER(m.competition_code)
+          `).all() as Array<{ comp_code: string; ah_matches: number }>;
+          for (const r of ahRows) {
+            leagueAhCountMap.set(r.comp_code, r.ah_matches);
+          }
+          ahQueried = true;
+        }
+      } catch (_) {}
+    }
+
+    if (!ahQueried) {
+      const matchCompById = new Map<string, string>();
+      for (const m of allMatches) {
+        matchCompById.set(m.provider_id, m.competition_code.toUpperCase());
+      }
+      const ahMatchIdsByComp = new Map<string, Set<string>>();
+      if (isSupabaseConfigured && supabase && storeUsed === 'supabase') {
+        try {
+          const { data: ahRows } = await supabase
+            .from('odds_snapshots')
+            .select('match_id, market_code')
+            .in('market_code', ['ASIAN_HANDICAP_HOME', 'ASIAN_HANDICAP_AWAY']);
+          for (const r of (ahRows || []) as Array<{ match_id: string; market_code: string }>) {
+            const comp = matchCompById.get(r.match_id);
+            if (comp) {
+              let set = ahMatchIdsByComp.get(comp);
+              if (!set) {
+                set = new Set<string>();
+                ahMatchIdsByComp.set(comp, set);
+              }
+              set.add(r.match_id);
+            }
+          }
+        } catch (_) {}
+      } else {
+        for (const o of Array.from(this.inMemoryOdds.values())) {
+          if (o.market_code.startsWith('ASIAN_HANDICAP')) {
+            const comp = matchCompById.get(o.match_id);
+            if (comp) {
+              let set = ahMatchIdsByComp.get(comp);
+              if (!set) {
+                set = new Set<string>();
+                ahMatchIdsByComp.set(comp, set);
+              }
+              set.add(o.match_id);
+            }
+          }
+        }
+      }
+      for (const [comp, set] of ahMatchIdsByComp.entries()) {
+        leagueAhCountMap.set(comp, set.size);
+      }
+    }
+
     const nowMs = Date.now();
     const STALE_THRESHOLD_DAYS = 21; // Matchmind standard staleness threshold
 
     const leagueLatestDates: LeagueLatestDateInfo[] = KNOWN_LEAGUES.map((l) => {
-      const altCodes = [l.code];
-      if (l.code === 'E0') altCodes.push('PL');
-      if (l.code === 'PL') altCodes.push('E0');
-      if (l.code === 'E1') altCodes.push('ELC');
-      if (l.code === 'ELC') altCodes.push('E1');
-      if (l.code === 'SP1') altCodes.push('PD');
-      if (l.code === 'PD') altCodes.push('SP1');
-      if (l.code === 'I1') altCodes.push('SA');
-      if (l.code === 'SA') altCodes.push('I1');
-      if (l.code === 'D1') altCodes.push('BL1');
-      if (l.code === 'BL1') altCodes.push('D1');
-      if (l.code === 'F1') altCodes.push('FL1');
-      if (l.code === 'FL1') altCodes.push('F1');
-      if (l.code === 'P1') altCodes.push('PPL');
-      if (l.code === 'T1') altCodes.push('TSL');
-      if (l.code === 'SC0') altCodes.push('SP');
-      if (l.code === 'BSA') altCodes.push('BRA');
+      const altCodes = [l.code, ...l.aliases];
 
       let totalCount = 0;
       let earliest: string | null = null;
       let latest: string | null = null;
+      let cardsCount = 0;
+      let cornersCount = 0;
+      let halfTimeGoalsCount = 0;
+      let refereeCount = 0;
+      let asianHandicapCount = 0;
 
       for (const code of altCodes) {
         const stat = leagueStatsMap.get(code);
@@ -1574,7 +1693,12 @@ class MatchesStore {
           totalCount += stat.count;
           if (!earliest || (stat.earliestDate && stat.earliestDate < earliest)) earliest = stat.earliestDate;
           if (!latest || (stat.latestDate && stat.latestDate > latest)) latest = stat.latestDate;
+          cardsCount += stat.cardsCount;
+          cornersCount += stat.cornersCount;
+          halfTimeGoalsCount += stat.halfTimeGoalsCount;
+          refereeCount += stat.refereeCount;
         }
+        asianHandicapCount += leagueAhCountMap.get(code) || 0;
       }
 
       const daysAgo = latest
@@ -1592,6 +1716,18 @@ class MatchesStore {
         daysAgo,
         isStale,
         isStale7d,
+        features: {
+          cards: cardsCount > 0,
+          corners: cornersCount > 0,
+          halfTimeGoals: halfTimeGoalsCount > 0,
+          referee: refereeCount > 0,
+          asianHandicapPrices: asianHandicapCount > 0,
+          cardsCount,
+          cornersCount,
+          halfTimeGoalsCount,
+          refereeCount,
+          asianHandicapCount,
+        },
       };
     });
 

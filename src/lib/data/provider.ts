@@ -80,18 +80,42 @@ export function americanToDecimalOdds(val: string | number | undefined | null): 
 const ESPN_LEAGUE_MAP: Record<string, { slug: string; name: string; country: string; defaultMatchday: number }> = {
   PL: { slug: 'eng.1', name: 'Premier League', country: 'England', defaultMatchday: 9 },
   ELC: { slug: 'eng.2', name: 'Championship', country: 'England', defaultMatchday: 12 },
+  E2: { slug: 'eng.3', name: 'League One', country: 'England', defaultMatchday: 12 },
+  E3: { slug: 'eng.4', name: 'League Two', country: 'England', defaultMatchday: 12 },
+  EC: { slug: 'eng.5', name: 'National League', country: 'England', defaultMatchday: 14 },
   PD: { slug: 'esp.1', name: 'La Liga', country: 'Spain', defaultMatchday: 10 },
+  SP2: { slug: 'esp.2', name: 'Segunda División', country: 'Spain', defaultMatchday: 12 },
   BL1: { slug: 'ger.1', name: 'Bundesliga', country: 'Germany', defaultMatchday: 8 },
+  D2: { slug: 'ger.2', name: '2. Bundesliga', country: 'Germany', defaultMatchday: 10 },
   SA: { slug: 'ita.1', name: 'Serie A', country: 'Italy', defaultMatchday: 9 },
+  I2: { slug: 'ita.2', name: 'Serie B', country: 'Italy', defaultMatchday: 10 },
   FL1: { slug: 'fra.1', name: 'Ligue 1', country: 'France', defaultMatchday: 9 },
+  F2: { slug: 'fra.2', name: 'Ligue 2', country: 'France', defaultMatchday: 10 },
   DED: { slug: 'ned.1', name: 'Eredivisie', country: 'Netherlands', defaultMatchday: 10 },
+  B1: { slug: 'bel.1', name: 'Belgian Pro League', country: 'Belgium', defaultMatchday: 12 },
   CL: { slug: 'uefa.champions', name: 'UEFA Champions League', country: 'Europe', defaultMatchday: 3 },
   PPL: { slug: 'por.1', name: 'Primeira Liga', country: 'Portugal', defaultMatchday: 9 },
   TSL: { slug: 'tur.1', name: 'Süper Lig', country: 'Turkey', defaultMatchday: 10 },
+  G1: { slug: 'gre.1', name: 'Super League Greece', country: 'Greece', defaultMatchday: 10 },
   SC0: { slug: 'sco.1', name: 'Scottish Premiership', country: 'Scotland', defaultMatchday: 10 },
-  BSA: { slug: 'bra.1', name: 'Campeonato Brasileiro Série A', country: 'Brazil', defaultMatchday: 30 },
+  SC1: { slug: 'sco.2', name: 'Scottish Championship', country: 'Scotland', defaultMatchday: 12 },
+  SC2: { slug: 'sco.3', name: 'Scottish League One', country: 'Scotland', defaultMatchday: 12 },
+  SC3: { slug: 'sco.4', name: 'Scottish League Two', country: 'Scotland', defaultMatchday: 12 },
   ARG: { slug: 'arg.1', name: 'Liga Profesional', country: 'Argentina', defaultMatchday: 15 },
+  AUT: { slug: 'aut.1', name: 'Austrian Bundesliga', country: 'Austria', defaultMatchday: 12 },
+  BSA: { slug: 'bra.1', name: 'Campeonato Brasileiro Série A', country: 'Brazil', defaultMatchday: 30 },
+  CHN: { slug: 'chn.1', name: 'Chinese Super League', country: 'China', defaultMatchday: 28 },
+  DNK: { slug: 'den.1', name: 'Danish Superliga', country: 'Denmark', defaultMatchday: 12 },
+  FIN: { slug: 'fin.1', name: 'Veikkausliiga', country: 'Finland', defaultMatchday: 25 },
+  IRL: { slug: 'irl.1', name: 'League of Ireland Premier Division', country: 'Ireland', defaultMatchday: 30 },
   JPN: { slug: 'jpn.1', name: 'J1 League', country: 'Japan', defaultMatchday: 25 },
+  MEX: { slug: 'mex.1', name: 'Liga MX', country: 'Mexico', defaultMatchday: 14 },
+  NOR: { slug: 'nor.1', name: 'Eliteserien', country: 'Norway', defaultMatchday: 26 },
+  ROU: { slug: 'rou.1', name: 'Liga I', country: 'Romania', defaultMatchday: 14 },
+  RUS: { slug: 'rus.1', name: 'Russian Premier League', country: 'Russia', defaultMatchday: 14 },
+  SWE: { slug: 'swe.1', name: 'Allsvenskan', country: 'Sweden', defaultMatchday: 26 },
+  SWZ: { slug: 'sui.1', name: 'Swiss Super League', country: 'Switzerland', defaultMatchday: 12 },
+  USA: { slug: 'usa.1', name: 'Major League Soccer', country: 'USA', defaultMatchday: 30 },
 };
 
 // Normalize Football-Data.org fixture
@@ -736,19 +760,30 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       if (ingestedFixtures.length === 0) {
         try {
           const fetchJsonWithTimeout = async (url: string) => {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
-            try {
-              const res = await fetch(url, {
-                headers: { 'Accept': 'application/json' },
-                signal: controller.signal,
-                cache: 'no-store',
-              });
-              if (!res.ok) return null;
-              return await res.json();
-            } finally {
-              clearTimeout(timeoutId);
+            const candidates = url.includes('site.web.api.espn.com')
+              ? [url, url.replace('site.web.api.espn.com', 'site.api.espn.com')]
+              : [url.replace('site.api.espn.com', 'site.web.api.espn.com'), url];
+            for (const candidateUrl of candidates) {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 8000);
+              try {
+                const res = await fetch(candidateUrl, {
+                  headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (compatible; Calibrall/1.0)',
+                  },
+                  signal: controller.signal,
+                  cache: 'no-store',
+                });
+                if (!res.ok) continue;
+                return await res.json();
+              } catch {
+                // Try fallback host
+              } finally {
+                clearTimeout(timeoutId);
+              }
             }
+            return null;
           };
 
           const leagueEntries = Object.entries(ESPN_LEAGUE_MAP);
@@ -757,13 +792,13 @@ export class LiveFootballDataProvider implements FootballDataProvider {
             allTasks.push({
               code,
               leagueInfo,
-              url: `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueInfo.slug}/scoreboard`,
+              url: `https://site.web.api.espn.com/apis/site/v2/sports/soccer/${leagueInfo.slug}/scoreboard`,
             });
             for (const ds of datesList) {
               allTasks.push({
                 code,
                 leagueInfo,
-                url: `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueInfo.slug}/scoreboard?dates=${ds}`,
+                url: `https://site.web.api.espn.com/apis/site/v2/sports/soccer/${leagueInfo.slug}/scoreboard?dates=${ds}`,
               });
             }
           }
@@ -773,9 +808,9 @@ export class LiveFootballDataProvider implements FootballDataProvider {
             eventMapByCode.set(code, new Map());
           }
 
-          // Bounded concurrency worker pool (16 workers) prevents socket starvation across 224 ESPN URLs
+          // Bounded concurrency worker pool (8 workers) prevents socket starvation and throttling across ESPN URLs
           let taskIdx = 0;
-          const workerCount = Math.min(16, allTasks.length);
+          const workerCount = Math.min(8, allTasks.length);
           const workers = Array.from({ length: workerCount }, async () => {
             while (taskIdx < allTasks.length) {
               const task = allTasks[taskIdx++];

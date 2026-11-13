@@ -4,19 +4,32 @@ import { lookupCanonicalTeam, recordUnresolvedTeam } from './canonicalTeams';
 // CALIBRALL: Backfill Catalog, Timezone Parser & Idempotent ID Utility
 
 export const DIVISION_MAP: Record<string, string> = {
-  // First tiers
+  // England
   E0: 'E0',
   E1: 'E1',
-  SP1: 'SP1',
-  I1: 'I1',
-  D1: 'D1',
-  F1: 'F1',
-  // Second tiers
   E2: 'E2',
+  E3: 'E3',
+  EC: 'EC',
+  // Scotland
+  SC0: 'SC0',
+  SC1: 'SC1',
+  SC2: 'SC2',
+  SC3: 'SC3',
+  // Spain, Italy, Germany, France
+  SP1: 'SP1',
   SP2: 'SP2',
+  I1: 'I1',
   I2: 'I2',
+  D1: 'D1',
   D2: 'D2',
+  F1: 'F1',
   F2: 'F2',
+  // Other European seasonal divisions
+  N1: 'N1',
+  B1: 'B1',
+  P1: 'P1',
+  T1: 'T1',
+  G1: 'G1',
   // Standard aliases
   PL: 'E0',
   ELC: 'E1',
@@ -25,11 +38,8 @@ export const DIVISION_MAP: Record<string, string> = {
   SA: 'I1',
   FL1: 'F1',
   DED: 'N1',
-  P1: 'P1',
   PPL: 'P1',
-  T1: 'T1',
   TSL: 'T1',
-  SC0: 'SC0',
   SP: 'SC0',
 };
 
@@ -43,13 +53,25 @@ export const PROMOTED_BRAZIL_2026_IDS = new Set<string>([
 
 // Extra Leagues hosted as single continuous CSV files at https://football-data.co.uk/new/{CODE}.csv
 export const EXTRA_LEAGUES_MAP: Record<string, string> = {
+  ARG: 'ARG',
+  AUT: 'AUT',
   BSA: 'BRA',
   BRA: 'BRA',
-  ARG: 'ARG',
+  CHN: 'CHN',
   DNK: 'DNK',
-  NOR: 'NOR',
   FIN: 'FIN',
+  IRL: 'IRL',
   JPN: 'JPN',
+  MEX: 'MEX',
+  NOR: 'NOR',
+  POL: 'POL',
+  ROU: 'ROU',
+  ROM: 'ROU',
+  RUS: 'RUS',
+  SWE: 'SWE',
+  SWZ: 'SWZ',
+  SUI: 'SWZ',
+  USA: 'USA',
 };
 
 export interface LeagueMetadata {
@@ -60,43 +82,64 @@ export interface LeagueMetadata {
   sourceType: 'seasonal' | 'extra_file';
   hasCorners: boolean;
   hasCards: boolean;
-  liveDataSource: string; // e.g. Football-Data.org Free / ESPN / Paid Sportmonks / None
+  hasHalfTimeGoals: boolean;
+  hasReferee: boolean;
+  hasAsianHandicapPrices: boolean;
+  liveDataSource: string;
   coverageNotes: string;
 }
 
 export const LEAGUE_METADATA: Record<string, LeagueMetadata> = {
-  E0: { code: 'E0', name: 'Premier League', country: 'England', divisionCode: 'E0', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
-  E1: { code: 'E1', name: 'Championship', country: 'England', divisionCode: 'E1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN', coverageNotes: 'Full match stats + corners + cards' },
-  E2: { code: 'E2', name: 'League One', country: 'England', divisionCode: 'E2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
-  SP1: { code: 'SP1', name: 'La Liga', country: 'Spain', divisionCode: 'SP1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
-  SP2: { code: 'SP2', name: 'Segunda División', country: 'Spain', divisionCode: 'SP2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
-  I1: { code: 'I1', name: 'Serie A', country: 'Italy', divisionCode: 'I1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
-  I2: { code: 'I2', name: 'Serie B', country: 'Italy', divisionCode: 'I2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
-  D1: { code: 'D1', name: 'Bundesliga', country: 'Germany', divisionCode: 'D1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
-  D2: { code: 'D2', name: '2. Bundesliga', country: 'Germany', divisionCode: 'D2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
-  F1: { code: 'F1', name: 'Ligue 1', country: 'France', divisionCode: 'F1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
-  F2: { code: 'F2', name: 'Ligue 2', country: 'France', divisionCode: 'F2', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org', coverageNotes: 'Full match stats + corners + cards' },
-  PL: { code: 'PL', name: 'Premier League', country: 'England', divisionCode: 'E0', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
-  ELC: { code: 'ELC', name: 'Championship', country: 'England', divisionCode: 'E1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN', coverageNotes: 'Full match stats + corners + cards' },
-  PD: { code: 'PD', name: 'La Liga', country: 'Spain', divisionCode: 'SP1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
-  BL1: { code: 'BL1', name: 'Bundesliga', country: 'Germany', divisionCode: 'D1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
-  SA: { code: 'SA', name: 'Serie A', country: 'Italy', divisionCode: 'I1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
-  FL1: { code: 'FL1', name: 'Ligue 1', country: 'France', divisionCode: 'F1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards' },
-  DED: { code: 'DED', name: 'Eredivisie', country: 'Netherlands', divisionCode: 'N1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org / ESPN', coverageNotes: 'Full match stats + corners + cards' },
-  P1: { code: 'P1', name: 'Primeira Liga (Liga Portugal)', country: 'Portugal', divisionCode: 'P1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'Football-Data.org (PPL) / ESPN (por.1)', coverageNotes: 'Full match stats + corners + cards' },
-  T1: { code: 'T1', name: 'Süper Lig', country: 'Turkey', divisionCode: 'T1', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Historical CSV has corners + cards; no live data source on standard free plan' },
-  SC0: { code: 'SC0', name: 'Scottish Premiership', country: 'Scotland', divisionCode: 'SC0', sourceType: 'seasonal', hasCorners: true, hasCards: true, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Historical CSV has corners + cards; no live data source on standard free plan' },
-  BSA: { code: 'BSA', name: 'Campeonato Brasileiro Série A', country: 'Brazil', divisionCode: 'BRA', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'Football-Data.org (BSA) / ESPN', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
-  BRA: { code: 'BRA', name: 'Campeonato Brasileiro Série A', country: 'Brazil', divisionCode: 'BRA', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'Football-Data.org (BSA) / ESPN', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
-  ARG: { code: 'ARG', name: 'Liga Profesional', country: 'Argentina', divisionCode: 'ARG', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
-  DNK: { code: 'DNK', name: 'Superliga', country: 'Denmark', divisionCode: 'DNK', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
-  NOR: { code: 'NOR', name: 'Eliteserien', country: 'Norway', divisionCode: 'NOR', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
-  FIN: { code: 'FIN', name: 'Veikkausliiga', country: 'Finland', divisionCode: 'FIN', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
-  JPN: { code: 'JPN', name: 'J1 League', country: 'Japan', divisionCode: 'JPN', sourceType: 'extra_file', hasCorners: false, hasCards: false, liveDataSource: 'No live source on free plan (Requires Sportmonks/Custom)', coverageNotes: 'Scores and 1X2 odds only; NO corners, NO cards in extra file' },
+  E0: { code: 'E0', name: 'Premier League', country: 'England', divisionCode: 'E0', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards + HT goals + referee + AH prices' },
+  E1: { code: 'E1', name: 'Championship', country: 'England', divisionCode: 'E1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards + HT goals + referee + AH prices' },
+  E2: { code: 'E2', name: 'League One', country: 'England', divisionCode: 'E2', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards + HT goals + referee + AH prices' },
+  E3: { code: 'E3', name: 'League Two', country: 'England', divisionCode: 'E3', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards + HT goals + referee + AH prices' },
+  EC: { code: 'EC', name: 'National League', country: 'England', divisionCode: 'EC', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'ESPN', coverageNotes: 'Cards + HT goals + referee + AH prices across all seasons; corners in 2627 only' },
+  SC0: { code: 'SC0', name: 'Scottish Premiership', country: 'Scotland', divisionCode: 'SC0', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards + HT goals + referee + AH prices' },
+  SC1: { code: 'SC1', name: 'Scottish Championship', country: 'Scotland', divisionCode: 'SC1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'ESPN', coverageNotes: 'Full match stats + corners + cards + HT goals + referee + AH prices' },
+  SC2: { code: 'SC2', name: 'Scottish League One', country: 'Scotland', divisionCode: 'SC2', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'ESPN (limited/stale)', coverageNotes: 'Full match stats + corners + cards + HT goals + referee + AH prices' },
+  SC3: { code: 'SC3', name: 'Scottish League Two', country: 'Scotland', divisionCode: 'SC3', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'ESPN (limited/stale)', coverageNotes: 'Full match stats + corners + cards + HT goals + referee + AH prices' },
+  SP1: { code: 'SP1', name: 'La Liga', country: 'Spain', divisionCode: 'SP1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  SP2: { code: 'SP2', name: 'Segunda División', country: 'Spain', divisionCode: 'SP2', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  I1: { code: 'I1', name: 'Serie A', country: 'Italy', divisionCode: 'I1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  I2: { code: 'I2', name: 'Serie B', country: 'Italy', divisionCode: 'I2', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  D1: { code: 'D1', name: 'Bundesliga', country: 'Germany', divisionCode: 'D1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  D2: { code: 'D2', name: '2. Bundesliga', country: 'Germany', divisionCode: 'D2', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  F1: { code: 'F1', name: 'Ligue 1', country: 'France', divisionCode: 'F1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  F2: { code: 'F2', name: 'Ligue 2', country: 'France', divisionCode: 'F2', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  N1: { code: 'N1', name: 'Eredivisie', country: 'Netherlands', divisionCode: 'N1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  B1: { code: 'B1', name: 'Belgian Pro League', country: 'Belgium', divisionCode: 'B1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  P1: { code: 'P1', name: 'Primeira Liga (Liga Portugal)', country: 'Portugal', divisionCode: 'P1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org (PPL) / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  T1: { code: 'T1', name: 'Süper Lig', country: 'Turkey', divisionCode: 'T1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  G1: { code: 'G1', name: 'Super League Greece', country: 'Greece', divisionCode: 'G1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  PL: { code: 'PL', name: 'Premier League', country: 'England', divisionCode: 'E0', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards + HT goals + referee + AH prices' },
+  ELC: { code: 'ELC', name: 'Championship', country: 'England', divisionCode: 'E1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: true, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Full match stats + corners + cards + HT goals + referee + AH prices' },
+  PD: { code: 'PD', name: 'La Liga', country: 'Spain', divisionCode: 'SP1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  BL1: { code: 'BL1', name: 'Bundesliga', country: 'Germany', divisionCode: 'D1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  SA: { code: 'SA', name: 'Serie A', country: 'Italy', divisionCode: 'I1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  FL1: { code: 'FL1', name: 'Ligue 1', country: 'France', divisionCode: 'F1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  DED: { code: 'DED', name: 'Eredivisie', country: 'Netherlands', divisionCode: 'N1', sourceType: 'seasonal', hasCorners: true, hasCards: true, hasHalfTimeGoals: true, hasReferee: false, hasAsianHandicapPrices: true, liveDataSource: 'Football-Data.org / ESPN / The Odds API', coverageNotes: 'Corners + cards + HT goals + AH prices; NO referee column' },
+  // 16 Extra Leagues (/new/*.csv)
+  ARG: { code: 'ARG', name: 'Liga Profesional', country: 'Argentina', divisionCode: 'ARG', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  AUT: { code: 'AUT', name: 'Austrian Bundesliga', country: 'Austria', divisionCode: 'AUT', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  BSA: { code: 'BSA', name: 'Campeonato Brasileiro Série A', country: 'Brazil', divisionCode: 'BRA', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'Football-Data.org (BSA) / ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  BRA: { code: 'BRA', name: 'Campeonato Brasileiro Série A', country: 'Brazil', divisionCode: 'BRA', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'Football-Data.org (BSA) / ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  CHN: { code: 'CHN', name: 'Chinese Super League', country: 'China', divisionCode: 'CHN', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  DNK: { code: 'DNK', name: 'Superliga', country: 'Denmark', divisionCode: 'DNK', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  FIN: { code: 'FIN', name: 'Veikkausliiga', country: 'Finland', divisionCode: 'FIN', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  IRL: { code: 'IRL', name: 'League of Ireland Premier Division', country: 'Ireland', divisionCode: 'IRL', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  JPN: { code: 'JPN', name: 'J1 League', country: 'Japan', divisionCode: 'JPN', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  MEX: { code: 'MEX', name: 'Liga MX', country: 'Mexico', divisionCode: 'MEX', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  NOR: { code: 'NOR', name: 'Eliteserien', country: 'Norway', divisionCode: 'NOR', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  POL: { code: 'POL', name: 'Ekstraklasa', country: 'Poland', divisionCode: 'POL', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'The Odds API (Not on ESPN)', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  ROU: { code: 'ROU', name: 'Liga I', country: 'Romania', divisionCode: 'ROU', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN (limited/stale)', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  RUS: { code: 'RUS', name: 'Russian Premier League', country: 'Russia', divisionCode: 'RUS', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only (19 cols, no BFE/B365 closing); NO cards, corners, HT goals, referee, or AH prices' },
+  SWE: { code: 'SWE', name: 'Allsvenskan', country: 'Sweden', divisionCode: 'SWE', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  SWZ: { code: 'SWZ', name: 'Swiss Super League', country: 'Switzerland', divisionCode: 'SWZ', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN (limited/stale) / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
+  USA: { code: 'USA', name: 'Major League Soccer', country: 'USA', divisionCode: 'USA', sourceType: 'extra_file', hasCorners: false, hasCards: false, hasHalfTimeGoals: false, hasReferee: false, hasAsianHandicapPrices: false, liveDataSource: 'ESPN / The Odds API', coverageNotes: 'Scores and 1X2 odds only; NO cards, corners, HT goals, referee, or AH prices' },
 };
 
-// Authoritative Backfill Matrix: Seasons 2526 and 2627 (current) included for every league,
-// BSA/Extra 2024, 2025, 2026 included, 1920 dropped.
+// Authoritative Backfill Matrix: Seasons 2021..2627 for Europe, 2020..2026 for extra leagues.
 export const SUPPORTED_EUROPEAN_SEASONS = [
   '2021',
   '2122',
@@ -132,18 +175,28 @@ export function generateBackfillCallList(baseUrl: string = 'https://calibrall.ve
   const calls: BackfillCallItem[] = [];
 
   const seasonalLeagues = [
-    { code: 'PL', name: 'Premier League', div: 'E0' },
-    { code: 'ELC', name: 'English Championship', div: 'E1' },
+    { code: 'E0', name: 'Premier League', div: 'E0' },
+    { code: 'E1', name: 'English Championship', div: 'E1' },
     { code: 'E2', name: 'English League One', div: 'E2' },
-    { code: 'PD', name: 'La Liga', div: 'SP1' },
-    { code: 'SP2', name: 'La Liga 2', div: 'SP2' },
-    { code: 'BL1', name: 'Bundesliga', div: 'D1' },
-    { code: 'SA', name: 'Serie A', div: 'I1' },
-    { code: 'FL1', name: 'Ligue 1', div: 'F1' },
-    { code: 'DED', name: 'Eredivisie', div: 'N1' },
+    { code: 'E3', name: 'English League Two', div: 'E3' },
+    { code: 'EC', name: 'English National League', div: 'EC' },
+    { code: 'SC0', name: 'Scottish Premiership', div: 'SC0' },
+    { code: 'SC1', name: 'Scottish Championship', div: 'SC1' },
+    { code: 'SC2', name: 'Scottish League One', div: 'SC2' },
+    { code: 'SC3', name: 'Scottish League Two', div: 'SC3' },
+    { code: 'SP1', name: 'La Liga', div: 'SP1' },
+    { code: 'SP2', name: 'Segunda División', div: 'SP2' },
+    { code: 'I1', name: 'Serie A', div: 'I1' },
+    { code: 'I2', name: 'Serie B', div: 'I2' },
+    { code: 'D1', name: 'Bundesliga', div: 'D1' },
+    { code: 'D2', name: '2. Bundesliga', div: 'D2' },
+    { code: 'F1', name: 'Ligue 1', div: 'F1' },
+    { code: 'F2', name: 'Ligue 2', div: 'F2' },
+    { code: 'N1', name: 'Eredivisie', div: 'N1' },
+    { code: 'B1', name: 'Belgian Pro League', div: 'B1' },
     { code: 'P1', name: 'Liga Portugal', div: 'P1' },
     { code: 'T1', name: 'Turkish Süper Lig', div: 'T1' },
-    { code: 'SC0', name: 'Scottish Premiership', div: 'SC0' },
+    { code: 'G1', name: 'Super League Greece', div: 'G1' },
   ];
 
   for (const league of seasonalLeagues) {
@@ -163,16 +216,26 @@ export function generateBackfillCallList(baseUrl: string = 'https://calibrall.ve
   }
 
   const extraLeagues = [
-    { code: 'BSA', name: 'Brazil Série A', div: 'BRA' },
     { code: 'ARG', name: 'Argentina Liga Profesional', div: 'ARG' },
+    { code: 'AUT', name: 'Austrian Bundesliga', div: 'AUT' },
+    { code: 'BSA', name: 'Brazil Série A', div: 'BRA' },
+    { code: 'CHN', name: 'Chinese Super League', div: 'CHN' },
     { code: 'DNK', name: 'Denmark Superliga', div: 'DNK' },
-    { code: 'NOR', name: 'Norway Eliteserien', div: 'NOR' },
     { code: 'FIN', name: 'Finland Veikkausliiga', div: 'FIN' },
+    { code: 'IRL', name: 'Ireland Premier Division', div: 'IRL' },
     { code: 'JPN', name: 'Japan J1 League', div: 'JPN' },
+    { code: 'MEX', name: 'Mexico Liga MX', div: 'MEX' },
+    { code: 'NOR', name: 'Norway Eliteserien', div: 'NOR' },
+    { code: 'POL', name: 'Poland Ekstraklasa', div: 'POL' },
+    { code: 'ROU', name: 'Romania Liga I', div: 'ROU' },
+    { code: 'RUS', name: 'Russian Premier League', div: 'RUS' },
+    { code: 'SWE', name: 'Sweden Allsvenskan', div: 'SWE' },
+    { code: 'SWZ', name: 'Swiss Super League', div: 'SWZ' },
+    { code: 'USA', name: 'USA Major League Soccer', div: 'USA' },
   ];
 
   for (const league of extraLeagues) {
-    const meta = LEAGUE_METADATA[league.code] || { hasCorners: false, hasCards: false, liveDataSource: 'No live source on free plan' };
+    const meta = LEAGUE_METADATA[league.code] || { hasCorners: false, hasCards: false, liveDataSource: 'Configured API' };
     for (const season of SUPPORTED_BRAZIL_SEASONS) {
       calls.push({
         league: league.code,

@@ -154,29 +154,43 @@ export class NBADataProvider {
         const windowInfo = computeNBADateWindow(1, 14);
         const dates = windowInfo.datesList;
 
-        // Fetch scoreboards for all dates in parallel with 5s timeout
-        const fetchPromises = dates.map(async (dateStr) => {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000);
-            const res = await fetch(
-              `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`,
-              {
-                headers: { 'Accept': 'application/json' },
-                signal: controller.signal,
-                cache: 'no-store',
+        // Fetch scoreboards across dates with bounded concurrency (4 workers) to prevent Akamai throttling/timeouts
+        const allEventBatches: any[][] = new Array(dates.length).fill([]);
+        let dateIdx = 0;
+        const workerCount = Math.min(4, dates.length);
+        await Promise.all(
+          Array.from({ length: workerCount }, async () => {
+            while (dateIdx < dates.length) {
+              const i = dateIdx++;
+              const dateStr = dates[i];
+              const urls = [
+                `https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`,
+                `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`,
+              ];
+              for (const url of urls) {
+                try {
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 10000);
+                  const res = await fetch(url, {
+                    headers: {
+                      'Accept': 'application/json',
+                      'User-Agent': 'Mozilla/5.0 (compatible; Calibrall/1.0)',
+                    },
+                    signal: controller.signal,
+                    cache: 'no-store',
+                  });
+                  clearTimeout(timeoutId);
+                  if (!res.ok) continue;
+                  const data = await res.json();
+                  allEventBatches[i] = (data.events || []) as any[];
+                  break;
+                } catch {
+                  // Try next endpoint
+                }
               }
-            );
-            clearTimeout(timeoutId);
-            if (!res.ok) return [];
-            const data = await res.json();
-            return (data.events || []) as any[];
-          } catch {
-            return [];
-          }
-        });
-
-        const allEventBatches = await Promise.all(fetchPromises);
+            }
+          })
+        );
         const allEvents = allEventBatches.flat();
 
         let upsertedCount = 0;

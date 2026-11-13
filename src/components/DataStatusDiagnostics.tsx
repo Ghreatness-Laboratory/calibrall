@@ -20,6 +20,19 @@ interface UnderSampledTeam {
   matchCount: number;
 }
 
+interface LeagueFeatureCoverage {
+  cards: boolean;
+  corners: boolean;
+  halfTimeGoals: boolean;
+  referee: boolean;
+  asianHandicapPrices: boolean;
+  cardsCount: number;
+  cornersCount: number;
+  halfTimeGoalsCount: number;
+  refereeCount: number;
+  asianHandicapCount: number;
+}
+
 interface LeagueLatestDate {
   league: string;
   leagueName: string;
@@ -29,6 +42,7 @@ interface LeagueLatestDate {
   daysAgo: number | null;
   isStale: boolean;
   isStale7d?: boolean;
+  features?: LeagueFeatureCoverage;
 }
 
 interface TeamLatestDate {
@@ -390,15 +404,16 @@ export default function DataStatusDiagnostics() {
                 </span>
               </div>
               <div className="border border-white/[0.07] bg-[#151E19] rounded-[10px] overflow-hidden text-[11px] font-mono">
-                <div className="grid grid-cols-5 px-3 py-1.5 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
+                <div className="grid grid-cols-7 px-3 py-1.5 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
                   <span className="col-span-2">League</span>
                   <span className="text-right">Stored Matches</span>
                   <span className="text-right">Latest Loaded Date</span>
+                  <span className="col-span-2 text-center">Recorded Features</span>
                   <span className="text-right">Staleness Status</span>
                 </div>
-                <div className="divide-y divide-white/[0.04] max-h-56 overflow-y-auto">
+                <div className="divide-y divide-white/[0.04] max-h-72 overflow-y-auto">
                   {data.leagueLatestDates.map((l) => (
-                    <div key={l.league} className="grid grid-cols-5 px-3 py-1.5 text-[#8B9890] hover:text-[#ECF1EE] items-center">
+                    <div key={l.league} className="grid grid-cols-7 px-3 py-1.5 text-[#8B9890] hover:text-[#ECF1EE] items-center gap-1">
                       <div className="col-span-2 truncate pr-2">
                         <span className="font-semibold text-[#ECF1EE]">{l.league}</span>
                         <span className="text-[#5E6A63] ml-1.5 text-[10px] truncate">{l.leagueName}</span>
@@ -407,6 +422,26 @@ export default function DataStatusDiagnostics() {
                       <span className="text-right text-[#ECF1EE] truncate">
                         {l.latestDate ? l.latestDate.substring(0, 10) : 'None'}
                       </span>
+                      <div className="col-span-2 flex flex-wrap justify-center gap-1 text-[9px]">
+                        {[
+                          { key: 'Cards', ok: Boolean(l.features?.cards) },
+                          { key: 'Corners', ok: Boolean(l.features?.corners) },
+                          { key: 'HT', ok: Boolean(l.features?.halfTimeGoals) },
+                          { key: 'Ref', ok: Boolean(l.features?.referee) },
+                          { key: 'AH', ok: Boolean(l.features?.asianHandicapPrices) },
+                        ].map((tag) => (
+                          <span
+                            key={tag.key}
+                            className={`px-1 py-0.5 rounded border ${
+                              tag.ok
+                                ? 'bg-[#B6E63B]/10 text-[#B6E63B] border-[#B6E63B]/30'
+                                : 'bg-black/30 text-[#5E6A63] border-white/[0.05]'
+                            }`}
+                          >
+                            {tag.key}
+                          </span>
+                        ))}
+                      </div>
                       <div className="text-right">
                         {l.isStale ? (
                           <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">
