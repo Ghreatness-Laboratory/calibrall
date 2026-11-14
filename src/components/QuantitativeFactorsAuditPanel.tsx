@@ -23,7 +23,7 @@ import { fetchKickoffWeather, WeatherCondition } from '@/lib/prediction/weatherE
 import { evaluateContextualH2H, H2HEvaluationResult } from '@/lib/prediction/h2hEngine';
 import { generateMultiBookmakerPricing, blendModelWithMarket, OptionMarketPricing, ModelMarketBlendResult } from '@/lib/prediction/oddsEngine';
 import { cleanDisplayText } from '@/lib/utils/formatText';
-import { TeamHistoryAndForm } from '@/lib/data/matchesStore';
+import type { TeamHistoryAndForm } from '@/lib/data/matchesStore';
 
 interface Props {
   homeTeamName: string;

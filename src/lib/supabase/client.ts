@@ -259,13 +259,22 @@ class LocalSupabaseQueryBuilder {
   }
 }
 
-let localDbInstance: any = null;
+const getGlobalDbState = (): { db: any; schemaInitialized: boolean } => {
+  const g = globalThis as any;
+  if (!g.__calibrall_sqlite_state) {
+    g.__calibrall_sqlite_state = { db: null, schemaInitialized: false };
+  }
+  return g.__calibrall_sqlite_state;
+};
 
 declare const __non_webpack_require__: any;
 
 export function getLocalDatabase(): any {
   if (typeof window !== 'undefined') return null;
-  if (!localDbInstance) {
+  const state = getGlobalDbState();
+  if (state.db) return state.db;
+
+  try {
     const nodeReq = typeof __non_webpack_require__ !== 'undefined' ? __non_webpack_require__ : eval('require');
     const fs = nodeReq('fs');
     const path = nodeReq('path');
@@ -275,149 +284,219 @@ export function getLocalDatabase(): any {
       fs.mkdirSync(dataDir, { recursive: true });
     }
     const dbPath = path.join(dataDir, 'supabase.db');
-    localDbInstance = new DatabaseSync(dbPath);
-    localDbInstance.exec('PRAGMA busy_timeout = 5000;');
+    const db = new DatabaseSync(dbPath);
+    try {
+      db.exec('PRAGMA journal_mode = WAL;');
+    } catch (_) {}
+    try {
+      db.exec('PRAGMA busy_timeout = 5000;');
+    } catch (_) {}
 
-    // Initialize Schema
-    localDbInstance.exec(`
-      CREATE TABLE IF NOT EXISTS teams (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        short_name TEXT,
-        competition_code TEXT,
-        crest_url TEXT,
-        tla TEXT,
-        attack_rating REAL,
-        defense_rating REAL,
-        corner_attack_rating REAL,
-        discipline_rating REAL,
-        sample_matches INTEGER,
-        is_promoted INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS matches (
-        id TEXT PRIMARY KEY,
-        provider_id TEXT UNIQUE NOT NULL,
-        competition_code TEXT NOT NULL,
-        season TEXT NOT NULL,
-        matchday INTEGER,
-        home_team_id TEXT NOT NULL,
-        away_team_id TEXT NOT NULL,
-        home_team_name TEXT NOT NULL,
-        away_team_name TEXT NOT NULL,
-        kickoff_time TEXT,
-        kickoff_date TEXT,
-        status TEXT NOT NULL DEFAULT 'FINISHED',
-        home_score INTEGER,
-        away_score INTEGER,
-        home_half_time_score INTEGER,
-        away_half_time_score INTEGER,
-        home_corners INTEGER,
-        away_corners INTEGER,
-        home_first_half_corners INTEGER,
-        away_first_half_corners INTEGER,
-        home_yellow_cards INTEGER,
-        away_yellow_cards INTEGER,
-        home_red_cards INTEGER,
-        away_red_cards INTEGER,
-        home_shots INTEGER,
-        away_shots INTEGER,
-        home_shots_on_target INTEGER,
-        away_shots_on_target INTEGER,
-        home_fouls INTEGER,
-        away_fouls INTEGER,
-        referee TEXT,
-        result TEXT,
-        tournament TEXT,
-        is_playoff INTEGER DEFAULT 0,
-        source TEXT NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS odds_snapshots (
-        id TEXT PRIMARY KEY,
-        match_id TEXT NOT NULL,
-        bookmaker TEXT NOT NULL,
-        market_code TEXT NOT NULL,
-        selection TEXT NOT NULL,
-        decimal_odds REAL NOT NULL,
-        observed_at TEXT,
-        snapshot_type TEXT NOT NULL,
-        source TEXT NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(match_id, bookmaker, market_code, source)
-      );
-      CREATE TABLE IF NOT EXISTS fixtures (
-        id TEXT PRIMARY KEY,
-        provider_id TEXT,
-        home_team_id TEXT,
-        away_team_id TEXT,
-        home_team_name TEXT,
-        away_team_name TEXT,
-        kickoff_time TEXT,
-        status TEXT,
-        competition_code TEXT,
-        competition_id TEXT,
-        home_score INTEGER,
-        away_score INTEGER,
-        venue TEXT,
-        referee TEXT,
-        source TEXT,
-        is_demo BOOLEAN,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS lineups (
-        id TEXT PRIMARY KEY,
-        fixture_id TEXT,
-        home_formation TEXT,
-        away_formation TEXT,
-        home_lineup TEXT,
-        away_lineup TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS unresolved_teams (
-        id TEXT PRIMARY KEY,
-        source_name TEXT NOT NULL,
-        source_provider TEXT NOT NULL,
-        count INTEGER NOT NULL DEFAULT 1,
-        first_seen TEXT NOT NULL,
-        last_seen TEXT NOT NULL,
-        resolved INTEGER DEFAULT 0,
-        UNIQUE(source_name, source_provider)
-      );
-      CREATE TABLE IF NOT EXISTS rivalries (
-        id TEXT PRIMARY KEY,
-        team_a_id TEXT NOT NULL,
-        team_b_id TEXT NOT NULL,
-        competition_code TEXT,
-        rivalry_name TEXT NOT NULL,
-        intensity REAL NOT NULL DEFAULT 1.0,
-        source TEXT NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(team_a_id, team_b_id)
-      );
-    `);
+    if (!state.schemaInitialized) {
+      // Initialize Schema
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS teams (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          short_name TEXT,
+          competition_code TEXT,
+          crest_url TEXT,
+          tla TEXT,
+          attack_rating REAL,
+          defense_rating REAL,
+          corner_attack_rating REAL,
+          discipline_rating REAL,
+          sample_matches INTEGER,
+          is_promoted INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS matches (
+          id TEXT PRIMARY KEY,
+          provider_id TEXT UNIQUE NOT NULL,
+          competition_code TEXT NOT NULL,
+          season TEXT NOT NULL,
+          matchday INTEGER,
+          home_team_id TEXT NOT NULL,
+          away_team_id TEXT NOT NULL,
+          home_team_name TEXT NOT NULL,
+          away_team_name TEXT NOT NULL,
+          kickoff_time TEXT,
+          kickoff_date TEXT,
+          status TEXT NOT NULL DEFAULT 'FINISHED',
+          home_score INTEGER,
+          away_score INTEGER,
+          home_half_time_score INTEGER,
+          away_half_time_score INTEGER,
+          home_corners INTEGER,
+          away_corners INTEGER,
+          home_first_half_corners INTEGER,
+          away_first_half_corners INTEGER,
+          home_yellow_cards INTEGER,
+          away_yellow_cards INTEGER,
+          home_red_cards INTEGER,
+          away_red_cards INTEGER,
+          home_shots INTEGER,
+          away_shots INTEGER,
+          home_shots_on_target INTEGER,
+          away_shots_on_target INTEGER,
+          home_fouls INTEGER,
+          away_fouls INTEGER,
+          referee TEXT,
+          result TEXT,
+          tournament TEXT,
+          is_playoff INTEGER DEFAULT 0,
+          source TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS odds_snapshots (
+          id TEXT PRIMARY KEY,
+          match_id TEXT NOT NULL,
+          bookmaker TEXT NOT NULL,
+          market_code TEXT NOT NULL,
+          selection TEXT NOT NULL,
+          decimal_odds REAL NOT NULL,
+          observed_at TEXT,
+          snapshot_type TEXT NOT NULL,
+          source TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(match_id, bookmaker, market_code, source)
+        );
+        CREATE TABLE IF NOT EXISTS fixtures (
+          id TEXT PRIMARY KEY,
+          provider_id TEXT,
+          home_team_id TEXT,
+          away_team_id TEXT,
+          home_team_name TEXT,
+          away_team_name TEXT,
+          kickoff_time TEXT,
+          status TEXT,
+          competition_code TEXT,
+          competition_id TEXT,
+          home_score INTEGER,
+          away_score INTEGER,
+          venue TEXT,
+          referee TEXT,
+          source TEXT,
+          is_demo BOOLEAN,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS lineups (
+          id TEXT PRIMARY KEY,
+          fixture_id TEXT,
+          home_formation TEXT,
+          away_formation TEXT,
+          home_lineup TEXT,
+          away_lineup TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS unresolved_teams (
+          id TEXT PRIMARY KEY,
+          source_name TEXT NOT NULL,
+          source_provider TEXT NOT NULL,
+          count INTEGER NOT NULL DEFAULT 1,
+          first_seen TEXT NOT NULL,
+          last_seen TEXT NOT NULL,
+          resolved INTEGER DEFAULT 0,
+          UNIQUE(source_name, source_provider)
+        );
+        CREATE TABLE IF NOT EXISTS rivalries (
+          id TEXT PRIMARY KEY,
+          team_a_id TEXT NOT NULL,
+          team_b_id TEXT NOT NULL,
+          competition_code TEXT,
+          rivalry_name TEXT NOT NULL,
+          intensity REAL NOT NULL DEFAULT 1.0,
+          source TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(team_a_id, team_b_id)
+        );
+        CREATE TABLE IF NOT EXISTS provider_call_logs (
+          id TEXT PRIMARY KEY,
+          timestamp TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          endpoint TEXT NOT NULL,
+          method TEXT NOT NULL DEFAULT 'GET',
+          status_code INTEGER,
+          ok INTEGER NOT NULL DEFAULT 0,
+          latency_ms INTEGER,
+          league_code TEXT,
+          sync_mode TEXT,
+          quota_headers_json TEXT,
+          quota_remaining TEXT,
+          response_body TEXT,
+          error TEXT
+        );
+        CREATE TABLE IF NOT EXISTS provider_sync_state (
+          id TEXT PRIMARY KEY,
+          sport TEXT,
+          provider_name TEXT,
+          status TEXT,
+          last_attempt_at TEXT,
+          last_success_at TEXT,
+          last_error TEXT,
+          last_http_status INTEGER,
+          last_response_body TEXT,
+          quota_remaining TEXT,
+          quota_headers_json TEXT,
+          skipped_leagues_json TEXT,
+          calls_used_last_run INTEGER DEFAULT 0,
+          calls_today INTEGER DEFAULT 0,
+          budget_date TEXT,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
 
-    // Ensure columns exist on older tables
-    try { localDbInstance.exec('ALTER TABLE teams ADD COLUMN is_promoted INTEGER DEFAULT 0;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN referee TEXT;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN result TEXT;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN home_fouls INTEGER;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN away_fouls INTEGER;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN tournament TEXT;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE matches ADD COLUMN is_playoff INTEGER DEFAULT 0;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN competition_id TEXT;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN home_score INTEGER;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN away_score INTEGER;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN venue TEXT;'); } catch (_) {}
-    try { localDbInstance.exec('ALTER TABLE fixtures ADD COLUMN referee TEXT;'); } catch (_) {}
-    try { localDbInstance.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_fixtures_provider_id ON fixtures(provider_id);'); } catch (_) {}
-    try { localDbInstance.exec('CREATE INDEX IF NOT EXISTS idx_rivalries_pair ON rivalries(team_a_id, team_b_id);'); } catch (_) {}
+      // Ensure columns exist on older tables
+      try { db.exec('ALTER TABLE teams ADD COLUMN is_promoted INTEGER DEFAULT 0;'); } catch (_) {}
+      try { db.exec('ALTER TABLE matches ADD COLUMN referee TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE matches ADD COLUMN result TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE matches ADD COLUMN home_fouls INTEGER;'); } catch (_) {}
+      try { db.exec('ALTER TABLE matches ADD COLUMN away_fouls INTEGER;'); } catch (_) {}
+      try { db.exec('ALTER TABLE matches ADD COLUMN tournament TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE matches ADD COLUMN is_playoff INTEGER DEFAULT 0;'); } catch (_) {}
+      try { db.exec('ALTER TABLE fixtures ADD COLUMN competition_id TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE fixtures ADD COLUMN home_score INTEGER;'); } catch (_) {}
+      try { db.exec('ALTER TABLE fixtures ADD COLUMN away_score INTEGER;'); } catch (_) {}
+      try { db.exec('ALTER TABLE fixtures ADD COLUMN venue TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE fixtures ADD COLUMN referee TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE fixtures ADD COLUMN payload_json TEXT;'); } catch (_) {}
+      try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_fixtures_provider_id ON fixtures(provider_id);'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_rivalries_pair ON rivalries(team_a_id, team_b_id);'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_provider_call_logs_ts ON provider_call_logs(timestamp DESC);'); } catch (_) {}
+      state.schemaInitialized = true;
+    }
+
+    state.db = db;
+    return state.db;
+  } catch (err: any) {
+    console.warn('[LocalSupabase] Failed to initialize local SQLite database:', err?.message || err);
+    return null;
   }
-  return localDbInstance;
+}
+
+function createNoopQueryBuilder() {
+  const builder: any = {
+    select: () => builder,
+    delete: () => builder,
+    upsert: () => Promise.resolve({ data: [], error: null }),
+    eq: () => builder,
+    neq: () => builder,
+    in: () => builder,
+    gte: () => builder,
+    lte: () => builder,
+    gt: () => builder,
+    lt: () => builder,
+    or: () => builder,
+    order: () => builder,
+    limit: () => builder,
+    then: (resolve: (res: any) => void, reject?: (err: any) => void) =>
+      Promise.resolve({ data: [], count: 0, error: null }).then(resolve, reject),
+  };
+  return builder;
 }
 
 function createLocalSupabaseClient(): any {
@@ -425,12 +504,7 @@ function createLocalSupabaseClient(): any {
     from: (table: string) => {
       const db = getLocalDatabase();
       if (!db) {
-        // Fallback for browser client
-        return {
-          select: () => Promise.resolve({ data: [], error: null }),
-          upsert: () => Promise.resolve({ data: [], error: null }),
-          delete: () => Promise.resolve({ data: [], error: null }),
-        };
+        return createNoopQueryBuilder();
       }
       return new LocalSupabaseQueryBuilder(db, table);
     },

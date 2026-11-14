@@ -26,7 +26,11 @@ export async function GET(request: Request) {
         total: result.fixtures.length,
         liveDataAvailable: result.liveDataAvailable,
         lastUpdated: result.lastUpdated,
+        lastSyncTimestamp: result.lastSyncTimestamp,
         isDelayed: result.isDelayed,
+        staleLimitMinutes: result.staleLimitMinutes,
+        error: result.error,
+        failedProvider: result.failedProvider,
         season: result.season,
         filters: { sport, competition_id: 'comp_nba', status: status || 'ALL', day: day || 'ALL' },
         timestamp: new Date().toISOString(),
@@ -65,7 +69,7 @@ export async function GET(request: Request) {
     competitionId = rawCompetitionId.trim().toLowerCase();
   }
 
-  // Default: Football
+  // Strictly DB-only read via provider.getLiveFixtures()
   const provider = getFootballDataProvider();
   const result = await provider.getLiveFixtures({ competitionId, status, day });
 
@@ -83,9 +87,13 @@ export async function GET(request: Request) {
       total: result.fixtures.length,
       liveDataAvailable: result.liveDataAvailable,
       lastUpdated: result.lastUpdated,
+      lastSyncTimestamp: result.lastSyncTimestamp,
+      isDelayed: result.isDelayed,
+      staleLimitMinutes: result.staleLimitMinutes,
       providerUsed: result.providerUsed,
       failedProvider: result.failedProvider,
       quotaHeaders: result.quotaHeaders,
+      skippedLeagues: result.skippedLeagues,
       error: result.error,
       dateRange: result.dateRange,
       filters: { sport, competition_id: competitionId || 'ALL', day: day || 'ALL', status: status || 'ALL' },

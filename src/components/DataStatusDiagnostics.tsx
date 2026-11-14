@@ -84,6 +84,22 @@ interface DataStatusData {
   unmappedFixtureNames?: { name: string; provider: string }[];
   storeUsed?: 'supabase' | 'in-memory';
   persistenceMode?: string;
+  skippedLeagues?: {
+    leagueCode: string;
+    leagueName: string;
+    tier: number;
+    provider: string;
+    reason: string;
+  }[];
+  providerSyncStates?: {
+    id: string;
+    providerName: string;
+    status: string;
+    lastSuccessAt: string | null;
+    quotaRemaining: string | null;
+    callsToday: number;
+    lastError: string | null;
+  }[];
 }
 
 export default function DataStatusDiagnostics() {
@@ -320,6 +336,37 @@ export default function DataStatusDiagnostics() {
                     {name}
                   </span>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Priority-Tiered Provider Skipped Leagues Diagnostics */}
+          {data.skippedLeagues && data.skippedLeagues.length > 0 && (
+            <div className="p-3 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11.5px] font-semibold text-[#E2AE45] flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Leagues Skipped by Quota Budget ({data.skippedLeagues.length})</span>
+                </span>
+                <span className="text-[10px] font-mono text-[#E2AE45]">Tier 1 prioritised</span>
+              </div>
+              <div className="border border-white/[0.07] bg-[#151E19] rounded-[8px] overflow-hidden text-[10.5px] font-mono">
+                <div className="grid grid-cols-5 px-2.5 py-1 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
+                  <span>League</span>
+                  <span>Tier</span>
+                  <span>Provider</span>
+                  <span className="col-span-2">Reason</span>
+                </div>
+                <div className="divide-y divide-white/[0.04] max-h-36 overflow-y-auto">
+                  {data.skippedLeagues.map((sk, idx) => (
+                    <div key={`${sk.provider}_${sk.leagueCode}_${idx}`} className="grid grid-cols-5 px-2.5 py-1 text-[#8B9890]">
+                      <span className="font-semibold text-[#ECF1EE] truncate">{sk.leagueCode}</span>
+                      <span>T{sk.tier}</span>
+                      <span className="truncate">{sk.provider}</span>
+                      <span className="col-span-2 truncate text-[#E2AE45]">{sk.reason}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

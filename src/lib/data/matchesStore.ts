@@ -309,10 +309,7 @@ class MatchesStore {
     return (globalThis as any).__calibrall_promoted_teams;
   }
 
-  constructor() {
-    this.ensureHydratedFromDbSync();
-    this.rebuildTeamCounts();
-  }
+  constructor() {}
 
   ensureHydratedFromDbSync(): void {
     if (typeof window !== 'undefined') return;
@@ -499,6 +496,8 @@ class MatchesStore {
       );
     }
 
+    this.ensureHydratedFromDbSync();
+
     // 2. Update in-memory sandbox store
     for (const m of matches) {
       this.inMemoryMatches.set(m.provider_id, m);
@@ -683,6 +682,7 @@ class MatchesStore {
     }
 
     // Non-production sandbox fallback only
+    this.ensureHydratedFromDbSync();
     let results = Array.from(this.inMemoryMatches.values());
     if (competitionCode && competitionCode !== 'ALL') {
       results = results.filter(m => m.competition_code.toUpperCase() === competitionCode.toUpperCase());
@@ -1860,6 +1860,7 @@ class MatchesStore {
 
     // In-memory fallback ONLY in non-production when Supabase did not answer
     if (!isProduction && storeUsed !== 'supabase' && allMatches.length === 0) {
+      this.ensureHydratedFromDbSync();
       allMatches = Array.from(this.inMemoryMatches.values());
       storeUsed = 'in-memory';
     }

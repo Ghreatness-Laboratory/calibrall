@@ -63,6 +63,7 @@ export default function MatchesPage() {
     liveDataAvailable, 
     lastUpdated, 
     isDelayed, 
+    staleLimitMinutes,
     error, 
     failedProvider, 
     quotaHeaders, 
@@ -209,6 +210,7 @@ export default function MatchesPage() {
     : `${fixtures.length} scheduled`;
 
   const hasActiveFilters = searchQuery.trim() !== '' || selectedCompId !== 'ALL' || selectedDay !== 'ALL' || selectedStatus !== 'ALL' || selectedFootballGroup !== 'ALL';
+  const showStaleBanner = Boolean(isDelayed && (fixtures.length > 0 || error));
 
   return (
     <div className="space-y-3 py-1">
@@ -224,7 +226,7 @@ export default function MatchesPage() {
             Fixtures and markets
           </h2>
           <p className="text-[12px] text-[#8B9892] leading-tight">
-            {scheduledCount} · Active matchday pipelines · All kickoff times WAT {lastUpdated ? `· Last updated ${lastUpdated}` : ''}
+            {scheduledCount} · Database fixture store · All kickoff times WAT {lastUpdated ? `· Last updated ${lastUpdated}` : ''}
           </p>
         </div>
 
@@ -240,13 +242,15 @@ export default function MatchesPage() {
         </button>
       </div>
 
-      {/* Provider failover warning banner if a provider failed but cached real data is being served */}
-      {failedProvider && (
+      {/* Error/staleness banner shown ONLY when stored fixtures exceed the staleness limit */}
+      {showStaleBanner && (
         <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11.5px] space-y-1.5">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>
-              Provider feed <span className="font-semibold">{failedProvider}</span> unavailable or quota exhausted. Serving verified cached real fixtures (last updated {lastUpdated}).
+              {failedProvider
+                ? `Provider feed ${failedProvider} refresh failed. Showing stored fixtures (last updated ${lastUpdated || 'never'}, older than ${staleLimitMinutes || 120}m limit).`
+                : `Stored fixtures are older than ${staleLimitMinutes || 120} minutes (last updated ${lastUpdated || 'never'}).`}
             </span>
           </div>
           {quotaHeaders && Object.keys(quotaHeaders).length > 0 && (
@@ -254,14 +258,6 @@ export default function MatchesPage() {
               Quota: {Object.entries(quotaHeaders).map(([k, v]) => `${k}=${v}`).join(', ')}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Notice if sync is delayed by more than 2 hours or snapshot older than 30 minutes */}
-      {isDelayed && (
-        <div className="p-2.5 rounded-[10px] bg-[#E8B04A]/10 border border-[#E8B04A]/30 text-[#E8B04A] text-[11.5px] flex items-center gap-2">
-          <Info className="w-3.5 h-3.5 shrink-0" />
-          <span>Data may be out of date (snapshot is older than 30 minutes).</span>
         </div>
       )}
 

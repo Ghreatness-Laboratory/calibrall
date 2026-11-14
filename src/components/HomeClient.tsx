@@ -217,9 +217,9 @@ export default function HomeClient() {
             <h2 className="text-[14px] font-[600] text-[#E9EFEB]">
               {isBasketball ? 'Live matchups' : 'Live fixtures'}
             </h2>
-            {isBasketball && lastUpdated && (
+            {lastUpdated && (
               <span className="text-[11px] text-[#8B9892] tabular-nums">
-                · Updated {lastUpdated}
+                · Last updated {lastUpdated}
               </span>
             )}
           </div>
@@ -230,11 +230,13 @@ export default function HomeClient() {
           </div>
         </div>
 
-        {/* Notice when basketball sync is delayed by more than 2 hours */}
-        {isBasketball && isDelayed && (
+        {/* Notice shown ONLY when stored fixtures are older than the 2 hour limit */}
+        {isDelayed && (
           <div className="p-2.5 rounded-[12px] bg-[#E8B04A]/12 border border-[#E8B04A]/30 text-[#E8B04A] text-[11.5px] flex items-center gap-2">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-            <span>Data delayed: Basketball live pipeline sync was delayed by more than 2 hours. Displaying latest verified schedule.</span>
+            <span>
+              Stored fixtures are older than 2 hours (last updated {lastUpdated || 'never'}). Displaying latest verified schedule.
+            </span>
           </div>
         )}
 

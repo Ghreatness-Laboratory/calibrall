@@ -2,8 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
-      "path": "/api/v1/sync?sport=all",
-      "schedule": "0 6 * * *"
+      "path": "/api/v1/sync?sport=all&mode=live",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/v1/sync?sport=all&mode=schedule",
+      "schedule": "0 */6 * * *"
     }
   ],
   "headers": [

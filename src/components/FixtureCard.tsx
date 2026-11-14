@@ -12,7 +12,6 @@ import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds 
 import { cleanDisplayText, displayName, formatMatchTime } from '@/lib/utils/formatText';
 import { settleMarketPrediction, extractMatchStats } from '@/lib/prediction/settlementEngine';
 import { isTeamNewsEnabled } from '@/lib/prediction/featureFlags';
-import { matchesStore } from '@/lib/data/matchesStore';
 
 interface Props {
   fixture: Fixture;
@@ -412,8 +411,8 @@ export default function FixtureCard({
                   noRecommendationReason && noRecommendationReason !== 'Not enough data'
                     ? noRecommendationReason
                     : (() => {
-                        const hCount = fixture.homeTeam.storedMatchCount ?? matchesStore.getTeamMatchCountSync(fixture.homeTeam.id || fixture.homeTeam.name);
-                        const aCount = fixture.awayTeam.storedMatchCount ?? matchesStore.getTeamMatchCountSync(fixture.awayTeam.id || fixture.awayTeam.name);
+                        const hCount = fixture.homeTeam.storedMatchCount ?? 0;
+                        const aCount = fixture.awayTeam.storedMatchCount ?? 0;
                         return `Abstained: ${homeName} (${hCount} matches) & ${awayName} (${aCount} matches) lack qualifying predictive edge.`;
                       })()
                 )}

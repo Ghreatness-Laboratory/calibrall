@@ -1,22 +1,35 @@
-// NBA Data Provider: Server-side live API ingestion, caching, idempotent sync, and fail-safe handling
+// NBA Data Provider: Scheduled Server-Side Live API Ingestion & DB-Only Read Path
 import { serverCache } from '../cache/serverCache';
-import { 
-  NBATeamStats, 
+import {
+  NBATeamStats,
   Fixture,
-  MatchStatus
+  MatchStatus,
 } from '@/types';
-import { 
-  NBA_TEAMS_CATALOG, 
+import {
+  NBA_TEAMS_CATALOG,
   NBA_COMPETITION,
-  NBASeason, 
+  NBASeason,
   computeNBASeason,
-  getNBATeamStats, 
+  getNBATeamStats,
   getAllNBATeamsList,
-  createNBATeam
+  createNBATeam,
 } from './nbaSeedData';
 import { calculateNBAScoreProjection } from '../prediction/nbaMath';
 import { computeNBADateWindow } from '../utils/dateWindow';
-import { isSupabaseConfigured, supabase } from '../supabase/client';
+import {
+  getFixturesFromDatabase,
+  syncNBAFixturesToDatabase,
+} from './fixturesDatabase';
+import {
+  SyncMode,
+  FIXTURE_STALE_LIMIT_MINUTES,
+} from './providerBudget';
+import {
+  loggedProviderFetch,
+  upsertProviderSyncState,
+  getStoredSportFreshness,
+  formatUtcTimeStamp,
+} from './providerCallLogger';
 
 export interface NBAProviderHealth {
   providerName: string;
@@ -63,9 +76,8 @@ const ESPN_ABBR_MAP: Record<string, string> = {
 
 export class NBADataProvider {
   private static readonly STATS_CACHE_TTL_SEC = 6 * 60 * 60; // 6 hours cache
-  private static readonly FIXTURES_CACHE_TTL_SEC = 120; // 120s max cache per requirement
+  private static readonly FIXTURES_CACHE_TTL_SEC = 15 * 60; // 15 min scheduled sync TTL
 
-  // In-memory persistent fixture store (keyed by fixture.id, e.g. nba_401909853)
   private fixturesStore = new Map<string, Fixture>();
   private lastSyncTimestamp: string | null = null;
   private lastSyncStatus: 'ONLINE' | 'STANDBY_DEV_MODE' | 'ERROR' = 'ONLINE';
@@ -74,38 +86,33 @@ export class NBADataProvider {
 
   constructor() {}
 
-  /**
-   * Health check for NBA stats provider
-   */
   async getHealth(): Promise<NBAProviderHealth> {
     const ballDontLieKey = process.env.BALLDONTLIE_API_KEY?.trim() || process.env.BALL_DONT_LIE_API_KEY?.trim();
     const nbaApiKey = process.env.NBA_API_KEY?.trim();
+    const freshness = await getStoredSportFreshness('basketball');
 
     const isConfigured = Boolean(ballDontLieKey || nbaApiKey);
-    const providerName = ballDontLieKey 
-      ? 'BallDontLie API' 
-      : nbaApiKey 
-      ? 'NBA Stats API' 
-      : 'ESPN NBA Live Scoreboard (Public Verified)';
+    const providerName = ballDontLieKey
+      ? 'BallDontLie API + ESPN NBA Scoreboard'
+      : nbaApiKey
+      ? 'NBA Stats API + ESPN NBA Scoreboard'
+      : 'ESPN NBA Live Scoreboard (Scheduled DB Sync)';
 
     return {
       providerName,
       isConfigured: true,
-      status: this.lastSyncStatus,
-      lastSyncTimestamp: this.lastSyncTimestamp || new Date().toISOString(),
-      message: 'NBA real time pipeline operational. Scoreboard & efficiency engine active.',
+      status: freshness.syncState?.status === 'ERROR' && freshness.isStaleBeyondLimit ? 'ERROR' : this.lastSyncStatus,
+      lastSyncTimestamp: freshness.newestUpdatedAt || this.lastSyncTimestamp || new Date().toISOString(),
+      message: 'NBA scheduled cron pipeline active. Visitor reads served strictly from Supabase/DB.',
       missingEnvVars: isConfigured ? [] : ['BALLDONTLIE_API_KEY (optional)'],
     };
   }
 
-  /**
-   * Returns fixture health telemetry for /api/health/fixtures
-   */
   getFixturesHealth(): NBAFixturesHealthResult {
     const now = Date.now();
     const syncTimeMs = this.lastSyncTimestamp ? new Date(this.lastSyncTimestamp).getTime() : now;
-    const diffHours = (now - syncTimeMs) / (3600 * 1000);
-    const isDelayed = diffHours >= 2.0;
+    const diffMinutes = (now - syncTimeMs) / 60000;
+    const isDelayed = diffMinutes >= FIXTURE_STALE_LIMIT_MINUTES;
 
     let newestKickoff: string | null = null;
     let maxKickoffMs = 0;
@@ -133,10 +140,12 @@ export class NBADataProvider {
   }
 
   /**
-   * Idempotent sync for live NBA fixtures from today - 1 day to +14 days in UTC.
-   * Upserts on provider fixture ID, including score, status, clock, and sportsbook odds.
+   * Scheduled server-side sync ONLY (called by /api/v1/sync cron or admin/test runner, NEVER on visitor reads).
+   * - mode='live': polls today - 1 day and today (2 calls, every 15 mins)
+   * - mode='schedule': polls +1 to +14 days (14 calls, every 6 hours)
+   * - mode='full': polls entire [-1..+14] window (16 calls)
    */
-  async syncLiveFixtures(force = false): Promise<number> {
+  async syncLiveFixtures(force = false, mode: SyncMode = 'full'): Promise<number> {
     const now = Date.now();
     if (!force && this.lastSyncTimestamp && this.fixturesStore.size > 0) {
       const ageMs = now - new Date(this.lastSyncTimestamp).getTime();
@@ -150,14 +159,26 @@ export class NBADataProvider {
     }
 
     this.activeSyncPromise = (async () => {
+      const attemptIso = new Date().toISOString();
+      let callsMade = 0;
+      let lastError: string | null = null;
+      let lastHttpStatus: number | null = null;
+      let lastResponseBody: string | null = null;
+
       try {
         const windowInfo = computeNBADateWindow(1, 14);
-        const dates = windowInfo.datesList;
+        const allDates = windowInfo.datesList;
+        const dates =
+          mode === 'live'
+            ? allDates.slice(0, 2) // yesterday + today (2 calls)
+            : mode === 'schedule'
+            ? allDates.slice(2) // +1..+14 future days (14 calls)
+            : allDates; // full 16 days
 
-        // Fetch scoreboards across dates with bounded concurrency (4 workers) to prevent Akamai throttling/timeouts
         const allEventBatches: any[][] = new Array(dates.length).fill([]);
         let dateIdx = 0;
-        const workerCount = Math.min(4, dates.length);
+        const workerCount = Math.min(4, Math.max(1, dates.length));
+
         await Promise.all(
           Array.from({ length: workerCount }, async () => {
             while (dateIdx < dates.length) {
@@ -167,34 +188,33 @@ export class NBADataProvider {
                 `https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`,
                 `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`,
               ];
+
               for (const url of urls) {
-                try {
-                  const controller = new AbortController();
-                  const timeoutId = setTimeout(() => controller.abort(), 10000);
-                  const res = await fetch(url, {
-                    headers: {
-                      'Accept': 'application/json',
-                      'User-Agent': 'Mozilla/5.0 (compatible; Calibrall/1.0)',
-                    },
-                    signal: controller.signal,
-                    cache: 'no-store',
-                  });
-                  clearTimeout(timeoutId);
-                  if (!res.ok) continue;
-                  const data = await res.json();
-                  allEventBatches[i] = (data.events || []) as any[];
+                callsMade++;
+                const res = await loggedProviderFetch('espn_nba', url, {
+                  headers: {
+                    Accept: 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (compatible; Calibrall/1.0)',
+                  },
+                  leagueCode: 'NBA',
+                  syncMode: mode,
+                  timeoutMs: 10000,
+                });
+                lastHttpStatus = res.status;
+                if (res.ok && res.json) {
+                  allEventBatches[i] = (res.json.events || []) as any[];
                   break;
-                } catch {
-                  // Try next endpoint
+                } else {
+                  lastError = res.error || `HTTP ${res.status}`;
+                  lastResponseBody = res.bodyText.slice(0, 400);
                 }
               }
             }
           })
         );
-        const allEvents = allEventBatches.flat();
 
-        let upsertedCount = 0;
-        const currentSeason = computeNBASeason();
+        const allEvents = allEventBatches.flat();
+        const syncedFixtures: Fixture[] = [];
 
         for (const ev of allEvents) {
           const competitionData = ev.competitions?.[0];
@@ -210,11 +230,9 @@ export class NBADataProvider {
           const homeAbbr = ESPN_ABBR_MAP[rawHomeAbbr] || rawHomeAbbr;
           const awayAbbr = ESPN_ABBR_MAP[rawAwayAbbr] || rawAwayAbbr;
 
-          // Resolve full team catalog entries
           const homeCatalog = NBA_TEAMS_CATALOG[homeAbbr] || NBA_TEAMS_CATALOG.BOS;
           const awayCatalog = NBA_TEAMS_CATALOG[awayAbbr] || NBA_TEAMS_CATALOG.DET;
 
-          // Resolve efficiency stats dynamically for this game's season
           const gameDate = new Date(ev.date);
           const seasonYear = computeNBASeason(gameDate);
 
@@ -224,7 +242,6 @@ export class NBADataProvider {
           const homeStats = homeSeasonMap[seasonYear] || homeSeasonMap['2024-25'] || Object.values(homeSeasonMap)[0];
           const awayStats = awaySeasonMap[seasonYear] || awaySeasonMap['2024-25'] || Object.values(awaySeasonMap)[0];
 
-          // Map status
           const statusType = ev.status?.type;
           let status: MatchStatus = 'SCHEDULED';
           if (statusType?.completed || statusType?.state === 'post' || statusType?.name === 'STATUS_FINAL') {
@@ -239,18 +256,15 @@ export class NBADataProvider {
             status = 'CANCELED';
           }
 
-          // Scores
           const rawHomeScore = parseInt(homeComp.score, 10);
           const rawAwayScore = parseInt(awayComp.score, 10);
           const homeScore = !isNaN(rawHomeScore) && (status === 'FINISHED' || status === 'IN_PLAY') ? rawHomeScore : null;
           const awayScore = !isNaN(rawAwayScore) && (status === 'FINISHED' || status === 'IN_PLAY') ? rawAwayScore : null;
 
-          // Odds
           const oddsObj = competitionData.odds?.[0];
           const sportsbookTotal = oddsObj?.overUnder ? Number(oddsObj.overUnder) : 224.5;
           const sportsbookSpreadHome = oddsObj?.spread ? Number(oddsObj.spread) : -3.5;
 
-          // Projection calculation
           const proj = calculateNBAScoreProjection(
             {
               name: homeCatalog.name,
@@ -274,6 +288,9 @@ export class NBADataProvider {
           const fixture: Fixture = {
             id: fixtureId,
             providerId: String(ev.id),
+            providerName: 'ESPN NBA Live Scoreboard & DraftKings Lines',
+            fetchTime: attemptIso,
+            source: 'provider:espn_nba',
             competitionId: NBA_COMPETITION.id,
             competition: NBA_COMPETITION,
             seasonYear,
@@ -286,7 +303,7 @@ export class NBADataProvider {
             homeScore,
             awayScore,
             venue: competitionData.venue?.fullName || `${homeCatalog.city} Arena`,
-            dataFreshness: new Date().toISOString(),
+            dataFreshness: attemptIso,
             basketballStats: {
               homeOffEff: homeStats.offensiveEfficiency,
               homeDefEff: homeStats.defensiveEfficiency,
@@ -310,40 +327,74 @@ export class NBADataProvider {
             },
           };
 
-          // Idempotent upsert in memory
           this.fixturesStore.set(fixtureId, fixture);
-          upsertedCount++;
-
-          // If Supabase is configured, upsert into database table
-          if (isSupabaseConfigured && supabase) {
-            try {
-              await supabase.from('fixtures').upsert({
-                provider_id: fixture.providerId,
-                competition_id: fixture.competitionId,
-                kickoff_time: fixture.kickoffTime,
-                status: fixture.status,
-                home_score: fixture.homeScore,
-                away_score: fixture.awayScore,
-                venue: fixture.venue,
-                updated_at: new Date().toISOString(),
-              }, { onConflict: 'provider_id' });
-            } catch {
-              // Ignore Supabase write errors in offline mode
-            }
-          }
+          syncedFixtures.push(fixture);
         }
 
-        this.lastSyncTimestamp = new Date().toISOString();
-        this.lastSyncStatus = 'ONLINE';
-        this.lastProviderUsed = 'ESPN NBA Live Scoreboard & DraftKings Lines';
+        if (syncedFixtures.length > 0) {
+          await syncNBAFixturesToDatabase(syncedFixtures, mode === 'full' ? windowInfo.dateFrom : undefined);
+          this.lastSyncTimestamp = new Date().toISOString();
+          this.lastSyncStatus = 'ONLINE';
+          this.lastProviderUsed = 'ESPN NBA Live Scoreboard & DraftKings Lines';
 
-        // Cache full array with 120s TTL
+          await upsertProviderSyncState('basketball', {
+            sport: 'basketball',
+            providerName: 'ESPN NBA Live Scoreboard',
+            status: 'ONLINE',
+            lastAttemptAt: attemptIso,
+            lastSuccessAt: this.lastSyncTimestamp,
+            lastError: null,
+            lastHttpStatus: lastHttpStatus ?? 200,
+            callsUsedLastRun: callsMade,
+            skippedLeagues: [],
+          });
+          await upsertProviderSyncState('provider:espn_nba', {
+            sport: 'basketball',
+            providerName: 'ESPN NBA Scoreboard',
+            status: 'ONLINE',
+            lastAttemptAt: attemptIso,
+            lastSuccessAt: this.lastSyncTimestamp,
+            lastError: null,
+            lastHttpStatus: lastHttpStatus ?? 200,
+            callsUsedLastRun: callsMade,
+          });
+        } else {
+          this.lastSyncStatus = 'ERROR';
+          await upsertProviderSyncState('basketball', {
+            sport: 'basketball',
+            providerName: 'ESPN NBA Live Scoreboard',
+            status: 'ERROR',
+            lastAttemptAt: attemptIso,
+            lastError: lastError || 'ESPN NBA returned 0 events',
+            lastHttpStatus,
+            lastResponseBody,
+            callsUsedLastRun: callsMade,
+          });
+          await upsertProviderSyncState('provider:espn_nba', {
+            sport: 'basketball',
+            providerName: 'ESPN NBA Scoreboard',
+            status: 'ERROR',
+            lastAttemptAt: attemptIso,
+            lastError: lastError || 'ESPN NBA returned 0 events',
+            lastHttpStatus,
+            lastResponseBody,
+            callsUsedLastRun: callsMade,
+          });
+        }
+
         await serverCache.set('nba:fixtures:all', Array.from(this.fixturesStore.values()), NBADataProvider.FIXTURES_CACHE_TTL_SEC);
-
-        return upsertedCount;
+        return syncedFixtures.length;
       } catch (err: any) {
         console.error('[NBA Provider Sync Error]:', err?.message || err);
         this.lastSyncStatus = 'ERROR';
+        await upsertProviderSyncState('basketball', {
+          sport: 'basketball',
+          providerName: 'ESPN NBA Live Scoreboard',
+          status: 'ERROR',
+          lastAttemptAt: attemptIso,
+          lastError: err?.message || 'NBA sync exception',
+          callsUsedLastRun: callsMade,
+        });
         return this.fixturesStore.size;
       } finally {
         this.activeSyncPromise = null;
@@ -354,82 +405,101 @@ export class NBADataProvider {
   }
 
   /**
-   * Retrieves NBA Fixtures for the active window (today -1 to +14 days in UTC).
-   * Automatically synchronizes if the store is empty or stale.
+   * Visitor Read Path: Reads ONLY from Supabase/DB (plus hydrated memory store).
+   * NEVER calls external providers on page loads or API reads.
    */
-  async getFixtures(status?: string): Promise<{ 
-    fixtures: Fixture[]; 
-    lastUpdated: string; 
+  async getFixtures(status?: string): Promise<{
+    fixtures: Fixture[];
+    lastUpdated: string;
+    lastSyncTimestamp: string | null;
     liveDataAvailable: boolean;
     isDelayed: boolean;
+    staleLimitMinutes: number;
+    error?: string;
+    failedProvider?: string;
     season: string;
   }> {
-    // If empty or older than 120s, trigger sync
-    if (this.fixturesStore.size === 0 || !this.lastSyncTimestamp) {
-      await this.syncLiveFixtures();
-    } else {
-      const ageMs = Date.now() - new Date(this.lastSyncTimestamp).getTime();
-      if (ageMs > NBADataProvider.FIXTURES_CACHE_TTL_SEC * 1000) {
-        // Run sync in background or await if empty
-        this.syncLiveFixtures().catch(() => {});
+    const dbFixtures = await getFixturesFromDatabase({ sport: 'basketball', status });
+    const freshness = await getStoredSportFreshness('basketball');
+
+    // Hydrate memory store from DB rows so health/telemetry reflects persisted count
+    if (dbFixtures.length > 0) {
+      for (const f of dbFixtures) {
+        if (!this.fixturesStore.has(f.id)) {
+          this.fixturesStore.set(f.id, f);
+        }
+      }
+      if (!this.lastSyncTimestamp && freshness.newestUpdatedAt) {
+        this.lastSyncTimestamp = freshness.newestUpdatedAt;
       }
     }
 
-    const all = Array.from(this.fixturesStore.values());
-    let filtered = all;
-
-    if (status === 'FINISHED') {
-      filtered = all.filter(f => f.status === 'FINISHED');
-      // Sort finished games: newest first
-      filtered.sort((a, b) => new Date(b.kickoffTime).getTime() - new Date(a.kickoffTime).getTime());
-    } else if (status === 'TIMED' || status === 'SCHEDULED') {
-      filtered = all.filter(f => f.status !== 'FINISHED');
-      // Sort upcoming games: nearest first
-      filtered.sort((a, b) => new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime());
-    } else {
-      // All games: sort upcoming/live first in order, then finished
-      filtered.sort((a, b) => {
-        const aFin = a.status === 'FINISHED' ? 1 : 0;
-        const bFin = b.status === 'FINISHED' ? 1 : 0;
-        if (aFin !== bFin) return aFin - bFin;
-        if (aFin === 1) {
-          return new Date(b.kickoffTime).getTime() - new Date(a.kickoffTime).getTime();
-        }
-        return new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime();
-      });
+    let sourceList = dbFixtures.length > 0 ? dbFixtures : Array.from(this.fixturesStore.values());
+    if (status && status !== 'ALL') {
+      if (status === 'FINISHED') {
+        sourceList = sourceList.filter(f => f.status === 'FINISHED');
+      } else if (status === 'TIMED' || status === 'SCHEDULED') {
+        sourceList = sourceList.filter(f => f.status !== 'FINISHED');
+      } else {
+        sourceList = sourceList.filter(f => f.status === status);
+      }
     }
 
-    const now = Date.now();
-    const syncTimeMs = this.lastSyncTimestamp ? new Date(this.lastSyncTimestamp).getTime() : now;
-    const diffHours = (now - syncTimeMs) / (3600 * 1000);
-    const isDelayed = diffHours >= 2.0;
+    const filtered = [...sourceList].sort((a, b) => {
+      if (status === 'FINISHED') {
+        return new Date(b.kickoffTime).getTime() - new Date(a.kickoffTime).getTime();
+      }
+      if (status === 'TIMED' || status === 'SCHEDULED') {
+        return new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime();
+      }
+      const aFin = a.status === 'FINISHED' ? 1 : 0;
+      const bFin = b.status === 'FINISHED' ? 1 : 0;
+      if (aFin !== bFin) return aFin - bFin;
+      if (aFin === 1) {
+        return new Date(b.kickoffTime).getTime() - new Date(a.kickoffTime).getTime();
+      }
+      return new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime();
+    });
 
-    const syncDate = this.lastSyncTimestamp ? new Date(this.lastSyncTimestamp) : new Date();
-    const lastUpdated = `${String(syncDate.getUTCHours()).padStart(2, '0')}:${String(syncDate.getUTCMinutes()).padStart(2, '0')} UTC`;
+    const effectiveTimestamp = freshness.newestUpdatedAt || this.lastSyncTimestamp;
+    const lastUpdated = formatUtcTimeStamp(effectiveTimestamp);
+    const isDelayed =
+      filtered.length === 0 ||
+      (freshness.newestUpdatedAt ? freshness.isStaleBeyondLimit : false);
+
+    const lastFailed =
+      freshness.syncState?.status === 'ERROR' ? freshness.syncState.providerName : undefined;
 
     return {
       fixtures: filtered,
       lastUpdated,
-      liveDataAvailable: this.fixturesStore.size > 0,
+      lastSyncTimestamp: effectiveTimestamp,
+      liveDataAvailable: filtered.length > 0,
       isDelayed,
+      staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
+      error:
+        isDelayed && (lastFailed || filtered.length === 0)
+          ? `Basketball fixtures unavailable or stale beyond ${FIXTURE_STALE_LIMIT_MINUTES}m. Last updated ${lastUpdated}.`
+          : undefined,
+      failedProvider: isDelayed ? lastFailed : undefined,
       season: computeNBASeason(),
     };
   }
 
   /**
-   * Retrieves a fixture by ID (e.g. nba_401909853 or 401909853)
+   * DB-only lookup for single NBA fixture (never calls external APIs per visitor).
    */
   async getFixtureById(id: string): Promise<Fixture | null> {
-    if (this.fixturesStore.size === 0) {
-      await this.syncLiveFixtures();
-    }
     const cleanId = id.startsWith('nba_') ? id : `nba_${id}`;
-    return this.fixturesStore.get(cleanId) || Array.from(this.fixturesStore.values()).find(f => f.providerId === id || f.id === id) || null;
+    const memHit =
+      this.fixturesStore.get(cleanId) ||
+      Array.from(this.fixturesStore.values()).find(f => f.providerId === id || f.id === id);
+    if (memHit) return memHit;
+
+    const dbFixtures = await getFixturesFromDatabase({ sport: 'basketball' });
+    return dbFixtures.find(f => f.id === id || f.id === cleanId || f.providerId === id) || null;
   }
 
-  /**
-   * Fetches advanced efficiency stats for all 30 NBA teams for a specified season.
-   */
   async getTeamAdvancedStats(season?: NBASeason | string, forceRefresh = false): Promise<NBAStatsFetchResult> {
     const targetSeason = season || computeNBASeason();
     const cacheKey = `nba:stats:${targetSeason}`;
@@ -467,7 +537,6 @@ export class NBADataProvider {
   }
 }
 
-// Global singleton instance
 declare global {
   var __nbaProviderInstance: NBADataProvider | undefined;
 }

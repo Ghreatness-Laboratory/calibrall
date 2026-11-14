@@ -36,7 +36,6 @@ import LineupChip from '@/components/LineupChip';
 import { getFixtureLineupState } from '@/lib/data/lineupsService';
 import { forwardPickLedger } from '@/lib/prediction/forwardPickLedger';
 import { displayName, formatMatchTime, cleanDisplayText } from '@/lib/utils/formatText';
-import { matchesStore } from '@/lib/data/matchesStore';
 
 export default function MatchAnalysisPage() {
   const params = useParams();
@@ -422,8 +421,8 @@ export default function MatchAnalysisPage() {
           </div>
           <p className="text-[12px] text-[#E9EFEB] leading-[1.5]">
             {noRecommendationReason || (() => {
-              const hCount = fixture.homeTeam.storedMatchCount ?? matchesStore.getTeamMatchCountSync(fixture.homeTeam.id || fixture.homeTeam.name);
-              const aCount = fixture.awayTeam.storedMatchCount ?? matchesStore.getTeamMatchCountSync(fixture.awayTeam.id || fixture.awayTeam.name);
+              const hCount = fixture.homeTeam.storedMatchCount ?? 0;
+              const aCount = fixture.awayTeam.storedMatchCount ?? 0;
               return `Model projection withheld: ${homeName} (${hCount} matches stored) & ${awayName} (${aCount} matches stored) have insufficient statistical depth or staleness exceeding the 21 day threshold. Rather than inventing a projection, the engine abstains to preserve calibration integrity.`;
             })()}
           </p>
@@ -555,7 +554,7 @@ export default function MatchAnalysisPage() {
             <AlertCircle className="w-5 h-5 text-[#E8B04A] mx-auto" />
             <h4 className="text-[13px] font-semibold text-[#E8B04A]">Poisson Matrix Withheld</h4>
             <p className="text-[12px] text-[#E9EFEB] max-w-sm mx-auto">
-              Statistical evidence insufficient for {homeName} ({fixture.homeTeam.storedMatchCount ?? matchesStore.getTeamMatchCountSync(fixture.homeTeam.id || fixture.homeTeam.name)} matches stored) and {awayName} ({fixture.awayTeam.storedMatchCount ?? matchesStore.getTeamMatchCountSync(fixture.awayTeam.id || fixture.awayTeam.name)} matches stored) to parameterize Dixon Coles bivariate Poisson distribution. Abstaining rather than rendering fake probabilities.
+              Statistical evidence insufficient for {homeName} ({fixture.homeTeam.storedMatchCount ?? 0} matches stored) and {awayName} ({fixture.awayTeam.storedMatchCount ?? 0} matches stored) to parameterize Dixon Coles bivariate Poisson distribution. Abstaining rather than rendering fake probabilities.
             </p>
           </div>
         ) : (

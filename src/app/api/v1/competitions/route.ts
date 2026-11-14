@@ -4,7 +4,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCompetitionsFromDatabase } from '@/lib/data/canonicalCompetitions';
-import { getFootballDataProvider } from '@/lib/data/provider';
 import { Sport } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -14,10 +13,6 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const sport = (searchParams.get('sport') as Sport | 'all') || 'football';
   const day = searchParams.get('day') || undefined;
-
-  if (sport === 'football' || sport === 'all') {
-    await getFootballDataProvider().ensureSynced();
-  }
 
   const { competitions, groupedByCountry, total, totalFixtures } = await getCompetitionsFromDatabase(
     sport,

@@ -1,24 +1,35 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Fixture, Sport } from '@/types';
+
+export interface SkippedLeagueDiagnostic {
+  leagueCode: string;
+  leagueName: string;
+  tier: 1 | 2 | 3;
+  provider: string;
+  reason: string;
+}
 
 export interface LiveFixturesHookResult {
   fixtures: Fixture[];
   isLoading: boolean;
   liveDataAvailable: boolean;
   lastUpdated: string;
+  lastSyncTimestamp?: string | null;
   isDelayed?: boolean;
+  staleLimitMinutes?: number;
   error?: string;
   providerUsed?: string;
   failedProvider?: string;
   quotaHeaders?: Record<string, string>;
+  skippedLeagues?: SkippedLeagueDiagnostic[];
   refetch: () => Promise<void>;
 }
 
 export function useLiveFixtures(
-  competitionId?: string, 
-  status?: string, 
+  competitionId?: string,
+  status?: string,
   sport: Sport = 'football',
   day?: string
 ): LiveFixturesHookResult {
@@ -26,11 +37,15 @@ export function useLiveFixtures(
   const [isLoading, setIsLoading] = useState(true);
   const [liveDataAvailable, setLiveDataAvailable] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [lastSyncTimestamp, setLastSyncTimestamp] = useState<string | null>(null);
   const [isDelayed, setIsDelayed] = useState<boolean>(false);
+  const [staleLimitMinutes, setStaleLimitMinutes] = useState<number>(120);
   const [error, setError] = useState<string | undefined>();
   const [providerUsed, setProviderUsed] = useState<string | undefined>();
   const [failedProvider, setFailedProvider] = useState<string | undefined>();
   const [quotaHeaders, setQuotaHeaders] = useState<Record<string, string> | undefined>();
+  const [skippedLeagues, setSkippedLeagues] = useState<SkippedLeagueDiagnostic[]>([]);
+  const hasCachedListRef = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -47,63 +62,84 @@ export function useLiveFixtures(
         cache: 'no-store',
       });
       if (!res.ok) {
-        setLiveDataAvailable(false);
-        const now = new Date();
-        const stamp = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} UTC`;
-        setLastUpdated(prev => prev || stamp);
-        setError(`Live data unavailable. Last updated ${stamp}`);
+        if (!hasCachedListRef.current) {
+          setLiveDataAvailable(false);
+          setIsDelayed(true);
+          setError(`Fixtures unavailable, last updated ${lastUpdated || 'never'}`);
+        }
         return;
       }
       const text = await res.text();
-      let json;
+      let json: any;
       try {
         json = JSON.parse(text);
       } catch {
-        setLiveDataAvailable(false);
-        const now = new Date();
-        const stamp = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} UTC`;
-        setLastUpdated(prev => prev || stamp);
-        setError(`Live data unavailable. Last updated ${stamp}`);
+        if (!hasCachedListRef.current) {
+          setLiveDataAvailable(false);
+          setIsDelayed(true);
+          setError(`Fixtures unavailable, last updated ${lastUpdated || 'never'}`);
+        }
         return;
       }
-      
-      const list = json.data || [];
+
+      const list: Fixture[] = json.data || [];
+      if (list.length > 0) {
+        hasCachedListRef.current = true;
+      }
       setFixtures(list);
-      setLiveDataAvailable(Boolean(json.liveDataAvailable && list.length > 0));
+      setLiveDataAvailable(Boolean(json.liveDataAvailable || list.length > 0));
       setIsDelayed(Boolean(json.isDelayed));
+      if (typeof json.staleLimitMinutes === 'number') {
+        setStaleLimitMinutes(json.staleLimitMinutes);
+      }
+      setLastSyncTimestamp(json.lastSyncTimestamp || null);
       setProviderUsed(json.providerUsed);
       setFailedProvider(json.failedProvider);
       setQuotaHeaders(json.quotaHeaders);
+      setSkippedLeagues(Array.isArray(json.skippedLeagues) ? json.skippedLeagues : []);
       if (json.lastUpdated) {
         setLastUpdated(json.lastUpdated);
-      } else {
-        const now = new Date();
-        const stamp = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} UTC`;
-        setLastUpdated(prev => prev || stamp);
       }
-      if (json.error && list.length === 0) {
+
+      // Show error banner ONLY when stored fixtures exceed the staleness limit or are empty
+      if (json.error && (json.isDelayed || list.length === 0)) {
         setError(json.error);
       } else {
         setError(undefined);
       }
     } catch {
-      setLiveDataAvailable(false);
-      const now = new Date();
-      const stamp = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} UTC`;
-      setLastUpdated(prev => prev || stamp);
-      setError(`Fixtures unavailable, last updated ${stamp}`);
+      if (!hasCachedListRef.current) {
+        setLiveDataAvailable(false);
+        setIsDelayed(true);
+        setError(`Fixtures unavailable, last updated ${lastUpdated || 'never'}`);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [competitionId, status, sport, day]);
+  }, [competitionId, status, sport, day, lastUpdated]);
 
   useEffect(() => {
+    hasCachedListRef.current = false;
     load();
-    // Auto-revalidate every 120 seconds for live updates
+    // Poll DB-backed API every 120 seconds (0 external provider calls per visitor)
     const timer = setInterval(load, 120000);
     return () => clearInterval(timer);
-  }, [load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [competitionId, status, sport, day]);
 
-  return { fixtures, isLoading, liveDataAvailable, lastUpdated, isDelayed, error, providerUsed, failedProvider, quotaHeaders, refetch: load };
+  return {
+    fixtures,
+    isLoading,
+    liveDataAvailable,
+    lastUpdated,
+    lastSyncTimestamp,
+    isDelayed,
+    staleLimitMinutes,
+    error,
+    providerUsed,
+    failedProvider,
+    quotaHeaders,
+    skippedLeagues,
+    refetch: load,
+  };
 }
-

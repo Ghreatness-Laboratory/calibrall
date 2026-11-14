@@ -27,8 +27,6 @@ export class FootballSportEngine implements SportEngine {
   defaultLeague = 'ALL';
 
   async getCompetitions(): Promise<Competition[]> {
-    const provider = getFootballDataProvider();
-    await provider.ensureSynced();
     const res = await getCompetitionsFromDatabase('football');
     return res.competitions;
   }
