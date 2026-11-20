@@ -745,7 +745,7 @@ export async function POST(req: NextRequest) {
         sourceUsed,
         rowsFetched: matches.length + rowsSkipped,
         rowsInserted: matches.length,
-        rowsSkipped: 0,
+        rowsSkipped,
         oddsSnapshotsCount: oddsSnapshots.length,
         earliestDate,
         latestDate,
@@ -763,6 +763,24 @@ export async function POST(req: NextRequest) {
     // In production, confirms writes to Supabase and fails loudly if unconfigured or on error
     const upsertResult = await matchesStore.upsertMatches(matches, oddsSnapshots);
 
+    if (upsertResult.errors && upsertResult.errors.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          dryRun: false,
+          league,
+          season,
+          sourceUsed,
+          rowsFetched: upsertResult.fetched + rowsSkipped,
+          rowsInserted: 0,
+          rowsSkipped,
+          error: upsertResult.errors.join(' | '),
+          errors: upsertResult.errors,
+        },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       dryRun: false,
@@ -771,7 +789,7 @@ export async function POST(req: NextRequest) {
       sourceUsed,
       rowsFetched: upsertResult.fetched + rowsSkipped,
       rowsInserted: upsertResult.inserted,
-      rowsSkipped: 0,
+      rowsSkipped,
       oddsSnapshotsCount: oddsSnapshots.length,
       earliestDate,
       latestDate,
