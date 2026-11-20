@@ -7,7 +7,12 @@
 // 3. Filter by competition_id only, combined with the day filter.
 
 import { Fixture, MatchStatus, VerifiedMatchOdds } from '@/types';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import {
+  supabase,
+  isSupabaseConfigured,
+  assertPersistenceConfigured,
+  isProductionRuntime,
+} from '@/lib/supabase/client';
 import { lookupTeamStrength } from './teamDatabase';
 import { lookupCanonicalTeam } from './canonicalTeams';
 import {
@@ -259,7 +264,10 @@ export async function syncFootballFixturesToDatabase(
   fixtures: Fixture[],
   dateFrom?: string
 ): Promise<{ upserted: number; rejected: number }> {
-  if (!isSupabaseConfigured || !supabase) return { upserted: 0, rejected: 0 };
+  assertPersistenceConfigured();
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Persistence client is unavailable for fixtures upsert.');
+  }
   if (!fixtures || fixtures.length === 0) {
     // Keep last good fixtures intact if refresh produced 0 rows
     return { upserted: 0, rejected: 0 };
@@ -340,9 +348,9 @@ export async function syncFootballFixturesToDatabase(
       const res = await upsertFixtureRowsSafely(rowsToUpsert);
       if (!res.ok) {
         console.error('[syncFootballFixturesToDatabase Upsert Error]:', res.error);
-      } else {
-        upserted = rowsToUpsert.length;
+        throw new Error(`Failed to write fixtures to database: ${res.error}`);
       }
+      upserted = rowsToUpsert.length;
     }
 
     // 2. Only prune demo/legacy/expired fixtures AFTER verifying new real fixtures were persisted
@@ -378,6 +386,7 @@ export async function syncFootballFixturesToDatabase(
     }
   } catch (err: any) {
     console.error('[syncFootballFixturesToDatabase Error]:', err?.message || err);
+    throw err instanceof Error ? err : new Error(String(err));
   }
 
   return { upserted, rejected };
@@ -389,16 +398,20 @@ export async function syncFootballFixturesToDatabase(
 export async function updateFixtureVerifiedOddsInDatabase(
   updates: Array<{ id: string; providerId: string; verifiedOdds: VerifiedMatchOdds }>
 ): Promise<number> {
+  assertPersistenceConfigured();
   if (!isSupabaseConfigured || !supabase || !updates || updates.length === 0) return 0;
 
   try {
     const ids = updates.map(u => u.id);
     const { data: existingRows, error } = await supabase
       .from('fixtures')
-      .select('id, provider_id, payload_json')
+      .select('id, provider_id, competition_id, home_team_id, away_team_id, kickoff_time, payload_json')
       .in('id', ids);
 
-    if (error || !existingRows || !Array.isArray(existingRows)) return 0;
+    if (error) {
+      throw new Error(`Failed to read fixtures for odds update: ${error.message}`);
+    }
+    if (!existingRows || !Array.isArray(existingRows)) return 0;
 
     const byId = new Map<string, any>();
     for (const row of existingRows) {
@@ -419,6 +432,10 @@ export async function updateFixtureVerifiedOddsInDatabase(
       patchRows.push({
         id: existing.id,
         provider_id: existing.provider_id || u.providerId,
+        competition_id: existing.competition_id,
+        home_team_id: existing.home_team_id,
+        away_team_id: existing.away_team_id,
+        kickoff_time: existing.kickoff_time,
         payload_json: JSON.stringify(payload),
         updated_at: nowIso,
       });
@@ -426,9 +443,15 @@ export async function updateFixtureVerifiedOddsInDatabase(
 
     if (patchRows.length === 0) return 0;
     const res = await upsertFixtureRowsSafely(patchRows);
-    return res.ok ? patchRows.length : 0;
+    if (!res.ok) {
+      throw new Error(`Failed to write verified odds to database: ${res.error}`);
+    }
+    return patchRows.length;
   } catch (err: any) {
     console.error('[updateFixtureVerifiedOddsInDatabase Error]:', err?.message || err);
+    if (isProductionRuntime()) {
+      throw err instanceof Error ? err : new Error(String(err));
+    }
     return 0;
   }
 }
@@ -440,6 +463,7 @@ export async function syncNBAFixturesToDatabase(
   fixtures: Fixture[],
   dateFrom?: string
 ): Promise<{ upserted: number }> {
+  assertPersistenceConfigured();
   if (!isSupabaseConfigured || !supabase || !fixtures || fixtures.length === 0) {
     return { upserted: 0 };
   }

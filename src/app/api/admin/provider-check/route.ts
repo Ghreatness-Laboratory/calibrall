@@ -126,16 +126,18 @@ export async function GET(req: NextRequest) {
             : res.bodyText.slice(0, 300),
           error: res.error || null,
         });
-        await upsertProviderSyncState('provider:football-data', {
-          sport: 'football',
-          providerName: 'Football-Data.org v4',
-          status,
-          lastAttemptAt: nowIso,
-          ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
-          quotaRemaining: res.quotaRemaining,
-          quotaHeaders: res.quotaHeaders,
-          callsUsedLastRun: 1,
-        });
+        try {
+          await upsertProviderSyncState('provider:football-data', {
+            sport: 'football',
+            providerName: 'Football-Data.org v4',
+            status,
+            lastAttemptAt: nowIso,
+            ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
+            quotaRemaining: res.quotaRemaining,
+            quotaHeaders: res.quotaHeaders,
+            callsUsedLastRun: 1,
+          });
+        } catch {}
       })(),
 
       // 2. Sportmonks v3
@@ -165,16 +167,18 @@ export async function GET(req: NextRequest) {
             : res.bodyText.slice(0, 300),
           error: res.error || null,
         });
-        await upsertProviderSyncState('provider:sportmonks', {
-          sport: 'football',
-          providerName: 'Sportmonks v3',
-          status,
-          lastAttemptAt: nowIso,
-          ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
-          quotaRemaining: res.quotaRemaining,
-          quotaHeaders: res.quotaHeaders,
-          callsUsedLastRun: 1,
-        });
+        try {
+          await upsertProviderSyncState('provider:sportmonks', {
+            sport: 'football',
+            providerName: 'Sportmonks v3',
+            status,
+            lastAttemptAt: nowIso,
+            ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
+            quotaRemaining: res.quotaRemaining,
+            quotaHeaders: res.quotaHeaders,
+            callsUsedLastRun: 1,
+          });
+        } catch {}
       })(),
 
       // 3. The Odds API v4 (0-cost /v4/sports/ metadata endpoint exposes x-requests-remaining & x-requests-used)
@@ -204,16 +208,18 @@ export async function GET(req: NextRequest) {
             : res.bodyText.slice(0, 300),
           error: res.error || null,
         });
-        await upsertProviderSyncState('provider:the-odds-api', {
-          sport: 'odds',
-          providerName: 'The Odds API v4',
-          status,
-          lastAttemptAt: nowIso,
-          ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
-          quotaRemaining: res.quotaRemaining,
-          quotaHeaders: res.quotaHeaders,
-          // /v4/sports/ is 0 credits; preserve callsUsedLastRun from the latest sync run
-        });
+        try {
+          await upsertProviderSyncState('provider:the-odds-api', {
+            sport: 'odds',
+            providerName: 'The Odds API v4',
+            status,
+            lastAttemptAt: nowIso,
+            ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
+            quotaRemaining: res.quotaRemaining,
+            quotaHeaders: res.quotaHeaders,
+            // /v4/sports/ is 0 credits; preserve callsUsedLastRun from the latest sync run
+          });
+        } catch {}
       })(),
     ]);
   }

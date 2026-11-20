@@ -351,6 +351,12 @@ declare const __non_webpack_require__: any;
 
 export function getLocalDatabase(): any {
   if (typeof window !== 'undefined') return null;
+  if (isProductionRuntime()) {
+    if (!isRemoteSupabase) {
+      throw new Error(persistenceBackendInfo().message);
+    }
+    return null;
+  }
   const state = getGlobalDbState();
   if (state.db) return state.db;
 

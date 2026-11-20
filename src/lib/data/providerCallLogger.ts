@@ -2,7 +2,7 @@
 // Captures every external provider call (HTTP status, truncated body, quota headers, timestamp),
 // persists last-known-good sync state in Supabase/SQLite, and exposes the last 20 calls for /api/admin/provider-check.
 
-import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { supabase, isSupabaseConfigured, isProductionRuntime } from '@/lib/supabase/client';
 import {
   ProviderId,
   SkippedLeagueRecord,
@@ -128,7 +128,7 @@ export async function recordProviderCall(entry: Omit<ProviderCallLogEntry, 'id'>
 
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('provider_call_logs').upsert(
+      const { error } = await supabase.from('provider_call_logs').upsert(
         {
           id: full.id,
           timestamp: full.timestamp,
@@ -147,8 +147,11 @@ export async function recordProviderCall(entry: Omit<ProviderCallLogEntry, 'id'>
         },
         { onConflict: 'id' }
       );
-    } catch {
-      // Never block sync pipeline on telemetry write failure
+      if (error) {
+        console.error('[provider_call_logs upsert error]:', error.message);
+      }
+    } catch (err: any) {
+      console.error('[provider_call_logs upsert exception]:', err?.message || err);
     }
   }
 
@@ -372,30 +375,32 @@ export async function upsertProviderSyncState(
   getMemoryStateMap().set(id, merged);
 
   if (isSupabaseConfigured && supabase) {
-    try {
-      await supabase.from('provider_sync_state').upsert(
-        {
-          id: merged.id,
-          sport: merged.sport,
-          provider_name: merged.providerName,
-          status: merged.status,
-          last_attempt_at: merged.lastAttemptAt,
-          last_success_at: merged.lastSuccessAt,
-          last_error: merged.lastError,
-          last_http_status: merged.lastHttpStatus,
-          last_response_body: merged.lastResponseBody ? merged.lastResponseBody.slice(0, 500) : null,
-          quota_remaining: merged.quotaRemaining,
-          quota_headers_json: JSON.stringify(merged.quotaHeaders || {}),
-          skipped_leagues_json: JSON.stringify(merged.skippedLeagues || []),
-          calls_used_last_run: merged.callsUsedLastRun,
-          calls_today: merged.callsToday,
-          budget_date: merged.budgetDate,
-          updated_at: merged.updatedAt,
-        },
-        { onConflict: 'id' }
-      );
-    } catch {
-      // Non-fatal
+    const { error } = await supabase.from('provider_sync_state').upsert(
+      {
+        id: merged.id,
+        sport: merged.sport,
+        provider_name: merged.providerName,
+        status: merged.status,
+        last_attempt_at: merged.lastAttemptAt,
+        last_success_at: merged.lastSuccessAt,
+        last_error: merged.lastError,
+        last_http_status: merged.lastHttpStatus,
+        last_response_body: merged.lastResponseBody ? merged.lastResponseBody.slice(0, 500) : null,
+        quota_remaining: merged.quotaRemaining,
+        quota_headers_json: JSON.stringify(merged.quotaHeaders || {}),
+        skipped_leagues_json: JSON.stringify(merged.skippedLeagues || []),
+        calls_used_last_run: merged.callsUsedLastRun,
+        calls_today: merged.callsToday,
+        budget_date: merged.budgetDate,
+        updated_at: merged.updatedAt,
+      },
+      { onConflict: 'id' }
+    );
+    if (error) {
+      console.error(`[provider_sync_state upsert error for ${id}]:`, error.message);
+      if (isProductionRuntime() || error.code === 'PERSISTENCE_MISCONFIGURED') {
+        throw new Error(`Failed to write provider_sync_state (${id}): ${error.message}`);
+      }
     }
   }
 }

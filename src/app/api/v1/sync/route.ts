@@ -229,6 +229,8 @@ async function handleSync(request: Request) {
         mode: syncOut.mode,
         status: syncOut.ok ? 'ONLINE' : 'ERROR',
         records: syncOut.count,
+        rowsWrittenToFixtures: syncOut.rowsWrittenToFixtures,
+        rejectedFixtures: syncOut.rejectedFixtures,
         callsMade: syncOut.callsMade,
         skippedLeaguesCount: syncOut.skippedLeagues.length,
         skippedLeagues: syncOut.skippedLeagues,
@@ -239,6 +241,8 @@ async function handleSync(request: Request) {
         provider: 'Football Providers',
         mode,
         status: 'ERROR',
+        records: 0,
+        rowsWrittenToFixtures: 0,
         error: e.message || 'Football sync failed',
         latencyMs: Date.now() - t0,
       };
@@ -553,16 +557,27 @@ async function handleSync(request: Request) {
     }
   }
 
-  // 4. Database check
+  // 4. Database check & exact fixtures row count
+  let dbHealthy = false;
   if (isSupabaseConfigured && supabase) {
     const t0 = Date.now();
     try {
-      const [{ error: fixErr }, { error: syncErr }] = await Promise.all([
-        supabase.from('fixtures').select('id').limit(1),
-        supabase.from('provider_sync_state').select('id').limit(1),
+      const [
+        { count: fixturesTotalCount, error: fixErr },
+        { count: syncStateCount, error: syncErr },
+      ] = await Promise.all([
+        supabase.from('fixtures').select('id', { count: 'exact', head: true }),
+        supabase.from('provider_sync_state').select('id', { count: 'exact', head: true }),
       ]);
       const dbOk = !fixErr && !syncErr;
+      dbHealthy = dbOk;
       results['database'] = {
+        target:
+          persistence.backend === 'supabase_postgres'
+            ? 'Supabase Postgres'
+            : persistence.backend === 'local_sqlite'
+            ? 'Local SQLite (data/supabase.db)'
+            : 'MISCONFIGURED (Production refuses local SQLite)',
         backend: persistence.backend,
         isRemoteSupabase: persistence.isRemoteSupabase,
         isProduction: persistence.isProduction,
@@ -571,6 +586,8 @@ async function handleSync(request: Request) {
         localSqliteAllowed: persistence.localSqliteAllowed,
         message: persistence.message,
         status: dbOk ? 'ONLINE' : 'ERROR',
+        fixturesTotalCount: typeof fixturesTotalCount === 'number' ? fixturesTotalCount : null,
+        syncStateTotalCount: typeof syncStateCount === 'number' ? syncStateCount : null,
         tables: {
           fixtures: fixErr ? fixErr.message : 'OK',
           provider_sync_state: syncErr ? syncErr.message : 'OK',
@@ -579,6 +596,7 @@ async function handleSync(request: Request) {
       };
     } catch (e: any) {
       results['database'] = {
+        target: persistence.backend === 'supabase_postgres' ? 'Supabase Postgres' : 'MISCONFIGURED',
         backend: persistence.backend,
         isRemoteSupabase: persistence.isRemoteSupabase,
         isProduction: persistence.isProduction,
@@ -588,9 +606,13 @@ async function handleSync(request: Request) {
     }
   }
 
+  const hasFatalError =
+    results['football']?.status === 'ERROR' ||
+    !dbHealthy;
+
   return NextResponse.json(
     {
-      success: true,
+      success: !hasFatalError,
       mode,
       sport: sportParam,
       timestamp: new Date().toISOString(),
@@ -606,6 +628,7 @@ async function handleSync(request: Request) {
       results,
     },
     {
+      status: hasFatalError ? 500 : 200,
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
       },

@@ -5,7 +5,12 @@
 // 3. In-memory local fallback store for seamless development and testing (clearly labeled as sandbox)
 // 4. Exact data status reporting for leagues, seasons, date boundaries, joined teams, and unmatched names
 
-import { supabase, isSupabaseConfigured, getLocalDatabase } from '@/lib/supabase/client';
+import {
+  supabase,
+  isSupabaseConfigured,
+  getLocalDatabase,
+  isProductionRuntime,
+} from '@/lib/supabase/client';
 import { TEAM_STRENGTH_DATABASE, lookupTeamStrength, normalizeTeamLookupKey } from './teamDatabase';
 import { COMPETITIONS } from './seedData';
 import { displayName } from '@/lib/utils/formatText';
@@ -312,7 +317,7 @@ class MatchesStore {
   constructor() {}
 
   ensureHydratedFromDbSync(): void {
-    if (typeof window !== 'undefined') return;
+    if (typeof window !== 'undefined' || isProductionRuntime()) return;
     try {
       const db = getLocalDatabase();
       if (!db) return;
@@ -487,7 +492,7 @@ class MatchesStore {
     let inserted = 0;
     const errors: string[] = [];
 
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production';
+    const isProduction = isProductionRuntime();
 
     // 1. Strict production check: Fail loudly if Supabase is unconfigured in production
     if (isProduction && (!isSupabaseConfigured || !supabase)) {
@@ -629,7 +634,7 @@ class MatchesStore {
       console.log(`[MatchesStore Sandbox Output] Processed ${matches.length} matches and ${oddsSnapshots?.length || 0} odds snapshots into in-memory sandbox store.`);
     }
 
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' && !isProduction) {
       try {
         const db = getLocalDatabase();
         if (db) {
@@ -649,7 +654,7 @@ class MatchesStore {
    * Reads from Supabase if configured, falling back to in-memory store in sandbox mode.
    */
   async getMatches(competitionCode?: string, season?: string): Promise<StoredMatch[]> {
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production';
+    const isProduction = isProductionRuntime();
 
     if (isProduction && (!isSupabaseConfigured || !supabase)) {
       throw new Error('[MatchesStore] Fatal: Supabase persistence is strictly required in production.');
@@ -1663,7 +1668,7 @@ class MatchesStore {
    * (snapshot_type === 'csv_pre_match' or 'live_pre_kickoff'), strictly excluding closing odds.
    */
   async getOdds(matchId: string, preKickoffOnly: boolean = false): Promise<StoredOddsSnapshot[]> {
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production';
+    const isProduction = isProductionRuntime();
 
     if (isProduction && (!isSupabaseConfigured || !supabase)) {
       throw new Error('[MatchesStore] Fatal: Supabase persistence is strictly required in production.');
@@ -1801,7 +1806,7 @@ class MatchesStore {
    * Explicitly reports storeUsed: 'supabase' | 'in-memory'.
    */
   async getDataStatus(): Promise<DataStatusReport> {
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.ENVIRONMENT === 'production';
+    const isProduction = isProductionRuntime();
     let storeUsed: 'supabase' | 'in-memory' = 'in-memory';
 
     if (isProduction && (!isSupabaseConfigured || !supabase)) {
@@ -2033,7 +2038,7 @@ class MatchesStore {
 
     // Empirical Asian handicap prices count & distinct seasons per league from odds_snapshots
     let ahQueried = false;
-    if (typeof window === 'undefined' && storeUsed === 'supabase') {
+    if (typeof window === 'undefined' && !isProduction && storeUsed === 'supabase') {
       try {
         const db = getLocalDatabase();
         if (db) {

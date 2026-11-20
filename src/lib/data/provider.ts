@@ -16,7 +16,7 @@ import { serverCache } from '../cache/serverCache';
 import { checkAndLogStartupEnv } from '../config/envAudit';
 import { lookupTeamStrength } from './teamDatabase';
 import { displayName, getTeamAbbreviation } from '../utils/formatText';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { supabase, isSupabaseConfigured, isProductionRuntime } from '@/lib/supabase/client';
 import { matchesStore } from './matchesStore';
 import {
   CANONICAL_COMPETITIONS,
@@ -668,7 +668,13 @@ export class LiveFootballDataProvider implements FootballDataProvider {
   private lastProviderUsed: string = 'Football-Data.org v4 + Sportmonks v3';
   private lastFailedProvider?: string;
   private lastQuotaHeaders?: Record<string, string>;
-  private activeSyncPromise: Promise<{ ok: boolean; count: number; providerUsed: string }> | null = null;
+  private activeSyncPromise: Promise<{
+    ok: boolean;
+    count: number;
+    rowsWrittenToFixtures: number;
+    rejectedFixtures: number;
+    providerUsed: string;
+  }> | null = null;
   private liveMetaById = new Map<string, {
     verifiedOdds?: VerifiedMatchOdds;
     matchday?: number;
@@ -821,6 +827,8 @@ export class LiveFootballDataProvider implements FootballDataProvider {
   ): Promise<{
     ok: boolean;
     count: number;
+    rowsWrittenToFixtures: number;
+    rejectedFixtures: number;
     providerUsed: string;
     callsMade: number;
     skippedLeagues: SkippedLeagueRecord[];
@@ -834,11 +842,13 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     const syncCacheKey = serverCache.getFixtureCacheKey(`SYNC_${mode.toUpperCase()}`, dateFrom, dateTo, 'football');
 
     if (!force) {
-      const cachedFlag = await serverCache.get<{ count: number; providerUsed: string }>(syncCacheKey);
+      const cachedFlag = await serverCache.get<{ count: number; rowsWrittenToFixtures?: number; providerUsed: string }>(syncCacheKey);
       if (cachedFlag && Date.now() - this.lastSyncEpochMs < 120_000) {
         return {
           ok: true,
           count: cachedFlag.count,
+          rowsWrittenToFixtures: cachedFlag.rowsWrittenToFixtures ?? cachedFlag.count,
+          rejectedFixtures: 0,
           providerUsed: cachedFlag.providerUsed,
           callsMade: 0,
           skippedLeagues: [],
@@ -1063,7 +1073,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
             });
           }
 
-          await syncFootballFixturesToDatabase(
+          const dbWrite = await syncFootballFixturesToDatabase(
             integrityReport.validFixtures,
             mode === 'schedule' ? undefined : dateFrom
           );
@@ -1102,6 +1112,9 @@ export class LiveFootballDataProvider implements FootballDataProvider {
             try {
               await matchesStore.upsertMatches(finishedToStore);
             } catch (e: any) {
+              if (isProductionRuntime()) {
+                throw e;
+              }
               console.warn('[FootballDataProvider] Non-fatal matches result sync warning:', e?.message || e);
             }
           }
@@ -1126,9 +1139,15 @@ export class LiveFootballDataProvider implements FootballDataProvider {
           });
 
           const ttl = Math.min(900, serverCache.computeFixtureTTL(integrityReport.validFixtures));
-          await serverCache.set(syncCacheKey, { count: integrityReport.validFixtures.length, providerUsed: providerNameUsed }, ttl);
+          await serverCache.set(syncCacheKey, { count: integrityReport.validFixtures.length, rowsWrittenToFixtures: dbWrite.upserted, providerUsed: providerNameUsed }, ttl);
 
-          return { ok: true, count: integrityReport.validFixtures.length, providerUsed: providerNameUsed };
+          return {
+            ok: true,
+            count: integrityReport.validFixtures.length,
+            rowsWrittenToFixtures: dbWrite.upserted,
+            rejectedFixtures: dbWrite.rejected,
+            providerUsed: providerNameUsed,
+          };
         }
       }
 
@@ -1146,7 +1165,13 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         callsUsedLastRun: totalCallsMade,
       });
 
-      return { ok: false, count: 0, providerUsed: this.lastProviderUsed };
+      return {
+        ok: false,
+        count: 0,
+        rowsWrittenToFixtures: 0,
+        rejectedFixtures: 0,
+        providerUsed: this.lastProviderUsed,
+      };
     })();
 
     try {
