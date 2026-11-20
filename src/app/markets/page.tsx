@@ -60,7 +60,7 @@ export default function MarketExplorerPage() {
     isBasketball ? 'BASKETBALL_MONEYLINE' : 'TOTAL_GOALS_O25'
   );
 
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated } = useLiveFixtures(
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated, error, isOffline, isSavedCopy } = useLiveFixtures(
     isBasketball ? 'NBA' : undefined,
     'ALL',
     sport
@@ -161,6 +161,20 @@ export default function MarketExplorerPage() {
             : 'Compare model probability, pricing, and calibration status for specific option lines across all European fixtures.'}
         </p>
       </div>
+
+      {/* Saved copy or server error notice */}
+      {(isSavedCopy || error) && (
+        <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11.5px] flex items-center gap-2">
+          <Info className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+          <span>
+            {isSavedCopy
+              ? `Showing saved copy${lastUpdated ? ` from ${lastUpdated}` : ''}${error ? ` (${error})` : ''}.`
+              : isOffline
+              ? 'You appear to be offline and no saved copy is available.'
+              : error || 'Unable to load fixtures.'}
+          </span>
+        </div>
+      )}
 
       {/* Market Selector Card */}
       <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">

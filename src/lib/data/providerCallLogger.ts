@@ -3,6 +3,7 @@
 // persists last-known-good sync state in Supabase/SQLite, and exposes the last 20 calls for /api/admin/provider-check.
 
 import { supabase, isSupabaseConfigured, isProductionRuntime } from '@/lib/supabase/client';
+import { serverCache } from '@/lib/cache/serverCache';
 import {
   ProviderId,
   SkippedLeagueRecord,
@@ -402,6 +403,10 @@ export async function upsertProviderSyncState(
         throw new Error(`Failed to write provider_sync_state (${id}): ${error.message}`);
       }
     }
+  }
+
+  if (id === 'football') {
+    await serverCache.bust('live_fixtures:');
   }
 }
 

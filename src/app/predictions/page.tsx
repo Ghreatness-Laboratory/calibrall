@@ -62,7 +62,7 @@ export default function PredictionsPage() {
       .catch(err => console.error('[PredictionsPage] Error fetching active competitions:', err));
   }, [isBasketball]);
 
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated, isDelayed, hasFreeFixturesSource, storedHistoryMode } = useLiveFixtures(
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated, isDelayed, hasFreeFixturesSource, storedHistoryMode, error, isOffline, isSavedCopy } = useLiveFixtures(
     isBasketball ? 'comp_nba' : selectedCompId,
     'ALL',
     sport,
@@ -347,6 +347,20 @@ export default function PredictionsPage() {
           {lastUpdated ? ` · Last updated ${lastUpdated}` : ''}
         </p>
       </div>
+
+      {/* Saved copy or server error notice */}
+      {(isSavedCopy || error) && (
+        <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11.5px] flex items-center gap-2">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+          <span>
+            {isSavedCopy
+              ? `Showing saved copy${lastUpdated ? ` from ${lastUpdated}` : ''}${error ? ` (${error})` : ''}.`
+              : isOffline
+              ? 'You appear to be offline and no saved copy is available.'
+              : error || 'Unable to load fixtures.'}
+          </span>
+        </div>
+      )}
 
       {/* Uncovered league notice */}
       {(storedHistoryMode || hasFreeFixturesSource === false) && !isBasketball && (

@@ -749,6 +749,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     statusDetail?: string;
     providerName?: string;
   }>();
+  private inFlightLiveFixtures = new Map<string, Promise<LiveFixturesResult>>();
 
   async getHealth(): Promise<ProviderHealth> {
     checkAndLogStartupEnv();
@@ -1208,6 +1209,8 @@ export class LiveFootballDataProvider implements FootballDataProvider {
 
           const ttl = Math.min(900, serverCache.computeFixtureTTL(integrityReport.validFixtures));
           await serverCache.set(syncCacheKey, { count: integrityReport.validFixtures.length, rowsWrittenToFixtures: dbWrite.upserted, providerUsed: providerNameUsed }, ttl);
+          matchesStore.clearPreloadCache();
+          await serverCache.bust('live_fixtures:');
 
           return {
             ok: true,
@@ -1265,156 +1268,190 @@ export class LiveFootballDataProvider implements FootballDataProvider {
   async getLiveFixtures(params?: { competitionId?: string; status?: string; day?: string }): Promise<LiveFixturesResult> {
     checkAndLogStartupEnv();
 
-    const { dateFrom, dateTo } = computeRequestDateWindow(14);
-    let selectedCanonicalComp: Competition | null = null;
+    const normCompId = params?.competitionId && params.competitionId !== 'ALL'
+      ? params.competitionId.trim().toLowerCase()
+      : 'ALL';
+    const normStatus = params?.status && params.status !== 'ALL' ? params.status.trim() : 'ALL';
+    const normDay = params?.day && params.day !== 'ALL' ? params.day.trim().toLowerCase() : 'ALL';
+    const cacheKey = `live_fixtures:football:${normCompId}:${normStatus}:${normDay}`;
 
-    if (params?.competitionId && params.competitionId !== 'ALL') {
-      if (!isCanonicalCompetitionId(params.competitionId)) {
-        logCompetitionIntegrityError('api_filter', params.competitionId, 'getLiveFixtures');
-        const freshness = await getStoredSportFreshness('football');
-        return {
-          fixtures: [],
-          liveDataAvailable: true,
-          lastUpdated: freshness.lastUpdatedFormatted,
-          lastSyncTimestamp: freshness.newestUpdatedAt,
-          isDelayed: freshness.isStaleBeyondLimit,
-          staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
-          hasFreeFixturesSource: true,
-          storedHistoryMode: false,
-          providerUsed: this.lastProviderUsed,
-          dateRange: { dateFrom, dateTo },
-        };
-      }
-      selectedCanonicalComp = getCanonicalCompetition(params.competitionId);
+    const cachedResult = await serverCache.get<LiveFixturesResult>(cacheKey);
+    if (cachedResult) {
+      return cachedResult;
     }
 
-    const compCoverage = selectedCanonicalComp
-      ? hasFreeFixturesCoverage(selectedCanonicalComp.code)
-      : { hasFreeSource: true, provider: 'Football-Data.org v4 + Sportmonks v3' };
+    const existingPromise = this.inFlightLiveFixtures.get(cacheKey);
+    if (existingPromise) {
+      return existingPromise;
+    }
 
-    const freshness = await getStoredSportFreshness('football');
-    const syncState = freshness.syncState;
-    const lastUpdatedStr = freshness.lastUpdatedFormatted !== 'never'
-      ? freshness.lastUpdatedFormatted
-      : (this.lastGoodSyncTime || 'never');
+    const runPromise = (async (): Promise<LiveFixturesResult> => {
+      const { dateFrom, dateTo } = computeRequestDateWindow(14);
+      let selectedCanonicalComp: Competition | null = null;
 
-    // Uncovered League Path: Show history and picks only from stored `matches` (never show an outage error banner)
-    if (selectedCanonicalComp && !compCoverage.hasFreeSource) {
-      let storedList = await getFixturesFromDatabase({
-        competitionId: params?.competitionId,
-        status: params?.status,
-        day: params?.day,
-        sport: 'football',
-      });
+      if (params?.competitionId && params.competitionId !== 'ALL') {
+        if (!isCanonicalCompetitionId(params.competitionId)) {
+          logCompetitionIntegrityError('api_filter', params.competitionId, 'getLiveFixtures');
+          const freshness = await getStoredSportFreshness('football');
+          return {
+            fixtures: [],
+            liveDataAvailable: true,
+            lastUpdated: freshness.lastUpdatedFormatted,
+            lastSyncTimestamp: freshness.newestUpdatedAt,
+            isDelayed: freshness.isStaleBeyondLimit,
+            staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
+            hasFreeFixturesSource: true,
+            storedHistoryMode: false,
+            providerUsed: this.lastProviderUsed,
+            dateRange: { dateFrom, dateTo },
+          };
+        }
+        selectedCanonicalComp = getCanonicalCompetition(params.competitionId);
+      }
 
-      if (storedList.length === 0) {
-        const historicalMatches = await matchesStore.getMatches(selectedCanonicalComp.code);
-        const nowIso = new Date().toISOString();
-        const converted = historicalMatches
-          .slice(0, 30)
-          .map(m => mapDbMatchToFixture(m, nowIso))
-          .filter((f): f is Fixture => f !== null);
+      const compCoverage = selectedCanonicalComp
+        ? hasFreeFixturesCoverage(selectedCanonicalComp.code)
+        : { hasFreeSource: true, provider: 'Football-Data.org v4 + Sportmonks v3' };
 
-        storedList = converted.filter(f => {
-          if (params?.status && params.status !== 'ALL' && f.status !== params.status) return false;
-          if (params?.day && params.day !== 'ALL' && !matchesDayFilter(f.kickoffTime, params.day)) return false;
-          return true;
+      const freshness = await getStoredSportFreshness('football');
+      const syncState = freshness.syncState;
+      const lastUpdatedStr = freshness.lastUpdatedFormatted !== 'never'
+        ? freshness.lastUpdatedFormatted
+        : (this.lastGoodSyncTime || 'never');
+
+      // Uncovered League Path: Show history and picks only from stored `matches` (never show an outage error banner)
+      if (selectedCanonicalComp && !compCoverage.hasFreeSource) {
+        let storedList = await getFixturesFromDatabase({
+          competitionId: params?.competitionId,
+          status: params?.status,
+          day: params?.day,
+          sport: 'football',
         });
-      }
 
-      await matchesStore.preloadForFixtures(storedList);
+        if (storedList.length === 0) {
+          const historicalMatches = await matchesStore.getMatches(selectedCanonicalComp.code);
+          const nowIso = new Date().toISOString();
+          const converted = historicalMatches
+            .slice(0, 30)
+            .map(m => mapDbMatchToFixture(m, nowIso))
+            .filter((f): f is Fixture => f !== null);
 
-      return {
-        fixtures: storedList.map(f => this.enrichFixtureWithDbStats(f)),
-        liveDataAvailable: true,
-        lastUpdated: lastUpdatedStr,
-        lastSyncTimestamp: freshness.newestUpdatedAt,
-        isDelayed: false,
-        staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
-        hasFreeFixturesSource: false,
-        storedHistoryMode: true,
-        providerUsed: 'Stored Match History (Fixtures Not Available on Free Tier)',
-        skippedLeagues: syncState?.skippedLeagues || [],
-        dateRange: { dateFrom, dateTo },
-      };
-    }
+          storedList = converted.filter(f => {
+            if (params?.status && params.status !== 'ALL' && f.status !== params.status) return false;
+            if (params?.day && params.day !== 'ALL' && !matchesDayFilter(f.kickoffTime, params.day)) return false;
+            return true;
+          });
+        }
 
-    // Primary Single Source of Truth: Database `fixtures` table ONLY
-    if (isSupabaseConfigured && supabase) {
-      const dbFixtures = await getFixturesFromDatabase({
-        competitionId: params?.competitionId,
-        status: params?.status,
-        day: params?.day,
-        sport: 'football',
-      });
+        await matchesStore.preloadForFixtures(storedList);
 
-      const hasAnyStoredFootball = dbFixtures.length > 0 || freshness.fixtureCount > 0;
-
-      if (hasAnyStoredFootball) {
-        await matchesStore.preloadForFixtures(dbFixtures);
-        const isStaleBeyondLimit = freshness.isStaleBeyondLimit;
-        const staleError = isStaleBeyondLimit
-          ? `Stored fixtures are older than 3 days. Last updated ${lastUpdatedStr}`
-          : undefined;
-
-        return {
-          fixtures: dbFixtures.map(f => this.enrichFixtureWithDbStats(f)),
+        const result: LiveFixturesResult = {
+          fixtures: storedList.map(f => this.enrichFixtureWithDbStats(f)),
           liveDataAvailable: true,
           lastUpdated: lastUpdatedStr,
           lastSyncTimestamp: freshness.newestUpdatedAt,
-          isDelayed: isStaleBeyondLimit,
+          isDelayed: false,
           staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
-          hasFreeFixturesSource: true,
+          hasFreeFixturesSource: false,
+          storedHistoryMode: true,
+          providerUsed: 'Stored Match History (Fixtures Not Available on Free Tier)',
+          skippedLeagues: syncState?.skippedLeagues || [],
+          dateRange: { dateFrom, dateTo },
+        };
+        if (result.fixtures.length > 0) {
+          await serverCache.set(cacheKey, result, 180);
+        }
+        return result;
+      }
+
+      // Primary Single Source of Truth: Database `fixtures` table ONLY
+      if (isSupabaseConfigured && supabase) {
+        const dbFixtures = await getFixturesFromDatabase({
+          competitionId: params?.competitionId,
+          status: params?.status,
+          day: params?.day,
+          sport: 'football',
+        });
+
+        const hasAnyStoredFootball = dbFixtures.length > 0 || freshness.fixtureCount > 0;
+
+        if (hasAnyStoredFootball) {
+          await matchesStore.preloadForFixtures(dbFixtures);
+          const isStaleBeyondLimit = freshness.isStaleBeyondLimit;
+          const staleError = isStaleBeyondLimit
+            ? `Stored fixtures are older than 3 days. Last updated ${lastUpdatedStr}`
+            : undefined;
+
+          const result: LiveFixturesResult = {
+            fixtures: dbFixtures.map(f => this.enrichFixtureWithDbStats(f)),
+            liveDataAvailable: true,
+            lastUpdated: lastUpdatedStr,
+            lastSyncTimestamp: freshness.newestUpdatedAt,
+            isDelayed: isStaleBeyondLimit,
+            staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
+            hasFreeFixturesSource: true,
+            storedHistoryMode: false,
+            error: staleError,
+            providerUsed: syncState?.providerName || 'Supabase Verified Fixtures',
+            failedProvider: isStaleBeyondLimit && syncState?.status === 'ERROR' ? syncState.providerName : undefined,
+            quotaHeaders: syncState?.quotaHeaders || this.lastQuotaHeaders,
+            skippedLeagues: syncState?.skippedLeagues || [],
+            dateRange: { dateFrom, dateTo },
+          };
+          if (result.fixtures.length > 0 && !result.error) {
+            await serverCache.set(cacheKey, result, 180);
+          }
+          return result;
+        }
+      }
+
+      // In-memory snapshot ONLY if DB has 0 rows (e.g. disconnected local sandbox)
+      if (this.lastGoodCachedFixtures.length > 0) {
+        const filteredRaw = this.applyLiveFilters(this.lastGoodCachedFixtures, params);
+        await matchesStore.preloadForFixtures(filteredRaw);
+        const filtered = filteredRaw.map(f => this.enrichFixtureWithDbStats(f));
+        return {
+          fixtures: filtered,
+          liveDataAvailable: true,
+          lastUpdated: lastUpdatedStr,
+          lastSyncTimestamp: freshness.newestUpdatedAt,
+          isDelayed: freshness.isStaleBeyondLimit,
+          staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
+          hasFreeFixturesSource: compCoverage.hasFreeSource,
           storedHistoryMode: false,
-          error: staleError,
-          providerUsed: syncState?.providerName || 'Supabase Verified Fixtures',
-          failedProvider: isStaleBeyondLimit && syncState?.status === 'ERROR' ? syncState.providerName : undefined,
-          quotaHeaders: syncState?.quotaHeaders || this.lastQuotaHeaders,
+          providerUsed: `${this.lastGoodCachedFixtures[0]?.providerName || 'Provider'} (Cached snapshot)`,
+          failedProvider: freshness.isStaleBeyondLimit ? this.lastFailedProvider : undefined,
+          quotaHeaders: this.lastQuotaHeaders,
           skippedLeagues: syncState?.skippedLeagues || [],
           dateRange: { dateFrom, dateTo },
         };
       }
-    }
 
-    // In-memory snapshot ONLY if DB has 0 rows (e.g. disconnected local sandbox)
-    if (this.lastGoodCachedFixtures.length > 0) {
-      const filteredRaw = this.applyLiveFilters(this.lastGoodCachedFixtures, params);
-      await matchesStore.preloadForFixtures(filteredRaw);
-      const filtered = filteredRaw.map(f => this.enrichFixtureWithDbStats(f));
+      // Required Empty/Stale Error State: Never generate synthetic substitute data!
+      const errorMsg = `Fixtures unavailable, last updated ${lastUpdatedStr}`;
       return {
-        fixtures: filtered,
-        liveDataAvailable: true,
+        fixtures: [],
+        liveDataAvailable: false,
         lastUpdated: lastUpdatedStr,
         lastSyncTimestamp: freshness.newestUpdatedAt,
-        isDelayed: freshness.isStaleBeyondLimit,
+        isDelayed: true,
         staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
         hasFreeFixturesSource: compCoverage.hasFreeSource,
         storedHistoryMode: false,
-        providerUsed: `${this.lastGoodCachedFixtures[0]?.providerName || 'Provider'} (Cached snapshot)`,
-        failedProvider: freshness.isStaleBeyondLimit ? this.lastFailedProvider : undefined,
-        quotaHeaders: this.lastQuotaHeaders,
+        error: errorMsg,
+        failedProvider: syncState?.providerName || this.lastFailedProvider || 'Football-Data.org / Sportmonks',
+        quotaHeaders: syncState?.quotaHeaders || this.lastQuotaHeaders,
         skippedLeagues: syncState?.skippedLeagues || [],
         dateRange: { dateFrom, dateTo },
       };
-    }
+    })();
 
-    // Required Empty/Stale Error State: Never generate synthetic substitute data!
-    const errorMsg = `Fixtures unavailable, last updated ${lastUpdatedStr}`;
-    return {
-      fixtures: [],
-      liveDataAvailable: false,
-      lastUpdated: lastUpdatedStr,
-      lastSyncTimestamp: freshness.newestUpdatedAt,
-      isDelayed: true,
-      staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
-      hasFreeFixturesSource: compCoverage.hasFreeSource,
-      storedHistoryMode: false,
-      error: errorMsg,
-      failedProvider: syncState?.providerName || this.lastFailedProvider || 'Football-Data.org / Sportmonks',
-      quotaHeaders: syncState?.quotaHeaders || this.lastQuotaHeaders,
-      skippedLeagues: syncState?.skippedLeagues || [],
-      dateRange: { dateFrom, dateTo },
-    };
+    this.inFlightLiveFixtures.set(cacheKey, runPromise);
+    try {
+      return await runPromise;
+    } finally {
+      this.inFlightLiveFixtures.delete(cacheKey);
+    }
   }
 
   async getFixtureById(id: string): Promise<Fixture | null> {

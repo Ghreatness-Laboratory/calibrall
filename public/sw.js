@@ -2,7 +2,7 @@
 // Version: 1.0.0
 // Brand: Every call, on record.
 
-const CACHE_VERSION = 'calibrall-v1.0.2';
+const CACHE_VERSION = 'calibrall-v1.0.3';
 const PRECACHE_NAME = `calibrall-precache-${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `calibrall-static-${CACHE_VERSION}`;
 const DATA_CACHE_NAME = `calibrall-data-${CACHE_VERSION}`;
@@ -138,35 +138,70 @@ self.addEventListener('fetch', (event) => {
   }
 
   // API and data requests (fixtures, odds, probabilities, EV, track record)
-  // Policy: Network-first with short timeout (2.5s).
-  // If offline/network fails, fallback to cached data with header indicating cache.
-  // NEVER serve stale data as current.
+  // Policy: Network-first with 15s timeout.
+  // Only report "Offline" when self.navigator.onLine === false.
+  // When server returns 5xx or times out while online, return saved copy (with X-Calibrall-Saved-Copy: true)
+  // or return the real HTTP status and reason (e.g. "server timeout (504)").
   if (url.pathname.startsWith('/api/v1/')) {
     event.respondWith(
       (async () => {
-        try {
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Network timeout')), 2500)
-          );
-          const networkResponse = await Promise.race([
-            fetch(request),
-            timeoutPromise,
-          ]);
+        const isBrowserOffline = () =>
+          typeof self.navigator !== 'undefined' && self.navigator.onLine === false;
 
-          if (networkResponse && networkResponse.status === 200) {
-            const cache = await caches.open(DATA_CACHE_NAME);
-            cache.put(request, networkResponse.clone());
-            return networkResponse;
+        const buildFailureMeta = (status, err, rawBodyReason) => {
+          if (isBrowserOffline()) {
+            return {
+              httpStatus: 503,
+              isOffline: true,
+              errorTitle: 'Offline',
+              reason: 'Offline',
+              message: 'Browser is offline and no saved copy exists.',
+            };
           }
-          return networkResponse;
-        } catch (err) {
-          // Network failed or timed out: check if cache has entry
+
+          if (status === 504 || (err && (err.name === 'AbortError' || err.message === 'Network timeout'))) {
+            const detail = rawBodyReason ? `server timeout (504): ${rawBodyReason}` : 'server timeout (504)';
+            return {
+              httpStatus: 504,
+              isOffline: false,
+              errorTitle: detail,
+              reason: detail,
+              message: detail,
+            };
+          }
+
+          if (typeof status === 'number' && status >= 500) {
+            const detail = rawBodyReason ? `server error (${status}): ${rawBodyReason}` : `server error (${status})`;
+            return {
+              httpStatus: status,
+              isOffline: false,
+              errorTitle: detail,
+              reason: detail,
+              message: detail,
+            };
+          }
+
+          const errMsg = err && err.message ? err.message : 'connection failed';
+          const detail = `server unreachable (${errMsg})`;
+          return {
+            httpStatus: 502,
+            isOffline: false,
+            errorTitle: detail,
+            reason: detail,
+            message: detail,
+          };
+        };
+
+        const serveSavedCopyOrError = async (failureMeta, originalResponse) => {
           const cachedResponse = await caches.match(request);
           if (cachedResponse) {
-            // Inject header to notify client that this response is from cache
             const headers = new Headers(cachedResponse.headers);
             headers.set('X-Calibrall-Cached', 'true');
+            headers.set('X-Calibrall-Saved-Copy', 'true');
             headers.set('X-Calibrall-Cached-Time', new Date().toISOString());
+            headers.set('X-Calibrall-Server-Status', String(failureMeta.httpStatus));
+            headers.set('X-Calibrall-Server-Error', failureMeta.reason);
+            headers.set('X-Calibrall-Offline', failureMeta.isOffline ? 'true' : 'false');
 
             return new Response(await cachedResponse.blob(), {
               status: cachedResponse.status,
@@ -175,18 +210,60 @@ self.addEventListener('fetch', (event) => {
             });
           }
 
-          // Return JSON response indicating offline status
+          if (originalResponse) {
+            const contentType = originalResponse.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+              return originalResponse;
+            }
+          }
+
           return new Response(
             JSON.stringify({
-              error: 'Offline',
-              message: 'Live network unavailable and no cached data exists.',
-              isOffline: true,
+              error: failureMeta.errorTitle,
+              reason: failureMeta.reason,
+              message: failureMeta.message,
+              serverStatus: failureMeta.httpStatus,
+              isOffline: failureMeta.isOffline,
             }),
             {
-              status: 503,
+              status: failureMeta.httpStatus,
               headers: { 'Content-Type': 'application/json' },
             }
           );
+        };
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        try {
+          const networkResponse = await fetch(request, { signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          if (networkResponse && networkResponse.status === 200) {
+            const cache = await caches.open(DATA_CACHE_NAME);
+            cache.put(request, networkResponse.clone());
+            return networkResponse;
+          }
+
+          if (networkResponse && networkResponse.status >= 500) {
+            let bodyReason = '';
+            try {
+              const cloned = networkResponse.clone();
+              const ct = cloned.headers.get('content-type') || '';
+              if (ct.includes('application/json')) {
+                const parsed = await cloned.json();
+                bodyReason = parsed?.reason || parsed?.error || '';
+              }
+            } catch (_) {}
+            const meta = buildFailureMeta(networkResponse.status, null, bodyReason);
+            return await serveSavedCopyOrError(meta, networkResponse);
+          }
+
+          return networkResponse;
+        } catch (err) {
+          clearTimeout(timeoutId);
+          const meta = buildFailureMeta(null, err, '');
+          return await serveSavedCopyOrError(meta, null);
         }
       })()
     );
@@ -212,9 +289,12 @@ self.addEventListener('fetch', (event) => {
           if (cachedPage) {
             return cachedPage;
           }
-          // Otherwise fall back to the offline app shell
-          const offlinePage = await caches.match('/offline');
-          return offlinePage || new Response('Offline', { status: 503 });
+          const isBrowserOffline = typeof self.navigator !== 'undefined' && self.navigator.onLine === false;
+          if (isBrowserOffline) {
+            const offlinePage = await caches.match('/offline');
+            return offlinePage || new Response('Offline', { status: 503 });
+          }
+          return new Response('Server unavailable (502)', { status: 502 });
         }
       })()
     );

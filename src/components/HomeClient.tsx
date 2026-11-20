@@ -25,7 +25,7 @@ import SportSwitcher from '@/components/SportSwitcher';
 
 export default function HomeClient() {
   const { sport, isSwitching } = useSport();
-  const { fixtures, lastUpdated, isDelayed } = useLiveFixtures('ALL', 'ALL', sport);
+  const { fixtures, lastUpdated, isDelayed, error, isSavedCopy, isOffline } = useLiveFixtures('ALL', 'ALL', sport);
 
   const isBasketball = sport === 'basketball';
 
@@ -225,17 +225,34 @@ export default function HomeClient() {
           </div>
 
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#151D19] border border-[#1F2A24] text-[10.5px] text-[#8B9892]">
-            <span className={`w-1.5 h-1.5 rounded-full ${isDelayed ? 'bg-[#E8B04A]' : 'bg-[#B8E636]'} shrink-0`} />
-            <span>{isDelayed ? 'Data delayed' : 'Pipeline active'}</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${isSavedCopy || isDelayed ? 'bg-[#E8B04A]' : 'bg-[#B8E636]'} shrink-0`} />
+            <span>{isSavedCopy ? 'saved copy' : isDelayed ? 'Data delayed' : 'Pipeline active'}</span>
           </div>
         </div>
 
-        {/* Notice shown ONLY when stored fixtures are older than the 3 day limit */}
-        {isDelayed && (
+        {/* Saved copy / server error / offline notice */}
+        {isSavedCopy && fixtures.length > 0 && (
+          <div className="p-2.5 rounded-[12px] bg-[#E8B04A]/12 border border-[#E8B04A]/30 text-[#E8B04A] text-[11.5px] flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">
+                {isOffline ? 'Offline' : (error || 'Live request failed')}: showing saved copy{lastUpdated ? ` (last updated ${lastUpdated})` : ''}.
+              </span>
+            </div>
+            <span className="shrink-0 px-2 py-0.5 rounded-[6px] bg-[#E8B04A]/20 font-mono text-[10px] font-semibold uppercase">
+              saved copy
+            </span>
+          </div>
+        )}
+
+        {/* Notice shown when stored fixtures are older than the 3 day limit or empty error */}
+        {!isSavedCopy && (isDelayed || (error && fixtures.length === 0)) && (
           <div className="p-2.5 rounded-[12px] bg-[#E8B04A]/12 border border-[#E8B04A]/30 text-[#E8B04A] text-[11.5px] flex items-center gap-2">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>
-              Stored fixtures are older than 3 days (last updated {lastUpdated || 'never'}). Displaying latest verified schedule.
+              {error && fixtures.length === 0
+                ? `${isOffline ? 'Offline' : error}${lastUpdated ? ` (last updated ${lastUpdated})` : ''}`
+                : `Stored fixtures are older than 3 days (last updated ${lastUpdated || 'never'}). Displaying latest verified schedule.`}
             </span>
           </div>
         )}

@@ -66,7 +66,10 @@ export default function MatchesPage() {
     staleLimitMinutes,
     hasFreeFixturesSource,
     storedHistoryMode,
-    error, 
+    error,
+    serverStatus,
+    isOffline,
+    isSavedCopy,
     failedProvider, 
     quotaHeaders, 
     refetch 
@@ -259,8 +262,23 @@ export default function MatchesPage() {
         </div>
       )}
 
+      {/* Saved copy notice when serving preserved fixtures after a server/network error */}
+      {isSavedCopy && fixtures.length > 0 && (
+        <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11.5px] flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              {isOffline ? 'Offline' : (error || (serverStatus ? `server error (${serverStatus})` : 'Server unavailable'))}: keeping saved copy{lastUpdated ? ` (last updated ${lastUpdated})` : ''}.
+            </span>
+          </div>
+          <span className="shrink-0 px-2 py-0.5 rounded-[6px] bg-amber-500/20 font-mono text-[10px] font-semibold uppercase">
+            saved copy
+          </span>
+        </div>
+      )}
+
       {/* Error/staleness banner shown ONLY when stored fixtures exceed the 3 day staleness limit */}
-      {showStaleBanner && (
+      {showStaleBanner && !isSavedCopy && (
         <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11.5px] space-y-1.5">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -468,16 +486,20 @@ export default function MatchesPage() {
           ))}
         </div>
       ) : !storedHistoryMode && (error || !liveDataAvailable) && fixtures.length === 0 ? (
-        /* Loud Error State (Requirement 4) */
+        /* Loud Error State showing real status and reason */
         <div className="border border-rose-500/30 bg-rose-500/10 rounded-[14px] p-6 text-center space-y-3">
           <div className="w-[46px] h-[46px] rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
             <AlertCircle className="w-6 h-6" />
           </div>
           <div className="text-[16px] font-[700] text-[#ECF1EE]">
-            Fixtures unavailable, last updated {lastUpdated || 'recently'}
+            {isOffline
+              ? 'Offline: browser is not connected'
+              : (error || `Fixtures unavailable${serverStatus ? ` (${serverStatus})` : ''}`)}
           </div>
           <p className="text-[12.5px] text-[#8B9890] max-w-sm mx-auto leading-relaxed">
-            Live football data provider failed or quota is exhausted. In accordance with zero-fake-data policy, no synthetic substitute data is generated.
+            {isOffline
+              ? 'Your browser appears offline and no saved copy exists for this filter.'
+              : `Request could not load fresh fixtures${lastUpdated ? ` (last updated ${lastUpdated})` : ''}. No synthetic substitute data is generated.`}
           </p>
           {failedProvider && (
             <div className="text-[12px] font-mono text-rose-300">

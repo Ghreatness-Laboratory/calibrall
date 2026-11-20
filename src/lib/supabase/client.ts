@@ -17,6 +17,9 @@ const supabaseAnonKey =
   '';
 
 export function isProductionRuntime(): boolean {
+  if (!isRemoteSupabase && process.env.VERCEL !== '1' && process.env.VERCEL_ENV !== 'production') {
+    return false;
+  }
   return (
     process.env.NODE_ENV === 'production' ||
     process.env.ENVIRONMENT === 'production' ||
@@ -569,6 +572,9 @@ export function getLocalDatabase(): any {
       try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_fixtures_provider_id ON fixtures(provider_id);'); } catch (_) {}
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_rivalries_pair ON rivalries(team_a_id, team_b_id);'); } catch (_) {}
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_provider_call_logs_ts ON provider_call_logs(timestamp DESC);'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_matches_home_kickoff ON matches(home_team_id, kickoff_time DESC);'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_matches_away_kickoff ON matches(away_team_id, kickoff_time DESC);'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_odds_snapshots_match_id ON odds_snapshots(match_id);'); } catch (_) {}
       state.schemaInitialized = true;
     }
 
@@ -645,11 +651,101 @@ function createLocalSupabaseClient(): any {
       }
       return new LocalSupabaseQueryBuilder(db, table);
     },
-    rpc: (fnName: string) =>
-      Promise.resolve({
+    rpc: async (fnName: string, params?: Record<string, any>) => {
+      if (fnName === 'get_fixture_teams_recent_matches') {
+        try {
+          const db = getLocalDatabase();
+          if (!db) {
+            return { data: { matches: [], odds: [], promoted_team_ids: [] }, error: null };
+          }
+          const teamIds: string[] = Array.isArray(params?.team_ids)
+            ? Array.from(new Set(params.team_ids.filter((x: any) => typeof x === 'string' && x.trim() !== '')))
+            : [];
+          const perTeamLimit = Math.max(1, Math.min(200, Number(params?.per_team_limit) || 40));
+          const fixtureIds: string[] = Array.isArray(params?.fixture_ids)
+            ? Array.from(new Set(params.fixture_ids.filter((x: any) => typeof x === 'string' && x.trim() !== '')))
+            : [];
+          const refereeNames: string[] = Array.isArray(params?.referee_names)
+            ? Array.from(new Set(params.referee_names.filter((x: any) => typeof x === 'string' && x.trim() !== '').map((x: string) => x.trim().toLowerCase())))
+            : [];
+
+          let matches: any[] = [];
+          if (teamIds.length > 0 || refereeNames.length > 0) {
+            const teamPlaceholders = teamIds.map(() => '?').join(', ');
+            const refPlaceholders = refereeNames.map(() => '?').join(', ');
+            const ctes: string[] = [];
+            const unionSelects: string[] = [];
+            const sqlParams: any[] = [];
+
+            if (teamIds.length > 0) {
+              ctes.push(`
+                team_matches AS (
+                  SELECT m.*, m.home_team_id AS _tid
+                  FROM matches m
+                  WHERE m.home_team_id IN (${teamPlaceholders})
+                  UNION ALL
+                  SELECT m.*, m.away_team_id AS _tid
+                  FROM matches m
+                  WHERE m.away_team_id IN (${teamPlaceholders})
+                ),
+                ranked_team AS (
+                  SELECT *, ROW_NUMBER() OVER (PARTITION BY _tid ORDER BY kickoff_time DESC, id ASC) AS rn
+                  FROM team_matches
+                )
+              `);
+              sqlParams.push(...teamIds, ...teamIds);
+              unionSelects.push(`SELECT id FROM ranked_team WHERE rn <= ${perTeamLimit}`);
+            }
+
+            if (refereeNames.length > 0) {
+              ctes.push(`
+                ranked_ref AS (
+                  SELECT id, ROW_NUMBER() OVER (PARTITION BY LOWER(TRIM(referee)) ORDER BY kickoff_time DESC, id ASC) AS rn
+                  FROM matches
+                  WHERE referee IS NOT NULL AND LOWER(TRIM(referee)) IN (${refPlaceholders})
+                )
+              `);
+              sqlParams.push(...refereeNames);
+              unionSelects.push(`SELECT id FROM ranked_ref WHERE rn <= ${perTeamLimit}`);
+            }
+
+            const sql = `
+              WITH ${ctes.join(', ')}
+              SELECT * FROM matches
+              WHERE id IN (${unionSelects.join(' UNION ')})
+              ORDER BY kickoff_time DESC, id ASC
+            `;
+            matches = db.prepare(sql).all(...sqlParams) as any[];
+          }
+
+          let odds: any[] = [];
+          if (fixtureIds.length > 0) {
+            const oddsPlaceholders = fixtureIds.map(() => '?').join(', ');
+            odds = db
+              .prepare(`SELECT * FROM odds_snapshots WHERE match_id IN (${oddsPlaceholders}) ORDER BY id ASC`)
+              .all(...fixtureIds) as any[];
+          }
+
+          const promotedRows = db.prepare('SELECT id FROM teams WHERE is_promoted = 1').all() as Array<{ id: string }>;
+          const promotedTeamIds = promotedRows.map(r => r.id).filter(Boolean);
+
+          return {
+            data: {
+              matches,
+              odds,
+              promoted_team_ids: promotedTeamIds,
+            },
+            error: null,
+          };
+        } catch (err: any) {
+          return { data: null, error: { message: err?.message || 'Local RPC error', code: 'LOCAL_RPC_ERROR' } };
+        }
+      }
+      return {
         data: null,
         error: { message: `RPC function ${fnName} is not registered on local SQLite adapter`, code: 'LOCAL_RPC_UNSUPPORTED' },
-      }),
+      };
+    },
     auth: {
       persistSession: false,
     },

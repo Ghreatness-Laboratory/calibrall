@@ -5,6 +5,7 @@ import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/predi
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 120;
+export const maxDuration = 60;
 
 export async function GET() {
   const provider = getFootballDataProvider();

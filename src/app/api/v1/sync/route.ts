@@ -9,6 +9,7 @@ import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/s
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { lookupCanonicalTeam } from '@/lib/data/canonicalTeams';
 import { updateFixtureVerifiedOddsInDatabase } from '@/lib/data/fixturesDatabase';
+import { serverCache } from '@/lib/cache/serverCache';
 import {
   SyncMode,
   PROVIDER_BUDGETS,
@@ -29,6 +30,7 @@ import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+export const maxDuration = 60;
 
 const ODDS_API_LEAGUES: Array<{ code: string; name: string; sportKey: string }> = [
   { code: 'PL', name: 'Premier League', sportKey: 'soccer_epl' },
@@ -536,6 +538,10 @@ async function handleSync(request: Request) {
           skippedLeagues: oddsSkipped,
           callsUsedLastRun: oddsCalls,
         });
+
+        if (matchesUpdated > 0) {
+          await serverCache.bust('live_fixtures:');
+        }
 
         results['theOddsApi'] = {
           provider: 'the-odds-api.com',

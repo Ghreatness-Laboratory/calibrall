@@ -326,10 +326,127 @@ class MatchesStore {
     return (globalThis as any).__calibrall_promoted_teams;
   }
 
+  private get teamMatchesIndex(): Map<string, StoredMatch[]> {
+    if (!(globalThis as any).__calibrall_team_matches_index) {
+      (globalThis as any).__calibrall_team_matches_index = new Map<string, StoredMatch[]>();
+    }
+    return (globalThis as any).__calibrall_team_matches_index;
+  }
+
+  private get normNameMatchesIndex(): Map<string, StoredMatch[]> {
+    if (!(globalThis as any).__calibrall_norm_name_matches_index) {
+      (globalThis as any).__calibrall_norm_name_matches_index = new Map<string, StoredMatch[]>();
+    }
+    return (globalThis as any).__calibrall_norm_name_matches_index;
+  }
+
+  private get refereeMatchesIndex(): Map<string, StoredMatch[]> {
+    if (!(globalThis as any).__calibrall_referee_matches_index) {
+      (globalThis as any).__calibrall_referee_matches_index = new Map<string, StoredMatch[]>();
+    }
+    return (globalThis as any).__calibrall_referee_matches_index;
+  }
+
+  private get kickoffMsCache(): WeakMap<StoredMatch, number> {
+    if (!(globalThis as any).__calibrall_kickoff_ms_cache) {
+      (globalThis as any).__calibrall_kickoff_ms_cache = new WeakMap<StoredMatch, number>();
+    }
+    return (globalThis as any).__calibrall_kickoff_ms_cache;
+  }
+
+  private get oddsByMatchIndex(): Map<string, StoredOddsSnapshot[]> {
+    if (!(globalThis as any).__calibrall_odds_by_match_index) {
+      (globalThis as any).__calibrall_odds_by_match_index = new Map<string, StoredOddsSnapshot[]>();
+    }
+    return (globalThis as any).__calibrall_odds_by_match_index;
+  }
+
+  private get teamStatsMemo(): Map<string, { stats: DbTeamStatsSummary; computedAt: number }> {
+    if (!(globalThis as any).__calibrall_team_stats_memo) {
+      (globalThis as any).__calibrall_team_stats_memo = new Map<string, { stats: DbTeamStatsSummary; computedAt: number }>();
+    }
+    return (globalThis as any).__calibrall_team_stats_memo;
+  }
+
+  private get rivalriesIndex(): Map<string, RivalryLookupResult> {
+    if (!(globalThis as any).__calibrall_rivalries_index) {
+      (globalThis as any).__calibrall_rivalries_index = new Map<string, RivalryLookupResult>();
+    }
+    return (globalThis as any).__calibrall_rivalries_index;
+  }
+
+  private getKickoffMs(m: StoredMatch): number {
+    let ms = this.kickoffMsCache.get(m);
+    if (ms === undefined) {
+      ms = m.kickoff_time ? Date.parse(m.kickoff_time) : NaN;
+      this.kickoffMsCache.set(m, ms);
+    }
+    return ms;
+  }
+
+  private rebuildOddsIndex(): void {
+    this.oddsByMatchIndex.clear();
+    for (const o of Array.from(this.inMemoryOdds.values())) {
+      if (!o || !o.match_id) continue;
+      let bucket = this.oddsByMatchIndex.get(o.match_id);
+      if (!bucket) {
+        bucket = [];
+        this.oddsByMatchIndex.set(o.match_id, bucket);
+      }
+      bucket.push(o);
+    }
+  }
+
+  private getCandidateMatchesForTeam(idVariants: Set<string>, normName: string): StoredMatch[] {
+    if (this.teamMatchesIndex.size === 0 && this.inMemoryMatches.size > 0) {
+      this.rebuildTeamCounts();
+    }
+
+    const seen = new Set<StoredMatch>();
+    let singleList: StoredMatch[] | null = null;
+    let listCount = 0;
+
+    for (const variant of Array.from(idVariants)) {
+      const list = this.teamMatchesIndex.get(variant);
+      if (list && list.length > 0) {
+        if (listCount === 0) singleList = list;
+        listCount++;
+        if (listCount > 1) {
+          if (seen.size === 0 && singleList) {
+            for (const item of singleList) seen.add(item);
+          }
+          for (const item of list) seen.add(item);
+        }
+      }
+    }
+
+    if (normName) {
+      const normList = this.normNameMatchesIndex.get(normName);
+      if (normList && normList.length > 0) {
+        if (listCount === 0) singleList = normList;
+        listCount++;
+        if (listCount > 1) {
+          if (seen.size === 0 && singleList) {
+            for (const item of singleList) seen.add(item);
+          }
+          for (const item of normList) seen.add(item);
+        }
+      }
+    }
+
+    if (listCount === 0) return [];
+    if (listCount === 1 && singleList) {
+      // Single bucket is already pre-sorted descending by kickoff_time
+      return singleList;
+    }
+
+    return Array.from(seen).sort((a, b) => (this.getKickoffMs(b) || 0) - (this.getKickoffMs(a) || 0));
+  }
+
   constructor() {}
 
   ensureHydratedFromDbSync(): void {
-    if (typeof window !== 'undefined' || isProductionRuntime()) return;
+    if (typeof window !== 'undefined' || isProductionRuntime() || persistenceBackendInfo().isRemoteSupabase) return;
     try {
       const db = getLocalDatabase();
       if (!db) return;
@@ -356,11 +473,39 @@ class MatchesStore {
         }
       } catch (_) {}
 
+      this.ensureRivalriesLoadedSync(db);
+
       (globalThis as any).__calibrall_hydrated_db_count = dbCount;
       this.rebuildTeamCounts();
     } catch (_) {
       // Ignore if DB unavailable during client bundling
     }
+  }
+
+  private ensureRivalriesLoadedSync(dbOverride?: any): void {
+    if (typeof window !== 'undefined') return;
+    if ((globalThis as any).__calibrall_rivalries_loaded) return;
+    try {
+      const db = dbOverride || getLocalDatabase();
+      if (!db) return;
+      const rows = db.prepare(`SELECT team_a_id, team_b_id, rivalry_name, source, intensity FROM rivalries`).all() as Array<{
+        team_a_id: string;
+        team_b_id: string;
+        rivalry_name: string;
+        source: string;
+        intensity: number;
+      }>;
+      this.rivalriesIndex.clear();
+      for (const r of rows) {
+        this.rivalriesIndex.set(`${r.team_a_id}|${r.team_b_id}`, {
+          isDerby: true,
+          derbyName: r.rivalry_name,
+          source: r.source,
+          intensity: r.intensity,
+        });
+      }
+      (globalThis as any).__calibrall_rivalries_loaded = true;
+    } catch (_) {}
   }
 
   private canonicalizeTeamId(
@@ -463,7 +608,9 @@ class MatchesStore {
   /**
    * Preloads historical matches, odds_snapshots, and promoted flags from Supabase Postgres
    * into `inMemoryMatches` / `inMemoryOdds` before synchronous prediction enrichment (`enrichFixtureWithDbStats`).
-   * Uses chunked `.or(...)` / `.in(...)` queries with paginated `fetchAllRows` (no 1,000-row cap) and a 60s TTL cache.
+   * Uses a single indexed Postgres RPC (`get_fixture_teams_recent_matches`) returning each team's
+   * last 40 matches + referees + odds + promoted flags in 1 DB round-trip (with parallel batch fallback
+   * if the migration has not yet been applied).
    */
   async preloadForFixtures(fixtures: Fixture[]): Promise<void> {
     if (!fixtures || fixtures.length === 0) return;
@@ -471,13 +618,9 @@ class MatchesStore {
     this.ensureHydratedFromDbSync();
 
     const useRemoteSupabase = isProductionRuntime() || persistenceBackendInfo().isRemoteSupabase;
-    if (!isSupabaseConfigured || !supabase || (!useRemoteSupabase && this.inMemoryMatches.size > 0)) {
-      return;
-    }
-
     const cache = this.getPreloadCache();
     const now = Date.now();
-    const TTL_MS = 60_000;
+    const TTL_MS = 180_000;
 
     const neededTeamVariants = new Set<string>();
     const neededTeamCacheKeys = new Set<string>();
@@ -512,42 +655,172 @@ class MatchesStore {
       }
     }
 
-    const needTeams = neededTeamVariants.size > 0;
-    const needRefs = neededReferees.size > 0;
     const missingOddsIds = Array.from(neededFixtureIds).filter(id => {
       const last = cache.get(`odds:${id}`);
       return !last || now - last > TTL_MS;
     });
 
+    // Local SQLite fast-path: matches are already hydrated in memory; batch-load missing odds & rivalries once
+    if (!isSupabaseConfigured || !supabase || (!useRemoteSupabase && this.inMemoryMatches.size > 0)) {
+      if (typeof window === 'undefined' && !useRemoteSupabase) {
+        try {
+          const db = getLocalDatabase();
+          if (db) {
+            this.ensureRivalriesLoadedSync(db);
+            if (missingOddsIds.length > 0) {
+              for (const idBatch of chunkArray(missingOddsIds, 400)) {
+                const placeholders = idBatch.map(() => '?').join(', ');
+                const oddsRows = db
+                  .prepare(`SELECT * FROM odds_snapshots WHERE match_id IN (${placeholders})`)
+                  .all(...idBatch) as StoredOddsSnapshot[];
+                for (const o of oddsRows) {
+                  const uniqueKey = `${o.match_id}:${o.bookmaker}:${o.market_code}:${o.source}`;
+                  this.inMemoryOdds.set(uniqueKey, o);
+                }
+                this.markPreloadedKeys(idBatch.map(id => `odds:${id}`));
+              }
+              this.rebuildOddsIndex();
+            }
+          }
+        } catch (_) {}
+      }
+      return;
+    }
+
+    const needTeams = neededTeamVariants.size > 0;
+    const needRefs = neededReferees.size > 0;
     if (!needTeams && !needRefs && missingOddsIds.length === 0) {
       return;
     }
 
+    // 1. Primary Single-Call Path: Postgres/SQLite RPC `get_fixture_teams_recent_matches`
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_fixture_teams_recent_matches', {
+        team_ids: Array.from(neededTeamVariants),
+        per_team_limit: 40,
+        fixture_ids: missingOddsIds,
+        referee_names: Array.from(neededReferees),
+      });
+
+      if (!rpcError && rpcData && typeof rpcData === 'object') {
+        const payload = rpcData as {
+          matches?: StoredMatch[];
+          odds?: StoredOddsSnapshot[];
+          promoted_team_ids?: string[];
+        };
+
+        const rpcMatches = Array.isArray(payload.matches) ? payload.matches : [];
+        if (rpcMatches.length > 0) {
+          for (const row of rpcMatches) {
+            const normalizedRow: StoredMatch = {
+              ...row,
+              home_team_id: this.canonicalizeTeamId(row.home_team_id),
+              away_team_id: this.canonicalizeTeamId(row.away_team_id),
+            };
+            this.inMemoryMatches.set(normalizedRow.provider_id || normalizedRow.id, normalizedRow);
+          }
+          this.rebuildTeamCounts();
+        }
+
+        const rpcOdds = Array.isArray(payload.odds) ? payload.odds : [];
+        if (rpcOdds.length > 0) {
+          for (const o of rpcOdds) {
+            const uniqueKey = `${o.match_id}:${o.bookmaker}:${o.market_code}:${o.source}`;
+            this.inMemoryOdds.set(uniqueKey, o);
+          }
+          this.rebuildOddsIndex();
+        }
+
+        const rpcPromoted = Array.isArray(payload.promoted_team_ids) ? payload.promoted_team_ids : [];
+        for (const pid of rpcPromoted) {
+          if (pid) this.promotedTeamIds.add(this.canonicalizeTeamId(pid));
+        }
+
+        if (needTeams) this.markPreloadedKeys(Array.from(neededTeamCacheKeys));
+        if (needRefs) this.markPreloadedKeys(Array.from(neededReferees).map(r => `ref:${r.toLowerCase()}`));
+        if (missingOddsIds.length > 0) this.markPreloadedKeys(missingOddsIds.map(id => `odds:${id}`));
+        this.markPreloadedKeys(['teams:promoted']);
+        return;
+      }
+
+      if (rpcError) {
+        console.warn('[MatchesStore] Single-RPC get_fixture_teams_recent_matches unavailable, using parallel batch fallback:', rpcError.message);
+      }
+    } catch (err: any) {
+      console.warn('[MatchesStore] Single-RPC exception, using parallel batch fallback:', err?.message || err);
+    }
+
+    // 2. Fallback Path (if migration 20261120000000 has not been applied on remote Postgres yet):
+    // Run batches concurrently with Promise.all instead of sequential loops
     let fetchedAnyMatches = false;
+    let fetchedAnyOdds = false;
 
-    // 1. Load team match histories in chunks (12 team variants -> <= 24 OR predicates per query)
-    for (const variantBatch of chunkArray(Array.from(neededTeamVariants), 12)) {
-      const orFilter = variantBatch
-        .flatMap(id => [`home_team_id.eq.${id}`, `away_team_id.eq.${id}`])
-        .join(',');
+    const teamBatches = chunkArray(Array.from(neededTeamVariants), 20);
+    const refBatches = chunkArray(Array.from(neededReferees), 15);
+    const oddsBatches = chunkArray(missingOddsIds, 150);
+    const lastPromotedFetch = cache.get('teams:promoted');
+    const needPromoted = !lastPromotedFetch || now - lastPromotedFetch > TTL_MS;
 
-      const { data, error } = await fetchAllRows<StoredMatch>((from, to) =>
-        supabase
-          .from('matches')
-          .select('*')
-          .or(orFilter)
-          .order('kickoff_time', { ascending: false })
-          .order('id', { ascending: true })
-          .range(from, to)
-      );
+    const [teamResults, refResults, oddsResults, promResult] = await Promise.all([
+      Promise.all(
+        teamBatches.map(async variantBatch => {
+          const orFilter = variantBatch
+            .flatMap(id => [`home_team_id.eq.${id}`, `away_team_id.eq.${id}`])
+            .join(',');
+          return fetchAllRows<StoredMatch>((from, to) =>
+            supabase
+              .from('matches')
+              .select('*')
+              .or(orFilter)
+              .order('kickoff_time', { ascending: false })
+              .order('id', { ascending: true })
+              .range(from, to)
+          );
+        })
+      ),
+      Promise.all(
+        refBatches.map(async refBatch =>
+          fetchAllRows<StoredMatch>((from, to) =>
+            supabase
+              .from('matches')
+              .select('*')
+              .in('referee', refBatch)
+              .order('kickoff_time', { ascending: false })
+              .order('id', { ascending: true })
+              .range(from, to)
+          )
+        )
+      ),
+      Promise.all(
+        oddsBatches.map(async idBatch =>
+          fetchAllRows<StoredOddsSnapshot>((from, to) =>
+            supabase
+              .from('odds_snapshots')
+              .select('*')
+              .in('match_id', idBatch)
+              .order('id', { ascending: true })
+              .range(from, to)
+          )
+        )
+      ),
+      needPromoted
+        ? fetchAllRows<{ id: string }>((from, to) =>
+            supabase
+              .from('teams')
+              .select('id')
+              .eq('is_promoted', 1)
+              .order('id', { ascending: true })
+              .range(from, to)
+          ).catch(() => ({ data: null, error: null }))
+        : Promise.resolve({ data: null, error: null }),
+    ]);
 
-      if (error) {
-        if (isProductionRuntime()) {
-          throw new Error(`[MatchesStore] Failed to preload team matches: ${error.message}`);
-        }
-        console.warn('[MatchesStore] preloadForFixtures team query warning:', error.message);
-      } else if (data && data.length > 0) {
-        for (const row of data) {
+    for (const res of teamResults) {
+      if (res.error && isProductionRuntime()) {
+        throw new Error(`[MatchesStore] Failed to preload team matches: ${res.error.message}`);
+      }
+      if (res.data && res.data.length > 0) {
+        for (const row of res.data) {
           const normalizedRow: StoredMatch = {
             ...row,
             home_team_id: this.canonicalizeTeamId(row.home_team_id),
@@ -558,25 +831,12 @@ class MatchesStore {
         fetchedAnyMatches = true;
       }
     }
+    if (needTeams) this.markPreloadedKeys(Array.from(neededTeamCacheKeys));
 
-    if (needTeams) {
-      this.markPreloadedKeys(Array.from(neededTeamCacheKeys));
-    }
-
-    // 2. Load referee histories for announced referees
-    for (const refBatch of chunkArray(Array.from(neededReferees), 10)) {
-      const { data, error } = await fetchAllRows<StoredMatch>((from, to) =>
-        supabase
-          .from('matches')
-          .select('*')
-          .in('referee', refBatch)
-          .order('kickoff_time', { ascending: false })
-          .order('id', { ascending: true })
-          .range(from, to)
-      );
-
-      if (!error && data && data.length > 0) {
-        for (const row of data) {
+    for (let i = 0; i < refResults.length; i++) {
+      const res = refResults[i];
+      if (!res.error && res.data && res.data.length > 0) {
+        for (const row of res.data) {
           const normalizedRow: StoredMatch = {
             ...row,
             home_team_id: this.canonicalizeTeamId(row.home_team_id),
@@ -586,52 +846,33 @@ class MatchesStore {
         }
         fetchedAnyMatches = true;
       }
-      this.markPreloadedKeys(refBatch.map(r => `ref:${r.toLowerCase()}`));
+      this.markPreloadedKeys(refBatches[i].map(r => `ref:${r.toLowerCase()}`));
     }
 
-    // 3. Load odds_snapshots for fixture IDs
-    for (const idBatch of chunkArray(missingOddsIds, 100)) {
-      const { data, error } = await fetchAllRows<StoredOddsSnapshot>((from, to) =>
-        supabase
-          .from('odds_snapshots')
-          .select('*')
-          .in('match_id', idBatch)
-          .order('id', { ascending: true })
-          .range(from, to)
-      );
-
-      if (!error && data && data.length > 0) {
-        for (const o of data) {
+    for (let i = 0; i < oddsResults.length; i++) {
+      const res = oddsResults[i];
+      if (!res.error && res.data && res.data.length > 0) {
+        for (const o of res.data) {
           const uniqueKey = `${o.match_id}:${o.bookmaker}:${o.market_code}:${o.source}`;
           this.inMemoryOdds.set(uniqueKey, o);
         }
+        fetchedAnyOdds = true;
       }
-      this.markPreloadedKeys(idBatch.map(id => `odds:${id}`));
+      this.markPreloadedKeys(oddsBatches[i].map(id => `odds:${id}`));
     }
 
-    // 4. Refresh promoted team flags once per TTL window
-    const lastPromotedFetch = cache.get('teams:promoted');
-    if (!lastPromotedFetch || now - lastPromotedFetch > TTL_MS) {
-      try {
-        const { data: promotedRows, error: promErr } = await fetchAllRows<{ id: string }>((from, to) =>
-          supabase
-            .from('teams')
-            .select('id')
-            .eq('is_promoted', 1)
-            .order('id', { ascending: true })
-            .range(from, to)
-        );
-        if (!promErr && promotedRows) {
-          for (const r of promotedRows) {
-            if (r.id) this.promotedTeamIds.add(this.canonicalizeTeamId(r.id));
-          }
-          this.markPreloadedKeys(['teams:promoted']);
-        }
-      } catch (_) {}
+    if (needPromoted && !promResult.error && promResult.data) {
+      for (const r of promResult.data) {
+        if (r.id) this.promotedTeamIds.add(this.canonicalizeTeamId(r.id));
+      }
+      this.markPreloadedKeys(['teams:promoted']);
     }
 
     if (fetchedAnyMatches) {
       this.rebuildTeamCounts();
+    }
+    if (fetchedAnyOdds) {
+      this.rebuildOddsIndex();
     }
   }
 
@@ -678,15 +919,70 @@ class MatchesStore {
 
   private rebuildTeamCounts() {
     this.teamMatchCounts.clear();
+    this.teamMatchesIndex.clear();
+    this.normNameMatchesIndex.clear();
+    this.refereeMatchesIndex.clear();
+    this.teamStatsMemo.clear();
+
+    const addToBucket = (map: Map<string, StoredMatch[]>, key: string, match: StoredMatch) => {
+      if (!key) return;
+      let bucket = map.get(key);
+      if (!bucket) {
+        bucket = [];
+        map.set(key, bucket);
+      }
+      bucket.push(match);
+    };
+
     for (const match of Array.from(this.inMemoryMatches.values())) {
-      if (match.is_playoff === 1) continue;
-      if (match.status === 'FINISHED' || match.home_score !== null) {
-        const homeId = this.canonicalizeTeamId(match.home_team_id);
-        const awayId = this.canonicalizeTeamId(match.away_team_id);
+      const homeId = this.canonicalizeTeamId(match.home_team_id);
+      const awayId = this.canonicalizeTeamId(match.away_team_id);
+
+      if (match.is_playoff !== 1 && (match.status === 'FINISHED' || match.home_score !== null)) {
         this.teamMatchCounts.set(homeId, (this.teamMatchCounts.get(homeId) || 0) + 1);
         this.teamMatchCounts.set(awayId, (this.teamMatchCounts.get(awayId) || 0) + 1);
       }
+
+      addToBucket(this.teamMatchesIndex, homeId, match);
+      if (match.home_team_id && match.home_team_id !== homeId) {
+        addToBucket(this.teamMatchesIndex, match.home_team_id, match);
+      }
+      if (awayId !== homeId) {
+        addToBucket(this.teamMatchesIndex, awayId, match);
+      }
+      if (match.away_team_id && match.away_team_id !== awayId && match.away_team_id !== homeId) {
+        addToBucket(this.teamMatchesIndex, match.away_team_id, match);
+      }
+
+      if (!match.home_team_id?.startsWith('team_') && match.home_team_name) {
+        addToBucket(this.normNameMatchesIndex, normalizeTeamLookupKey(match.home_team_name), match);
+      }
+      if (!match.away_team_id?.startsWith('team_') && match.away_team_name) {
+        addToBucket(this.normNameMatchesIndex, normalizeTeamLookupKey(match.away_team_name), match);
+      }
+
+      if (match.referee && match.referee.trim()) {
+        addToBucket(this.refereeMatchesIndex, match.referee.trim().toLowerCase(), match);
+      }
     }
+
+    const descByKickoff = (a: StoredMatch, b: StoredMatch) =>
+      (this.getKickoffMs(b) || 0) - (this.getKickoffMs(a) || 0);
+
+    for (const bucket of Array.from(this.teamMatchesIndex.values())) {
+      if (bucket.length > 1) bucket.sort(descByKickoff);
+    }
+    for (const bucket of Array.from(this.normNameMatchesIndex.values())) {
+      if (bucket.length > 1) bucket.sort(descByKickoff);
+    }
+    for (const bucket of Array.from(this.refereeMatchesIndex.values())) {
+      if (bucket.length > 1) bucket.sort(descByKickoff);
+    }
+  }
+
+  clearPreloadCache() {
+    this.getPreloadCache().clear();
+    this.teamStatsMemo.clear();
   }
 
   recordUnmatchedName(name: string) {
@@ -782,6 +1078,7 @@ class MatchesStore {
         const uniqueKey = `${o.match_id}:${o.bookmaker}:${o.market_code}:${o.source}`;
         this.inMemoryOdds.set(uniqueKey, o);
       }
+      this.rebuildOddsIndex();
     }
 
     this.rebuildTeamCounts();
@@ -1286,22 +1583,27 @@ class MatchesStore {
     const { canonicalId, teamName, normName, idVariants } = this.resolveCanonicalAndAliases(teamIdOrName, competitionCodeHint);
     const isPromoted = PROMOTED_BRAZIL_2026_IDS.has(canonicalId) || this.promotedTeamIds.has(canonicalId);
 
-    const matches = Array.from(this.inMemoryMatches.values())
-      .filter(m => {
-        if (m.is_playoff === 1) return false;
-        if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
-        if (asOfDate && m.kickoff_time > asOfDate) return false;
-        if (m.source === 'championshipMatchArchive:historical') return false;
-        return this.matchSideForTeam(m, idVariants, normName) !== null;
-      })
-      .sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
+    const memoKey = `${canonicalId}|${asOfDate || ''}|${competitionCodeHint || ''}|${isPromoted ? 1 : 0}`;
+    const memoHit = this.teamStatsMemo.get(memoKey);
+    if (memoHit && (asOfDate || Date.now() - memoHit.computedAt < 5_000)) {
+      return memoHit.stats;
+    }
+
+    const candidates = this.getCandidateMatchesForTeam(idVariants, normName);
+    const matches = candidates.filter(m => {
+      if (m.is_playoff === 1) return false;
+      if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
+      if (asOfDate && m.kickoff_time > asOfDate) return false;
+      if (m.source === 'championshipMatchArchive:historical') return false;
+      return true;
+    });
 
     const inferredCompCode = competitionCodeHint || matches[0]?.competition_code;
     const compCfg = getLeagueCalibratedConfig(inferredCompCode);
 
     const storedMatchCount = matches.length;
     if (storedMatchCount === 0) {
-      return {
+      const emptyResult: DbTeamStatsSummary = {
         teamId: canonicalId,
         teamName,
         competitionCode: inferredCompCode,
@@ -1329,6 +1631,8 @@ class MatchesStore {
         cardsSampleCount: 0,
         recentForm: [],
       };
+      this.teamStatsMemo.set(memoKey, { stats: emptyResult, computedAt: Date.now() });
+      return emptyResult;
     }
 
     const lastMatchDate = matches[0].kickoff_time;
@@ -1348,7 +1652,7 @@ class MatchesStore {
     });
 
     if (storedMatchCount < 10) {
-      return {
+      const lowSampleResult: DbTeamStatsSummary = {
         teamId: canonicalId,
         teamName,
         competitionCode: inferredCompCode,
@@ -1376,6 +1680,8 @@ class MatchesStore {
         cardsSampleCount: 0,
         recentForm,
       };
+      this.teamStatsMemo.set(memoKey, { stats: lowSampleResult, computedAt: Date.now() });
+      return lowSampleResult;
     }
 
     const calParams = getCalibratedParams();
@@ -1530,7 +1836,7 @@ class MatchesStore {
       ? Number(Math.max(0.60, Math.min(1.65, ((cardsSampleCount * (weightedCardAgainstRatio / cardWeightSum)) + K_CARDS) / (cardsSampleCount + K_CARDS))).toFixed(3))
       : 1.00;
 
-    return {
+    const summaryResult: DbTeamStatsSummary = {
       teamId: canonicalId,
       teamName,
       competitionCode: inferredCompCode,
@@ -1558,6 +1864,8 @@ class MatchesStore {
       cardsSampleCount,
       recentForm,
     };
+    this.teamStatsMemo.set(memoKey, { stats: summaryResult, computedAt: Date.now() });
+    return summaryResult;
   }
 
   /**
@@ -1599,8 +1907,12 @@ class MatchesStore {
     let weightSum = 0;
     let weightedCards = 0;
 
-    for (const m of this.inMemoryMatches.values()) {
-      if (!m.referee || m.referee.trim().toLowerCase() !== normRef) continue;
+    if (this.refereeMatchesIndex.size === 0 && this.inMemoryMatches.size > 0) {
+      this.rebuildTeamCounts();
+    }
+    const refMatches = this.refereeMatchesIndex.get(normRef) || [];
+
+    for (const m of refMatches) {
       if (asOfDate && m.kickoff_time >= asOfDate) continue;
       if (m.home_yellow_cards === null || m.home_yellow_cards === undefined) continue;
       if (m.away_yellow_cards === null || m.away_yellow_cards === undefined) continue;
@@ -1611,7 +1923,7 @@ class MatchesStore {
         (m.home_red_cards ?? 0) +
         (m.away_red_cards ?? 0);
 
-      const daysAgo = Math.max(0, (refTime - new Date(m.kickoff_time).getTime()) / (1000 * 60 * 60 * 24));
+      const daysAgo = Math.max(0, (refTime - (this.getKickoffMs(m) || refTime)) / (1000 * 60 * 60 * 24));
       const w = Math.exp(-0.005 * daysAgo);
       sampleSize++;
       weightSum += w;
@@ -1663,28 +1975,12 @@ class MatchesStore {
 
     const pairA = hCanon < aCanon ? hCanon : aCanon;
     const pairB = hCanon < aCanon ? aCanon : hCanon;
+    const pairKey = `${pairA}|${pairB}`;
 
-    if (typeof window === 'undefined') {
-      try {
-        const db = getLocalDatabase();
-        if (db) {
-          const row = db.prepare(`
-            SELECT rivalry_name, source, intensity
-            FROM rivalries
-            WHERE team_a_id = ? AND team_b_id = ?
-            LIMIT 1
-          `).get(pairA, pairB) as { rivalry_name: string; source: string; intensity: number } | undefined;
-
-          if (row) {
-            return {
-              isDerby: true,
-              derbyName: row.rivalry_name,
-              source: row.source,
-              intensity: row.intensity,
-            };
-          }
-        }
-      } catch (_) {}
+    this.ensureRivalriesLoadedSync();
+    const cached = this.rivalriesIndex.get(pairKey);
+    if (cached) {
+      return cached;
     }
 
     return { isDerby: false };
@@ -1698,13 +1994,13 @@ class MatchesStore {
     this.ensureHydratedFromDbSync();
     const { normName, idVariants } = this.resolveCanonicalAndAliases(teamIdOrName);
 
-    const matches = Array.from(this.inMemoryMatches.values()).filter(m => {
+    const matches = this.getCandidateMatchesForTeam(idVariants, normName).filter(m => {
       if (m.is_playoff === 1) return false;
       if (m.home_score === null || m.away_score === null || isNaN(m.home_score) || isNaN(m.away_score)) return false;
       if (asOfDate && m.kickoff_time > asOfDate) return false;
       if (m.source === 'championshipMatchArchive:historical') return false;
-      return this.matchSideForTeam(m, idVariants, normName) !== null;
-    }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
+      return true;
+    });
 
     if (matches.length === 0) {
       return { days: null, lastMatchDate: null, matchesInLast120Days: 0 };
@@ -1712,10 +2008,10 @@ class MatchesStore {
 
     const lastMatchDate = matches[0].kickoff_time;
     const refTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
-    const days = Math.max(0, Math.round((refTime - new Date(lastMatchDate).getTime()) / (1000 * 60 * 60 * 24)));
+    const days = Math.max(0, Math.round((refTime - (this.getKickoffMs(matches[0]) || refTime)) / (1000 * 60 * 60 * 24)));
     const window120Start = refTime - (120 * 24 * 60 * 60 * 1000);
     const matchesInLast120Days = matches.filter(m => {
-      const t = new Date(m.kickoff_time).getTime();
+      const t = this.getKickoffMs(m);
       return t >= window120Start && t <= refTime;
     }).length;
 
@@ -1734,22 +2030,20 @@ class MatchesStore {
     this.ensureHydratedFromDbSync();
     const resA = this.resolveCanonicalAndAliases(teamA);
     const resB = this.resolveCanonicalAndAliases(teamB);
-    const idA = resA.canonicalId;
-    const idB = resB.canonicalId;
     const normA = resA.normName;
     const normB = resB.normName;
 
     const refTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
     const fiveSeasonsAgo = refTime - (5 * 365.25 * 24 * 60 * 60 * 1000);
 
-    const allStored = Array.from(this.inMemoryMatches.values());
+    const teamACandidates = this.getCandidateMatchesForTeam(resA.idVariants, normA);
 
     // Filter to finished matches between these two clubs (both venue orders) within 5 seasons
-    const h2hMatches = allStored.filter(m => {
+    const h2hMatches = teamACandidates.filter(m => {
       const isFinished = m.status === 'FINISHED' || m.home_score !== null;
       if (!isFinished) return false;
 
-      const matchTime = new Date(m.kickoff_time).getTime();
+      const matchTime = this.getKickoffMs(m);
       // Zero temporal leakage: when asOfDate is provided, match must be strictly before asOfDate
       if (asOfDate && !isNaN(matchTime) && matchTime >= refTime) return false;
       // 5 seasons cutoff
@@ -1761,7 +2055,7 @@ class MatchesStore {
       const matchesAB = sideA === 'home' && sideB === 'away';
       const matchesBA = sideB === 'home' && sideA === 'away';
       return matchesAB || matchesBA;
-    }).sort((a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime());
+    });
 
     // Limit to the last 6 meetings within 5 seasons
     const recent6Matches = h2hMatches.slice(0, 6);
@@ -2047,20 +2341,35 @@ class MatchesStore {
    * from local SQLite odds_snapshots or in-memory snapshots. Never invents prices.
    */
   getVerifiedOddsSync(matchId: string, existing?: VerifiedMatchOdds): VerifiedMatchOdds | undefined {
-    let rows: StoredOddsSnapshot[] = [];
-    if (typeof window === 'undefined') {
-      try {
-        const db = getLocalDatabase();
-        if (db && matchId) {
-          rows = db
-            .prepare(`SELECT * FROM odds_snapshots WHERE match_id = ?`)
-            .all(matchId) as StoredOddsSnapshot[];
-        }
-      } catch (_) {}
+    if (!matchId) return existing;
+
+    if (this.oddsByMatchIndex.size === 0 && this.inMemoryOdds.size > 0) {
+      this.rebuildOddsIndex();
     }
 
-    if (rows.length === 0) {
-      rows = Array.from(this.inMemoryOdds.values()).filter(o => o.match_id === matchId);
+    let rows: StoredOddsSnapshot[] = [];
+    const indexed = this.oddsByMatchIndex.get(matchId);
+    if (indexed && indexed.length > 0) {
+      rows = indexed.slice();
+    } else if (!this.getPreloadCache().has(`odds:${matchId}`)) {
+      if (typeof window === 'undefined' && !isProductionRuntime() && !persistenceBackendInfo().isRemoteSupabase) {
+        try {
+          const db = getLocalDatabase();
+          if (db) {
+            rows = db
+              .prepare(`SELECT * FROM odds_snapshots WHERE match_id = ?`)
+              .all(matchId) as StoredOddsSnapshot[];
+            for (const o of rows) {
+              const uniqueKey = `${o.match_id}:${o.bookmaker}:${o.market_code}:${o.source}`;
+              this.inMemoryOdds.set(uniqueKey, o);
+            }
+            if (rows.length > 0) {
+              this.oddsByMatchIndex.set(matchId, rows.slice());
+            }
+            this.markPreloadedKeys([`odds:${matchId}`]);
+          }
+        } catch (_) {}
+      }
     }
 
     if (rows.length === 0) {

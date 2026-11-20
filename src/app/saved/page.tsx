@@ -15,7 +15,7 @@ export default function SavedMatchesPage() {
   const { sport } = useSport();
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const { fixtures, liveDataAvailable, lastUpdated } = useLiveFixtures(undefined, undefined, sport);
+  const { fixtures, liveDataAvailable, lastUpdated, error, isOffline, isSavedCopy } = useLiveFixtures(undefined, undefined, sport);
 
   useEffect(() => {
     setSavedIds(getStoredSavedFixtures());
@@ -71,6 +71,17 @@ export default function SavedMatchesPage() {
         )}
       </div>
 
+      {/* Saved copy or server error notice */}
+      {(isSavedCopy || error) && (
+        <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11.5px]">
+          {isSavedCopy
+            ? `Showing saved copy${lastUpdated ? ` from ${lastUpdated}` : ''}${error ? ` (${error})` : ''}.`
+            : isOffline
+            ? 'You appear to be offline and no saved copy is available.'
+            : error || 'Unable to load fixtures.'}
+        </div>
+      )}
+
       {/* Content */}
       {isLoaded && savedFixtures.length > 0 ? (
         <div className="space-y-3">
@@ -92,7 +103,12 @@ export default function SavedMatchesPage() {
         <div className="p-8 text-center bg-[#101713] border border-white/[0.07] rounded-[14px] space-y-2.5">
           <Bookmark className="w-8 h-8 mx-auto text-[#5E6A63]" />
           <h3 suppressHydrationWarning className="text-[#ECF1EE] font-semibold text-[14px]">
-            Live data unavailable.{lastUpdated ? ` Last updated ${lastUpdated}` : ''}
+            {isOffline
+              ? 'You appear to be offline.'
+              : error
+              ? error
+              : 'Live data unavailable.'}
+            {lastUpdated ? ` Last updated ${lastUpdated}` : ''}
           </h3>
           <p className="text-[12px] text-[#8B9890] max-w-sm mx-auto">
             You have {savedIds.length} bookmarked fixture{savedIds.length > 1 ? 's' : ''}. Live fixture data will display once live pipelines synchronize.
