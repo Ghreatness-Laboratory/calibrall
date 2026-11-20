@@ -33,6 +33,9 @@ export interface SkippedLeagueRecord {
   reason: string;
 }
 
+// Disable NBA & basketball syncing until basketball module is built
+export const BASKETBALL_SYNC_ENABLED = false;
+
 // Stored fixtures are treated as within SLA until 3 days (72 hours / 4320 minutes) old.
 // Error banners are suppressed while stored real fixtures are newer than this limit.
 export const FIXTURE_STALE_LIMIT_MINUTES = 4320;
@@ -43,7 +46,7 @@ export const FOOTBALL_DATA_ORG_COVERED_CODES = new Set<string>([
   'ELC',
   'PL',
   'CL',
-  'EURO', // Football-Data.org returns code 'EC' for UEFA European Championship
+  'EURO', // Football-Data.org returns code 'EC' for UEFA European Championship (internal id: comp_euro)
   'FL1',
   'BL1',
   'SA',
@@ -156,7 +159,7 @@ export const PROVIDER_BUDGETS: Record<ProviderId, ProviderBudgetSpec> = {
     scheduleRefreshIntervalMinutes: 720,
     budgetedCallsPerDay: 4,
     beforeCallsPerDayEstimate: '104/day (15m cron) or 720+/day per visitor + HTTP 400 from 15-day window',
-    notes: 'Runs twice daily (06:00 & 18:00 UTC) covering -1..+14d in two <=10d chunks (2 calls/run = 4 calls/day).',
+    notes: 'Vercel Hobby daily cron (06:00 UTC) + GitHub Actions evening cron (18:00 UTC), covering -1..+14d in two <=10d chunks (2 calls/run = 4 calls/day).',
   },
   sportmonks: {
     id: 'sportmonks',
@@ -170,7 +173,7 @@ export const PROVIDER_BUDGETS: Record<ProviderId, ProviderBudgetSpec> = {
     scheduleRefreshIntervalMinutes: 720,
     budgetedCallsPerDay: 4,
     beforeCallsPerDayEstimate: '100/day (15m fallback) or 720+/day per visitor',
-    notes: 'Runs twice daily (06:00 & 18:00 UTC) to supplement Scottish Premiership (SC0) and Danish Superliga (DNK) free-tier fixtures (2 calls/run = 4 calls/day).',
+    notes: 'Runs twice daily (Vercel 06:00 UTC + GitHub Actions 18:00 UTC) to supplement Scottish Premiership (SC0) and Danish Superliga (DNK) free-tier fixtures (2 calls/run = 4 calls/day).',
   },
   'the-odds-api': {
     id: 'the-odds-api',
@@ -184,7 +187,7 @@ export const PROVIDER_BUDGETS: Record<ProviderId, ProviderBudgetSpec> = {
     scheduleRefreshIntervalMinutes: 720,
     budgetedCallsPerDay: 16,
     beforeCallsPerDayEstimate: 'Uncapped blind polling of 10 leagues every 6h (up to 40/day) exhausting 500/month in <13 days',
-    notes: 'Runs at most twice daily, fetching h2h odds (1 credit/league) ONLY for upcoming leagues that have qualified picks (<=16 credits/day, <=480/month vs 500 allowance).',
+    notes: 'Runs at most twice daily, ordering leagues by upcoming pick count descending and fetching h2h odds (1 credit/league) ONLY for leagues with qualified picks (<=16 credits/day).',
   },
   espn_soccer: {
     id: 'espn_soccer',
@@ -204,29 +207,29 @@ export const PROVIDER_BUDGETS: Record<ProviderId, ProviderBudgetSpec> = {
     id: 'espn_nba',
     name: 'ESPN NBA Scoreboard',
     sport: 'basketball',
-    freeQuota: 'Public scoreboard endpoint (scheduled twice daily)',
-    dailyQuotaLimit: 100,
+    freeQuota: 'Disabled until basketball module is built (0 calls/day)',
+    dailyQuotaLimit: 0,
     callsPerLiveRefresh: 0,
-    callsPerScheduleRefresh: 16,
+    callsPerScheduleRefresh: 0,
     liveRefreshIntervalMinutes: 0,
-    scheduleRefreshIntervalMinutes: 720,
-    budgetedCallsPerDay: 32,
+    scheduleRefreshIntervalMinutes: 0,
+    budgetedCallsPerDay: 0,
     beforeCallsPerDayEstimate: '248/day (15m/6h crons) and ~11,520+/day per active 120s visitor',
-    notes: 'Twice-daily cron (06:00 & 18:00 UTC) fetches -1..+14d (16 calls/run = 32 calls/day).',
+    notes: 'Disabled until basketball module is built (0 calls/day).',
   },
   balldontlie: {
     id: 'balldontlie',
     name: 'BallDontLie v1',
     sport: 'basketball',
-    freeQuota: '5 requests/minute free tier',
-    dailyQuotaLimit: 200,
+    freeQuota: 'Disabled until basketball module is built (0 calls/day)',
+    dailyQuotaLimit: 0,
     callsPerLiveRefresh: 0,
-    callsPerScheduleRefresh: 1,
+    callsPerScheduleRefresh: 0,
     liveRefreshIntervalMinutes: 0,
-    scheduleRefreshIntervalMinutes: 720,
-    budgetedCallsPerDay: 2,
+    scheduleRefreshIntervalMinutes: 0,
+    budgetedCallsPerDay: 0,
     beforeCallsPerDayEstimate: '4/day (6h cron)',
-    notes: 'Polled twice daily (1 call/run = 2 calls/day) when BALLDONTLIE_API_KEY is configured.',
+    notes: 'Disabled until basketball module is built (0 calls/day).',
   },
 };
 

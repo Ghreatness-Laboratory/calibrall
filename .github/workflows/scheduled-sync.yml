@@ -1,0 +1,28 @@
+name: Evening Fixture & Odds Sync (GitHub Actions)
+
+on:
+  schedule:
+    # Runs once daily at 18:00 UTC to complement Vercel Hobby's 06:00 UTC daily cron
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/v1/sync (evening football + odds refresh)
+        env:
+          APP_URL: ${{ secrets.CALIBRALL_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Error: CALIBRALL_APP_URL and CRON_SECRET repository secrets must be configured."
+            exit 1
+          fi
+          TARGET_URL="${APP_URL%/}/api/v1/sync?sport=football&mode=full"
+          HTTP_CODE=$(curl -sS -o /tmp/sync_resp.json -w "%{http_code}" \
+            -X POST "$TARGET_URL" \
+            -H "Authorization: Bearer ${CRON_SECRET}")
+          echo "HTTP Status: $HTTP_CODE"
+          cat /tmp/sync_resp.json
+          test "$HTTP_CODE" -ge 200 -a "$HTTP_CODE" -lt 300

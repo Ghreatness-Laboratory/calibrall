@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSecretHeader } from '@/lib/auth/adminAuth';
 import { getUncoveredFootballCompetitions } from '@/lib/data/canonicalCompetitions';
 import {
+  supabase,
+  isSupabaseConfigured,
+  persistenceBackendInfo,
+} from '@/lib/supabase/client';
+import {
   PROVIDER_BUDGETS,
   ProviderId,
   SkippedLeagueRecord,
   FIXTURE_STALE_LIMIT_MINUTES,
+  BASKETBALL_SYNC_ENABLED,
   getBudgetSummary,
 } from '@/lib/data/providerBudget';
 import {
@@ -30,6 +36,7 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const shouldProbe = url.searchParams.get('probe') !== 'false';
   const nowIso = new Date().toISOString();
+  const persistence = persistenceBackendInfo();
 
   let footballDataCoveredCompetitions: Array<{
     code: string;
@@ -41,7 +48,7 @@ export async function GET(req: NextRequest) {
   const probeResults = new Map<
     ProviderId,
     {
-      status: 'ONLINE' | 'ERROR' | 'RATE_LIMITED' | 'UNCONFIGURED' | 'RETIRED';
+      status: 'ONLINE' | 'ERROR' | 'RATE_LIMITED' | 'UNCONFIGURED' | 'RETIRED' | 'DISABLED';
       httpStatus: number | null;
       quotaRemaining: string | null;
       quotaHeaders: Record<string, string>;
@@ -51,6 +58,32 @@ export async function GET(req: NextRequest) {
     }
   >();
 
+  // Probe active DB tables read-only to confirm Supabase Postgres schema readiness
+  const tableChecks: Record<string, { ok: boolean; count: number | null; error: string | null }> = {};
+  if (isSupabaseConfigured && supabase) {
+    const tablesToCheck = ['fixtures', 'provider_sync_state', 'provider_call_logs', 'matches', 'teams'];
+    await Promise.all(
+      tablesToCheck.map(async table => {
+        try {
+          const { count, error } = await supabase
+            .from(table)
+            .select('id', { count: 'exact', head: true });
+          tableChecks[table] = {
+            ok: !error,
+            count: typeof count === 'number' ? count : null,
+            error: error ? error.message : null,
+          };
+        } catch (err: any) {
+          tableChecks[table] = {
+            ok: false,
+            count: null,
+            error: err?.message || 'Probe failed',
+          };
+        }
+      })
+    );
+  }
+
   if (shouldProbe) {
     const fdKey = process.env.FOOTBALL_DATA_API_KEY?.trim();
     const smToken =
@@ -58,9 +91,6 @@ export async function GET(req: NextRequest) {
       process.env.SPORTSMONK_API_KEY?.trim() ||
       process.env.SPORTMONKS_API_KEY?.trim();
     const oddsKey = process.env.ODDS_API_KEY?.trim();
-    const bdlKey =
-      process.env.BALLDONTLIE_API_KEY?.trim() ||
-      process.env.BALL_DONT_LIE_API_KEY?.trim();
 
     await Promise.all([
       // 1. Football-Data.org (v4/competitions returns exact covered free-tier competitions)
@@ -182,79 +212,32 @@ export async function GET(req: NextRequest) {
           ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
           quotaRemaining: res.quotaRemaining,
           quotaHeaders: res.quotaHeaders,
-          callsUsedLastRun: 0, // /v4/sports/ is 0 credits
-        });
-      })(),
-
-      // 4. BallDontLie v1
-      (async () => {
-        const res = await loggedProviderFetch('balldontlie', 'https://api.balldontlie.io/v1/teams', {
-          headers: bdlKey ? { Authorization: bdlKey } : undefined,
-          syncMode: 'health_probe',
-          timeoutMs: 8000,
-        });
-        const status = !bdlKey && !res.ok
-          ? 'UNCONFIGURED'
-          : res.status === 429
-          ? 'RATE_LIMITED'
-          : res.ok
-          ? 'ONLINE'
-          : 'ERROR';
-        probeResults.set('balldontlie', {
-          status,
-          httpStatus: res.status,
-          quotaRemaining: res.quotaRemaining,
-          quotaHeaders: res.quotaHeaders,
-          latencyMs: res.latencyMs,
-          responseBody: res.ok ? `OK (${Array.isArray(res.json?.data) ? res.json.data.length : 0} NBA teams)` : res.bodyText.slice(0, 300),
-          error: res.error || null,
-        });
-        await upsertProviderSyncState('provider:balldontlie', {
-          sport: 'basketball',
-          providerName: 'BallDontLie v1',
-          status,
-          lastAttemptAt: nowIso,
-          ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
-          quotaRemaining: res.quotaRemaining,
-          quotaHeaders: res.quotaHeaders,
-          callsUsedLastRun: 1,
-        });
-      })(),
-
-      // 5. ESPN NBA Scoreboard (scheduled twice daily)
-      (async () => {
-        const res = await loggedProviderFetch(
-          'espn_nba',
-          'https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
-          {
-            headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; Calibrall/1.0)' },
-            leagueCode: 'NBA',
-            syncMode: 'health_probe',
-            timeoutMs: 8000,
-          }
-        );
-        const status = res.status === 429 ? 'RATE_LIMITED' : res.ok ? 'ONLINE' : 'ERROR';
-        probeResults.set('espn_nba', {
-          status,
-          httpStatus: res.status,
-          quotaRemaining: res.quotaRemaining,
-          quotaHeaders: res.quotaHeaders,
-          latencyMs: res.latencyMs,
-          responseBody: res.ok ? `OK (${(res.json?.events || []).length} events)` : res.bodyText.slice(0, 300),
-          error: res.error || null,
-        });
-        await upsertProviderSyncState('provider:espn_nba', {
-          sport: 'basketball',
-          providerName: 'ESPN NBA Scoreboard',
-          status,
-          lastAttemptAt: nowIso,
-          ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
-          quotaRemaining: res.quotaRemaining,
-          quotaHeaders: res.quotaHeaders,
-          callsUsedLastRun: 1,
+          // /v4/sports/ is 0 credits; preserve callsUsedLastRun from the latest sync run
         });
       })(),
     ]);
+  }
+
+  // Basketball providers remain disabled (0 calls) until basketball module is built
+  if (!BASKETBALL_SYNC_ENABLED) {
+    probeResults.set('balldontlie', {
+      status: 'DISABLED',
+      httpStatus: null,
+      quotaRemaining: '0/0 disabled',
+      quotaHeaders: {},
+      latencyMs: 0,
+      responseBody: 'NBA and basketball syncing disabled until basketball module is built.',
+      error: null,
+    });
+    probeResults.set('espn_nba', {
+      status: 'DISABLED',
+      httpStatus: null,
+      quotaRemaining: '0/0 disabled',
+      quotaHeaders: {},
+      latencyMs: 0,
+      responseBody: 'NBA and basketball syncing disabled until basketball module is built.',
+      error: null,
+    });
   }
 
   // ESPN Soccer is retired and never live-probed
@@ -285,7 +268,7 @@ export async function GET(req: NextRequest) {
       process.env.BALLDONTLIE_API_KEY?.trim() || process.env.BALL_DONT_LIE_API_KEY?.trim()
     ),
     espn_soccer: false,
-    espn_nba: true,
+    espn_nba: BASKETBALL_SYNC_ENABLED,
   };
 
   const providersReport = await Promise.all(
@@ -293,16 +276,22 @@ export async function GET(req: NextRequest) {
       const budget = PROVIDER_BUDGETS[id];
       const storedState = stateById.get(`provider:${id}`);
       const liveProbe = probeResults.get(id);
-      const callsToday = id === 'espn_soccer' ? 0 : await getProviderCallCountToday(id);
+      const isBasketballDisabled = !BASKETBALL_SYNC_ENABLED && (id === 'balldontlie' || id === 'espn_nba');
+      const callsToday =
+        id === 'espn_soccer' || isBasketballDisabled
+          ? 0
+          : await getProviderCallCountToday(id);
 
       const dailyCap = budget.dailyQuotaLimit;
       const budgetLeft =
         dailyCap !== null ? `${Math.max(0, dailyCap - callsToday)}/${dailyCap} daily budget` : null;
 
       const lastSuccessIso =
-        storedState?.lastSuccessAt ||
-        ((id === 'football-data' || id === 'sportmonks') ? footballFreshness.newestUpdatedAt : null) ||
-        (id === 'espn_nba' ? basketballFreshness.newestUpdatedAt : null);
+        isBasketballDisabled
+          ? null
+          : storedState?.lastSuccessAt ||
+            ((id === 'football-data' || id === 'sportmonks') ? footballFreshness.newestUpdatedAt : null) ||
+            (id === 'espn_nba' ? basketballFreshness.newestUpdatedAt : null);
 
       return {
         id,
@@ -310,7 +299,7 @@ export async function GET(req: NextRequest) {
         sport: budget.sport,
         configured: keyPresent[id],
         status: liveProbe?.status || storedState?.status || (keyPresent[id] ? 'ONLINE' : 'UNCONFIGURED'),
-        lastHttpStatus: liveProbe?.httpStatus ?? storedState?.lastHttpStatus ?? null,
+        lastHttpStatus: isBasketballDisabled ? null : (liveProbe?.httpStatus ?? storedState?.lastHttpStatus ?? null),
         lastSuccessfulFetch: lastSuccessIso,
         lastSuccessfulFetchFormatted: formatUtcTimeStamp(lastSuccessIso),
         quotaLeft:
@@ -355,14 +344,38 @@ export async function GET(req: NextRequest) {
   const allRecentOdds = last20Calls.filter(c => c.provider === 'the-odds-api' && c.syncMode !== 'health_probe');
   const oddsProbeHeaders = probeResults.get('the-odds-api')?.quotaHeaders || stateById.get('provider:the-odds-api')?.quotaHeaders || {};
   const oddsState = stateById.get('provider:the-odds-api');
+  const oddsWithoutOddsLastRun = oddsState?.skippedLeagues || [];
 
   return NextResponse.json(
     {
       success: true,
       timestamp: nowIso,
       probedLive: shouldProbe,
-      architecture: 'scheduled_twice_daily_cron_to_supabase_db_only_reads',
-      cronSchedule: ['0 6 * * *', '0 18 * * *'],
+      basketballSyncEnabled: BASKETBALL_SYNC_ENABLED,
+      architecture: 'vercel_hobby_daily_cron_plus_github_actions_to_supabase_postgres',
+      cronSchedule: {
+        vercelJson: '0 6 * * *',
+        githubActionsEveningSync: '0 18 * * *',
+        githubActionsWeeklyBackfill: '0 4 * * 1',
+      },
+      persistence: {
+        ...persistence,
+        tables: tableChecks,
+      },
+      competitionIdDisambiguation: {
+        footballDataOrgEuropeanChampionship: {
+          externalCode: 'EC',
+          internalId: 'comp_euro',
+          internalCode: 'EURO',
+          name: 'UEFA European Championship',
+        },
+        footballDataCoUkNationalLeague: {
+          divisionCode: 'EC',
+          internalId: 'comp_eng_national_league',
+          internalCode: 'EC',
+          name: 'National League',
+        },
+      },
       storedFixturesFreshness: {
         staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
         staleLimitDays: Math.round(FIXTURE_STALE_LIMIT_MINUTES / 1440),
@@ -374,6 +387,8 @@ export async function GET(req: NextRequest) {
           isStaleBeyondLimit: footballFreshness.isStaleBeyondLimit,
         },
         basketball: {
+          enabled: BASKETBALL_SYNC_ENABLED,
+          status: BASKETBALL_SYNC_ENABLED ? 'ONLINE' : 'DISABLED',
           fixtureCount: basketballFreshness.fixtureCount,
           lastUpdated: basketballFreshness.lastUpdatedFormatted,
           newestUpdatedAt: basketballFreshness.newestUpdatedAt,
@@ -393,10 +408,13 @@ export async function GET(req: NextRequest) {
         maxRunsPerDay: 2,
         dailyCreditCeiling: PROVIDER_BUDGETS['the-odds-api'].dailyQuotaLimit,
         projectedMonthlyMax: (PROVIDER_BUDGETS['the-odds-api'].dailyQuotaLimit || 16) * 30,
+        leagueOrderingRule: 'Ordered descending by upcoming qualified picks count per league',
         creditsUsedLastRun: oddsState?.callsUsedLastRun ?? 0,
         creditsUsedThisMonthFromHeader: oddsProbeHeaders['x-requests-used'] || null,
         creditsRemainingFromHeader: oddsProbeHeaders['x-requests-remaining'] || oddsState?.quotaRemaining || null,
         recentCreditCallsLogged: allRecentOdds.length,
+        leaguesWithoutOddsLastRunCount: oddsWithoutOddsLastRun.length,
+        leaguesWithoutOddsLastRun: oddsWithoutOddsLastRun,
       },
       uncoveredLeaguesCount: uncoveredLeagues.length,
       uncoveredLeagues,

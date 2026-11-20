@@ -238,8 +238,8 @@ export const CANONICAL_COMPETITIONS: Record<string, Competition> = {
     avgCardsPerGame: 3.10,
     isActive: true,
   },
-  comp_ec: {
-    id: 'comp_ec',
+  comp_eng_national_league: {
+    id: 'comp_eng_national_league',
     code: 'EC',
     name: 'National League',
     country: 'England',
@@ -585,17 +585,44 @@ export function isCanonicalCompetitionId(id: unknown): id is string {
   const clean = id.trim().toLowerCase();
   if (!clean.startsWith('comp_')) return false;
   if (clean === 'comp_league' || clean === 'comp_sm_league' || clean === 'fallback') return false;
+  if (clean === 'comp_ec') return true; // Legacy alias for comp_eng_national_league
   return Object.prototype.hasOwnProperty.call(CANONICAL_COMPETITIONS, clean);
 }
 
 /**
  * Resolves canonical Competition definition from canonical competition_id or known league code.
+ * Disambiguates 'EC': football-data.org uses 'EC' for UEFA European Championship (comp_euro),
+ * whereas football-data.co.uk uses 'EC' for English National League (comp_eng_national_league).
  */
-export function getCanonicalCompetition(idOrCode: string): Competition | null {
+export function getCanonicalCompetition(
+  idOrCode: string,
+  sourceProvider?: string
+): Competition | null {
   if (!idOrCode || typeof idOrCode !== 'string') return null;
   const normalized = idOrCode.trim().toLowerCase();
+  const codeUpper = idOrCode.trim().toUpperCase();
+  const providerNorm = (sourceProvider || '').trim().toLowerCase();
 
-  // 1. Direct canonical key match (e.g. comp_fl1, comp_pl)
+  if (
+    providerNorm.includes('football-data.org') &&
+    (codeUpper === 'EC' || codeUpper === 'EURO' || normalized === 'comp_euro')
+  ) {
+    return CANONICAL_COMPETITIONS.comp_euro;
+  }
+
+  if (
+    providerNorm.includes('football-data.co.uk') &&
+    (codeUpper === 'EC' || normalized === 'comp_ec' || normalized === 'comp_eng_national_league')
+  ) {
+    return CANONICAL_COMPETITIONS.comp_eng_national_league;
+  }
+
+  // Legacy comp_ec key maps cleanly to comp_eng_national_league
+  if (normalized === 'comp_ec') {
+    return CANONICAL_COMPETITIONS.comp_eng_national_league;
+  }
+
+  // 1. Direct canonical key match (e.g. comp_fl1, comp_pl, comp_eng_national_league, comp_euro)
   if (Object.prototype.hasOwnProperty.call(CANONICAL_COMPETITIONS, normalized)) {
     return CANONICAL_COMPETITIONS[normalized];
   }
@@ -607,7 +634,6 @@ export function getCanonicalCompetition(idOrCode: string): Competition | null {
   }
 
   // 3. Exact code aliases across providers (football-data.co.uk / ESPN / Sportmonks)
-  const codeUpper = idOrCode.trim().toUpperCase();
   if (codeUpper === 'BRA') return CANONICAL_COMPETITIONS.comp_bsa;
   if (codeUpper === 'E0') return CANONICAL_COMPETITIONS.comp_pl;
   if (codeUpper === 'E1') return CANONICAL_COMPETITIONS.comp_elc;
@@ -621,6 +647,7 @@ export function getCanonicalCompetition(idOrCode: string): Competition | null {
   if (codeUpper === 'SP') return CANONICAL_COMPETITIONS.comp_sc0;
   if (codeUpper === 'ROM') return CANONICAL_COMPETITIONS.comp_rou;
   if (codeUpper === 'SUI') return CANONICAL_COMPETITIONS.comp_swz;
+  if (codeUpper === 'EC') return CANONICAL_COMPETITIONS.comp_eng_national_league;
 
   const byCode = Object.values(CANONICAL_COMPETITIONS).find(c => c.code.toUpperCase() === codeUpper);
   if (byCode) {

@@ -273,6 +273,55 @@ export default function MatchAnalysisPage() {
             <span className="font-semibold text-[#E9EFEB]">{cleanDisplayText(fixture.competition.name)}</span>
             <span className="text-[#5E6B65]">·</span>
             <span className="tabular-nums">MD {fixture.matchday}</span>
+            {(() => {
+              const kickoffMs = kickoff.getTime();
+              const isPastKickoff = !isNaN(kickoffMs) && Date.now() >= kickoffMs;
+              const hasVerifiedLiveMinute = typeof fixture.minute === 'number' && !isNaN(fixture.minute);
+              if (fixture.status === 'FINISHED') {
+                return (
+                  <span className="ml-1 px-2 py-0.5 rounded-full bg-[#B8E636]/12 text-[#B8E636] text-[10px] font-semibold border border-[#B8E636]/30">
+                    FT
+                  </span>
+                );
+              }
+              if (fixture.status === 'IN_PLAY' && hasVerifiedLiveMinute) {
+                return (
+                  <span className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E5684F]/15 text-[#E5684F] text-[10px] font-semibold border border-[#E5684F]/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#E5684F] animate-pulse" />
+                    LIVE {fixture.minute}&apos;
+                  </span>
+                );
+              }
+              if (fixture.status === 'PAUSED') {
+                return (
+                  <span className="ml-1 px-2 py-0.5 rounded-full bg-[#E8B04A]/15 text-[#E8B04A] text-[10px] font-semibold border border-[#E8B04A]/30">
+                    HT
+                  </span>
+                );
+              }
+              if (fixture.status === 'POSTPONED') {
+                return (
+                  <span className="ml-1 px-2 py-0.5 rounded-full bg-[#E8B04A]/15 text-[#E8B04A] text-[10px] font-semibold border border-[#E8B04A]/30">
+                    Postponed
+                  </span>
+                );
+              }
+              if (fixture.status === 'CANCELED') {
+                return (
+                  <span className="ml-1 px-2 py-0.5 rounded-full bg-[#E5684F]/15 text-[#E5684F] text-[10px] font-semibold border border-[#E5684F]/30">
+                    Canceled
+                  </span>
+                );
+              }
+              if (isPastKickoff || (fixture.status === 'IN_PLAY' && !hasVerifiedLiveMinute)) {
+                return (
+                  <span className="ml-1 px-2 py-0.5 rounded-full bg-[#E8B04A]/15 text-[#E8B04A] text-[10px] font-semibold border border-[#E8B04A]/30">
+                    kicked off, awaiting result
+                  </span>
+                );
+              }
+              return null;
+            })()}
             {lineupState && (
               <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#151D19] border border-[#1F2A24] text-[#B8E636]">
                 Team news

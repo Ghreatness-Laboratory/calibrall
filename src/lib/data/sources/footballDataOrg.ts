@@ -12,7 +12,7 @@ export class FootballDataOrgService {
   private lastRequestTime = 0;
   private minIntervalMs = 6100; // 10 calls per 60s -> ~6.1s between calls
   private lastSyncTime: string | null = null;
-  private coverage = ['PL', 'ELC', 'BL1', 'PD', 'SA', 'FL1', 'DED', 'PPL', 'CL'];
+  private coverage = ['PL', 'ELC', 'BL1', 'PD', 'SA', 'FL1', 'DED', 'PPL', 'CL', 'EC'];
 
   public getCoveredCompetitions(): string[] {
     return this.coverage;
@@ -37,14 +37,15 @@ export class FootballDataOrgService {
       return { count: 0, error: 'FOOTBALL_DATA_API_KEY not configured' };
     }
 
-    if (!this.coverage.includes(competitionCode.toUpperCase())) {
+    const reqCode = competitionCode.toUpperCase() === 'EURO' ? 'EC' : competitionCode.toUpperCase();
+    if (!this.coverage.includes(reqCode)) {
       return { count: 0, error: `Competition ${competitionCode} not covered in football-data.org free tier` };
     }
 
     await this.waitForToken();
 
     try {
-      const url = `https://api.football-data.org/v4/competitions/${competitionCode}/matches`;
+      const url = `https://api.football-data.org/v4/competitions/${reqCode}/matches`;
       const res = await fetch(url, {
         headers: {
           'X-Auth-Token': apiKey,
@@ -60,9 +61,12 @@ export class FootballDataOrgService {
       const matches = json.matches || [];
       let count = 0;
 
+      // Football-Data.org uses 'EC' for UEFA European Championship (internal id: comp_euro, code: EURO)
+      const internalCompCode = reqCode === 'EC' ? 'EURO' : reqCode;
+
       for (const m of matches) {
-        const homeCanon = lookupCanonicalTeam(m.homeTeam?.name);
-        const awayCanon = lookupCanonicalTeam(m.awayTeam?.name);
+        const homeCanon = lookupCanonicalTeam(m.homeTeam?.name, internalCompCode);
+        const awayCanon = lookupCanonicalTeam(m.awayTeam?.name, internalCompCode);
         const homeId = homeCanon ? homeCanon.canonicalId : `team_${(m.homeTeam?.name || 'home').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
         const awayId = awayCanon ? awayCanon.canonicalId : `team_${(m.awayTeam?.name || 'away').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
 
@@ -77,7 +81,7 @@ export class FootballDataOrgService {
         const matchObj: Partial<CanonicalMatch> = {
           date: rawDate,
           kickoffTime: m.utcDate,
-          competitionCode,
+          competitionCode: internalCompCode,
           season: `${m.season?.startDate?.substring(0, 4) || '2026'}/${m.season?.endDate?.substring(0, 4) || '2027'}`,
           matchday: m.matchday,
           homeTeamId: homeId,

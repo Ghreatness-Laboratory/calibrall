@@ -1,0 +1,40 @@
+name: Weekly Current-Season Backfill
+
+on:
+  schedule:
+    # Runs every Monday at 04:00 UTC to refresh full CSV stats (corners, cards, shots, closing odds)
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+jobs:
+  weekly-backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-run current-season backfill across European (2627) & extra (2026) leagues
+        env:
+          APP_URL: ${{ secrets.CALIBRALL_APP_URL }}
+          ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$ADMIN_SECRET" ]; then
+            echo "Error: CALIBRALL_APP_URL and ADMIN_SECRET repository secrets must be configured."
+            exit 1
+          fi
+          BASE="${APP_URL%/}"
+
+          for LEAGUE in E0 E1 E2 E3 EC SC0 SC1 SC2 SC3 SP1 SP2 I1 I2 D1 D2 F1 F2 N1 B1 P1 T1 G1; do
+            echo "Backfilling seasonal league ${LEAGUE} season=2627..."
+            CODE=$(curl -sS -o /tmp/bf.json -w "%{http_code}" -X POST \
+              "${BASE}/api/admin/backfill?league=${LEAGUE}&season=2627" \
+              -H "x-admin-secret: ${ADMIN_SECRET}")
+            echo "  ${LEAGUE} 2627 -> HTTP ${CODE}: $(head -c 220 /tmp/bf.json)"
+            sleep 1
+          done
+
+          for LEAGUE in ARG AUT BSA CHN DNK FIN IRL JPN MEX NOR POL ROU RUS SWE SWZ USA; do
+            echo "Backfilling extra league ${LEAGUE} season=2026..."
+            CODE=$(curl -sS -o /tmp/bf.json -w "%{http_code}" -X POST \
+              "${BASE}/api/admin/backfill?league=${LEAGUE}&season=2026" \
+              -H "x-admin-secret: ${ADMIN_SECRET}")
+            echo "  ${LEAGUE} 2026 -> HTTP ${CODE}: $(head -c 220 /tmp/bf.json)"
+            sleep 1
+          done

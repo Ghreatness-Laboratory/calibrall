@@ -5,6 +5,9 @@ import { generateMissAnalysisReport, SettledPredictionRecord } from '@/lib/predi
 import { getTeamStyle } from '@/lib/prediction/situationalContext';
 import { matchesStore } from '@/lib/data/matchesStore';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const report = marketMonitor.getReport(100, 0.40);
 

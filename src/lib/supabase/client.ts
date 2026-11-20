@@ -4,8 +4,8 @@ import { UserProfile, UserPreferences } from '@/types';
 
 // Support both server-side runtime env vars and NEXT_PUBLIC client vars
 const supabaseUrl = 
-  process.env.SUPABASE_URL || 
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 
+  process.env.SUPABASE_URL?.trim() || 
+  process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || 
   '';
 
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || '';
@@ -16,19 +16,97 @@ const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || 
   '';
 
-const isRemoteSupabase = Boolean(
-  supabaseUrl && 
-  supabaseAnonKey && 
+export function isProductionRuntime(): boolean {
+  return (
+    process.env.NODE_ENV === 'production' ||
+    process.env.ENVIRONMENT === 'production' ||
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.VERCEL === '1'
+  );
+}
+
+const hasValidSupabaseUrl = Boolean(
+  supabaseUrl &&
   supabaseUrl.startsWith('https://') &&
-  !supabaseUrl.includes('your-project-id') &&
+  !supabaseUrl.includes('your-project-id')
+);
+
+const isRemoteSupabase = Boolean(
+  hasValidSupabaseUrl &&
+  supabaseAnonKey &&
   (typeof window !== 'undefined' || Boolean(supabaseServiceKey))
 );
 
-// We consider Supabase configured whenever remote credentials exist OR local persistence is active
-export const isSupabaseConfigured = true;
+export interface PersistenceBackendInfo {
+  backend: 'supabase_postgres' | 'local_sqlite' | 'misconfigured';
+  isRemoteSupabase: boolean;
+  isProduction: boolean;
+  hasSupabaseUrl: boolean;
+  hasAnonOrPublishableKey: boolean;
+  hasServiceRoleKey: boolean;
+  localSqliteAllowed: boolean;
+  message: string;
+}
+
+export function persistenceBackendInfo(): PersistenceBackendInfo {
+  const isProd = isProductionRuntime();
+  const hasAnon = Boolean(
+    process.env.SUPABASE_ANON_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim()
+  );
+  const hasService = Boolean(supabaseServiceKey);
+
+  if (isRemoteSupabase) {
+    return {
+      backend: 'supabase_postgres',
+      isRemoteSupabase: true,
+      isProduction: isProd,
+      hasSupabaseUrl: hasValidSupabaseUrl,
+      hasAnonOrPublishableKey: hasAnon,
+      hasServiceRoleKey: hasService,
+      localSqliteAllowed: false,
+      message: 'Remote Supabase Postgres active via service-role client.',
+    };
+  }
+
+  if (isProd) {
+    const missing: string[] = [];
+    if (!hasValidSupabaseUrl) missing.push('NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL)');
+    if (!hasService) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+    return {
+      backend: 'misconfigured',
+      isRemoteSupabase: false,
+      isProduction: true,
+      hasSupabaseUrl: hasValidSupabaseUrl,
+      hasAnonOrPublishableKey: hasAnon,
+      hasServiceRoleKey: hasService,
+      localSqliteAllowed: false,
+      message: `Production persistence misconfigured: missing ${missing.join(' and ')}. Local SQLite fallback (data/supabase.db) is disabled in production.`,
+    };
+  }
+
+  return {
+    backend: 'local_sqlite',
+    isRemoteSupabase: false,
+    isProduction: false,
+    hasSupabaseUrl: hasValidSupabaseUrl,
+    hasAnonOrPublishableKey: hasAnon,
+    hasServiceRoleKey: hasService,
+    localSqliteAllowed: true,
+    message: hasValidSupabaseUrl && !hasService
+      ? 'Local SQLite fallback (data/supabase.db) active in non-production because SUPABASE_SERVICE_ROLE_KEY is unset.'
+      : 'Local SQLite persistent store (data/supabase.db) active in development/test.',
+  };
+}
+
+// Production strictly requires remote Supabase Postgres (never silent SQLite fallback)
+export const isSupabaseConfigured = isProductionRuntime() ? isRemoteSupabase : true;
 
 export function assertPersistenceConfigured(): void {
-  // Persistence is always configured via Supabase (remote or local persistent DB)
+  if (isProductionRuntime() && !isRemoteSupabase) {
+    throw new Error(persistenceBackendInfo().message);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -501,6 +579,37 @@ function createNoopQueryBuilder() {
   return builder;
 }
 
+function createMisconfiguredProdQueryBuilder(errMessage: string) {
+  const errObj = { message: errMessage, code: 'PERSISTENCE_MISCONFIGURED' };
+  const builder: any = {
+    select: () => builder,
+    delete: () => builder,
+    upsert: () => Promise.resolve({ data: null, error: errObj }),
+    eq: () => builder,
+    neq: () => builder,
+    in: () => builder,
+    gte: () => builder,
+    lte: () => builder,
+    gt: () => builder,
+    lt: () => builder,
+    or: () => builder,
+    order: () => builder,
+    limit: () => builder,
+    then: (resolve: (res: any) => void, reject?: (err: any) => void) =>
+      Promise.resolve({ data: null, count: 0, error: errObj }).then(resolve, reject),
+  };
+  return builder;
+}
+
+function createMisconfiguredProdClient(errMessage: string): any {
+  return {
+    from: () => createMisconfiguredProdQueryBuilder(errMessage),
+    auth: {
+      persistSession: false,
+    },
+  };
+}
+
 function createLocalSupabaseClient(): any {
   return {
     from: (table: string) => {
@@ -516,13 +625,16 @@ function createLocalSupabaseClient(): any {
   };
 }
 
-// Real client when credentials exist, or persistent local database client
+// Real Supabase Postgres client when credentials exist.
+// Production refuses local SQLite fallback so fixtures/sync_state are never written to ephemeral files.
 export const supabase = isRemoteSupabase
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: typeof window !== 'undefined',
       },
     })
+  : isProductionRuntime()
+  ? createMisconfiguredProdClient(persistenceBackendInfo().message)
   : createLocalSupabaseClient();
 
 // Local persistent state keys for demonstration mode

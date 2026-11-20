@@ -2,11 +2,15 @@ import { NextResponse } from 'next/server';
 import { getNBADataProvider } from '@/lib/data/nbaProvider';
 import { getFootballDataProvider } from '@/lib/data/provider';
 import { getStoredSportFreshness } from '@/lib/data/providerCallLogger';
+import { BASKETBALL_SYNC_ENABLED } from '@/lib/data/providerBudget';
+import { persistenceBackendInfo } from '@/lib/supabase/client';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET() {
+  const persistence = persistenceBackendInfo();
+
   // Strictly DB-only read path: never triggers external provider API calls on health pings
   const nbaProvider = getNBADataProvider();
   const nbaMatches = await nbaProvider.getFixtures().catch(() => ({
@@ -48,22 +52,25 @@ export async function GET() {
     }
   });
 
-  const isBasketballHealthy = (nbaMatches.fixtures || []).length > 0 && !nbaMatches.isDelayed;
+  const isFootballHealthy = (footballMatches.fixtures || []).length > 0 && !footballMatches.isDelayed;
+  const isBasketballHealthy = !BASKETBALL_SYNC_ENABLED || ((nbaMatches.fixtures || []).length > 0 && !nbaMatches.isDelayed);
 
   return NextResponse.json(
     {
-      status: isBasketballHealthy ? 'HEALTHY' : 'DEGRADED',
+      status: persistence.backend !== 'misconfigured' && isFootballHealthy && isBasketballHealthy ? 'HEALTHY' : 'DEGRADED',
       timestamp: new Date().toISOString(),
+      persistence,
       sports: {
         basketball: {
+          enabled: BASKETBALL_SYNC_ENABLED,
           lastSyncTime: nbaFreshness.newestUpdatedAt || nbaMatches.lastSyncTimestamp || null,
           lastSyncFormatted: nbaMatches.lastUpdated,
           newestKickoff: newestNbaKickoff,
           rowCount: (nbaMatches.fixtures || []).length,
-          providerStatus: nbaFreshness.syncState?.status || 'ONLINE',
-          provider: nbaFreshness.syncState?.providerName || 'ESPN NBA Live Scoreboard',
+          providerStatus: BASKETBALL_SYNC_ENABLED ? (nbaFreshness.syncState?.status || 'ONLINE') : 'DISABLED',
+          provider: BASKETBALL_SYNC_ENABLED ? (nbaFreshness.syncState?.providerName || 'ESPN NBA Live Scoreboard') : 'Disabled until basketball module is built',
           season: nbaMatches.season,
-          isDelayed: nbaMatches.isDelayed,
+          isDelayed: BASKETBALL_SYNC_ENABLED ? nbaMatches.isDelayed : false,
           ageMinutes: nbaFreshness.ageMinutes,
         },
         football: {

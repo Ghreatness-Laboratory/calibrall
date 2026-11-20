@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
+import {
+  isSupabaseConfigured,
+  supabase,
+  persistenceBackendInfo,
+} from '@/lib/supabase/client';
 import { getFootballDataProvider } from '@/lib/data/provider';
-import { getNBADataProvider } from '@/lib/data/nbaProvider';
-import { computeNBADateWindow } from '@/lib/utils/dateWindow';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { lookupCanonicalTeam } from '@/lib/data/canonicalTeams';
@@ -10,10 +12,10 @@ import { updateFixtureVerifiedOddsInDatabase } from '@/lib/data/fixturesDatabase
 import {
   SyncMode,
   PROVIDER_BUDGETS,
-  TIER_1_LEAGUES,
   TIER_2_LEAGUES,
   TIER_3_LEAGUES,
   SkippedLeagueRecord,
+  BASKETBALL_SYNC_ENABLED,
   getLeaguePriorityTier,
 } from '@/lib/data/providerBudget';
 import {
@@ -42,6 +44,16 @@ const ODDS_API_LEAGUES: Array<{ code: string; name: string; sportKey: string }> 
   { code: 'SC0', name: 'Scottish Premiership', sportKey: 'soccer_spl' },
   { code: 'DNK', name: 'Danish Superliga', sportKey: 'soccer_denmark_superliga' },
 ];
+
+function constantTimeMatch(provided: string, expected: string): boolean {
+  const bufProvided = Buffer.from(provided, 'utf8');
+  const bufExpected = Buffer.from(expected, 'utf8');
+  if (bufProvided.length !== bufExpected.length) {
+    crypto.timingSafeEqual(bufExpected, bufExpected);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufProvided, bufExpected);
+}
 
 function normalizeTeamToken(name: string): string {
   return name
@@ -95,6 +107,56 @@ async function countOddsSyncRunsToday(): Promise<number> {
 }
 
 async function handleSync(request: Request) {
+  // 0a. Fail-closed secret protection: requires CRON_SECRET or ADMIN_SECRET via headers only
+  const allowedSecrets = [
+    process.env.CRON_SECRET?.trim(),
+    process.env.ADMIN_SECRET?.trim(),
+  ].filter((s): s is string => Boolean(s));
+
+  if (allowedSecrets.length === 0) {
+    return NextResponse.json(
+      {
+        error: 'Service Unavailable: CRON_SECRET or ADMIN_SECRET must be configured before invoking /api/v1/sync.',
+      },
+      { status: 503 }
+    );
+  }
+
+  const secretHeader =
+    request.headers.get('x-sync-secret')?.trim() ||
+    request.headers.get('x-admin-secret')?.trim() ||
+    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim() ||
+    '';
+
+  if (!secretHeader) {
+    return NextResponse.json(
+      {
+        error: 'Unauthorized: Missing sync secret (send Authorization: Bearer <CRON_SECRET>, x-sync-secret, or x-admin-secret).',
+      },
+      { status: 401 }
+    );
+  }
+
+  const authorized = allowedSecrets.some(expected => constantTimeMatch(secretHeader, expected));
+  if (!authorized) {
+    return NextResponse.json(
+      { error: 'Unauthorized: Invalid sync secret.' },
+      { status: 401 }
+    );
+  }
+
+  // 0b. Production persistence check: refuse local SQLite fallback in production
+  const persistence = persistenceBackendInfo();
+  if (persistence.backend === 'misconfigured') {
+    return NextResponse.json(
+      {
+        error: persistence.message,
+        persistence,
+      },
+      { status: 503 }
+    );
+  }
+
   const url = new URL(request.url);
   const sportParam = url.searchParams.get('sport')?.toLowerCase() || 'all';
   const rawMode = url.searchParams.get('mode')?.toLowerCase();
@@ -105,93 +167,54 @@ async function handleSync(request: Request) {
   const maxCallsParam = url.searchParams.get('maxCalls');
   const maxCalls = maxCallsParam && !isNaN(Number(maxCallsParam)) ? Math.max(1, Number(maxCallsParam)) : undefined;
 
-  // Secret protection: check x-sync-secret or Authorization Bearer header (no query string)
-  const secretHeader =
-    request.headers.get('x-sync-secret') ||
-    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const configuredSecret = process.env.CRON_SECRET?.trim();
-
-  if (configuredSecret) {
-    if (!secretHeader) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Missing sync secret.' },
-        { status: 401 }
-      );
-    }
-    const bufProvided = Buffer.from(secretHeader, 'utf8');
-    const bufConfigured = Buffer.from(configuredSecret, 'utf8');
-    if (bufProvided.length !== bufConfigured.length || !crypto.timingSafeEqual(bufProvided, bufConfigured)) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Invalid sync secret.' },
-        { status: 401 }
-      );
-    }
-  }
-
   const results: Record<string, any> = {};
 
-  // 1. Basketball Sync (NBA) - Scheduled server ingestion
+  // 1. Basketball Sync (NBA) - Disabled until basketball module is built
   if (sportParam === 'all' || sportParam === 'basketball') {
-    const t0 = Date.now();
-    try {
-      const nbaProvider = getNBADataProvider();
-      const count = await nbaProvider.syncLiveFixtures(true, mode);
-      const health = nbaProvider.getFixturesHealth();
-      const windowInfo = computeNBADateWindow(1, 14);
+    const attemptIso = new Date().toISOString();
+    if (!BASKETBALL_SYNC_ENABLED) {
+      await Promise.all([
+        upsertProviderSyncState('basketball', {
+          sport: 'basketball',
+          providerName: 'ESPN NBA Scoreboard + BallDontLie v1',
+          status: 'DISABLED',
+          lastAttemptAt: attemptIso,
+          lastError: null,
+          lastResponseBody: 'NBA and basketball syncing disabled until basketball module is built',
+          callsUsedLastRun: 0,
+        }),
+        upsertProviderSyncState('provider:espn_nba', {
+          sport: 'basketball',
+          providerName: 'ESPN NBA Scoreboard',
+          status: 'DISABLED',
+          lastAttemptAt: attemptIso,
+          lastError: null,
+          lastResponseBody: 'Disabled until basketball module is built (0 calls/day)',
+          callsUsedLastRun: 0,
+        }),
+        upsertProviderSyncState('provider:balldontlie', {
+          sport: 'basketball',
+          providerName: 'BallDontLie v1',
+          status: 'DISABLED',
+          lastAttemptAt: attemptIso,
+          lastError: null,
+          lastResponseBody: 'Disabled until basketball module is built (0 calls/day)',
+          callsUsedLastRun: 0,
+        }),
+      ]);
 
       results['basketball'] = {
-        provider: health.provider,
-        mode,
-        status: health.providerStatus,
-        season: health.season,
-        records: count,
-        newestKickoff: health.newestKickoff,
-        window: {
-          dateFrom: windowInfo.dateFrom,
-          dateTo: windowInfo.dateTo,
-          daysIncluded: windowInfo.datesList.length,
-        },
-        latencyMs: Date.now() - t0,
-        lastSync: health.lastSyncTime,
-      };
-    } catch (e: any) {
-      results['basketball'] = {
-        provider: 'ESPN NBA Live Scoreboard',
-        mode,
-        status: 'ERROR',
-        error: e.message || 'Sync failed',
-        latencyMs: Date.now() - t0,
-      };
-    }
-
-    // BallDontLie stats check (schedule/full only, 2 calls/day budget)
-    const ballDontLieKey = process.env.BALLDONTLIE_API_KEY?.trim() || process.env.BALL_DONT_LIE_API_KEY?.trim();
-    if (ballDontLieKey && mode !== 'live') {
-      const attemptIso = new Date().toISOString();
-      const res = await loggedProviderFetch('balldontlie', 'https://api.balldontlie.io/v1/teams', {
-        headers: { Authorization: ballDontLieKey },
-        syncMode: mode,
-        timeoutMs: 8000,
-      });
-      await upsertProviderSyncState('provider:balldontlie', {
-        sport: 'basketball',
-        providerName: 'BallDontLie v1',
-        status: res.ok ? 'ONLINE' : 'ERROR',
-        lastAttemptAt: attemptIso,
-        ...(res.ok ? { lastSuccessAt: attemptIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 400) }),
-        quotaRemaining: res.quotaRemaining,
-        quotaHeaders: res.quotaHeaders,
-        callsUsedLastRun: 1,
-      });
-      results['balldontlie'] = {
-        status: res.ok ? 'ONLINE' : 'ERROR',
-        httpStatus: res.status,
-        latencyMs: res.latencyMs,
+        enabled: false,
+        provider: 'ESPN NBA / BallDontLie',
+        status: 'DISABLED',
+        reason: 'NBA and basketball syncing disabled until basketball module is built',
+        records: 0,
+        callsMade: 0,
       };
     }
   }
 
-  // 2. Football Fixture Sync (Football-Data.org -> Sportmonks into Supabase/SQLite)
+  // 2. Football Fixture Sync (Football-Data.org -> Sportmonks into Supabase Postgres / dev SQLite)
   if (sportParam === 'all' || sportParam === 'football') {
     const t0 = Date.now();
     const footballProvider = getFootballDataProvider();
@@ -221,7 +244,7 @@ async function handleSync(request: Request) {
       };
     }
 
-    // 3. The Odds API: ONLY for odds, ONLY for upcoming matches that have picks, AT MOST twice a day
+    // 3. The Odds API: ONLY for odds, ordered by upcoming pick count descending, AT MOST twice a day
     const oddsApiKey = process.env.ODDS_API_KEY?.trim();
     if (oddsApiKey && mode !== 'live') {
       const attemptIso = new Date().toISOString();
@@ -251,6 +274,27 @@ async function handleSync(request: Request) {
         pickFixturesByLeague.set(code, list);
       }
 
+      // Order Odds API leagues strictly by upcoming picks count DESC, then priority tier ASC
+      const orderedOddsLeagues = [...ODDS_API_LEAGUES].sort((a, b) => {
+        const countA = pickFixturesByLeague.get(a.code)?.length || 0;
+        const countB = pickFixturesByLeague.get(b.code)?.length || 0;
+        if (countB !== countA) return countB - countA;
+        return getLeaguePriorityTier(a.code) - getLeaguePriorityTier(b.code);
+      });
+
+      const leaguesOrderedByUpcomingPicks = orderedOddsLeagues.map(item => ({
+        code: item.code,
+        name: item.name,
+        sportKey: item.sportKey,
+        upcomingMatchesWithPicks: pickFixturesByLeague.get(item.code)?.length || 0,
+      }));
+
+      const leaguesWithOddsUpdated: Array<{
+        leagueCode: string;
+        leagueName: string;
+        upcomingMatchesWithPicks: number;
+        matchesUpdated: number;
+      }> = [];
       const oddsSkipped: SkippedLeagueRecord[] = [];
       let oddsCalls = 0;
       let matchesUpdated = 0;
@@ -261,7 +305,42 @@ async function handleSync(request: Request) {
       let lastQuotaHeaders: Record<string, string> = existingOddsState?.quotaHeaders || {};
       let lastQuotaRemaining: string | null = existingOddsState?.quotaRemaining || null;
 
+      const appendExcludedTiers = () => {
+        for (const code of [...TIER_2_LEAGUES, ...TIER_3_LEAGUES]) {
+          if (ODDS_API_LEAGUES.some(o => o.code === code)) continue;
+          oddsSkipped.push({
+            leagueCode: code,
+            leagueName: code,
+            tier: getLeaguePriorityTier(code),
+            provider: 'the-odds-api',
+            reason: 'Excluded from 500 credits/month free Odds API allowance',
+          });
+        }
+      };
+
       if (runsCompletedToday >= 2) {
+        for (const item of orderedOddsLeagues) {
+          oddsSkipped.push({
+            leagueCode: item.code,
+            leagueName: item.name,
+            tier: getLeaguePriorityTier(item.code),
+            provider: 'the-odds-api',
+            reason: 'Skipped: twice-daily Odds API run cap reached (2/2 today)',
+          });
+        }
+        appendExcludedTiers();
+
+        await upsertProviderSyncState('provider:the-odds-api', {
+          sport: 'odds',
+          providerName: 'The Odds API v4',
+          status: existingOddsState?.status || 'ONLINE',
+          lastAttemptAt: attemptIso,
+          quotaRemaining: lastQuotaRemaining,
+          quotaHeaders: lastQuotaHeaders,
+          skippedLeagues: oddsSkipped,
+          callsUsedLastRun: 0,
+        });
+
         results['theOddsApi'] = {
           provider: 'the-odds-api.com',
           status: 'SKIPPED_TWICE_DAILY_CAP',
@@ -272,14 +351,23 @@ async function handleSync(request: Request) {
           dailyCap,
           quotaRemaining: lastQuotaRemaining,
           upcomingMatchesWithPicks: upcomingWithPicks.length,
+          leaguesOrderedByUpcomingPicks,
+          leaguesWithOddsUpdated: [],
+          leaguesWithoutOddsCount: oddsSkipped.length,
+          leaguesWithoutOdds: oddsSkipped,
         };
       } else {
         const perRunRemainingDaily = Math.max(0, dailyCap - callsTodayBeforeRun);
         const runCap = Math.min(8, perRunRemainingDaily);
-        const targetLeagues = ODDS_API_LEAGUES.filter(item => (pickFixturesByLeague.get(item.code)?.length || 0) > 0);
+        const targetLeagues = orderedOddsLeagues.filter(
+          item => (pickFixturesByLeague.get(item.code)?.length || 0) > 0
+        );
+        let abortedEarlyReason: string | null = null;
 
-        for (const item of ODDS_API_LEAGUES) {
+        for (let idx = 0; idx < orderedOddsLeagues.length; idx++) {
+          const item = orderedOddsLeagues[idx];
           const leaguePickFixtures = pickFixturesByLeague.get(item.code) || [];
+
           if (leaguePickFixtures.length === 0) {
             oddsSkipped.push({
               leagueCode: item.code,
@@ -287,6 +375,17 @@ async function handleSync(request: Request) {
               tier: getLeaguePriorityTier(item.code),
               provider: 'the-odds-api',
               reason: 'No upcoming matches with qualified picks (0 credits spent)',
+            });
+            continue;
+          }
+
+          if (abortedEarlyReason) {
+            oddsSkipped.push({
+              leagueCode: item.code,
+              leagueName: item.name,
+              tier: getLeaguePriorityTier(item.code),
+              provider: 'the-odds-api',
+              reason: abortedEarlyReason,
             });
             continue;
           }
@@ -371,31 +470,49 @@ async function handleSync(request: Request) {
               }
             }
 
+            let leagueUpdated = 0;
             if (updates.length > 0) {
-              const updatedCount = await updateFixtureVerifiedOddsInDatabase(updates);
-              matchesUpdated += updatedCount;
+              leagueUpdated = await updateFixtureVerifiedOddsInDatabase(updates);
+              matchesUpdated += leagueUpdated;
+            }
+
+            if (leagueUpdated > 0) {
+              leaguesWithOddsUpdated.push({
+                leagueCode: item.code,
+                leagueName: item.name,
+                upcomingMatchesWithPicks: leaguePickFixtures.length,
+                matchesUpdated: leagueUpdated,
+              });
+            } else {
+              oddsSkipped.push({
+                leagueCode: item.code,
+                leagueName: item.name,
+                tier: getLeaguePriorityTier(item.code),
+                provider: 'the-odds-api',
+                reason:
+                  res.json.length === 0
+                    ? `Queried Odds API (${leaguePickFixtures.length} picks) but 0 active events returned`
+                    : `Queried Odds API (${leaguePickFixtures.length} picks, ${res.json.length} events) but 0 matched fixtures had EU H2H quotes`,
+              });
             }
           } else {
             lastErr = res.error || `HTTP ${res.status}`;
             lastBody = res.bodyText.slice(0, 400);
+            oddsSkipped.push({
+              leagueCode: item.code,
+              leagueName: item.name,
+              tier: getLeaguePriorityTier(item.code),
+              provider: 'the-odds-api',
+              reason: `Odds API error (${lastErr})`,
+            });
             const rem = res.quotaRemaining ? parseInt(res.quotaRemaining, 10) : NaN;
             if (res.status === 401 || res.status === 429 || (!isNaN(rem) && rem <= 10)) {
-              break;
+              abortedEarlyReason = `Stopped early after ${item.code} (${lastErr})`;
             }
           }
         }
 
-        // Note Tier 2/3 leagues not queried via Odds API to conserve 500 credits/month free allowance
-        for (const code of [...TIER_2_LEAGUES, ...TIER_3_LEAGUES]) {
-          if (ODDS_API_LEAGUES.some(o => o.code === code)) continue;
-          oddsSkipped.push({
-            leagueCode: code,
-            leagueName: code,
-            tier: getLeaguePriorityTier(code),
-            provider: 'the-odds-api',
-            reason: 'Excluded from 500 credits/month free Odds API allowance',
-          });
-        }
+        appendExcludedTiers();
 
         if (targetLeagues.length === 0) {
           lastOk = true;
@@ -421,16 +538,16 @@ async function handleSync(request: Request) {
           status: lastOk ? 'ONLINE' : 'ERROR',
           runsToday: oddsCalls > 0 ? runsCompletedToday + 1 : runsCompletedToday,
           maxRunsPerDay: 2,
-          leaguesWithUpcomingPicks: Array.from(pickFixturesByLeague.entries()).map(([code, list]) => ({
-            code,
-            upcomingMatchesWithPicks: list.length,
-          })),
+          leaguesOrderedByUpcomingPicks,
+          leaguesWithUpcomingPicks: leaguesOrderedByUpcomingPicks.filter(l => l.upcomingMatchesWithPicks > 0),
+          leaguesWithOddsUpdated,
           callsMade: oddsCalls,
           matchesUpdatedWithOdds: matchesUpdated,
           quotaRemaining: lastQuotaRemaining,
           quotaUsedThisMonth: lastQuotaHeaders['x-requests-used'] || null,
           monthlyAllowance: 500,
-          skippedLeaguesCount: oddsSkipped.length,
+          leaguesWithoutOddsCount: oddsSkipped.length,
+          leaguesWithoutOdds: oddsSkipped,
         };
       }
     }
@@ -440,17 +557,31 @@ async function handleSync(request: Request) {
   if (isSupabaseConfigured && supabase) {
     const t0 = Date.now();
     try {
-      const { error } = await supabase.from('fixtures').select('id').limit(1);
+      const [{ error: fixErr }, { error: syncErr }] = await Promise.all([
+        supabase.from('fixtures').select('id').limit(1),
+        supabase.from('provider_sync_state').select('id').limit(1),
+      ]);
+      const dbOk = !fixErr && !syncErr;
       results['database'] = {
-        provider: 'Supabase / Local Persistent Store',
-        isConfigured: true,
-        status: error ? 'ERROR' : 'ONLINE',
+        backend: persistence.backend,
+        isRemoteSupabase: persistence.isRemoteSupabase,
+        isProduction: persistence.isProduction,
+        hasSupabaseUrl: persistence.hasSupabaseUrl,
+        hasServiceRoleKey: persistence.hasServiceRoleKey,
+        localSqliteAllowed: persistence.localSqliteAllowed,
+        message: persistence.message,
+        status: dbOk ? 'ONLINE' : 'ERROR',
+        tables: {
+          fixtures: fixErr ? fixErr.message : 'OK',
+          provider_sync_state: syncErr ? syncErr.message : 'OK',
+        },
         latencyMs: Date.now() - t0,
       };
     } catch (e: any) {
       results['database'] = {
-        provider: 'Supabase / Local Persistent Store',
-        isConfigured: true,
+        backend: persistence.backend,
+        isRemoteSupabase: persistence.isRemoteSupabase,
+        isProduction: persistence.isProduction,
         status: 'ERROR',
         error: e.message,
       };
@@ -463,6 +594,15 @@ async function handleSync(request: Request) {
       mode,
       sport: sportParam,
       timestamp: new Date().toISOString(),
+      protection: {
+        requiresSecret: true,
+        acceptedEnvVars: ['CRON_SECRET', 'ADMIN_SECRET'],
+        acceptedHeaders: ['Authorization: Bearer <secret>', 'x-sync-secret', 'x-admin-secret'],
+        queryParamsRejected: true,
+        timingSafe: true,
+        failClosedStatusCodes: { unconfigured: 503, missingOrInvalid: 401 },
+      },
+      persistence,
       results,
     },
     {

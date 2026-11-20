@@ -3,6 +3,7 @@
 
 import { getNBADataProvider } from '../lib/data/nbaProvider';
 import { computeNBASeason } from '../lib/data/nbaSeedData';
+import { BASKETBALL_SYNC_ENABLED } from '../lib/data/providerBudget';
 
 async function runStalenessTest() {
   console.log('--- RUNNING BASKETBALL STALENESS & PIPELINE VERIFICATION TEST ---');
@@ -21,6 +22,20 @@ async function runStalenessTest() {
   }
 
   const nbaProvider = getNBADataProvider();
+  if (!BASKETBALL_SYNC_ENABLED) {
+    console.log('BASKETBALL_SYNC_ENABLED is false (syncing disabled until basketball module is built). Verifying 0-call gate...');
+    const syncedCount = await nbaProvider.syncLiveFixtures(true);
+    if (syncedCount !== 0) {
+      throw new Error(`FAIL: Expected 0 NBA fixtures synced while disabled, got ${syncedCount}.`);
+    }
+    const health = nbaProvider.getFixturesHealth();
+    if (health.providerStatus !== 'DISABLED') {
+      throw new Error(`FAIL: Expected NBA providerStatus DISABLED, got ${health.providerStatus}`);
+    }
+    console.log('PASSED: Basketball syncing is intentionally disabled (0 external calls, status DISABLED).');
+    return;
+  }
+
   console.log('Triggering live NBA sync across window (today - 1 day to +14 days in UTC)...');
   const syncedCount = await nbaProvider.syncLiveFixtures(true);
 

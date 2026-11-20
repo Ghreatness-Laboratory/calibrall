@@ -23,6 +23,7 @@ import {
 import {
   SyncMode,
   FIXTURE_STALE_LIMIT_MINUTES,
+  BASKETBALL_SYNC_ENABLED,
 } from './providerBudget';
 import {
   loggedProviderFetch,
@@ -34,7 +35,7 @@ import {
 export interface NBAProviderHealth {
   providerName: string;
   isConfigured: boolean;
-  status: 'ONLINE' | 'STANDBY_DEV_MODE' | 'ERROR' | 'RATE_LIMITED';
+  status: 'ONLINE' | 'STANDBY_DEV_MODE' | 'ERROR' | 'RATE_LIMITED' | 'DISABLED';
   lastSyncTimestamp: string;
   message: string;
   missingEnvVars: string[];
@@ -54,7 +55,7 @@ export interface NBAFixturesHealthResult {
   lastSyncFormatted: string;
   newestKickoff: string | null;
   rowCount: number;
-  providerStatus: 'ONLINE' | 'STANDBY_DEV_MODE' | 'ERROR';
+  providerStatus: 'ONLINE' | 'STANDBY_DEV_MODE' | 'ERROR' | 'DISABLED';
   provider: string;
   season: string;
   isDelayed: boolean;
@@ -80,13 +81,24 @@ export class NBADataProvider {
 
   private fixturesStore = new Map<string, Fixture>();
   private lastSyncTimestamp: string | null = null;
-  private lastSyncStatus: 'ONLINE' | 'STANDBY_DEV_MODE' | 'ERROR' = 'ONLINE';
+  private lastSyncStatus: 'ONLINE' | 'STANDBY_DEV_MODE' | 'ERROR' | 'DISABLED' =
+    BASKETBALL_SYNC_ENABLED ? 'ONLINE' : 'DISABLED';
   private lastProviderUsed: string = 'ESPN NBA Live Scoreboard & DraftKings Lines';
   private activeSyncPromise: Promise<number> | null = null;
 
   constructor() {}
 
   async getHealth(): Promise<NBAProviderHealth> {
+    if (!BASKETBALL_SYNC_ENABLED) {
+      return {
+        providerName: 'Disabled until basketball module is built',
+        isConfigured: false,
+        status: 'DISABLED',
+        lastSyncTimestamp: this.lastSyncTimestamp || new Date().toISOString(),
+        message: 'NBA and basketball syncing disabled until basketball module is built.',
+        missingEnvVars: [],
+      };
+    }
     const ballDontLieKey = process.env.BALLDONTLIE_API_KEY?.trim() || process.env.BALL_DONT_LIE_API_KEY?.trim();
     const nbaApiKey = process.env.NBA_API_KEY?.trim();
     const freshness = await getStoredSportFreshness('basketball');
@@ -109,6 +121,19 @@ export class NBADataProvider {
   }
 
   getFixturesHealth(): NBAFixturesHealthResult {
+    if (!BASKETBALL_SYNC_ENABLED) {
+      return {
+        lastSyncTime: this.lastSyncTimestamp || new Date().toISOString(),
+        lastSyncFormatted: 'disabled',
+        newestKickoff: null,
+        rowCount: this.fixturesStore.size,
+        providerStatus: 'DISABLED',
+        provider: 'Disabled until basketball module is built',
+        season: computeNBASeason(),
+        isDelayed: false,
+      };
+    }
+
     const now = Date.now();
     const syncTimeMs = this.lastSyncTimestamp ? new Date(this.lastSyncTimestamp).getTime() : now;
     const diffMinutes = (now - syncTimeMs) / 60000;
@@ -146,6 +171,30 @@ export class NBADataProvider {
    * - mode='full': polls entire [-1..+14] window (16 calls)
    */
   async syncLiveFixtures(force = false, mode: SyncMode = 'full'): Promise<number> {
+    if (!BASKETBALL_SYNC_ENABLED) {
+      this.lastSyncStatus = 'DISABLED';
+      const attemptIso = new Date().toISOString();
+      await upsertProviderSyncState('basketball', {
+        sport: 'basketball',
+        providerName: 'ESPN NBA Live Scoreboard',
+        status: 'DISABLED',
+        lastAttemptAt: attemptIso,
+        lastError: null,
+        lastResponseBody: 'Disabled until basketball module is built.',
+        callsUsedLastRun: 0,
+      });
+      await upsertProviderSyncState('provider:espn_nba', {
+        sport: 'basketball',
+        providerName: 'ESPN NBA Scoreboard',
+        status: 'DISABLED',
+        lastAttemptAt: attemptIso,
+        lastError: null,
+        lastResponseBody: 'Disabled until basketball module is built.',
+        callsUsedLastRun: 0,
+      });
+      return 0;
+    }
+
     const now = Date.now();
     if (!force && this.lastSyncTimestamp && this.fixturesStore.size > 0) {
       const ageMs = now - new Date(this.lastSyncTimestamp).getTime();

@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { serverCache } from '@/lib/cache/serverCache';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import {
+  supabase,
+  isSupabaseConfigured,
+  persistenceBackendInfo,
+} from '@/lib/supabase/client';
+import { BASKETBALL_SYNC_ENABLED } from '@/lib/data/providerBudget';
 import { getAllProviderSyncStates, getStoredSportFreshness } from '@/lib/data/providerCallLogger';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +22,7 @@ interface DependencyHealth {
 
 export async function GET() {
   const tStart = Date.now();
+  const persistence = persistenceBackendInfo();
 
   // DB-only health check: never calls external provider APIs on visitor/health requests.
   const [syncStates, footballFreshness, basketballFreshness] = await Promise.all([
@@ -55,20 +61,34 @@ export async function GET() {
 
   const ballDontLieKey =
     process.env.BALLDONTLIE_API_KEY?.trim() || process.env.BALL_DONT_LIE_API_KEY?.trim();
-  const basketballHealthy =
-    basketballFreshness.fixtureCount > 0 && !basketballFreshness.isStaleBeyondLimit;
+  const basketballHealthy = BASKETBALL_SYNC_ENABLED
+    ? basketballFreshness.fixtureCount > 0 && !basketballFreshness.isStaleBeyondLimit
+    : true;
 
-  const basketballDependency: DependencyHealth = {
-    envVarPresent: Boolean(ballDontLieKey || basketballFreshness.fixtureCount > 0),
-    testCallSucceeded: basketballHealthy || bdlState?.status === 'ONLINE',
-    provider: 'ESPN NBA Scoreboard + BallDontLie v1',
-    details: {
-      storedFixtures: basketballFreshness.fixtureCount,
-      lastUpdated: basketballFreshness.lastUpdatedFormatted,
-      ageMinutes: basketballFreshness.ageMinutes,
-      ballDontLieStatus: bdlState?.status || 'UNCHECKED',
-    },
-  };
+  const basketballDependency: DependencyHealth = BASKETBALL_SYNC_ENABLED
+    ? {
+        envVarPresent: Boolean(ballDontLieKey || basketballFreshness.fixtureCount > 0),
+        testCallSucceeded: basketballHealthy || bdlState?.status === 'ONLINE',
+        provider: 'ESPN NBA Scoreboard + BallDontLie v1',
+        details: {
+          enabled: true,
+          storedFixtures: basketballFreshness.fixtureCount,
+          lastUpdated: basketballFreshness.lastUpdatedFormatted,
+          ageMinutes: basketballFreshness.ageMinutes,
+          ballDontLieStatus: bdlState?.status || 'UNCHECKED',
+        },
+      }
+    : {
+        envVarPresent: true,
+        testCallSucceeded: true,
+        provider: 'Disabled until basketball module is built',
+        details: {
+          enabled: false,
+          status: 'DISABLED',
+          storedFixtures: basketballFreshness.fixtureCount,
+          lastUpdated: basketballFreshness.lastUpdatedFormatted,
+        },
+      };
 
   const oddsApiKey = process.env.ODDS_API_KEY?.trim();
   const oddsDependency: DependencyHealth = {
@@ -97,17 +117,26 @@ export async function GET() {
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || process.env.SUPABASE_URL?.trim()
   );
   const databaseDependency: DependencyHealth = {
-    envVarPresent: hasDbUrl || hasSupabaseUrl || isSupabaseConfigured,
+    envVarPresent: hasDbUrl || persistence.isRemoteSupabase || persistence.localSqliteAllowed,
     testCallSucceeded: false,
-    provider: hasDbUrl ? 'PostgreSQL' : isSupabaseConfigured ? 'Persistent DB Store' : 'Local Seed/Memory State',
+    provider:
+      persistence.backend === 'supabase_postgres'
+        ? 'Supabase PostgreSQL'
+        : persistence.backend === 'local_sqlite'
+        ? 'Local SQLite Dev Store (data/supabase.db)'
+        : 'Misconfigured Production Persistence',
+    details: { ...persistence, hasSupabaseUrl },
   };
 
-  if (isSupabaseConfigured && supabase) {
+  if (persistence.backend === 'misconfigured') {
+    databaseDependency.testCallSucceeded = false;
+    databaseDependency.error = persistence.message;
+  } else if (isSupabaseConfigured && supabase) {
     const t0 = Date.now();
     try {
       const { error } = await supabase.from('fixtures').select('count', { count: 'exact', head: true });
       databaseDependency.latencyMs = Date.now() - t0;
-      if (!error || error.code === '42P01' || error.message.includes('relation') || error.code === 'PGRST116') {
+      if (!error) {
         databaseDependency.testCallSucceeded = true;
       } else {
         databaseDependency.error = error.message;
@@ -122,12 +151,12 @@ export async function GET() {
   }
 
   const footballOperational = footballDependency.testCallSucceeded;
-  const basketballOperational = basketballDependency.testCallSucceeded;
+  const basketballOperational = BASKETBALL_SYNC_ENABLED ? basketballDependency.testCallSucceeded : false;
 
   let overallStatus: 'HEALTHY' | 'DEGRADED' | 'UNHEALTHY' = 'HEALTHY';
-  if (!footballOperational && !basketballOperational) {
-    overallStatus = 'UNHEALTHY';
-  } else if (!footballOperational || !basketballOperational || !redisDependency.testCallSucceeded) {
+  if (!footballOperational || !databaseDependency.testCallSucceeded) {
+    overallStatus = databaseDependency.testCallSucceeded ? 'DEGRADED' : 'UNHEALTHY';
+  } else if (!redisDependency.testCallSucceeded) {
     overallStatus = 'DEGRADED';
   }
 
@@ -145,9 +174,10 @@ export async function GET() {
           engine: 'Dixon Coles Poisson + NegBinomial',
         },
         basketball: {
+          enabled: BASKETBALL_SYNC_ENABLED,
           operational: basketballOperational,
           api: basketballDependency,
-          engine: 'NBA Efficiency (OffEff x Poss + DefEff x OppPoss)',
+          engine: 'Disabled until basketball module is built',
         },
       },
       infrastructure: {

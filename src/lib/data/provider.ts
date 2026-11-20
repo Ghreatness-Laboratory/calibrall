@@ -176,11 +176,8 @@ const ESPN_LEAGUE_MAP: Record<string, { slug: string; name: string; country: str
 // Normalize Football-Data.org fixture
 function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
   const rawCompCode = String(m.competition?.code || m.competition?.id || '').trim();
-  // Football-Data.org uses 'EC' for UEFA European Championship (NOT English National League comp_ec)
-  const comp =
-    rawCompCode.toUpperCase() === 'EC'
-      ? CANONICAL_COMPETITIONS.comp_euro
-      : getCanonicalCompetition(rawCompCode);
+  // Football-Data.org uses 'EC' for UEFA European Championship (comp_euro), NOT National League (comp_eng_national_league)
+  const comp = getCanonicalCompetition(rawCompCode, 'football-data.org');
   if (!comp || !isCanonicalCompetitionId(comp.id)) {
     logCompetitionIntegrityError(
       `fix_${m.id ?? 'unknown'}`,
@@ -708,7 +705,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       status: freshness.isStaleBeyondLimit && freshness.syncState?.status === 'ERROR' ? 'ERROR' : 'ONLINE',
       lastSyncTimestamp: freshness.newestUpdatedAt || this.lastGoodSyncTime || new Date().toISOString(),
       activeLeaguesCount: footballCompCount,
-      message: `Scheduled twice-daily cron pipelines active: ${providers.join(', ')}. App reads from Supabase/DB only.`,
+      message: `Scheduled twice-daily cron pipelines active (Vercel Hobby 06:00 UTC + GitHub Actions 18:00 UTC): ${providers.join(', ')}. App reads from Supabase Postgres / DB only.`,
       missingEnvVars: missing,
       quotaHeaders: freshness.syncState?.quotaHeaders || this.lastQuotaHeaders,
     };

@@ -8,6 +8,9 @@ import { LiveStateStatus, Fixture } from '@/types';
  * Checks in-play state of a fixture and flags any state disruption (e.g. red cards, game state shifts)
  */
 export function evaluateLiveMatchState(fixture: Fixture): LiveStateStatus {
+  const kickoffMs = new Date(fixture.kickoffTime).getTime();
+  const isPastKickoff = !isNaN(kickoffMs) && Date.now() >= kickoffMs;
+  const hasVerifiedLiveMinute = typeof fixture.minute === 'number' && !isNaN(fixture.minute);
   const isLive = fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED';
   const homeReds = fixture.homeRedCards ?? 0;
   const awayReds = fixture.awayRedCards ?? 0;
@@ -20,16 +23,20 @@ export function evaluateLiveMatchState(fixture: Fixture): LiveStateStatus {
   if (isLive) {
     if (isSupersededByRedCard) {
       statusNotice = `Match state changed: in-play red card issued (${homeReds > 0 ? `${fixture.homeTeam.name} 10-man` : `${fixture.awayTeam.name} 10-man`}). Pre-match analysis no longer applies.`;
+    } else if (hasVerifiedLiveMinute) {
+      statusNotice = `Match in-play (${fixture.minute}', ${fixture.homeScore ?? 0}:${fixture.awayScore ?? 0}). Note: Pre-match analysis reflects kickoff state.`;
     } else {
-      statusNotice = `Match in-play (${fixture.homeScore ?? 0}-${fixture.awayScore ?? 0}). Note: Pre-match analysis reflects kickoff state; live goal decay applies with elapsed minutes.`;
+      statusNotice = 'Kicked off, awaiting result. Pre-match analysis reflects kickoff state; live minutes are omitted without an active live feed.';
     }
   } else if (fixture.status === 'FINISHED') {
     statusNotice = 'Fixture completed. Settled against verified official match report.';
+  } else if (isPastKickoff && fixture.status !== 'POSTPONED' && fixture.status !== 'CANCELED') {
+    statusNotice = 'Kicked off, awaiting result until the next scheduled sync writes the official score.';
   }
 
   return {
     isLive,
-    minute: isLive ? 65 : undefined, // Estimated or provider-supplied minute
+    minute: isLive && hasVerifiedLiveMinute ? fixture.minute : undefined,
     homeScore: fixture.homeScore ?? undefined,
     awayScore: fixture.awayScore ?? undefined,
     homeRedCards: homeReds,

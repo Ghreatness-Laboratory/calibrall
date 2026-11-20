@@ -46,28 +46,21 @@ export default function FixtureCard({
     return !isNaN(kickoffMs) && Date.now() >= kickoffMs;
   }, [fixture.kickoffTime]);
 
-  const elapsedMinutes = useMemo(() => {
-    const kickoffMs = new Date(fixture.kickoffTime).getTime();
-    if (isNaN(kickoffMs) || Date.now() < kickoffMs) return 0;
-    return Math.floor((Date.now() - kickoffMs) / 60000);
-  }, [fixture.kickoffTime]);
-
+  const hasVerifiedLiveMinute = typeof fixture.minute === 'number' && !isNaN(fixture.minute);
   const isPostponed = fixture.status === 'POSTPONED';
-  const isFinished = fixture.status === 'FINISHED' || (isPastKickoff && elapsedMinutes >= 125 && !isPostponed);
-  const isPaused = fixture.status === 'PAUSED' || (isPastKickoff && !isFinished && !isPostponed && elapsedMinutes >= 47 && elapsedMinutes <= 62);
-  const isInPlay = fixture.status === 'IN_PLAY' || (isPastKickoff && !isFinished && !isPaused && !isPostponed);
+  const isCanceled = fixture.status === 'CANCELED';
+  const isFinished = fixture.status === 'FINISHED';
+  const isPaused = fixture.status === 'PAUSED';
+  const isInPlayWithMinute = fixture.status === 'IN_PLAY' && hasVerifiedLiveMinute;
+  const isAwaitingResult =
+    !isFinished &&
+    !isPostponed &&
+    !isCanceled &&
+    !isPaused &&
+    !isInPlayWithMinute &&
+    (isPastKickoff || fixture.status === 'IN_PLAY');
 
   const stats = useMemo(() => extractMatchStats(fixture), [fixture]);
-
-  const displayMinute = useMemo(() => {
-    if (fixture.minute !== undefined && fixture.minute !== null) return fixture.minute;
-    if (isInPlay) {
-      if (elapsedMinutes <= 45) return Math.max(1, elapsedMinutes);
-      if (elapsedMinutes > 60) return Math.min(90, elapsedMinutes - 15);
-      return 45;
-    }
-    return stats.minute || 90;
-  }, [fixture.minute, isInPlay, elapsedMinutes, stats.minute]);
 
   const settledTopPrediction = useMemo(() => {
     if (!topPrediction || !isFinished) return null;
@@ -82,11 +75,9 @@ export default function FixtureCard({
     if (isFinished) return 'FT';
     if (isPaused) return 'HT';
     if (isPostponed) return 'Postponed';
-    // When in-play, the left badge renders the red LIVE minute pill.
-    // Display kickoffFormatted on the right so 'LIVE 82\'' is rendered once, not twice.
-    if (isInPlay) return kickoffFormatted;
+    if (isCanceled) return 'Canceled';
     return kickoffFormatted;
-  }, [isFinished, isPaused, isPostponed, isInPlay, kickoffFormatted]);
+  }, [isFinished, isPaused, isPostponed, isCanceled, kickoffFormatted]);
 
   const homeName = displayName(fixture.homeTeam);
   const awayName = displayName(fixture.awayTeam);
@@ -152,10 +143,15 @@ export default function FixtureCard({
               FT
             </span>
           )}
-          {isInPlay && (
+          {isInPlayWithMinute && (
             <span className="ml-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#E5684F]/15 text-[#E5684F] text-[9.5px] font-semibold border border-[#E5684F]/30">
               <span className="w-1.5 h-1.5 rounded-full bg-[#E5684F] animate-pulse" />
-              LIVE {displayMinute}&apos;
+              LIVE {fixture.minute}&apos;
+            </span>
+          )}
+          {isAwaitingResult && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[#E8B04A]/15 text-[#E8B04A] text-[9.5px] font-semibold border border-[#E8B04A]/30">
+              kicked off, awaiting result
             </span>
           )}
           {isPaused && (
@@ -166,6 +162,11 @@ export default function FixtureCard({
           {isPostponed && (
             <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[#E8B04A]/15 text-[#E8B04A] text-[9.5px] font-semibold border border-[#E8B04A]/30">
               Postponed
+            </span>
+          )}
+          {isCanceled && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[#E5684F]/15 text-[#E5684F] text-[9.5px] font-semibold border border-[#E5684F]/30">
+              Canceled
             </span>
           )}
 
