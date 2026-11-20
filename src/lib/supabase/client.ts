@@ -574,7 +574,6 @@ export function getLocalDatabase(): any {
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_provider_call_logs_ts ON provider_call_logs(timestamp DESC);'); } catch (_) {}
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_matches_home_kickoff ON matches(home_team_id, kickoff_time DESC);'); } catch (_) {}
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_matches_away_kickoff ON matches(away_team_id, kickoff_time DESC);'); } catch (_) {}
-      try { db.exec('CREATE INDEX IF NOT EXISTS idx_odds_snapshots_match_id ON odds_snapshots(match_id);'); } catch (_) {}
       state.schemaInitialized = true;
     }
 

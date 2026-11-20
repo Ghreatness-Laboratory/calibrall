@@ -1,8 +1,8 @@
 // Calibrall Service Worker
-// Version: 1.0.0
+// Version: 1.0.4
 // Brand: Every call, on record.
 
-const CACHE_VERSION = 'calibrall-v1.0.3';
+const CACHE_VERSION = 'calibrall-v1.0.4';
 const PRECACHE_NAME = `calibrall-precache-${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `calibrall-static-${CACHE_VERSION}`;
 const DATA_CACHE_NAME = `calibrall-data-${CACHE_VERSION}`;
@@ -36,14 +36,16 @@ async function trimCache(cacheName, maxItems) {
   }
 }
 
-// 1. Install lifecycle: precache the core app shell
+// 1. Install lifecycle: precache the core app shell and activate immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(PRECACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-        console.warn('[SW] Precache asset fetch failure:', err);
-      });
-    })
+    caches.open(PRECACHE_NAME)
+      .then((cache) => {
+        return cache.addAll(PRECACHE_ASSETS).catch((err) => {
+          console.warn('[SW] Precache asset fetch failure:', err);
+        });
+      })
+      .then(() => self.skipWaiting())
   );
 });
 

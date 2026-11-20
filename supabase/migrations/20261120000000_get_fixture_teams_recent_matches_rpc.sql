@@ -23,9 +23,6 @@ CREATE INDEX IF NOT EXISTS idx_matches_referee_lower_kickoff
   ON public.matches (LOWER(TRIM(referee)), kickoff_time DESC NULLS LAST)
   WHERE referee IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_odds_snapshots_match_id
-  ON public.odds_snapshots (match_id);
-
 -- 3. Single-RPC loader: last N (default 40) matches per team + odds + promoted flags
 CREATE OR REPLACE FUNCTION public.get_fixture_teams_recent_matches(
   team_ids TEXT[],

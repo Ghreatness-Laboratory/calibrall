@@ -95,9 +95,10 @@ export function InstallPromptProvider({ children }: { children: React.ReactNode 
             console.debug('[SW] Registration notice:', err);
           });
 
+        const hadController = Boolean(navigator.serviceWorker.controller);
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
+          if (hadController && !refreshing) {
             refreshing = true;
             window.location.reload();
           }
