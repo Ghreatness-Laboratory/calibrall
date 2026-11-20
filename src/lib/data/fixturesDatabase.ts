@@ -13,8 +13,12 @@ import {
   assertPersistenceConfigured,
   isProductionRuntime,
 } from '@/lib/supabase/client';
+import { fetchAllRows, chunkArray } from '@/lib/supabase/pagination';
 import { lookupTeamStrength } from './teamDatabase';
-import { lookupCanonicalTeam } from './canonicalTeams';
+import {
+  resolveFixtureTeamCanonical,
+  ExternalTeamProviderKey,
+} from './canonicalTeams';
 import {
   getCanonicalCompetition,
   isCanonicalCompetitionId,
@@ -50,6 +54,14 @@ function safeParsePayloadJson(raw: unknown): Record<string, any> | null {
   } catch {
     return null;
   }
+}
+
+function inferExternalProviderFromSource(source?: string | null): ExternalTeamProviderKey {
+  const s = String(source || '').toLowerCase();
+  if (s.includes('sportmonks')) return 'sportmonks';
+  if (s.includes('espn')) return 'espn';
+  if (s.includes('football-data.co.uk') || s.includes('fdco')) return 'footballDataCoUk';
+  return 'footballDataOrg';
 }
 
 /**
@@ -172,13 +184,27 @@ export function mapDbRowToFixture(row: any): Fixture | null {
     return null;
   }
 
-  const homeCanon = lookupCanonicalTeam(row.home_team_id, comp.code) || lookupCanonicalTeam(row.home_team_name, comp.code);
-  const awayCanon = lookupCanonicalTeam(row.away_team_id, comp.code) || lookupCanonicalTeam(row.away_team_name, comp.code);
+  const providerKey = inferExternalProviderFromSource(row.source);
+  const homeCanon = resolveFixtureTeamCanonical({
+    provider: providerKey,
+    providerTeamId: payload?.homeProviderTeamId ?? null,
+    canonicalOrLegacyTeamId: row.home_team_id,
+    name: row.home_team_name,
+    competitionCode: comp.code,
+  });
+  const awayCanon = resolveFixtureTeamCanonical({
+    provider: providerKey,
+    providerTeamId: payload?.awayProviderTeamId ?? null,
+    canonicalOrLegacyTeamId: row.away_team_id,
+    name: row.away_team_name,
+    competitionCode: comp.code,
+  });
   const homeLookup = lookupTeamStrength(row.home_team_name || row.home_team_id);
   const awayLookup = lookupTeamStrength(row.away_team_name || row.away_team_id);
 
   const homeTeam = {
     id: homeCanon?.canonicalId || homeLookup.data?.id || row.home_team_id || `team_${(row.home_team_name || 'home').toLowerCase().replace(/\s+/g, '_')}`,
+    providerTeamId: payload?.homeProviderTeamId ? String(payload.homeProviderTeamId) : undefined,
     name: row.home_team_name || homeCanon?.canonicalName || homeLookup.data?.name || 'Home Team',
     shortName: homeCanon?.shortName || homeLookup.data?.shortName || cleanDisplayText(row.home_team_name || 'Home'),
     tla: homeCanon?.tla || homeLookup.data?.tla || (row.home_team_name || 'HOM').slice(0, 3).toUpperCase(),
@@ -193,6 +219,7 @@ export function mapDbRowToFixture(row: any): Fixture | null {
 
   const awayTeam = {
     id: awayCanon?.canonicalId || awayLookup.data?.id || row.away_team_id || `team_${(row.away_team_name || 'away').toLowerCase().replace(/\s+/g, '_')}`,
+    providerTeamId: payload?.awayProviderTeamId ? String(payload.awayProviderTeamId) : undefined,
     name: row.away_team_name || awayCanon?.canonicalName || awayLookup.data?.name || 'Away Team',
     shortName: awayCanon?.shortName || awayLookup.data?.shortName || cleanDisplayText(row.away_team_name || 'Away'),
     tla: awayCanon?.tla || awayLookup.data?.tla || (row.away_team_name || 'AWY').slice(0, 3).toUpperCase(),
@@ -309,6 +336,27 @@ export async function syncFootballFixturesToDatabase(
         continue;
       }
 
+      const providerKey = inferExternalProviderFromSource(f.source);
+      const resolvedHome = resolveFixtureTeamCanonical({
+        provider: providerKey,
+        providerTeamId: f.homeTeam.providerTeamId ?? null,
+        canonicalOrLegacyTeamId: f.homeTeam.id,
+        name: f.homeTeam.name,
+        shortName: f.homeTeam.shortName,
+        competitionCode: canonicalComp.code,
+      });
+      const resolvedAway = resolveFixtureTeamCanonical({
+        provider: providerKey,
+        providerTeamId: f.awayTeam.providerTeamId ?? null,
+        canonicalOrLegacyTeamId: f.awayTeam.id,
+        name: f.awayTeam.name,
+        shortName: f.awayTeam.shortName,
+        competitionCode: canonicalComp.code,
+      });
+
+      const canonicalHomeTeamId = resolvedHome?.canonicalId || f.homeTeam.id;
+      const canonicalAwayTeamId = resolvedAway?.canonicalId || f.awayTeam.id;
+
       const payload = {
         providerName: f.providerName,
         seasonYear: f.seasonYear,
@@ -319,6 +367,8 @@ export async function syncFootballFixturesToDatabase(
         awayHalfTimeScore: f.awayHalfTimeScore ?? null,
         homeCrestUrl: f.homeTeam.crestUrl || undefined,
         awayCrestUrl: f.awayTeam.crestUrl || undefined,
+        homeProviderTeamId: f.homeTeam.providerTeamId || undefined,
+        awayProviderTeamId: f.awayTeam.providerTeamId || undefined,
         verifiedOdds: f.verifiedOdds,
       };
 
@@ -327,8 +377,8 @@ export async function syncFootballFixturesToDatabase(
         provider_id: f.providerId,
         competition_id: canonicalComp.id,
         competition_code: canonicalComp.code,
-        home_team_id: f.homeTeam.id,
-        away_team_id: f.awayTeam.id,
+        home_team_id: canonicalHomeTeamId,
+        away_team_id: canonicalAwayTeamId,
         home_team_name: f.homeTeam.name,
         away_team_name: f.awayTeam.name,
         kickoff_time: f.kickoffTime,
@@ -355,11 +405,15 @@ export async function syncFootballFixturesToDatabase(
 
     // 2. Only prune demo/legacy/expired fixtures AFTER verifying new real fixtures were persisted
     if (upserted > 0) {
-      const { data: existingRows } = await supabase
-        .from('fixtures')
-        .select('id, provider_id, competition_id, home_team_name, away_team_name, kickoff_time, is_demo, source');
+      const { data: existingRows } = await fetchAllRows((from, to) =>
+        supabase
+          .from('fixtures')
+          .select('id, provider_id, competition_id, home_team_name, away_team_name, kickoff_time, is_demo, source')
+          .order('id', { ascending: true })
+          .range(from, to)
+      );
 
-      if (existingRows && Array.isArray(existingRows)) {
+      if (existingRows && existingRows.length > 0) {
         const idsToDelete: string[] = [];
         const minIso = dateFrom ? `${dateFrom}T00:00:00Z` : null;
 
@@ -379,8 +433,8 @@ export async function syncFootballFixturesToDatabase(
           }
         }
 
-        if (idsToDelete.length > 0) {
-          await supabase.from('fixtures').delete().in('id', idsToDelete);
+        for (const idBatch of chunkArray(idsToDelete, 200)) {
+          await supabase.from('fixtures').delete().in('id', idBatch);
         }
       }
     }
@@ -402,16 +456,22 @@ export async function updateFixtureVerifiedOddsInDatabase(
   if (!isSupabaseConfigured || !supabase || !updates || updates.length === 0) return 0;
 
   try {
-    const ids = updates.map(u => u.id);
-    const { data: existingRows, error } = await supabase
-      .from('fixtures')
-      .select('id, provider_id, competition_id, home_team_id, away_team_id, kickoff_time, payload_json')
-      .in('id', ids);
+    const ids = Array.from(new Set(updates.map(u => u.id)));
+    const existingRows: any[] = [];
+    for (const idBatch of chunkArray(ids, 200)) {
+      const { data, error } = await supabase
+        .from('fixtures')
+        .select('id, provider_id, competition_id, home_team_id, away_team_id, kickoff_time, payload_json')
+        .in('id', idBatch);
 
-    if (error) {
-      throw new Error(`Failed to read fixtures for odds update: ${error.message}`);
+      if (error) {
+        throw new Error(`Failed to read fixtures for odds update: ${error.message}`);
+      }
+      if (Array.isArray(data)) {
+        existingRows.push(...data);
+      }
     }
-    if (!existingRows || !Array.isArray(existingRows)) return 0;
+    if (existingRows.length === 0) return 0;
 
     const byId = new Map<string, any>();
     for (const row of existingRows) {
@@ -508,12 +568,16 @@ export async function syncNBAFixturesToDatabase(
 
     if (upserted > 0 && dateFrom) {
       const minIso = `${dateFrom}T00:00:00Z`;
-      const { data: existingRows } = await supabase
-        .from('fixtures')
-        .select('id, provider_id, competition_id, home_team_name, kickoff_time')
-        .eq('competition_id', 'comp_nba');
+      const { data: existingRows } = await fetchAllRows((from, to) =>
+        supabase
+          .from('fixtures')
+          .select('id, provider_id, competition_id, home_team_name, kickoff_time')
+          .eq('competition_id', 'comp_nba')
+          .order('id', { ascending: true })
+          .range(from, to)
+      );
 
-      if (existingRows && Array.isArray(existingRows)) {
+      if (existingRows && existingRows.length > 0) {
         const providerIdsToDelete: string[] = [];
         for (const r of existingRows) {
           const isMalformed = !r.id || !r.home_team_name;
@@ -522,8 +586,8 @@ export async function syncNBAFixturesToDatabase(
             providerIdsToDelete.push(String(r.provider_id));
           }
         }
-        if (providerIdsToDelete.length > 0) {
-          await supabase.from('fixtures').delete().in('provider_id', providerIdsToDelete);
+        for (const pidBatch of chunkArray(providerIdsToDelete, 200)) {
+          await supabase.from('fixtures').delete().in('provider_id', pidBatch);
         }
       }
     }
@@ -548,8 +612,7 @@ export async function getFixturesFromDatabase(options?: {
   if (!isSupabaseConfigured || !supabase) return [];
 
   try {
-    let query = supabase.from('fixtures').select('*').order('kickoff_time', { ascending: true });
-
+    let filterCompId: string | null = null;
     // Rule 3: Filter by competition_id ONLY
     if (options?.competitionId && options.competitionId !== 'ALL') {
       const rawCompId = options.competitionId.trim();
@@ -557,14 +620,28 @@ export async function getFixturesFromDatabase(options?: {
         logCompetitionIntegrityError('query_filter', rawCompId, 'getFixturesFromDatabase');
         return [];
       }
-      query = query.eq('competition_id', rawCompId.toLowerCase());
+      filterCompId = rawCompId.toLowerCase();
     }
 
-    if (options?.status && options.status !== 'ALL') {
-      query = query.eq('status', options.status);
-    }
+    const { data: rows, error } = await fetchAllRows((from, to) => {
+      let query = supabase
+        .from('fixtures')
+        .select('*')
+        .order('kickoff_time', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to);
 
-    const { data: rows, error } = await query;
+      if (filterCompId) {
+        query = query.eq('competition_id', filterCompId);
+      }
+
+      if (options?.status && options.status !== 'ALL') {
+        query = query.eq('status', options.status);
+      }
+
+      return query;
+    });
+
     if (error || !rows) {
       console.error('[Database Fixtures Query Error]:', error?.message);
       return [];
@@ -595,5 +672,27 @@ export async function getFixturesFromDatabase(options?: {
   } catch (err: any) {
     console.error('[getFixturesFromDatabase Error]:', err?.message || err);
     return [];
+  }
+}
+
+export async function getFixtureFromDatabaseById(id: string): Promise<Fixture | null> {
+  if (!id || !isSupabaseConfigured || !supabase) return null;
+  const cleanId = id.trim();
+  if (!cleanId) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('fixtures')
+      .select('*')
+      .or(`id.eq.${cleanId},provider_id.eq.${cleanId}`)
+      .limit(1);
+
+    if (error || !Array.isArray(data) || data.length === 0) {
+      return null;
+    }
+    return mapDbRowToFixture(data[0]);
+  } catch (err: any) {
+    console.error('[getFixtureFromDatabaseById Error]:', err?.message || err);
+    return null;
   }
 }

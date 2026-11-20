@@ -252,6 +252,7 @@ export interface Competition {
 
 export interface Team {
   id: string;
+  providerTeamId?: string;
   name: string;
   shortName: string;
   tla: string;

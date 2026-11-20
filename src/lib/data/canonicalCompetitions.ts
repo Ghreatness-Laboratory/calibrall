@@ -6,7 +6,8 @@
 // 4. Strict validation: fixtures with missing or non-canonical competition_id are logged as errors and rejected with 0 fallback
 
 import { Competition, Sport } from '@/types';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { supabase, isSupabaseConfigured, getLocalDatabase, isProductionRuntime } from '@/lib/supabase/client';
+import { fetchAllRows } from '@/lib/supabase/pagination';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import { matchesDayFilter, DayFilterType } from '@/lib/utils/dateWindow';
 import { hasFreeFixturesCoverage } from './providerBudget';
@@ -697,13 +698,17 @@ export async function getCompetitionsFromDatabase(
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data: dbFixtures, error } = await supabase
-        .from('fixtures')
-        .select('id, provider_id, competition_id, competition_code, kickoff_time, status');
+      const { data: dbFixtures, error } = await fetchAllRows((from, to) =>
+        supabase
+          .from('fixtures')
+          .select('id, provider_id, competition_id, competition_code, kickoff_time, status')
+          .order('id', { ascending: true })
+          .range(from, to)
+      );
 
       if (error) {
         console.error('[Competitions Database Query Error]:', error.message);
-      } else if (dbFixtures && Array.isArray(dbFixtures)) {
+      } else if (dbFixtures && dbFixtures.length > 0) {
         for (const row of dbFixtures) {
           const rawId = row.competition_id;
 
@@ -731,25 +736,80 @@ export async function getCompetitionsFromDatabase(
         }
       }
 
-      // Count stored historical matches per canonical competition (used for uncovered leagues + history depth)
+      // Count stored historical matches per canonical competition (SQL aggregate RPC/local SQLite, paginated fallback)
       if (sport !== 'basketball') {
-        const { data: dbMatches, error: matchErr } = await supabase
-          .from('matches')
-          .select('competition_code');
+        let aggregatedCounts = false;
 
-        if (!matchErr && dbMatches && Array.isArray(dbMatches)) {
-          for (const row of dbMatches) {
-            const rawCode = String(row.competition_code || '').trim().toUpperCase();
-            if (!rawCode) continue;
-            const mapped = getCanonicalCompetition(rawCode);
-            if (!mapped || !isCanonicalCompetitionId(mapped.id)) continue;
-            if (mapped.id === 'comp_nba') continue;
-            storedMatchCountsByCompId.set(
-              mapped.id,
-              (storedMatchCountsByCompId.get(mapped.id) || 0) + 1
-            );
-            if (!countsByCompId.has(mapped.id)) {
-              countsByCompId.set(mapped.id, 0);
+        if (!isProductionRuntime() && typeof window === 'undefined') {
+          try {
+            const db = getLocalDatabase();
+            if (db) {
+              const rows = db
+                .prepare('SELECT UPPER(competition_code) AS code, COUNT(*) AS cnt FROM matches GROUP BY UPPER(competition_code)')
+                .all() as Array<{ code: string; cnt: number }>;
+              for (const r of rows) {
+                const rawCode = String(r.code || '').trim().toUpperCase();
+                if (!rawCode) continue;
+                const mapped = getCanonicalCompetition(rawCode);
+                if (!mapped || !isCanonicalCompetitionId(mapped.id) || mapped.id === 'comp_nba') continue;
+                storedMatchCountsByCompId.set(
+                  mapped.id,
+                  (storedMatchCountsByCompId.get(mapped.id) || 0) + Number(r.cnt || 0)
+                );
+                if (!countsByCompId.has(mapped.id)) {
+                  countsByCompId.set(mapped.id, 0);
+                }
+              }
+              aggregatedCounts = true;
+            }
+          } catch (_) {}
+        }
+
+        if (!aggregatedCounts) {
+          try {
+            const rpcRes = await supabase.rpc('get_calibrall_data_status_aggregates');
+            if (!rpcRes.error && rpcRes.data && Array.isArray(rpcRes.data.leagueAggs)) {
+              for (const row of rpcRes.data.leagueAggs as Array<{ league: string; count: number }>) {
+                const rawCode = String(row.league || '').trim().toUpperCase();
+                if (!rawCode) continue;
+                const mapped = getCanonicalCompetition(rawCode);
+                if (!mapped || !isCanonicalCompetitionId(mapped.id) || mapped.id === 'comp_nba') continue;
+                storedMatchCountsByCompId.set(
+                  mapped.id,
+                  (storedMatchCountsByCompId.get(mapped.id) || 0) + Number(row.count || 0)
+                );
+                if (!countsByCompId.has(mapped.id)) {
+                  countsByCompId.set(mapped.id, 0);
+                }
+              }
+              aggregatedCounts = true;
+            }
+          } catch (_) {}
+        }
+
+        if (!aggregatedCounts) {
+          const { data: dbMatches, error: matchErr } = await fetchAllRows((from, to) =>
+            supabase
+              .from('matches')
+              .select('id, competition_code')
+              .order('id', { ascending: true })
+              .range(from, to)
+          );
+
+          if (!matchErr && dbMatches && dbMatches.length > 0) {
+            for (const row of dbMatches) {
+              const rawCode = String(row.competition_code || '').trim().toUpperCase();
+              if (!rawCode) continue;
+              const mapped = getCanonicalCompetition(rawCode);
+              if (!mapped || !isCanonicalCompetitionId(mapped.id)) continue;
+              if (mapped.id === 'comp_nba') continue;
+              storedMatchCountsByCompId.set(
+                mapped.id,
+                (storedMatchCountsByCompId.get(mapped.id) || 0) + 1
+              );
+              if (!countsByCompId.has(mapped.id)) {
+                countsByCompId.set(mapped.id, 0);
+              }
             }
           }
         }

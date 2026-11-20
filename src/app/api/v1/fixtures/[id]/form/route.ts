@@ -17,10 +17,12 @@ export async function GET(
   }
 
   try {
+    const homeTeamKey = fixture.homeTeam.id || fixture.homeTeam.name;
+    const awayTeamKey = fixture.awayTeam.id || fixture.awayTeam.name;
     const [homeForm, awayForm, h2h] = await Promise.all([
-      matchesStore.getTeamHistoryAndForm(fixture.homeTeam.name, fixture.kickoffTime),
-      matchesStore.getTeamHistoryAndForm(fixture.awayTeam.name, fixture.kickoffTime),
-      matchesStore.getHeadToHeadMeetings(fixture.homeTeam.name, fixture.awayTeam.name),
+      matchesStore.getTeamHistoryAndForm(homeTeamKey, fixture.kickoffTime),
+      matchesStore.getTeamHistoryAndForm(awayTeamKey, fixture.kickoffTime),
+      matchesStore.getHeadToHeadMeetings(homeTeamKey, awayTeamKey),
     ]);
 
     return NextResponse.json({

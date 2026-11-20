@@ -28,11 +28,17 @@ import {
 } from './canonicalCompetitions';
 import {
   getFixturesFromDatabase,
+  getFixtureFromDatabaseById,
   syncFootballFixturesToDatabase,
   matchesDayFilter,
 } from './fixturesDatabase';
 import { validateFixtureIntegrity, isPlaceholderTeamName } from './fixtureIntegrity';
-import { lookupCanonicalTeam, recordUnresolvedTeam } from './canonicalTeams';
+import {
+  lookupCanonicalTeam,
+  resolveFixtureTeamCanonical,
+  recordUnresolvedTeam,
+  ExternalTeamProviderKey,
+} from './canonicalTeams';
 import {
   SyncMode,
   SkippedLeagueRecord,
@@ -191,8 +197,22 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
     return null;
   }
 
-  const homeCanon = lookupCanonicalTeam(m.homeTeam?.name, comp.code) || lookupCanonicalTeam(m.homeTeam?.shortName, comp.code);
-  const awayCanon = lookupCanonicalTeam(m.awayTeam?.name, comp.code) || lookupCanonicalTeam(m.awayTeam?.shortName, comp.code);
+  const homeProviderId = m.homeTeam?.id !== undefined && m.homeTeam?.id !== null ? String(m.homeTeam.id) : undefined;
+  const awayProviderId = m.awayTeam?.id !== undefined && m.awayTeam?.id !== null ? String(m.awayTeam.id) : undefined;
+  const homeCanon = resolveFixtureTeamCanonical({
+    provider: 'footballDataOrg',
+    providerTeamId: homeProviderId,
+    name: m.homeTeam?.name,
+    shortName: m.homeTeam?.shortName,
+    competitionCode: comp.code,
+  });
+  const awayCanon = resolveFixtureTeamCanonical({
+    provider: 'footballDataOrg',
+    providerTeamId: awayProviderId,
+    name: m.awayTeam?.name,
+    shortName: m.awayTeam?.shortName,
+    competitionCode: comp.code,
+  });
   const homeLookup = lookupTeamStrength(m.homeTeam);
   const awayLookup = lookupTeamStrength(m.awayTeam);
 
@@ -207,7 +227,8 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
 
   const homeTeam: Team = {
     id: homeCanon?.canonicalId || homeLookup.data?.id || `team_${m.homeTeam?.id || m.homeTeam?.name?.toLowerCase().replace(/\s+/g, '_')}`,
-    name: m.homeTeam?.name || 'Home Team',
+    providerTeamId: homeProviderId,
+    name: m.homeTeam?.name || homeCanon?.canonicalName || 'Home Team',
     shortName: homeCanon?.shortName || (homeLookup.found && homeLookup.data ? homeLookup.data.shortName : displayName(m.homeTeam)),
     tla: homeCanon?.tla || (homeLookup.found && homeLookup.data ? homeLookup.data.tla : getTeamAbbreviation(m.homeTeam)),
     crestUrl: m.homeTeam?.crest || homeCanon?.crestUrl || (homeLookup.found && homeLookup.data?.crestUrl ? homeLookup.data.crestUrl : ''),
@@ -221,7 +242,8 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
 
   const awayTeam: Team = {
     id: awayCanon?.canonicalId || awayLookup.data?.id || `team_${m.awayTeam?.id || m.awayTeam?.name?.toLowerCase().replace(/\s+/g, '_')}`,
-    name: m.awayTeam?.name || 'Away Team',
+    providerTeamId: awayProviderId,
+    name: m.awayTeam?.name || awayCanon?.canonicalName || 'Away Team',
     shortName: awayCanon?.shortName || (awayLookup.found && awayLookup.data ? awayLookup.data.shortName : displayName(m.awayTeam)),
     tla: awayCanon?.tla || (awayLookup.found && awayLookup.data ? awayLookup.data.tla : getTeamAbbreviation(m.awayTeam)),
     crestUrl: m.awayTeam?.crest || awayCanon?.crestUrl || (awayLookup.found && awayLookup.data?.crestUrl ? awayLookup.data.crestUrl : ''),
@@ -311,8 +333,22 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture | null {
     return null;
   }
 
-  const homeCanon = lookupCanonicalTeam(home.name, comp.code);
-  const awayCanon = lookupCanonicalTeam(away.name, comp.code);
+  const homeProviderId = home.id !== undefined && home.id !== null ? String(home.id) : undefined;
+  const awayProviderId = away.id !== undefined && away.id !== null ? String(away.id) : undefined;
+  const homeCanon = resolveFixtureTeamCanonical({
+    provider: 'sportmonks',
+    providerTeamId: homeProviderId,
+    name: home.name,
+    shortName: home.short_code,
+    competitionCode: comp.code,
+  });
+  const awayCanon = resolveFixtureTeamCanonical({
+    provider: 'sportmonks',
+    providerTeamId: awayProviderId,
+    name: away.name,
+    shortName: away.short_code,
+    competitionCode: comp.code,
+  });
   const homeLookup = lookupTeamStrength(home);
   const awayLookup = lookupTeamStrength(away);
 
@@ -327,7 +363,8 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture | null {
 
   const homeTeam: Team = {
     id: homeCanon?.canonicalId || homeLookup.data?.id || `team_${home.id || 'home'}`,
-    name: home.name || 'Home Team',
+    providerTeamId: homeProviderId,
+    name: home.name || homeCanon?.canonicalName || 'Home Team',
     shortName: homeCanon?.shortName || (homeLookup.found && homeLookup.data ? homeLookup.data.shortName : displayName(home)),
     tla: homeCanon?.tla || (homeLookup.found && homeLookup.data ? homeLookup.data.tla : getTeamAbbreviation(home)),
     crestUrl: home.image_path || homeCanon?.crestUrl || (homeLookup.found && homeLookup.data?.crestUrl ? homeLookup.data.crestUrl : ''),
@@ -341,7 +378,8 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture | null {
 
   const awayTeam: Team = {
     id: awayCanon?.canonicalId || awayLookup.data?.id || `team_${away.id || 'away'}`,
-    name: away.name || 'Away Team',
+    providerTeamId: awayProviderId,
+    name: away.name || awayCanon?.canonicalName || 'Away Team',
     shortName: awayCanon?.shortName || (awayLookup.found && awayLookup.data ? awayLookup.data.shortName : displayName(away)),
     tla: awayCanon?.tla || (awayLookup.found && awayLookup.data ? awayLookup.data.tla : getTeamAbbreviation(away)),
     crestUrl: away.image_path || awayCanon?.crestUrl || (awayLookup.found && awayLookup.data?.crestUrl ? awayLookup.data.crestUrl : ''),
@@ -440,14 +478,24 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
     return null;
   }
 
-  const homeCanon =
-    lookupCanonicalTeam(homeComp.team?.displayName, comp.code) ||
-    lookupCanonicalTeam(homeComp.team?.name, comp.code) ||
-    lookupCanonicalTeam(homeComp.team?.shortDisplayName, comp.code);
-  const awayCanon =
-    lookupCanonicalTeam(awayComp.team?.displayName, comp.code) ||
-    lookupCanonicalTeam(awayComp.team?.name, comp.code) ||
-    lookupCanonicalTeam(awayComp.team?.shortDisplayName, comp.code);
+  const homeProviderId = homeComp.team?.id !== undefined && homeComp.team?.id !== null ? String(homeComp.team.id) : undefined;
+  const awayProviderId = awayComp.team?.id !== undefined && awayComp.team?.id !== null ? String(awayComp.team.id) : undefined;
+  const homeCanon = resolveFixtureTeamCanonical({
+    provider: 'espn',
+    providerTeamId: homeProviderId,
+    displayName: homeComp.team?.displayName,
+    name: homeComp.team?.name,
+    shortName: homeComp.team?.shortDisplayName,
+    competitionCode: comp.code,
+  });
+  const awayCanon = resolveFixtureTeamCanonical({
+    provider: 'espn',
+    providerTeamId: awayProviderId,
+    displayName: awayComp.team?.displayName,
+    name: awayComp.team?.name,
+    shortName: awayComp.team?.shortDisplayName,
+    competitionCode: comp.code,
+  });
   const homeLookup = lookupTeamStrength(homeComp.team);
   const awayLookup = lookupTeamStrength(awayComp.team);
 
@@ -468,7 +516,8 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
 
   const homeTeam: Team = {
     id: homeCanon?.canonicalId || homeLookup.data?.id || `team_${homeComp.team?.id || homeComp.id || 'home'}`,
-    name: homeComp.team?.displayName || homeComp.team?.name || 'Home Team',
+    providerTeamId: homeProviderId,
+    name: homeComp.team?.displayName || homeComp.team?.name || homeCanon?.canonicalName || 'Home Team',
     shortName: homeCanon?.shortName || (homeLookup.found && homeLookup.data ? homeLookup.data.shortName : (homeComp.team?.shortDisplayName || homeComp.team?.name)),
     tla: homeCanon?.tla || (homeLookup.found && homeLookup.data ? homeLookup.data.tla : (homeComp.team?.abbreviation || getTeamAbbreviation(homeComp.team?.name))),
     crestUrl: homeProviderLogo || homeCanon?.crestUrl || (homeLookup.found && homeLookup.data?.crestUrl ? homeLookup.data.crestUrl : ''),
@@ -482,7 +531,8 @@ function parseESPNMatch(ev: any, compCode: string, leagueMeta: typeof ESPN_LEAGU
 
   const awayTeam: Team = {
     id: awayCanon?.canonicalId || awayLookup.data?.id || `team_${awayComp.team?.id || awayComp.id || 'away'}`,
-    name: awayComp.team?.displayName || awayComp.team?.name || 'Away Team',
+    providerTeamId: awayProviderId,
+    name: awayComp.team?.displayName || awayComp.team?.name || awayCanon?.canonicalName || 'Away Team',
     shortName: awayCanon?.shortName || (awayLookup.found && awayLookup.data ? awayLookup.data.shortName : (awayComp.team?.shortDisplayName || awayComp.team?.name)),
     tla: awayCanon?.tla || (awayLookup.found && awayLookup.data ? awayLookup.data.tla : (awayComp.team?.abbreviation || getTeamAbbreviation(awayComp.team?.name))),
     crestUrl: awayProviderLogo || awayCanon?.crestUrl || (awayLookup.found && awayLookup.data?.crestUrl ? awayLookup.data.crestUrl : ''),
@@ -593,10 +643,27 @@ function mapDbMatchToFixture(m: any, fetchTime: string): Fixture | null {
     return null;
   }
 
-  const homeCanon = lookupCanonicalTeam(m.home_team_id, comp.code) || lookupCanonicalTeam(m.home_team_name, comp.code);
-  const awayCanon = lookupCanonicalTeam(m.away_team_id, comp.code) || lookupCanonicalTeam(m.away_team_name, comp.code);
-  const homeLookup = lookupTeamStrength(m.home_team_id) || lookupTeamStrength(m.home_team_name);
-  const awayLookup = lookupTeamStrength(m.away_team_id) || lookupTeamStrength(m.away_team_name);
+  const inferredProvider: ExternalTeamProviderKey =
+    m.source === 'provider:sportmonks' || String(m.provider_id || '').startsWith('sm:')
+      ? 'sportmonks'
+      : m.source === 'provider:football-data' || String(m.provider_id || '').startsWith('fdorg:')
+      ? 'footballDataOrg'
+      : 'footballDataCoUk';
+
+  const homeCanon = resolveFixtureTeamCanonical({
+    provider: inferredProvider,
+    canonicalOrLegacyTeamId: m.home_team_id,
+    name: m.home_team_name,
+    competitionCode: comp.code,
+  });
+  const awayCanon = resolveFixtureTeamCanonical({
+    provider: inferredProvider,
+    canonicalOrLegacyTeamId: m.away_team_id,
+    name: m.away_team_name,
+    competitionCode: comp.code,
+  });
+  const homeLookup = lookupTeamStrength(homeCanon?.canonicalId || m.home_team_id) || lookupTeamStrength(m.home_team_name);
+  const awayLookup = lookupTeamStrength(awayCanon?.canonicalId || m.away_team_id) || lookupTeamStrength(m.away_team_name);
 
   const homeTeam: Team = {
     id: homeCanon?.canonicalId || m.home_team_id,
@@ -810,7 +877,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     if (params?.day && params.day !== 'ALL') {
       filtered = filtered.filter(f => matchesDayFilter(f.kickoffTime, params.day!));
     }
-    return filtered.map(f => this.enrichFixtureWithDbStats(f));
+    return filtered;
   }
 
   /**
@@ -1097,6 +1164,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
                 home_team_name: f.homeTeam.name,
                 away_team_name: f.awayTeam.name,
                 kickoff_time: f.kickoffTime,
+                kickoff_date: f.kickoffTime ? f.kickoffTime.slice(0, 10) : null,
                 status: 'FINISHED' as const,
                 home_score: hs,
                 away_score: as,
@@ -1254,6 +1322,8 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         });
       }
 
+      await matchesStore.preloadForFixtures(storedList);
+
       return {
         fixtures: storedList.map(f => this.enrichFixtureWithDbStats(f)),
         liveDataAvailable: true,
@@ -1281,6 +1351,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       const hasAnyStoredFootball = dbFixtures.length > 0 || freshness.fixtureCount > 0;
 
       if (hasAnyStoredFootball) {
+        await matchesStore.preloadForFixtures(dbFixtures);
         const isStaleBeyondLimit = freshness.isStaleBeyondLimit;
         const staleError = isStaleBeyondLimit
           ? `Stored fixtures are older than 3 days. Last updated ${lastUpdatedStr}`
@@ -1307,7 +1378,9 @@ export class LiveFootballDataProvider implements FootballDataProvider {
 
     // In-memory snapshot ONLY if DB has 0 rows (e.g. disconnected local sandbox)
     if (this.lastGoodCachedFixtures.length > 0) {
-      const filtered = this.applyLiveFilters(this.lastGoodCachedFixtures, params);
+      const filteredRaw = this.applyLiveFilters(this.lastGoodCachedFixtures, params);
+      await matchesStore.preloadForFixtures(filteredRaw);
+      const filtered = filteredRaw.map(f => this.enrichFixtureWithDbStats(f));
       return {
         fixtures: filtered,
         liveDataAvailable: true,
@@ -1348,24 +1421,31 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     // DB-only read path: never calls external APIs on visitor match view
     if (isSupabaseConfigured && supabase) {
       try {
-        const dbFixtures = await getFixturesFromDatabase({ sport: 'football' });
-        const dbMatch = dbFixtures.find(f => f.id === id || f.providerId === id);
-        if (dbMatch) return this.enrichFixtureWithDbStats(dbMatch);
+        const dbMatch = await getFixtureFromDatabaseById(id);
+        if (dbMatch && dbMatch.sport !== 'basketball') {
+          await matchesStore.preloadForFixtures([dbMatch]);
+          return this.enrichFixtureWithDbStats(dbMatch);
+        }
       } catch (_) {}
 
       // Fallback to stored historical matches (covers uncovered leagues & archived results)
       try {
-        const storedMatches = await matchesStore.getMatches();
-        const matchHit = storedMatches.find(m => m.id === id || m.provider_id === id);
+        const matchHit = await matchesStore.getMatchById(id);
         if (matchHit) {
           const converted = mapDbMatchToFixture(matchHit, new Date().toISOString());
-          if (converted) return this.enrichFixtureWithDbStats(converted);
+          if (converted) {
+            await matchesStore.preloadForFixtures([converted]);
+            return this.enrichFixtureWithDbStats(converted);
+          }
         }
       } catch (_) {}
     }
 
     const cachedHit = this.lastGoodCachedFixtures.find(f => f.id === id || f.providerId === id);
-    if (cachedHit) return this.enrichFixtureWithDbStats(cachedHit);
+    if (cachedHit) {
+      await matchesStore.preloadForFixtures([cachedHit]);
+      return this.enrichFixtureWithDbStats(cachedHit);
+    }
 
     return null;
   }
@@ -1374,6 +1454,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     const fixture = await this.getFixtureById(fixtureId);
     if (!fixture) return null;
 
+    await matchesStore.preloadForFixtures([fixture]);
     const stats = getFixtureStatistics(fixture);
     return buildFixtureContextFromStats(fixture, stats);
   }

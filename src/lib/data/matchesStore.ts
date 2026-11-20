@@ -10,7 +10,9 @@ import {
   isSupabaseConfigured,
   getLocalDatabase,
   isProductionRuntime,
+  persistenceBackendInfo,
 } from '@/lib/supabase/client';
+import { fetchAllRows, chunkArray } from '@/lib/supabase/pagination';
 import { TEAM_STRENGTH_DATABASE, lookupTeamStrength, normalizeTeamLookupKey } from './teamDatabase';
 import { COMPETITIONS } from './seedData';
 import { displayName } from '@/lib/utils/formatText';
@@ -20,11 +22,12 @@ import {
   recordUnresolvedTeam,
   clearUnresolvedTeamsLog,
   UnresolvedTeamLogEntry,
+  CANONICAL_TEAMS,
   CANONICAL_ID_ALIASES,
 } from './canonicalTeams';
 import { PROMOTED_BRAZIL_2026_IDS } from './backfillCatalog';
 import { getCalibratedParams, getLeagueCalibratedConfig } from '@/lib/prediction/calibratedParams';
-import type { VerifiedMatchOdds } from '@/types';
+import type { Fixture, VerifiedMatchOdds } from '@/types';
 
 export interface FormMatchRecord {
   id: string;
@@ -93,6 +96,7 @@ export interface StoredMatch {
   home_team_name: string;
   away_team_name: string;
   kickoff_time: string;
+  kickoff_date?: string | null;
   status: 'SCHEDULED' | 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | 'POSTPONED' | 'CANCELED';
   home_score: number | null;
   away_score: number | null;
@@ -243,12 +247,20 @@ export interface DataStatusReport {
     competitionCode: string;
     matchCount: number;
   }[];
+  teamsWithUnder8Matches: {
+    teamId: string;
+    name: string;
+    shortName: string;
+    competitionCode: string;
+    matchCount: number;
+  }[];
   unmatchedNamesCount: number;
   unmatchedNames: string[];
   unresolvedTeamsCount: number;
   unresolvedTeams: UnresolvedTeamLogEntry[];
   unmappedFixtureNamesCount: number;
   unmappedFixtureNames: { name: string; provider: string }[];
+  aggregationMethod?: 'postgres_sql_rpc' | 'sqlite_sql_aggregates' | 'paginated_fallback';
   storeUsed: 'supabase' | 'in-memory';
   persistenceMode: 'SUPABASE_PRODUCTION' | 'IN_MEMORY_SANDBOX';
 }
@@ -351,10 +363,28 @@ class MatchesStore {
     }
   }
 
-  private canonicalizeTeamId(rawId: string): string {
-    if (!rawId) return '';
-    if (CANONICAL_ID_ALIASES[rawId]) return CANONICAL_ID_ALIASES[rawId];
-    return rawId;
+  private canonicalizeTeamId(
+    rawId: string,
+    teamNameFallback?: string,
+    competitionCode?: string
+  ): string {
+    const trimmed = typeof rawId === 'string' ? rawId.trim() : '';
+    if (!trimmed && !teamNameFallback) return '';
+    if (trimmed) {
+      if (CANONICAL_ID_ALIASES[trimmed]) return CANONICAL_ID_ALIASES[trimmed];
+      const low = trimmed.toLowerCase();
+      if (CANONICAL_ID_ALIASES[low]) return CANONICAL_ID_ALIASES[low];
+      if (CANONICAL_TEAMS[trimmed]) return trimmed;
+      if (!trimmed.startsWith('team_') || /^team_\d+$/.test(trimmed)) {
+        const direct = lookupCanonicalTeam(trimmed, competitionCode);
+        if (direct) return direct.canonicalId;
+      }
+    }
+    if (teamNameFallback && (!trimmed || !trimmed.startsWith('team_') || /^team_\d+$/.test(trimmed))) {
+      const byName = lookupCanonicalTeam(teamNameFallback, competitionCode);
+      if (byName) return byName.canonicalId;
+    }
+    return trimmed || rawId;
   }
 
   private resolveCanonicalAndAliases(
@@ -413,6 +443,237 @@ class MatchesStore {
       }
     }
     return null;
+  }
+
+  private getPreloadCache(): Map<string, number> {
+    if (!(globalThis as any).__calibrall_preloaded_keys) {
+      (globalThis as any).__calibrall_preloaded_keys = new Map<string, number>();
+    }
+    return (globalThis as any).__calibrall_preloaded_keys;
+  }
+
+  private markPreloadedKeys(keys: string[]): void {
+    const cache = this.getPreloadCache();
+    const now = Date.now();
+    for (const k of keys) {
+      if (k) cache.set(k, now);
+    }
+  }
+
+  /**
+   * Preloads historical matches, odds_snapshots, and promoted flags from Supabase Postgres
+   * into `inMemoryMatches` / `inMemoryOdds` before synchronous prediction enrichment (`enrichFixtureWithDbStats`).
+   * Uses chunked `.or(...)` / `.in(...)` queries with paginated `fetchAllRows` (no 1,000-row cap) and a 60s TTL cache.
+   */
+  async preloadForFixtures(fixtures: Fixture[]): Promise<void> {
+    if (!fixtures || fixtures.length === 0) return;
+
+    this.ensureHydratedFromDbSync();
+
+    const useRemoteSupabase = isProductionRuntime() || persistenceBackendInfo().isRemoteSupabase;
+    if (!isSupabaseConfigured || !supabase || (!useRemoteSupabase && this.inMemoryMatches.size > 0)) {
+      return;
+    }
+
+    const cache = this.getPreloadCache();
+    const now = Date.now();
+    const TTL_MS = 60_000;
+
+    const neededTeamVariants = new Set<string>();
+    const neededTeamCacheKeys = new Set<string>();
+    const neededReferees = new Set<string>();
+    const neededFixtureIds = new Set<string>();
+
+    for (const f of fixtures) {
+      if (f.id) neededFixtureIds.add(f.id);
+      if (f.providerId) neededFixtureIds.add(f.providerId);
+      const compCode = f.competition?.code;
+
+      for (const team of [f.homeTeam, f.awayTeam]) {
+        if (!team) continue;
+        const resolved = this.resolveCanonicalAndAliases(team, compCode);
+        const cacheKey = `team:${resolved.canonicalId}`;
+        const lastFetched = cache.get(cacheKey);
+        if (!lastFetched || now - lastFetched > TTL_MS) {
+          neededTeamCacheKeys.add(cacheKey);
+          for (const v of resolved.idVariants) {
+            neededTeamVariants.add(v);
+          }
+        }
+      }
+
+      if (f.referee && f.referee.trim()) {
+        const refClean = f.referee.trim();
+        const refKey = `ref:${refClean.toLowerCase()}`;
+        const lastFetched = cache.get(refKey);
+        if (!lastFetched || now - lastFetched > TTL_MS) {
+          neededReferees.add(refClean);
+        }
+      }
+    }
+
+    const needTeams = neededTeamVariants.size > 0;
+    const needRefs = neededReferees.size > 0;
+    const missingOddsIds = Array.from(neededFixtureIds).filter(id => {
+      const last = cache.get(`odds:${id}`);
+      return !last || now - last > TTL_MS;
+    });
+
+    if (!needTeams && !needRefs && missingOddsIds.length === 0) {
+      return;
+    }
+
+    let fetchedAnyMatches = false;
+
+    // 1. Load team match histories in chunks (12 team variants -> <= 24 OR predicates per query)
+    for (const variantBatch of chunkArray(Array.from(neededTeamVariants), 12)) {
+      const orFilter = variantBatch
+        .flatMap(id => [`home_team_id.eq.${id}`, `away_team_id.eq.${id}`])
+        .join(',');
+
+      const { data, error } = await fetchAllRows<StoredMatch>((from, to) =>
+        supabase
+          .from('matches')
+          .select('*')
+          .or(orFilter)
+          .order('kickoff_time', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      );
+
+      if (error) {
+        if (isProductionRuntime()) {
+          throw new Error(`[MatchesStore] Failed to preload team matches: ${error.message}`);
+        }
+        console.warn('[MatchesStore] preloadForFixtures team query warning:', error.message);
+      } else if (data && data.length > 0) {
+        for (const row of data) {
+          const normalizedRow: StoredMatch = {
+            ...row,
+            home_team_id: this.canonicalizeTeamId(row.home_team_id),
+            away_team_id: this.canonicalizeTeamId(row.away_team_id),
+          };
+          this.inMemoryMatches.set(normalizedRow.provider_id || normalizedRow.id, normalizedRow);
+        }
+        fetchedAnyMatches = true;
+      }
+    }
+
+    if (needTeams) {
+      this.markPreloadedKeys(Array.from(neededTeamCacheKeys));
+    }
+
+    // 2. Load referee histories for announced referees
+    for (const refBatch of chunkArray(Array.from(neededReferees), 10)) {
+      const { data, error } = await fetchAllRows<StoredMatch>((from, to) =>
+        supabase
+          .from('matches')
+          .select('*')
+          .in('referee', refBatch)
+          .order('kickoff_time', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      );
+
+      if (!error && data && data.length > 0) {
+        for (const row of data) {
+          const normalizedRow: StoredMatch = {
+            ...row,
+            home_team_id: this.canonicalizeTeamId(row.home_team_id),
+            away_team_id: this.canonicalizeTeamId(row.away_team_id),
+          };
+          this.inMemoryMatches.set(normalizedRow.provider_id || normalizedRow.id, normalizedRow);
+        }
+        fetchedAnyMatches = true;
+      }
+      this.markPreloadedKeys(refBatch.map(r => `ref:${r.toLowerCase()}`));
+    }
+
+    // 3. Load odds_snapshots for fixture IDs
+    for (const idBatch of chunkArray(missingOddsIds, 100)) {
+      const { data, error } = await fetchAllRows<StoredOddsSnapshot>((from, to) =>
+        supabase
+          .from('odds_snapshots')
+          .select('*')
+          .in('match_id', idBatch)
+          .order('id', { ascending: true })
+          .range(from, to)
+      );
+
+      if (!error && data && data.length > 0) {
+        for (const o of data) {
+          const uniqueKey = `${o.match_id}:${o.bookmaker}:${o.market_code}:${o.source}`;
+          this.inMemoryOdds.set(uniqueKey, o);
+        }
+      }
+      this.markPreloadedKeys(idBatch.map(id => `odds:${id}`));
+    }
+
+    // 4. Refresh promoted team flags once per TTL window
+    const lastPromotedFetch = cache.get('teams:promoted');
+    if (!lastPromotedFetch || now - lastPromotedFetch > TTL_MS) {
+      try {
+        const { data: promotedRows, error: promErr } = await fetchAllRows<{ id: string }>((from, to) =>
+          supabase
+            .from('teams')
+            .select('id')
+            .eq('is_promoted', 1)
+            .order('id', { ascending: true })
+            .range(from, to)
+        );
+        if (!promErr && promotedRows) {
+          for (const r of promotedRows) {
+            if (r.id) this.promotedTeamIds.add(this.canonicalizeTeamId(r.id));
+          }
+          this.markPreloadedKeys(['teams:promoted']);
+        }
+      } catch (_) {}
+    }
+
+    if (fetchedAnyMatches) {
+      this.rebuildTeamCounts();
+    }
+  }
+
+  /**
+   * Targeted single-match lookup by `id` or `provider_id` (avoids scanning full matches table).
+   */
+  async getMatchById(id: string): Promise<StoredMatch | null> {
+    if (!id) return null;
+    const cleanId = id.trim();
+    if (!cleanId) return null;
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('matches')
+          .select('*')
+          .or(`id.eq.${cleanId},provider_id.eq.${cleanId}`)
+          .limit(1);
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const row = data[0] as StoredMatch;
+          const normalizedRow: StoredMatch = {
+            ...row,
+            home_team_id: this.canonicalizeTeamId(row.home_team_id),
+            away_team_id: this.canonicalizeTeamId(row.away_team_id),
+          };
+          this.inMemoryMatches.set(normalizedRow.provider_id || normalizedRow.id, normalizedRow);
+          return normalizedRow;
+        }
+      } catch (err) {
+        if (isProductionRuntime()) {
+          throw err;
+        }
+      }
+    }
+
+    this.ensureHydratedFromDbSync();
+    return (
+      this.inMemoryMatches.get(cleanId) ||
+      Array.from(this.inMemoryMatches.values()).find(m => m.id === cleanId || m.provider_id === cleanId) ||
+      null
+    );
   }
 
   private rebuildTeamCounts() {
@@ -503,8 +764,15 @@ class MatchesStore {
 
     this.ensureHydratedFromDbSync();
 
+    const normalizedMatches: StoredMatch[] = matches.map(m => ({
+      ...m,
+      home_team_id: this.canonicalizeTeamId(m.home_team_id, m.home_team_name, m.competition_code),
+      away_team_id: this.canonicalizeTeamId(m.away_team_id, m.away_team_name, m.competition_code),
+      kickoff_date: m.kickoff_date || (m.kickoff_time ? m.kickoff_time.slice(0, 10) : null),
+    }));
+
     // 2. Update in-memory sandbox store
-    for (const m of matches) {
+    for (const m of normalizedMatches) {
       this.inMemoryMatches.set(m.provider_id, m);
       inserted++;
     }
@@ -539,9 +807,9 @@ class MatchesStore {
           is_promoted: number;
         }>();
 
-        for (const m of matches) {
-          const homeId = this.canonicalizeTeamId(m.home_team_id);
-          const awayId = this.canonicalizeTeamId(m.away_team_id);
+        for (const m of normalizedMatches) {
+          const homeId = m.home_team_id;
+          const awayId = m.away_team_id;
           if (!teamMap.has(homeId)) {
             const isHomePromoted = PROMOTED_BRAZIL_2026_IDS.has(homeId) || this.promotedTeamIds.has(homeId);
             if (isHomePromoted) this.promotedTeamIds.add(homeId);
@@ -583,20 +851,22 @@ class MatchesStore {
 
         const teamsToInsert = Array.from(teamMap.values());
         if (teamsToInsert.length > 0) {
-          const { error: teamErr } = await supabase.from('teams').upsert(teamsToInsert, { onConflict: 'id' });
-          if (teamErr) {
-            console.error('[MatchesStore] Supabase teams upsert error:', teamErr.message);
-            if (isProduction) {
-              throw new Error(`[MatchesStore] Fatal: Teams upsert to Supabase failed: ${teamErr.message}`);
+          for (const teamBatch of chunkArray(teamsToInsert, 500)) {
+            const { error: teamErr } = await supabase.from('teams').upsert(teamBatch, { onConflict: 'id' });
+            if (teamErr) {
+              console.error('[MatchesStore] Supabase teams upsert error:', teamErr.message);
+              if (isProduction) {
+                throw new Error(`[MatchesStore] Fatal: Teams upsert to Supabase failed: ${teamErr.message}`);
+              }
+              errors.push(`Teams upsert error: ${teamErr.message}`);
             }
-            errors.push(`Teams upsert error: ${teamErr.message}`);
           }
         }
 
         // Step 3b: Upsert matches in chunks of 500
         const chunkSize = 500;
-        for (let i = 0; i < matches.length; i += chunkSize) {
-          const chunk = matches.slice(i, i + chunkSize);
+        for (let i = 0; i < normalizedMatches.length; i += chunkSize) {
+          const chunk = normalizedMatches.slice(i, i + chunkSize);
           const { error: matchErr } = await supabase.from('matches').upsert(chunk, { onConflict: 'provider_id' });
           if (matchErr) {
             console.error('[MatchesStore] Supabase matches chunk upsert error:', matchErr.message);
@@ -662,14 +932,23 @@ class MatchesStore {
 
     if (isSupabaseConfigured && supabase) {
       try {
-        let query = supabase.from('matches').select('*').order('kickoff_time', { ascending: false });
-        if (competitionCode && competitionCode !== 'ALL') {
-          query = query.eq('competition_code', competitionCode.toUpperCase());
-        }
-        if (season && season !== 'ALL') {
-          query = query.eq('season', season);
-        }
-        const { data, error } = await query;
+        const { data, error } = await fetchAllRows<StoredMatch>((from, to) => {
+          let query = supabase
+            .from('matches')
+            .select('*')
+            .order('kickoff_time', { ascending: false })
+            .order('id', { ascending: true })
+            .range(from, to);
+
+          if (competitionCode && competitionCode !== 'ALL') {
+            query = query.eq('competition_code', competitionCode.toUpperCase());
+          }
+          if (season && season !== 'ALL') {
+            query = query.eq('season', season);
+          }
+          return query;
+        });
+
         if (error) {
           if (isProduction) {
             throw new Error(`[MatchesStore] Fatal: Failed to read matches from Supabase in production: ${error.message}`);
@@ -677,7 +956,7 @@ class MatchesStore {
           console.error('[MatchesStore] Failed to read from Supabase matches:', error.message);
         } else if (data) {
           if (isProduction || data.length > 0) {
-            return data as StoredMatch[];
+            return data;
           }
         }
       } catch (e: any) {
@@ -747,20 +1026,37 @@ class MatchesStore {
       return this.matchSideForTeam(m, idVariants, normName) !== null;
     });
 
-    if (candidateMatches.length === 0 && isSupabaseConfigured && supabase) {
+    const useRemoteSupabase = isProductionRuntime() || persistenceBackendInfo().isRemoteSupabase;
+    if ((useRemoteSupabase || candidateMatches.length === 0) && isSupabaseConfigured && supabase) {
       try {
         const orFilter = Array.from(idVariants)
           .flatMap(id => [`home_team_id.eq.${id}`, `away_team_id.eq.${id}`])
           .join(',');
-        const { data, error } = await supabase
-          .from('matches')
-          .select('*')
-          .or(orFilter)
-          .order('kickoff_time', { ascending: false });
+        const { data, error } = await fetchAllRows<StoredMatch>((from, to) =>
+          supabase
+            .from('matches')
+            .select('*')
+            .or(orFilter)
+            .order('kickoff_time', { ascending: false })
+            .order('id', { ascending: true })
+            .range(from, to)
+        );
         if (!error && data && data.length > 0) {
-          candidateMatches = data as StoredMatch[];
+          candidateMatches = data;
+          for (const row of data) {
+            const normalizedRow: StoredMatch = {
+              ...row,
+              home_team_id: this.canonicalizeTeamId(row.home_team_id),
+              away_team_id: this.canonicalizeTeamId(row.away_team_id),
+            };
+            this.inMemoryMatches.set(normalizedRow.provider_id || normalizedRow.id, normalizedRow);
+          }
+          this.rebuildTeamCounts();
         }
       } catch (err) {
+        if (isProductionRuntime()) {
+          throw err;
+        }
         console.warn('[MatchesStore] Supabase getTeamHistoryAndForm error:', err);
       }
     }
@@ -1651,6 +1947,42 @@ class MatchesStore {
   }
 
   async getHeadToHeadMeetings(teamA: string, teamB: string, asOfDate?: string) {
+    this.ensureHydratedFromDbSync();
+    const resA = this.resolveCanonicalAndAliases(teamA);
+    const resB = this.resolveCanonicalAndAliases(teamB);
+    const useRemoteSupabase = isProductionRuntime() || persistenceBackendInfo().isRemoteSupabase;
+
+    if ((useRemoteSupabase || this.inMemoryMatches.size === 0) && isSupabaseConfigured && supabase) {
+      try {
+        const variants = Array.from(new Set([...resA.idVariants, ...resB.idVariants]));
+        for (const variantBatch of chunkArray(variants, 12)) {
+          const orFilter = variantBatch
+            .flatMap(id => [`home_team_id.eq.${id}`, `away_team_id.eq.${id}`])
+            .join(',');
+          const { data, error } = await fetchAllRows<StoredMatch>((from, to) =>
+            supabase
+              .from('matches')
+              .select('*')
+              .or(orFilter)
+              .order('kickoff_time', { ascending: false })
+              .order('id', { ascending: true })
+              .range(from, to)
+          );
+          if (!error && data && data.length > 0) {
+            for (const row of data) {
+              const normalizedRow: StoredMatch = {
+                ...row,
+                home_team_id: this.canonicalizeTeamId(row.home_team_id),
+                away_team_id: this.canonicalizeTeamId(row.away_team_id),
+              };
+              this.inMemoryMatches.set(normalizedRow.provider_id || normalizedRow.id, normalizedRow);
+            }
+          }
+        }
+        this.rebuildTeamCounts();
+      } catch (_) {}
+    }
+
     return this.getHeadToHeadMeetingsSync(teamA, teamB, asOfDate);
   }
 
@@ -1803,87 +2135,20 @@ class MatchesStore {
   /**
    * Diagnostic Data Status Report
    * Reads from Supabase in production and fails loudly otherwise.
-   * Explicitly reports storeUsed: 'supabase' | 'in-memory'.
+   * Computes counts, earliest/latest dates, league aggregates, and teams under 8 matches using SQL aggregates
+   * (Postgres RPC `get_calibrall_data_status_aggregates` or local SQLite SQL), with full paginated fallback.
    */
   async getDataStatus(): Promise<DataStatusReport> {
     const isProduction = isProductionRuntime();
+    const isRemote = persistenceBackendInfo().isRemoteSupabase;
     let storeUsed: 'supabase' | 'in-memory' = 'in-memory';
+    let aggregationMethod: DataStatusReport['aggregationMethod'] = 'paginated_fallback';
 
     if (isProduction && (!isSupabaseConfigured || !supabase)) {
       throw new Error(
         '[MatchesStore] Fatal: Supabase persistence is strictly required in production environment, but Supabase is not configured.'
       );
     }
-
-    let allMatches: StoredMatch[] = [];
-    let registeredTeams: { id: string; name: string; shortName: string; competitionCode: string; sampleMatches: number }[] = [];
-
-    // 1. Fetch matches and joined teams from Supabase if configured
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { data: matchData, error: matchErr } = await supabase
-          .from('matches')
-          .select('id, provider_id, competition_code, season, tournament, is_playoff, kickoff_time, home_team_id, away_team_id, status, home_score, home_half_time_score, away_half_time_score, home_corners, away_corners, home_yellow_cards, away_yellow_cards, home_red_cards, away_red_cards, referee')
-          .order('kickoff_time', { ascending: true });
-        
-        if (matchErr) {
-          if (isProduction) {
-            throw new Error(`[MatchesStore] Fatal: Failed to read matches from Supabase in production: ${matchErr.message}`);
-          }
-          console.warn('[MatchesStore] Could not read matches from Supabase:', matchErr.message);
-        } else if (matchData) {
-          allMatches = matchData as StoredMatch[];
-          storeUsed = 'supabase';
-        }
-
-        // Join teams table
-        const { data: teamData, error: teamErr } = await supabase
-          .from('teams')
-          .select('id, name, short_name, competition_code, sample_matches');
-        
-        if (teamErr) {
-          if (isProduction) {
-            throw new Error(`[MatchesStore] Fatal: Failed to read teams from Supabase in production: ${teamErr.message}`);
-          }
-          console.warn('[MatchesStore] Could not read teams from Supabase:', teamErr.message);
-        } else if (teamData && teamData.length > 0) {
-          registeredTeams = teamData.map((t: any) => ({
-            id: t.id,
-            name: t.name,
-            shortName: t.short_name,
-            competitionCode: t.competition_code,
-            sampleMatches: t.sample_matches ?? 0,
-          }));
-        }
-      } catch (err: any) {
-        if (isProduction) {
-          throw err instanceof Error ? err : new Error(`[MatchesStore] Fatal: Supabase read failed in production: ${err}`);
-        }
-        console.warn('[MatchesStore] Could not read all data from Supabase in sandbox:', err);
-      }
-    }
-
-    // In-memory fallback ONLY in non-production when Supabase did not answer
-    if (!isProduction && storeUsed !== 'supabase' && allMatches.length === 0) {
-      this.ensureHydratedFromDbSync();
-      allMatches = Array.from(this.inMemoryMatches.values());
-      storeUsed = 'in-memory';
-    }
-
-    // Only populate teams list from static registry in non-production sandbox if teams table is empty
-    if (!isProduction && registeredTeams.length === 0 && storeUsed !== 'supabase') {
-      registeredTeams = Object.values(TEAM_STRENGTH_DATABASE).map(t => ({
-        id: this.canonicalizeTeamId(t.id),
-        name: t.name,
-        shortName: t.shortName,
-        competitionCode: t.competitionCode,
-        sampleMatches: 0,
-      }));
-    }
-
-    // 2. Aggregate matches by league and season, and build team counts
-    const leagueSeasonMap = new Map<string, { league: string; season: string; count: number; earliestDate: string; latestDate: string }>();
-    const teamFinishedCounts = new Map<string, number>();
 
     const KNOWN_LEAGUES: { code: string; name: string; aliases: string[] }[] = [
       { code: 'E0', name: 'Premier League (England)', aliases: ['PL'] },
@@ -1926,7 +2191,7 @@ class MatchesStore {
       { code: 'USA', name: 'Major League Soccer (USA)', aliases: [] },
     ];
 
-    const leagueStatsMap = new Map<string, {
+    interface LeagueAggBucket {
       count: number;
       earliestDate: string | null;
       latestDate: string | null;
@@ -1938,154 +2203,440 @@ class MatchesStore {
       cornersSeasons: Set<string>;
       halfTimeGoalsSeasons: Set<string>;
       refereeSeasons: Set<string>;
-    }>();
+    }
+
+    let totalMatches = 0;
+    let earliestDate: string | null = null;
+    let latestDate: string | null = null;
+    const leagueSeasonList: DataStatusReport['matchesPerLeagueAndSeason'] = [];
+    const leagueStatsMap = new Map<string, LeagueAggBucket>();
     const leagueAhCountMap = new Map<string, number>();
     const leagueAhSeasonsMap = new Map<string, Set<string>>();
     const teamMatchesMap = new Map<string, { count: number; earliestDate: string | null; latestDate: string | null }>();
+    const teamFinishedCounts = new Map<string, number>();
+    let registeredTeams: { id: string; name: string; shortName: string; competitionCode: string; sampleMatches: number }[] = [];
 
-    let earliestDate: string | null = null;
-    let latestDate: string | null = null;
+    const mergeTeamMetric = (
+      map: Map<string, { count: number; earliestDate: string | null; latestDate: string | null }>,
+      rawId: string,
+      addCount: number,
+      eDate: string | null,
+      lDate: string | null
+    ) => {
+      const canonId = this.canonicalizeTeamId(rawId);
+      const prev = map.get(canonId) || { count: 0, earliestDate: null, latestDate: null };
+      prev.count += addCount;
+      if (eDate && (!prev.earliestDate || eDate < prev.earliestDate)) prev.earliestDate = eDate;
+      if (lDate && (!prev.latestDate || lDate > prev.latestDate)) prev.latestDate = lDate;
+      map.set(canonId, prev);
+    };
 
-    for (const m of allMatches) {
-      const key = `${m.competition_code}_${m.season}`;
-      const kDate = m.kickoff_time;
+    const mergeFinishedTeamCount = (rawId: string, addCount: number) => {
+      const canonId = this.canonicalizeTeamId(rawId);
+      teamFinishedCounts.set(canonId, (teamFinishedCounts.get(canonId) || 0) + addCount);
+    };
 
-      if (!earliestDate || kDate < earliestDate) earliestDate = kDate;
-      if (!latestDate || kDate > latestDate) latestDate = kDate;
+    let sqlAggregated = false;
 
-      const existing = leagueSeasonMap.get(key) || {
-        league: m.competition_code,
-        season: m.season,
-        count: 0,
-        earliestDate: kDate,
-        latestDate: kDate,
-      };
+    // 1A. Primary Production Path: Postgres SQL Aggregate RPC (`get_calibrall_data_status_aggregates`)
+    if (isRemote && isSupabaseConfigured && supabase) {
+      try {
+        const rpcRes = await supabase.rpc('get_calibrall_data_status_aggregates');
+        if (!rpcRes.error && rpcRes.data && typeof rpcRes.data === 'object') {
+          const payload = rpcRes.data as any;
+          totalMatches = Number(payload.totalMatches) || 0;
+          earliestDate = payload.earliestDate || null;
+          latestDate = payload.latestDate || null;
 
-      existing.count++;
-      if (kDate < existing.earliestDate) existing.earliestDate = kDate;
-      if (kDate > existing.latestDate) existing.latestDate = kDate;
-      leagueSeasonMap.set(key, existing);
+          if (Array.isArray(payload.matchesPerLeagueAndSeason)) {
+            for (const row of payload.matchesPerLeagueAndSeason) {
+              leagueSeasonList.push({
+                league: String(row.league || ''),
+                season: String(row.season || ''),
+                count: Number(row.count) || 0,
+                earliestDate: String(row.earliestDate || ''),
+                latestDate: String(row.latestDate || ''),
+              });
+            }
+          }
 
-      const canonHomeId = this.canonicalizeTeamId(m.home_team_id);
-      const canonAwayId = this.canonicalizeTeamId(m.away_team_id);
+          if (Array.isArray(payload.leagueAggs)) {
+            for (const row of payload.leagueAggs) {
+              const code = String(row.league || '').toUpperCase();
+              if (!code) continue;
+              leagueStatsMap.set(code, {
+                count: Number(row.count) || 0,
+                earliestDate: row.earliestDate || null,
+                latestDate: row.latestDate || null,
+                cardsCount: Number(row.cardsCount) || 0,
+                cornersCount: Number(row.cornersCount) || 0,
+                halfTimeGoalsCount: Number(row.halfTimeGoalsCount) || 0,
+                refereeCount: Number(row.refereeCount) || 0,
+                cardsSeasons: new Set(Array.isArray(row.cardsSeasons) ? row.cardsSeasons : []),
+                cornersSeasons: new Set(Array.isArray(row.cornersSeasons) ? row.cornersSeasons : []),
+                halfTimeGoalsSeasons: new Set(Array.isArray(row.halfTimeGoalsSeasons) ? row.halfTimeGoalsSeasons : []),
+                refereeSeasons: new Set(Array.isArray(row.refereeSeasons) ? row.refereeSeasons : []),
+              });
+            }
+          }
 
-      // Accumulate finished team matches
-      if (m.status === 'FINISHED' || m.home_score !== null) {
-        teamFinishedCounts.set(canonHomeId, (teamFinishedCounts.get(canonHomeId) || 0) + 1);
-        teamFinishedCounts.set(canonAwayId, (teamFinishedCounts.get(canonAwayId) || 0) + 1);
+          if (Array.isArray(payload.leagueAhAggs)) {
+            for (const row of payload.leagueAhAggs) {
+              const code = String(row.league || '').toUpperCase();
+              if (!code) continue;
+              leagueAhCountMap.set(code, Number(row.asianHandicapCount) || 0);
+              leagueAhSeasonsMap.set(code, new Set(Array.isArray(row.asianHandicapSeasons) ? row.asianHandicapSeasons : []));
+            }
+          }
+
+          if (Array.isArray(payload.teamAggs)) {
+            for (const row of payload.teamAggs) {
+              const rawId = String(row.teamId || '');
+              if (!rawId) continue;
+              mergeTeamMetric(
+                teamMatchesMap,
+                rawId,
+                Number(row.totalCount) || 0,
+                row.earliestDate || null,
+                row.latestDate || null
+              );
+              mergeFinishedTeamCount(rawId, Number(row.finishedCount) || 0);
+            }
+          }
+
+          const { data: teamRows, error: teamErr } = await fetchAllRows((from, to) =>
+            supabase
+              .from('teams')
+              .select('id, name, short_name, competition_code, sample_matches')
+              .order('id', { ascending: true })
+              .range(from, to)
+          );
+          if (teamErr && isProduction) {
+            throw new Error(`[MatchesStore] Fatal: Failed to read teams from Supabase: ${teamErr.message}`);
+          }
+          if (teamRows) {
+            registeredTeams = teamRows.map((t: any) => ({
+              id: t.id,
+              name: t.name,
+              shortName: t.short_name,
+              competitionCode: t.competition_code,
+              sampleMatches: t.sample_matches ?? 0,
+            }));
+          }
+
+          storeUsed = 'supabase';
+          aggregationMethod = 'postgres_sql_rpc';
+          sqlAggregated = true;
+        }
+      } catch (err) {
+        if (isProduction && String((err as any)?.message || '').includes('Fatal:')) {
+          throw err;
+        }
+        // If RPC isn't installed in live DB yet, gracefully fall through to full paginated fallback
       }
-
-      // League stats + empirical feature coverage from stored match fields
-      const lCode = m.competition_code.toUpperCase();
-      const lStat = leagueStatsMap.get(lCode) || {
-        count: 0,
-        earliestDate: null,
-        latestDate: null,
-        cardsCount: 0,
-        cornersCount: 0,
-        halfTimeGoalsCount: 0,
-        refereeCount: 0,
-        cardsSeasons: new Set<string>(),
-        cornersSeasons: new Set<string>(),
-        halfTimeGoalsSeasons: new Set<string>(),
-        refereeSeasons: new Set<string>(),
-      };
-      lStat.count++;
-      if (!lStat.earliestDate || kDate < lStat.earliestDate) lStat.earliestDate = kDate;
-      if (!lStat.latestDate || kDate > lStat.latestDate) lStat.latestDate = kDate;
-      if (
-        (m.home_yellow_cards !== null && m.home_yellow_cards !== undefined) ||
-        (m.away_yellow_cards !== null && m.away_yellow_cards !== undefined) ||
-        (m.home_red_cards !== null && m.home_red_cards !== undefined) ||
-        (m.away_red_cards !== null && m.away_red_cards !== undefined)
-      ) {
-        lStat.cardsCount++;
-        if (m.season) lStat.cardsSeasons.add(m.season);
-      }
-      if (
-        (m.home_corners !== null && m.home_corners !== undefined) ||
-        (m.away_corners !== null && m.away_corners !== undefined)
-      ) {
-        lStat.cornersCount++;
-        if (m.season) lStat.cornersSeasons.add(m.season);
-      }
-      if (
-        (m.home_half_time_score !== null && m.home_half_time_score !== undefined) ||
-        (m.away_half_time_score !== null && m.away_half_time_score !== undefined)
-      ) {
-        lStat.halfTimeGoalsCount++;
-        if (m.season) lStat.halfTimeGoalsSeasons.add(m.season);
-      }
-      if (typeof m.referee === 'string' && m.referee.trim().length > 0) {
-        lStat.refereeCount++;
-        if (m.season) lStat.refereeSeasons.add(m.season);
-      }
-      leagueStatsMap.set(lCode, lStat);
-
-      // Team match stats (home & away)
-      const homeStat = teamMatchesMap.get(canonHomeId) || { count: 0, earliestDate: null, latestDate: null };
-      homeStat.count++;
-      if (!homeStat.earliestDate || kDate < homeStat.earliestDate) homeStat.earliestDate = kDate;
-      if (!homeStat.latestDate || kDate > homeStat.latestDate) homeStat.latestDate = kDate;
-      teamMatchesMap.set(canonHomeId, homeStat);
-
-      const awayStat = teamMatchesMap.get(canonAwayId) || { count: 0, earliestDate: null, latestDate: null };
-      awayStat.count++;
-      if (!awayStat.earliestDate || kDate < awayStat.earliestDate) awayStat.earliestDate = kDate;
-      if (!awayStat.latestDate || kDate > awayStat.latestDate) awayStat.latestDate = kDate;
-      teamMatchesMap.set(canonAwayId, awayStat);
     }
 
-    // Empirical Asian handicap prices count & distinct seasons per league from odds_snapshots
-    let ahQueried = false;
-    if (typeof window === 'undefined' && !isProduction && storeUsed === 'supabase') {
+    // 1B. Local Development / Test SQLite SQL Aggregates Path (no full row dump into Node memory)
+    if (!sqlAggregated && !isProduction && !isRemote && typeof window === 'undefined') {
       try {
         const db = getLocalDatabase();
         if (db) {
-          const ahRows = db.prepare(`
-            SELECT UPPER(m.competition_code) AS comp_code, o.match_id, m.season
+          const summaryRow = db.prepare(`
+            SELECT
+              COUNT(*) AS totalMatches,
+              MIN(COALESCE(kickoff_time, kickoff_date)) AS earliestDate,
+              MAX(COALESCE(kickoff_time, kickoff_date)) AS latestDate
+            FROM matches
+          `).get() as { totalMatches: number; earliestDate: string | null; latestDate: string | null } | undefined;
+
+          totalMatches = Number(summaryRow?.totalMatches) || 0;
+          earliestDate = summaryRow?.earliestDate || null;
+          latestDate = summaryRow?.latestDate || null;
+
+          const lsRows = db.prepare(`
+            SELECT
+              competition_code AS league,
+              season,
+              COUNT(*) AS count,
+              MIN(COALESCE(kickoff_time, kickoff_date)) AS earliestDate,
+              MAX(COALESCE(kickoff_time, kickoff_date)) AS latestDate
+            FROM matches
+            GROUP BY competition_code, season
+            ORDER BY competition_code ASC, season DESC
+          `).all() as Array<{ league: string; season: string; count: number; earliestDate: string; latestDate: string }>;
+
+          for (const r of lsRows) {
+            leagueSeasonList.push({
+              league: r.league,
+              season: r.season,
+              count: Number(r.count) || 0,
+              earliestDate: r.earliestDate || '',
+              latestDate: r.latestDate || '',
+            });
+          }
+
+          const leagueAggRows = db.prepare(`
+            SELECT
+              UPPER(competition_code) AS league,
+              COUNT(*) AS count,
+              MIN(COALESCE(kickoff_time, kickoff_date)) AS earliestDate,
+              MAX(COALESCE(kickoff_time, kickoff_date)) AS latestDate,
+              SUM(CASE WHEN home_yellow_cards IS NOT NULL OR away_yellow_cards IS NOT NULL OR home_red_cards IS NOT NULL OR away_red_cards IS NOT NULL THEN 1 ELSE 0 END) AS cardsCount,
+              SUM(CASE WHEN home_corners IS NOT NULL OR away_corners IS NOT NULL THEN 1 ELSE 0 END) AS cornersCount,
+              SUM(CASE WHEN home_half_time_score IS NOT NULL OR away_half_time_score IS NOT NULL THEN 1 ELSE 0 END) AS halfTimeGoalsCount,
+              SUM(CASE WHEN referee IS NOT NULL AND TRIM(referee) != '' THEN 1 ELSE 0 END) AS refereeCount,
+              GROUP_CONCAT(DISTINCT CASE WHEN home_yellow_cards IS NOT NULL OR away_yellow_cards IS NOT NULL OR home_red_cards IS NOT NULL OR away_red_cards IS NOT NULL THEN season END) AS cardsSeasonsCsv,
+              GROUP_CONCAT(DISTINCT CASE WHEN home_corners IS NOT NULL OR away_corners IS NOT NULL THEN season END) AS cornersSeasonsCsv,
+              GROUP_CONCAT(DISTINCT CASE WHEN home_half_time_score IS NOT NULL OR away_half_time_score IS NOT NULL THEN season END) AS htSeasonsCsv,
+              GROUP_CONCAT(DISTINCT CASE WHEN referee IS NOT NULL AND TRIM(referee) != '' THEN season END) AS refSeasonsCsv
+            FROM matches
+            GROUP BY UPPER(competition_code)
+          `).all() as Array<any>;
+
+          for (const r of leagueAggRows) {
+            const splitSet = (csv: unknown) =>
+              new Set(typeof csv === 'string' && csv ? csv.split(',').filter(Boolean) : []);
+            leagueStatsMap.set(String(r.league), {
+              count: Number(r.count) || 0,
+              earliestDate: r.earliestDate || null,
+              latestDate: r.latestDate || null,
+              cardsCount: Number(r.cardsCount) || 0,
+              cornersCount: Number(r.cornersCount) || 0,
+              halfTimeGoalsCount: Number(r.halfTimeGoalsCount) || 0,
+              refereeCount: Number(r.refereeCount) || 0,
+              cardsSeasons: splitSet(r.cardsSeasonsCsv),
+              cornersSeasons: splitSet(r.cornersSeasonsCsv),
+              halfTimeGoalsSeasons: splitSet(r.htSeasonsCsv),
+              refereeSeasons: splitSet(r.refSeasonsCsv),
+            });
+          }
+
+          const ahAggRows = db.prepare(`
+            SELECT
+              UPPER(m.competition_code) AS league,
+              COUNT(DISTINCT o.match_id) AS asianHandicapCount,
+              GROUP_CONCAT(DISTINCT m.season) AS ahSeasonsCsv
             FROM odds_snapshots o
             JOIN matches m ON m.provider_id = o.match_id
             WHERE o.market_code LIKE 'ASIAN_HANDICAP%'
-          `).all() as Array<{ comp_code: string; match_id: string; season: string }>;
-          const ahMatchesByComp = new Map<string, Set<string>>();
-          for (const r of ahRows) {
-            let mSet = ahMatchesByComp.get(r.comp_code);
-            if (!mSet) {
-              mSet = new Set<string>();
-              ahMatchesByComp.set(r.comp_code, mSet);
-            }
-            mSet.add(r.match_id);
-            if (r.season) {
-              let sSet = leagueAhSeasonsMap.get(r.comp_code);
-              if (!sSet) {
-                sSet = new Set<string>();
-                leagueAhSeasonsMap.set(r.comp_code, sSet);
-              }
-              sSet.add(r.season);
-            }
+            GROUP BY UPPER(m.competition_code)
+          `).all() as Array<any>;
+
+          for (const r of ahAggRows) {
+            const code = String(r.league || '').toUpperCase();
+            if (!code) continue;
+            leagueAhCountMap.set(code, Number(r.asianHandicapCount) || 0);
+            leagueAhSeasonsMap.set(
+              code,
+              new Set(typeof r.ahSeasonsCsv === 'string' && r.ahSeasonsCsv ? r.ahSeasonsCsv.split(',').filter(Boolean) : [])
+            );
           }
-          for (const [comp, mSet] of ahMatchesByComp.entries()) {
-            leagueAhCountMap.set(comp, mSet.size);
+
+          const teamAggRows = db.prepare(`
+            SELECT
+              team_id AS teamId,
+              COUNT(*) AS totalCount,
+              SUM(CASE WHEN status = 'FINISHED' OR home_score IS NOT NULL THEN 1 ELSE 0 END) AS finishedCount,
+              MIN(dt) AS earliestDate,
+              MAX(dt) AS latestDate
+            FROM (
+              SELECT home_team_id AS team_id, status, home_score, COALESCE(kickoff_time, kickoff_date) AS dt FROM matches
+              UNION ALL
+              SELECT away_team_id AS team_id, status, home_score, COALESCE(kickoff_time, kickoff_date) AS dt FROM matches
+            ) t
+            GROUP BY team_id
+          `).all() as Array<{ teamId: string; totalCount: number; finishedCount: number; earliestDate: string | null; latestDate: string | null }>;
+
+          for (const r of teamAggRows) {
+            if (!r.teamId) continue;
+            mergeTeamMetric(teamMatchesMap, r.teamId, Number(r.totalCount) || 0, r.earliestDate, r.latestDate);
+            mergeFinishedTeamCount(r.teamId, Number(r.finishedCount) || 0);
           }
-          ahQueried = true;
+
+          const teamRows = db.prepare(`SELECT id, name, short_name, competition_code, sample_matches FROM teams`).all() as Array<any>;
+          registeredTeams = teamRows.map(t => ({
+            id: t.id,
+            name: t.name,
+            shortName: t.short_name,
+            competitionCode: t.competition_code,
+            sampleMatches: t.sample_matches ?? 0,
+          }));
+
+          storeUsed = 'supabase';
+          aggregationMethod = 'sqlite_sql_aggregates';
+          sqlAggregated = true;
         }
       } catch (_) {}
     }
 
-    if (!ahQueried) {
+    // 1C. Full Paginated Fallback (no 1,000-row cap) if SQL RPC is not yet installed in Postgres or local DB unavailable
+    if (!sqlAggregated) {
+      let allMatches: StoredMatch[] = [];
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: matchData, error: matchErr } = await fetchAllRows<StoredMatch>((from, to) =>
+            supabase
+              .from('matches')
+              .select('id, provider_id, competition_code, season, tournament, is_playoff, kickoff_time, kickoff_date, home_team_id, away_team_id, status, home_score, home_half_time_score, away_half_time_score, home_corners, away_corners, home_yellow_cards, away_yellow_cards, home_red_cards, away_red_cards, referee')
+              .order('id', { ascending: true })
+              .range(from, to)
+          );
+
+          if (matchErr) {
+            if (isProduction) {
+              throw new Error(`[MatchesStore] Fatal: Failed to read matches from Supabase in production: ${matchErr.message}`);
+            }
+            console.warn('[MatchesStore] Could not read matches from Supabase:', matchErr.message);
+          } else if (matchData) {
+            allMatches = matchData;
+            storeUsed = 'supabase';
+          }
+
+          const { data: teamData, error: teamErr } = await fetchAllRows((from, to) =>
+            supabase
+              .from('teams')
+              .select('id, name, short_name, competition_code, sample_matches')
+              .order('id', { ascending: true })
+              .range(from, to)
+          );
+
+          if (teamErr) {
+            if (isProduction) {
+              throw new Error(`[MatchesStore] Fatal: Failed to read teams from Supabase in production: ${teamErr.message}`);
+            }
+            console.warn('[MatchesStore] Could not read teams from Supabase:', teamErr.message);
+          } else if (teamData && teamData.length > 0) {
+            registeredTeams = teamData.map((t: any) => ({
+              id: t.id,
+              name: t.name,
+              shortName: t.short_name,
+              competitionCode: t.competition_code,
+              sampleMatches: t.sample_matches ?? 0,
+            }));
+          }
+        } catch (err: any) {
+          if (isProduction) {
+            throw err instanceof Error ? err : new Error(`[MatchesStore] Fatal: Supabase read failed in production: ${err}`);
+          }
+          console.warn('[MatchesStore] Could not read all data from Supabase in sandbox:', err);
+        }
+      }
+
+      if (!isProduction && storeUsed !== 'supabase' && allMatches.length === 0) {
+        this.ensureHydratedFromDbSync();
+        allMatches = Array.from(this.inMemoryMatches.values());
+        storeUsed = 'in-memory';
+      }
+
+      if (!isProduction && registeredTeams.length === 0 && storeUsed !== 'supabase') {
+        registeredTeams = Object.values(TEAM_STRENGTH_DATABASE).map(t => ({
+          id: this.canonicalizeTeamId(t.id),
+          name: t.name,
+          shortName: t.shortName,
+          competitionCode: t.competitionCode,
+          sampleMatches: 0,
+        }));
+      }
+
+      totalMatches = allMatches.length;
+      const leagueSeasonMap = new Map<string, { league: string; season: string; count: number; earliestDate: string; latestDate: string }>();
+
+      for (const m of allMatches) {
+        const key = `${m.competition_code}_${m.season}`;
+        const kDate = m.kickoff_time || m.kickoff_date || '';
+
+        if (kDate) {
+          if (!earliestDate || kDate < earliestDate) earliestDate = kDate;
+          if (!latestDate || kDate > latestDate) latestDate = kDate;
+        }
+
+        const existing = leagueSeasonMap.get(key) || {
+          league: m.competition_code,
+          season: m.season,
+          count: 0,
+          earliestDate: kDate,
+          latestDate: kDate,
+        };
+        existing.count++;
+        if (kDate && (!existing.earliestDate || kDate < existing.earliestDate)) existing.earliestDate = kDate;
+        if (kDate && (!existing.latestDate || kDate > existing.latestDate)) existing.latestDate = kDate;
+        leagueSeasonMap.set(key, existing);
+
+        if (m.status === 'FINISHED' || m.home_score !== null) {
+          mergeFinishedTeamCount(m.home_team_id, 1);
+          mergeFinishedTeamCount(m.away_team_id, 1);
+        }
+
+        const lCode = m.competition_code.toUpperCase();
+        const lStat = leagueStatsMap.get(lCode) || {
+          count: 0,
+          earliestDate: null,
+          latestDate: null,
+          cardsCount: 0,
+          cornersCount: 0,
+          halfTimeGoalsCount: 0,
+          refereeCount: 0,
+          cardsSeasons: new Set<string>(),
+          cornersSeasons: new Set<string>(),
+          halfTimeGoalsSeasons: new Set<string>(),
+          refereeSeasons: new Set<string>(),
+        };
+        lStat.count++;
+        if (kDate && (!lStat.earliestDate || kDate < lStat.earliestDate)) lStat.earliestDate = kDate;
+        if (kDate && (!lStat.latestDate || kDate > lStat.latestDate)) lStat.latestDate = kDate;
+        if (
+          (m.home_yellow_cards !== null && m.home_yellow_cards !== undefined) ||
+          (m.away_yellow_cards !== null && m.away_yellow_cards !== undefined) ||
+          (m.home_red_cards !== null && m.home_red_cards !== undefined) ||
+          (m.away_red_cards !== null && m.away_red_cards !== undefined)
+        ) {
+          lStat.cardsCount++;
+          if (m.season) lStat.cardsSeasons.add(m.season);
+        }
+        if (
+          (m.home_corners !== null && m.home_corners !== undefined) ||
+          (m.away_corners !== null && m.away_corners !== undefined)
+        ) {
+          lStat.cornersCount++;
+          if (m.season) lStat.cornersSeasons.add(m.season);
+        }
+        if (
+          (m.home_half_time_score !== null && m.home_half_time_score !== undefined) ||
+          (m.away_half_time_score !== null && m.away_half_time_score !== undefined)
+        ) {
+          lStat.halfTimeGoalsCount++;
+          if (m.season) lStat.halfTimeGoalsSeasons.add(m.season);
+        }
+        if (typeof m.referee === 'string' && m.referee.trim().length > 0) {
+          lStat.refereeCount++;
+          if (m.season) lStat.refereeSeasons.add(m.season);
+        }
+        leagueStatsMap.set(lCode, lStat);
+
+        mergeTeamMetric(teamMatchesMap, m.home_team_id, 1, kDate || null, kDate || null);
+        mergeTeamMetric(teamMatchesMap, m.away_team_id, 1, kDate || null, kDate || null);
+      }
+
+      leagueSeasonList.push(...Array.from(leagueSeasonMap.values()));
+
       const matchCompById = new Map<string, { comp: string; season: string }>();
       for (const m of allMatches) {
         matchCompById.set(m.provider_id, { comp: m.competition_code.toUpperCase(), season: m.season });
       }
       const ahMatchIdsByComp = new Map<string, Set<string>>();
+
       if (isSupabaseConfigured && supabase && storeUsed === 'supabase') {
         try {
-          const { data: ahRows } = await supabase
-            .from('odds_snapshots')
-            .select('match_id, market_code')
-            .in('market_code', ['ASIAN_HANDICAP_HOME', 'ASIAN_HANDICAP_AWAY']);
-          for (const r of (ahRows || []) as Array<{ match_id: string; market_code: string }>) {
+          const { data: ahRows } = await fetchAllRows<{ match_id: string; market_code: string }>((from, to) =>
+            supabase
+              .from('odds_snapshots')
+              .select('id, match_id, market_code')
+              .in('market_code', ['ASIAN_HANDICAP_HOME', 'ASIAN_HANDICAP_AWAY'])
+              .order('id', { ascending: true })
+              .range(from, to)
+          );
+          for (const r of ahRows || []) {
             const meta = matchCompById.get(r.match_id);
             if (meta) {
               let set = ahMatchIdsByComp.get(meta.comp);
@@ -2131,10 +2682,12 @@ class MatchesStore {
       for (const [comp, set] of ahMatchIdsByComp.entries()) {
         leagueAhCountMap.set(comp, set.size);
       }
+
+      aggregationMethod = 'paginated_fallback';
     }
 
     const nowMs = Date.now();
-    const STALE_THRESHOLD_DAYS = 21; // Matchmind standard staleness threshold
+    const STALE_THRESHOLD_DAYS = 21;
 
     const leagueLatestDates: LeagueLatestDateInfo[] = KNOWN_LEAGUES.map((l) => {
       const altCodes = [l.code, ...l.aliases];
@@ -2208,16 +2761,29 @@ class MatchesStore {
       };
     });
 
-    const teamLatestDates: TeamLatestDateInfo[] = registeredTeams.map((t) => {
+    // Deduplicate canonicalized registered teams in case legacy alias IDs existed in teams table
+    const dedupedRegisteredTeams = new Map<string, { id: string; name: string; shortName: string; competitionCode: string }>();
+    for (const t of registeredTeams) {
       const canonId = this.canonicalizeTeamId(t.id);
-      const stat = teamMatchesMap.get(canonId) || { count: 0, earliestDate: null, latestDate: null };
+      if (!dedupedRegisteredTeams.has(canonId) || t.id === canonId) {
+        dedupedRegisteredTeams.set(canonId, {
+          id: canonId,
+          name: t.name,
+          shortName: t.shortName,
+          competitionCode: t.competitionCode,
+        });
+      }
+    }
+
+    const teamLatestDates: TeamLatestDateInfo[] = Array.from(dedupedRegisteredTeams.values()).map((t) => {
+      const stat = teamMatchesMap.get(t.id) || { count: 0, earliestDate: null, latestDate: null };
       const daysAgo = stat.latestDate
         ? Math.floor((nowMs - new Date(stat.latestDate).getTime()) / (1000 * 60 * 60 * 24))
         : null;
       const isStale = daysAgo === null || daysAgo > STALE_THRESHOLD_DAYS;
 
       return {
-        teamId: canonId,
+        teamId: t.id,
         name: t.name,
         shortName: t.shortName,
         competitionCode: t.competitionCode,
@@ -2229,21 +2795,23 @@ class MatchesStore {
       };
     });
 
-    // 3. Identify every team with fewer than 10 matches strictly from DB match counts
-    const teamsWithFewerThan10Matches: {
-      teamId: string;
-      name: string;
-      shortName: string;
-      competitionCode: string;
-      matchCount: number;
-    }[] = [];
+    const teamsWithFewerThan10Matches: DataStatusReport['teamsWithFewerThan10Matches'] = [];
+    const teamsWithUnder8Matches: DataStatusReport['teamsWithUnder8Matches'] = [];
 
-    for (const team of registeredTeams) {
-      const canonId = this.canonicalizeTeamId(team.id);
-      const matchCount = teamFinishedCounts.get(canonId) ?? 0;
+    for (const team of dedupedRegisteredTeams.values()) {
+      const matchCount = teamFinishedCounts.get(team.id) ?? 0;
+      if (matchCount < 8) {
+        teamsWithUnder8Matches.push({
+          teamId: team.id,
+          name: team.name,
+          shortName: team.shortName,
+          competitionCode: team.competitionCode,
+          matchCount,
+        });
+      }
       if (matchCount < 10) {
         teamsWithFewerThan10Matches.push({
-          teamId: canonId,
+          teamId: team.id,
           name: team.name,
           shortName: team.shortName,
           competitionCode: team.competitionCode,
@@ -2258,10 +2826,14 @@ class MatchesStore {
 
     if (isSupabaseConfigured && supabase) {
       try {
-        const { data: unresRows } = await supabase
-          .from('unresolved_teams')
-          .select('source_name, source_provider, count, first_seen, last_seen')
-          .eq('resolved', 0);
+        const { data: unresRows } = await fetchAllRows((from, to) =>
+          supabase
+            .from('unresolved_teams')
+            .select('id, source_name, source_provider, count, first_seen, last_seen')
+            .eq('resolved', 0)
+            .order('id', { ascending: true })
+            .range(from, to)
+        );
         if (unresRows && unresRows.length > 0) {
           const mergedMap = new Map<string, UnresolvedTeamLogEntry>();
           for (const e of unresolvedTeams) {
@@ -2287,10 +2859,10 @@ class MatchesStore {
     }
 
     return {
-      totalMatches: allMatches.length,
+      totalMatches,
       earliestDate,
       latestDate,
-      matchesPerLeagueAndSeason: Array.from(leagueSeasonMap.values()).sort(
+      matchesPerLeagueAndSeason: leagueSeasonList.sort(
         (a, b) => a.league.localeCompare(b.league) || b.season.localeCompare(a.season)
       ),
       leagueLatestDates: leagueLatestDates.sort((a, b) => {
@@ -2306,12 +2878,16 @@ class MatchesStore {
       teamsWithFewerThan10Matches: teamsWithFewerThan10Matches.sort(
         (a, b) => a.matchCount - b.matchCount || a.name.localeCompare(b.name)
       ),
+      teamsWithUnder8Matches: teamsWithUnder8Matches.sort(
+        (a, b) => a.matchCount - b.matchCount || a.name.localeCompare(b.name)
+      ),
       unmatchedNamesCount: unmatched.length,
       unmatchedNames: unmatched,
       unresolvedTeamsCount: unresolvedTeams.length,
       unresolvedTeams,
       unmappedFixtureNamesCount: unmappedFixtures.length,
       unmappedFixtureNames: unmappedFixtures,
+      aggregationMethod,
       storeUsed,
       persistenceMode: (isSupabaseConfigured && supabase) ? 'SUPABASE_PRODUCTION' : 'IN_MEMORY_SANDBOX',
     };

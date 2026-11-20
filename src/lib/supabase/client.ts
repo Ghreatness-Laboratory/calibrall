@@ -119,8 +119,9 @@ class LocalSupabaseQueryBuilder {
   private countMode?: string;
   private isHead: boolean = false;
   private whereClauses: { sql: string; params: any[] }[] = [];
-  private orderClause?: string;
+  private orderClauses: string[] = [];
   private limitCount?: number;
+  private offsetCount?: number;
   private operation: 'select' | 'delete' = 'select';
 
   constructor(db: any, table: string) {
@@ -223,12 +224,20 @@ class LocalSupabaseQueryBuilder {
 
   order(column: string, options?: { ascending?: boolean }) {
     const asc = options?.ascending !== false;
-    this.orderClause = `ORDER BY "${column}" ${asc ? 'ASC' : 'DESC'}`;
+    this.orderClauses.push(`"${column}" ${asc ? 'ASC' : 'DESC'}`);
     return this;
   }
 
   limit(count: number) {
     this.limitCount = count;
+    return this;
+  }
+
+  range(from: number, to: number) {
+    const safeFrom = Math.max(0, Math.floor(from));
+    const safeTo = Math.max(safeFrom - 1, Math.floor(to));
+    this.offsetCount = safeFrom;
+    this.limitCount = Math.max(0, safeTo - safeFrom + 1);
     return this;
   }
 
@@ -324,8 +333,15 @@ class LocalSupabaseQueryBuilder {
       }
 
       let sql = `SELECT ${colsSql} FROM "${this.table}" ${whereSql}`;
-      if (this.orderClause) sql += ` ${this.orderClause}`;
-      if (this.limitCount !== undefined) sql += ` LIMIT ${this.limitCount}`;
+      if (this.orderClauses.length > 0) sql += ` ORDER BY ${this.orderClauses.join(', ')}`;
+      if (this.limitCount !== undefined) {
+        sql += ` LIMIT ${this.limitCount}`;
+        if (this.offsetCount !== undefined) {
+          sql += ` OFFSET ${this.offsetCount}`;
+        }
+      } else if (this.offsetCount !== undefined) {
+        sql += ` LIMIT -1 OFFSET ${this.offsetCount}`;
+      }
 
       const stmt = this.db.prepare(sql);
       const rows = stmt.all(...params) as any[];
@@ -579,6 +595,7 @@ function createNoopQueryBuilder() {
     or: () => builder,
     order: () => builder,
     limit: () => builder,
+    range: () => builder,
     then: (resolve: (res: any) => void, reject?: (err: any) => void) =>
       Promise.resolve({ data: [], count: 0, error: null }).then(resolve, reject),
   };
@@ -601,6 +618,7 @@ function createMisconfiguredProdQueryBuilder(errMessage: string) {
     or: () => builder,
     order: () => builder,
     limit: () => builder,
+    range: () => builder,
     then: (resolve: (res: any) => void, reject?: (err: any) => void) =>
       Promise.resolve({ data: null, count: 0, error: errObj }).then(resolve, reject),
   };
@@ -608,8 +626,10 @@ function createMisconfiguredProdQueryBuilder(errMessage: string) {
 }
 
 function createMisconfiguredProdClient(errMessage: string): any {
+  const errObj = { message: errMessage, code: 'PERSISTENCE_MISCONFIGURED' };
   return {
     from: () => createMisconfiguredProdQueryBuilder(errMessage),
+    rpc: () => Promise.resolve({ data: null, error: errObj }),
     auth: {
       persistSession: false,
     },
@@ -625,6 +645,11 @@ function createLocalSupabaseClient(): any {
       }
       return new LocalSupabaseQueryBuilder(db, table);
     },
+    rpc: (fnName: string) =>
+      Promise.resolve({
+        data: null,
+        error: { message: `RPC function ${fnName} is not registered on local SQLite adapter`, code: 'LOCAL_RPC_UNSUPPORTED' },
+      }),
     auth: {
       persistSession: false,
     },

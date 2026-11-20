@@ -322,14 +322,14 @@ export async function getProviderCallCountToday(providerFilter?: string): Promis
     try {
       let query = supabase
         .from('provider_call_logs')
-        .select('id, provider, timestamp')
+        .select('id', { count: 'exact', head: true })
         .gte('timestamp', `${todayPrefix}T00:00:00.000Z`);
       if (providerFilter) {
         query = query.eq('provider', providerFilter);
       }
-      const { data, error } = await query;
-      if (!error && Array.isArray(data)) {
-        return data.length;
+      const { count, error } = await query;
+      if (!error && typeof count === 'number') {
+        return count;
       }
     } catch {
       // Fallback
@@ -497,19 +497,31 @@ export async function getStoredSportFreshness(sport: 'football' | 'basketball'):
 
   if (isSupabaseConfigured && supabase) {
     try {
-      let query = supabase.from('fixtures').select('id, competition_id, updated_at');
+      let countQuery = supabase
+        .from('fixtures')
+        .select('id', { count: 'exact', head: true });
+      let latestQuery = supabase
+        .from('fixtures')
+        .select('updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
       if (sport === 'basketball') {
-        query = query.eq('competition_id', 'comp_nba');
+        countQuery = countQuery.eq('competition_id', 'comp_nba');
+        latestQuery = latestQuery.eq('competition_id', 'comp_nba');
       } else {
-        query = query.neq('competition_id', 'comp_nba');
+        countQuery = countQuery.neq('competition_id', 'comp_nba');
+        latestQuery = latestQuery.neq('competition_id', 'comp_nba');
       }
-      const { data, error } = await query;
-      if (!error && Array.isArray(data)) {
-        fixtureCount = data.length;
-        for (const row of data) {
-          if (row.updated_at && (!newestUpdatedAt || String(row.updated_at) > newestUpdatedAt)) {
-            newestUpdatedAt = String(row.updated_at);
-          }
+
+      const [countRes, latestRes] = await Promise.all([countQuery, latestQuery]);
+      if (!countRes.error && typeof countRes.count === 'number') {
+        fixtureCount = countRes.count;
+      }
+      if (!latestRes.error && Array.isArray(latestRes.data) && latestRes.data[0]?.updated_at) {
+        const candidateTs = String(latestRes.data[0].updated_at);
+        if (!newestUpdatedAt || candidateTs > newestUpdatedAt) {
+          newestUpdatedAt = candidateTs;
         }
       }
     } catch {

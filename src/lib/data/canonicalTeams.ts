@@ -13,6 +13,7 @@ export interface CanonicalTeam {
   providerIds: {
     footballDataCoUk?: string;
     footballDataOrg?: string;
+    sportmonks?: string;
     theSportsDb?: string;
     espn?: string;
     elvidge?: string;
@@ -1351,6 +1352,7 @@ for (const [id, team] of Object.entries(EXPANDED_CANONICAL_TEAMS)) {
 
 for (const rec of Object.values(TEAM_STRENGTH_DATABASE)) {
   if (!CANONICAL_TEAMS[rec.id]) {
+    const fdOrgMatch = (rec.crestUrl || '').match(/crests\.football-data\.org\/(\d+)\.png/i);
     CANONICAL_TEAMS[rec.id] = {
       canonicalId: rec.id,
       canonicalName: rec.name,
@@ -1359,8 +1361,158 @@ for (const rec of Object.values(TEAM_STRENGTH_DATABASE)) {
       competitionCode: rec.competitionCode,
       crestUrl: rec.crestUrl || '',
       aliases: rec.aliases,
-      providerIds: {},
+      providerIds: {
+        ...(fdOrgMatch ? { footballDataOrg: fdOrgMatch[1] } : {}),
+      },
     };
+  }
+}
+
+// Register Champions League qualifiers & patch provider IDs / exact aliases
+const EXTRA_CANONICAL_REGISTRATIONS: Record<string, CanonicalTeam> = {
+  team_slovan_bratislava: {
+    canonicalId: 'team_slovan_bratislava',
+    canonicalName: 'ŠK Slovan Bratislava',
+    shortName: 'Slovan Bratislava',
+    tla: 'SLO',
+    competitionCode: 'CL',
+    crestUrl: 'https://crests.football-data.org/7509.png',
+    aliases: ['šk slovan bratislava', 'sk slovan bratislava', 'slovan bratislava'],
+    providerIds: { footballDataOrg: '7509' },
+  },
+  team_slavia_praha: {
+    canonicalId: 'team_slavia_praha',
+    canonicalName: 'SK Slavia Praha',
+    shortName: 'Slavia Praha',
+    tla: 'SLA',
+    competitionCode: 'CL',
+    crestUrl: 'https://crests.football-data.org/930.png',
+    aliases: ['sk slavia praha', 'slavia praha', 'slavia prague'],
+    providerIds: { footballDataOrg: '930' },
+  },
+  team_sabah_fk: {
+    canonicalId: 'team_sabah_fk',
+    canonicalName: 'Sabah FK',
+    shortName: 'Sabah FK',
+    tla: 'SAB',
+    competitionCode: 'CL',
+    crestUrl: 'https://crests.football-data.org/10233.png',
+    aliases: ['sabah fk', 'sabah'],
+    providerIds: { footballDataOrg: '10233' },
+  },
+  team_shakhtar_donetsk: {
+    canonicalId: 'team_shakhtar_donetsk',
+    canonicalName: 'FK Shakhtar Donetsk',
+    shortName: 'Shakhtar Donetsk',
+    tla: 'SHA',
+    competitionCode: 'CL',
+    crestUrl: 'https://crests.football-data.org/1887.png',
+    aliases: ['fk shakhtar donetsk', 'shakhtar donetsk', 'shakhtar'],
+    providerIds: { footballDataOrg: '1887' },
+  },
+};
+
+for (const [id, team] of Object.entries(EXTRA_CANONICAL_REGISTRATIONS)) {
+  if (!CANONICAL_TEAMS[id]) {
+    CANONICAL_TEAMS[id] = team;
+  }
+}
+
+const PROVIDER_AND_ALIAS_PATCHES: Record<string, {
+  providerIds?: Partial<CanonicalTeam['providerIds']>;
+  aliases?: string[];
+  crestUrl?: string;
+}> = {
+  team_athletic: {
+    providerIds: { footballDataOrg: '77', footballDataCoUk: 'Ath Bilbao' },
+    aliases: ['athletic club', 'athletic bilbao', 'ath bilbao', 'athletic'],
+  },
+  team_espanyol: {
+    providerIds: { footballDataOrg: '80', footballDataCoUk: 'Espanol' },
+    aliases: ['rcd espanyol de barcelona', 'rcd espanyol', 'espanyol', 'espanol'],
+  },
+  team_troyes: {
+    providerIds: { footballDataOrg: '531', footballDataCoUk: 'Troyes' },
+    aliases: ['es troyes ac', 'troyes ac', 'troyes'],
+  },
+  team_lehavre: {
+    providerIds: { footballDataOrg: '533', footballDataCoUk: 'Le Havre' },
+    aliases: ['le havre ac', 'le havre', 'havre'],
+  },
+  team_athleticopr: {
+    providerIds: { footballDataOrg: '1768', footballDataCoUk: 'Athletico-PR' },
+    aliases: ['ca paranaense', 'club athletico paranaense', 'athletico paranaense', 'athletico-pr'],
+  },
+  team_aek: {
+    providerIds: { footballDataOrg: '1899', footballDataCoUk: 'AEK' },
+    aliases: ['pae aek', 'aek athens', 'aek'],
+    crestUrl: 'https://crests.football-data.org/1899.png',
+  },
+  team_nacional: {
+    providerIds: { footballDataOrg: '5529', footballDataCoUk: 'Nacional' },
+    aliases: ['cd nacional', 'clube desportivo nacional', 'nacional'],
+    crestUrl: 'https://crests.football-data.org/5529.png',
+  },
+  team_academico_viseu: {
+    providerIds: { footballDataOrg: '5527', footballDataCoUk: 'Academico Viseu' },
+    aliases: ['académico de viseu fc', 'academico de viseu fc', 'academico de viseu', 'academico viseu'],
+    crestUrl: 'https://crests.football-data.org/5527.png',
+  },
+  team_estrela: {
+    providerIds: { footballDataOrg: '9136', footballDataCoUk: 'Estrela' },
+    aliases: ['cf estrela da amadora', 'estrela da amadora', 'estrela'],
+    crestUrl: 'https://crests.football-data.org/9136.png',
+  },
+  team_estudiantes_l_p: {
+    providerIds: { footballDataOrg: '2051', footballDataCoUk: 'Estudiantes L.P.' },
+    aliases: ['estudiantes de la plata', 'estudiantes l.p.', 'estudiantes l p'],
+    crestUrl: 'https://crests.football-data.org/2051.png',
+  },
+  team_lyngby: {
+    providerIds: { sportmonks: '2650' },
+    aliases: ['lyngby boldklub'],
+  },
+  team_silkeborg: {
+    providerIds: { sportmonks: '86' },
+    aliases: ['silkeborg if'],
+  },
+  team_viborg: {
+    providerIds: { sportmonks: '2447' },
+    aliases: ['viborg ff'],
+  },
+  team_odense: {
+    providerIds: { sportmonks: '1789' },
+    aliases: ['odense bk', 'ob'],
+  },
+  team_nordsjaelland: {
+    providerIds: { sportmonks: '2394' },
+    aliases: ['nordsjælland', 'fc nordsjælland', 'fc nordsjaelland'],
+  },
+  team_fc_copenhagen: {
+    providerIds: { sportmonks: '85' },
+    aliases: ['fc københavn', 'fc kobenhavn', 'f.c. københavn', 'fc copenhagen'],
+  },
+  team_midtjylland: {
+    providerIds: { sportmonks: '939' },
+    aliases: ['fc midtjylland'],
+  },
+};
+
+for (const [id, patch] of Object.entries(PROVIDER_AND_ALIAS_PATCHES)) {
+  const existing = CANONICAL_TEAMS[id];
+  if (!existing) continue;
+  if (patch.providerIds) {
+    existing.providerIds = { ...existing.providerIds, ...patch.providerIds };
+  }
+  if (patch.aliases) {
+    const merged = new Set(existing.aliases.map(a => a.toLowerCase()));
+    for (const a of patch.aliases) {
+      merged.add(a.toLowerCase());
+    }
+    existing.aliases = Array.from(merged);
+  }
+  if (patch.crestUrl && !existing.crestUrl) {
+    existing.crestUrl = patch.crestUrl;
   }
 }
 
@@ -1398,20 +1550,55 @@ function normalizeCompLookupCode(code?: string): string {
   return COMP_CODE_ALIASES[up] || up;
 }
 
+export type ExternalTeamProviderKey =
+  | 'footballDataOrg'
+  | 'footballDataCoUk'
+  | 'sportmonks'
+  | 'theSportsDb'
+  | 'espn'
+  | 'elvidge';
+
 // O(1) lookup indexes built after all canonical teams are registered
 const EXACT_TEAM_INDEX = new Map<string, CanonicalTeam>();
 const NORM_TEAM_INDEX = new Map<string, CanonicalTeam>();
 const EXACT_SCOPED_INDEX = new Map<string, CanonicalTeam>();
 const NORM_SCOPED_INDEX = new Map<string, CanonicalTeam>();
+const PROVIDER_ID_INDEX: Record<ExternalTeamProviderKey, Map<string, CanonicalTeam>> = {
+  footballDataOrg: new Map<string, CanonicalTeam>(),
+  footballDataCoUk: new Map<string, CanonicalTeam>(),
+  sportmonks: new Map<string, CanonicalTeam>(),
+  theSportsDb: new Map<string, CanonicalTeam>(),
+  espn: new Map<string, CanonicalTeam>(),
+  elvidge: new Map<string, CanonicalTeam>(),
+};
+
 for (const team of Object.values(CANONICAL_TEAMS)) {
   const teamComp = normalizeCompLookupCode(team.competitionCode);
+
+  // Provider-scoped ID index (prevents numeric collisions across providers e.g. Sportmonks 85 vs Football-Data.org 85)
+  for (const pKey of Object.keys(PROVIDER_ID_INDEX) as ExternalTeamProviderKey[]) {
+    const pVal = team.providerIds[pKey];
+    if (pVal !== undefined && pVal !== null && String(pVal).trim()) {
+      const normalizedVal = String(pVal).trim();
+      if (!PROVIDER_ID_INDEX[pKey].has(normalizedVal)) {
+        PROVIDER_ID_INDEX[pKey].set(normalizedVal, team);
+      }
+      const lowerVal = normalizedVal.toLowerCase();
+      if (!PROVIDER_ID_INDEX[pKey].has(lowerVal)) {
+        PROVIDER_ID_INDEX[pKey].set(lowerVal, team);
+      }
+    }
+  }
+
+  // Name & exact-alias index (only string names/aliases, never raw numeric provider IDs)
   const exactCandidates = [
     team.canonicalId,
     team.canonicalName,
     team.shortName,
     ...team.aliases,
-    ...Object.values(team.providerIds).filter((v): v is string => Boolean(v)),
-  ];
+    team.providerIds.footballDataCoUk,
+    team.providerIds.elvidge,
+  ].filter((v): v is string => Boolean(v));
   for (const cand of exactCandidates) {
     const low = cand.toLowerCase();
     if (!EXACT_TEAM_INDEX.has(low)) EXACT_TEAM_INDEX.set(low, team);
@@ -1666,6 +1853,59 @@ export function lookupCanonicalTeam(rawNameOrId: string | any, competitionCode?:
     UNMATCHED_NAMES_LOG.add(input);
     recordUnresolvedTeam(input, 'canonical-lookup');
   }
+  return null;
+}
+
+export function lookupCanonicalTeamByProviderId(
+  provider: ExternalTeamProviderKey,
+  providerId: string | number | undefined | null
+): CanonicalTeam | null {
+  if (providerId === undefined || providerId === null) return null;
+  const raw = String(providerId).trim();
+  if (!raw) return null;
+  const idx = PROVIDER_ID_INDEX[provider];
+  if (!idx) return null;
+  return idx.get(raw) || idx.get(raw.toLowerCase()) || null;
+}
+
+/**
+ * Resolves a fixture's provider team payload deterministically to one canonical team
+ * using (1) provider-scoped external team ID, then (2) exact alias/name lookup.
+ */
+export function resolveFixtureTeamCanonical(params: {
+  provider: ExternalTeamProviderKey;
+  providerTeamId?: string | number | null;
+  canonicalOrLegacyTeamId?: string | null;
+  name?: string | null;
+  shortName?: string | null;
+  displayName?: string | null;
+  competitionCode?: string;
+}): CanonicalTeam | null {
+  if (params.canonicalOrLegacyTeamId) {
+    const idStr = String(params.canonicalOrLegacyTeamId).trim();
+    const numericMatch = idStr.match(/^team_(\d+)$/);
+    if (numericMatch && !params.providerTeamId) {
+      const byNumeric = lookupCanonicalTeamByProviderId(params.provider, numericMatch[1]);
+      if (byNumeric) return byNumeric;
+    } else if (!numericMatch && idStr.startsWith('team_')) {
+      const direct = lookupCanonicalTeam(idStr, params.competitionCode);
+      if (direct) return direct;
+    }
+  }
+
+  if (params.providerTeamId !== undefined && params.providerTeamId !== null) {
+    const byPid = lookupCanonicalTeamByProviderId(params.provider, params.providerTeamId);
+    if (byPid) return byPid;
+  }
+
+  const nameCandidates = [params.displayName, params.name, params.shortName];
+  for (const cand of nameCandidates) {
+    if (cand && cand.trim()) {
+      const byName = lookupCanonicalTeam(cand, params.competitionCode);
+      if (byName) return byName;
+    }
+  }
+
   return null;
 }
 

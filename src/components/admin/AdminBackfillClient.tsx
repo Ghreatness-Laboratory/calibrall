@@ -84,8 +84,16 @@ interface DataStatusPayload {
   latestDate: string | null;
   storeUsed: 'supabase' | 'in-memory';
   persistenceMode: string;
+  aggregationMethod?: string;
   leagueLatestDates: LeagueLatestDate[];
   teamLatestDates: TeamLatestDate[];
+  teamsWithUnder8Matches?: {
+    teamId: string;
+    name: string;
+    shortName: string;
+    competitionCode: string;
+    matchCount: number;
+  }[];
   unmatchedNamesCount: number;
   unmatchedNames: string[];
   unresolvedTeamsCount: number;
@@ -470,10 +478,21 @@ export default function AdminBackfillClient() {
       ? queue[currentIndex]
       : null;
 
+  const latestDateByTeamId = new Map(
+    (dataStatus?.teamLatestDates || []).map((t) => [t.teamId, t.latestDate] as const)
+  );
+
   const teamsUnder8Matches = dataStatus
-    ? dataStatus.teamLatestDates
-        .filter((t) => t.matchCount < 8)
-        .sort((a, b) => a.matchCount - b.matchCount || a.name.localeCompare(b.name))
+    ? (Array.isArray(dataStatus.teamsWithUnder8Matches)
+        ? dataStatus.teamsWithUnder8Matches
+            .map((t) => ({
+              ...t,
+              latestDate: latestDateByTeamId.get(t.teamId) ?? null,
+            }))
+            .sort((a, b) => a.matchCount - b.matchCount || a.name.localeCompare(b.name))
+        : dataStatus.teamLatestDates
+            .filter((t) => t.matchCount < 8)
+            .sort((a, b) => a.matchCount - b.matchCount || a.name.localeCompare(b.name)))
     : [];
 
   const visibleLeagues = dataStatus
@@ -883,7 +902,8 @@ export default function AdminBackfillClient() {
                 </h2>
               </div>
               <span className="text-[11px] font-mono text-[#8B9892]">
-                Store: {dataStatus.storeUsed} ({dataStatus.persistenceMode})
+                Store: {dataStatus.storeUsed} ({dataStatus.persistenceMode}
+                {dataStatus.aggregationMethod ? ` · ${dataStatus.aggregationMethod}` : ''})
               </span>
             </div>
 
