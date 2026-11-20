@@ -9,9 +9,13 @@ import { Competition, Sport } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import { matchesDayFilter, DayFilterType } from '@/lib/utils/dateWindow';
+import { hasFreeFixturesCoverage } from './providerBudget';
 
 export interface CompetitionWithCount extends Competition {
   fixtureCount: number;
+  storedMatchCount?: number;
+  hasFreeFixturesSource: boolean;
+  freeFixturesProvider: string | null;
 }
 
 export interface CountryCompetitionGroup {
@@ -522,6 +526,42 @@ export const CANONICAL_COMPETITIONS: Record<string, Competition> = {
     avgCardsPerGame: 3.95,
     isActive: true,
   },
+  comp_euro: {
+    id: 'comp_euro',
+    code: 'EURO',
+    name: 'UEFA European Championship',
+    country: 'Europe',
+    emblemUrl: 'https://crests.football-data.org/ec.png',
+    tier: 1,
+    avgGoalsPerGame: 2.55,
+    avgCornersPerGame: 9.80,
+    avgCardsPerGame: 3.90,
+    isActive: true,
+  },
+  comp_cli: {
+    id: 'comp_cli',
+    code: 'CLI',
+    name: 'Copa Libertadores',
+    country: 'South America',
+    emblemUrl: 'https://crests.football-data.org/CLI.svg',
+    tier: 2,
+    avgGoalsPerGame: 2.45,
+    avgCornersPerGame: 9.60,
+    avgCardsPerGame: 5.10,
+    isActive: true,
+  },
+  comp_wc: {
+    id: 'comp_wc',
+    code: 'WC',
+    name: 'FIFA World Cup',
+    country: 'World',
+    emblemUrl: 'https://crests.football-data.org/qatar.png',
+    tier: 1,
+    avgGoalsPerGame: 2.65,
+    avgCornersPerGame: 9.70,
+    avgCardsPerGame: 3.80,
+    isActive: true,
+  },
   comp_nba: {
     id: 'comp_nba',
     code: 'NBA',
@@ -590,10 +630,31 @@ export function getCanonicalCompetition(idOrCode: string): Competition | null {
   return null;
 }
 
+export function getUncoveredFootballCompetitions(): Array<{
+  id: string;
+  code: string;
+  name: string;
+  country: string;
+  tier: number;
+}> {
+  return Object.values(CANONICAL_COMPETITIONS)
+    .filter(c => c.id !== 'comp_nba')
+    .filter(c => !hasFreeFixturesCoverage(c.code).hasFreeSource)
+    .map(c => ({
+      id: c.id,
+      code: c.code,
+      name: c.name,
+      country: c.country,
+      tier: c.tier,
+    }))
+    .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
+}
+
 /**
  * Queries database fixtures and builds active competitions dynamically.
  * Rule 1: Every fixture must have a canonical competition_id. Those without are logged as errors and rejected.
- * Rule 2: Built from database, not hard-coded list. Shows every competition that has fixtures, grouped by country, with counts.
+ * Rule 2: Built from database, not hard-coded list. Shows every competition that has fixtures or stored matches,
+ *         plus uncovered canonical leagues labeled as "fixtures not available".
  */
 export async function getCompetitionsFromDatabase(
   sport: Sport | 'all' = 'football',
@@ -605,6 +666,7 @@ export async function getCompetitionsFromDatabase(
   totalFixtures: number;
 }> {
   const countsByCompId = new Map<string, number>();
+  const storedMatchCountsByCompId = new Map<string, number>();
 
   if (isSupabaseConfigured && supabase) {
     try {
@@ -618,8 +680,6 @@ export async function getCompetitionsFromDatabase(
         for (const row of dbFixtures) {
           const rawId = row.competition_id;
 
-          // Rule 1 Enforcement: Every fixture has a canonical competition_id.
-          // A fixture with none is logged as an error and never shown under a fallback.
           if (!isCanonicalCompetitionId(rawId)) {
             logCompetitionIntegrityError(
               String(row.id || row.provider_id || 'unknown'),
@@ -631,11 +691,9 @@ export async function getCompetitionsFromDatabase(
 
           const compId = rawId.trim().toLowerCase();
 
-          // Sport filter check
           if (sport === 'football' && compId === 'comp_nba') continue;
           if (sport === 'basketball' && compId !== 'comp_nba') continue;
 
-          // Optional day filter check
           if (options?.day && options.day !== 'ALL') {
             if (!matchesDayFilter(row.kickoff_time, options.day)) {
               continue;
@@ -646,21 +704,23 @@ export async function getCompetitionsFromDatabase(
         }
       }
 
-      // Include canonical competitions present in stored historical matches (even if 0 upcoming fixtures, e.g. CHN)
-      if ((!options?.day || options.day === 'ALL') && sport !== 'basketball') {
+      // Count stored historical matches per canonical competition (used for uncovered leagues + history depth)
+      if (sport !== 'basketball') {
         const { data: dbMatches, error: matchErr } = await supabase
           .from('matches')
           .select('competition_code');
 
         if (!matchErr && dbMatches && Array.isArray(dbMatches)) {
-          const seenCodes = new Set<string>();
           for (const row of dbMatches) {
             const rawCode = String(row.competition_code || '').trim().toUpperCase();
-            if (!rawCode || seenCodes.has(rawCode)) continue;
-            seenCodes.add(rawCode);
+            if (!rawCode) continue;
             const mapped = getCanonicalCompetition(rawCode);
             if (!mapped || !isCanonicalCompetitionId(mapped.id)) continue;
             if (mapped.id === 'comp_nba') continue;
+            storedMatchCountsByCompId.set(
+              mapped.id,
+              (storedMatchCountsByCompId.get(mapped.id) || 0) + 1
+            );
             if (!countsByCompId.has(mapped.id)) {
               countsByCompId.set(mapped.id, 0);
             }
@@ -672,7 +732,18 @@ export async function getCompetitionsFromDatabase(
     }
   }
 
-  // Construct active competitions list with counts (all DB competitions with fixtures or stored matches)
+  // Always include uncovered canonical football leagues so users see "fixtures not available"
+  // and can inspect any stored history/picks for them.
+  if (sport !== 'basketball' && (!options?.day || options.day === 'ALL')) {
+    for (const comp of Object.values(CANONICAL_COMPETITIONS)) {
+      if (comp.id === 'comp_nba') continue;
+      const coverage = hasFreeFixturesCoverage(comp.code);
+      if (!coverage.hasFreeSource && !countsByCompId.has(comp.id)) {
+        countsByCompId.set(comp.id, 0);
+      }
+    }
+  }
+
   const activeCompetitions: CompetitionWithCount[] = [];
   let totalFixtures = 0;
 
@@ -683,16 +754,25 @@ export async function getCompetitionsFromDatabase(
       logCompetitionIntegrityError('aggregate', compId, 'db:fixtures');
       continue;
     }
+    const coverage = hasFreeFixturesCoverage(canonical.code);
     totalFixtures += count;
     activeCompetitions.push({
       ...canonical,
       name: cleanDisplayText(canonical.name),
       fixtureCount: count,
+      storedMatchCount: storedMatchCountsByCompId.get(compId) || 0,
+      hasFreeFixturesSource: coverage.hasFreeSource,
+      freeFixturesProvider: coverage.provider,
     });
   }
 
-  // Sort competitions: tier ascending, then name ascending
-  activeCompetitions.sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
+  // Sort competitions: covered leagues first (tier asc, name asc), then uncovered leagues
+  activeCompetitions.sort((a, b) => {
+    if (a.hasFreeFixturesSource !== b.hasFreeFixturesSource) {
+      return a.hasFreeFixturesSource ? -1 : 1;
+    }
+    return a.tier - b.tier || a.name.localeCompare(b.name);
+  });
 
   // Group by country
   const countryMap = new Map<string, CompetitionWithCount[]>();

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { serverCache } from '@/lib/cache/serverCache';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
-import { getNBADataProvider } from '@/lib/data/nbaProvider';
+import { getAllProviderSyncStates, getStoredSportFreshness } from '@/lib/data/providerCallLogger';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -18,150 +18,71 @@ interface DependencyHealth {
 export async function GET() {
   const tStart = Date.now();
 
-  // 1. Audit Football API Dependency
+  // DB-only health check: never calls external provider APIs on visitor/health requests.
+  const [syncStates, footballFreshness, basketballFreshness] = await Promise.all([
+    getAllProviderSyncStates(),
+    getStoredSportFreshness('football'),
+    getStoredSportFreshness('basketball'),
+  ]);
+
+  const stateById = new Map(syncStates.map(s => [s.id, s]));
+  const fdState = stateById.get('provider:football-data');
+  const smState = stateById.get('provider:sportmonks');
+  const oddsState = stateById.get('provider:the-odds-api');
+  const bdlState = stateById.get('provider:balldontlie');
+
   const footballDataKey = process.env.FOOTBALL_DATA_API_KEY?.trim();
-  const sportmonksToken = process.env.SPORTMONKS_API_TOKEN?.trim();
-  const apiFootballKey = process.env.API_FOOTBALL_KEY?.trim();
+  const sportmonksToken =
+    process.env.SPORTMONKS_API_TOKEN?.trim() ||
+    process.env.SPORTSMONK_API_KEY?.trim() ||
+    process.env.SPORTMONKS_API_KEY?.trim();
+
+  const footballHealthy =
+    footballFreshness.fixtureCount > 0 && !footballFreshness.isStaleBeyondLimit;
 
   const footballDependency: DependencyHealth = {
-    envVarPresent: Boolean(footballDataKey || sportmonksToken || apiFootballKey),
-    testCallSucceeded: false,
-    provider: footballDataKey
-      ? 'Football-Data.org v4'
-      : sportmonksToken
-      ? 'Sportmonks v3'
-      : apiFootballKey
-      ? 'API-Football v3'
-      : 'None Configured',
+    envVarPresent: Boolean(footballDataKey || sportmonksToken),
+    testCallSucceeded: footballHealthy || fdState?.status === 'ONLINE' || smState?.status === 'ONLINE',
+    provider: footballDataKey ? 'Football-Data.org v4' : sportmonksToken ? 'Sportmonks v3' : 'None Configured',
+    details: {
+      storedFixtures: footballFreshness.fixtureCount,
+      lastUpdated: footballFreshness.lastUpdatedFormatted,
+      ageMinutes: footballFreshness.ageMinutes,
+      providerStatus: fdState?.status || smState?.status || 'UNKNOWN',
+    },
+    ...(footballHealthy ? {} : footballFreshness.syncState?.lastError ? { error: footballFreshness.syncState.lastError } : {}),
   };
 
-  if (footballDataKey) {
-    const t0 = Date.now();
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-      const res = await fetch('https://api.football-data.org/v4/competitions', {
-        headers: { 'X-Auth-Token': footballDataKey },
-        signal: controller.signal,
-        cache: 'no-store',
-      });
-      clearTimeout(timeoutId);
-
-      footballDependency.latencyMs = Date.now() - t0;
-      if (res.ok) {
-        footballDependency.testCallSucceeded = true;
-      } else {
-        const text = await res.text().catch(() => '');
-        footballDependency.error = `HTTP ${res.status}: ${text.slice(0, 150) || res.statusText}`;
-      }
-    } catch (err: any) {
-      footballDependency.latencyMs = Date.now() - t0;
-      footballDependency.error = err?.message || 'Connection timeout or network failure';
-    }
-  } else if (sportmonksToken) {
-    const t0 = Date.now();
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-      const res = await fetch(`https://api.sportmonks.com/v3/football/leagues?api_token=${sportmonksToken}`, {
-        signal: controller.signal,
-        cache: 'no-store',
-      });
-      clearTimeout(timeoutId);
-
-      footballDependency.latencyMs = Date.now() - t0;
-      footballDependency.testCallSucceeded = res.ok;
-      if (!res.ok) {
-        footballDependency.error = `HTTP ${res.status}: ${res.statusText}`;
-      }
-    } catch (err: any) {
-      footballDependency.latencyMs = Date.now() - t0;
-      footballDependency.error = err?.message || 'Connection timeout or network failure';
-    }
-  } else {
-    footballDependency.error = 'No football data API keys found. Set FOOTBALL_DATA_API_KEY in Vercel settings.';
-  }
-
-  // 2. Audit Basketball API Dependency (Separated per sport)
-  const ballDontLieKey = process.env.BALLDONTLIE_API_KEY?.trim();
-  const nbaApiKey = process.env.NBA_API_KEY?.trim();
+  const ballDontLieKey =
+    process.env.BALLDONTLIE_API_KEY?.trim() || process.env.BALL_DONT_LIE_API_KEY?.trim();
+  const basketballHealthy =
+    basketballFreshness.fixtureCount > 0 && !basketballFreshness.isStaleBeyondLimit;
 
   const basketballDependency: DependencyHealth = {
-    envVarPresent: Boolean(ballDontLieKey || nbaApiKey),
-    testCallSucceeded: false,
-    provider: ballDontLieKey 
-      ? 'BallDontLie API' 
-      : nbaApiKey 
-      ? 'NBA Stats API' 
-      : 'Local Seed / 30-Team Baseline',
+    envVarPresent: Boolean(ballDontLieKey || basketballFreshness.fixtureCount > 0),
+    testCallSucceeded: basketballHealthy || bdlState?.status === 'ONLINE',
+    provider: 'ESPN NBA Scoreboard + BallDontLie v1',
+    details: {
+      storedFixtures: basketballFreshness.fixtureCount,
+      lastUpdated: basketballFreshness.lastUpdatedFormatted,
+      ageMinutes: basketballFreshness.ageMinutes,
+      ballDontLieStatus: bdlState?.status || 'UNCHECKED',
+    },
   };
 
-  if (ballDontLieKey) {
-    const t0 = Date.now();
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-      const res = await fetch('https://api.balldontlie.io/v1/teams', {
-        headers: { Authorization: ballDontLieKey },
-        signal: controller.signal,
-        cache: 'no-store',
-      });
-      clearTimeout(timeoutId);
-
-      basketballDependency.latencyMs = Date.now() - t0;
-      if (res.ok) {
-        basketballDependency.testCallSucceeded = true;
-      } else {
-        const text = await res.text().catch(() => '');
-        basketballDependency.error = `HTTP ${res.status}: ${text.slice(0, 150) || res.statusText}`;
-      }
-    } catch (err: any) {
-      basketballDependency.latencyMs = Date.now() - t0;
-      basketballDependency.error = err?.message || 'Connection timeout or network failure';
-    }
-  } else {
-    basketballDependency.error = 'BALLDONTLIE_API_KEY not configured. Running with pre-cached 30-team NBA efficiency baseline.';
-    // In seed mode, basketball calculations are fully functional offline
-    basketballDependency.testCallSucceeded = true;
-  }
-
-  // 3. Audit Odds Provider Dependency
   const oddsApiKey = process.env.ODDS_API_KEY?.trim();
   const oddsDependency: DependencyHealth = {
     envVarPresent: Boolean(oddsApiKey),
-    testCallSucceeded: false,
+    testCallSucceeded: Boolean(oddsApiKey) && oddsState?.status !== 'ERROR',
     provider: 'The Odds API v4',
+    details: {
+      status: oddsState?.status || (oddsApiKey ? 'CONFIGURED' : 'UNCONFIGURED'),
+      quotaRemaining: oddsState?.quotaRemaining || null,
+      lastAttemptAt: oddsState?.lastAttemptAt || null,
+    },
+    ...(oddsState?.lastError ? { error: oddsState.lastError } : {}),
   };
 
-  if (oddsApiKey) {
-    const t0 = Date.now();
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-      const res = await fetch(`https://api.the-odds-api.com/v4/sports/?apiKey=${oddsApiKey}`, {
-        signal: controller.signal,
-        cache: 'no-store',
-      });
-      clearTimeout(timeoutId);
-
-      oddsDependency.latencyMs = Date.now() - t0;
-      oddsDependency.testCallSucceeded = res.ok;
-      if (!res.ok) {
-        oddsDependency.error = `HTTP ${res.status}: ${res.statusText}`;
-      }
-    } catch (err: any) {
-      oddsDependency.latencyMs = Date.now() - t0;
-      oddsDependency.error = err?.message || 'Connection timeout or network failure';
-    }
-  } else {
-    oddsDependency.error = 'ODDS_API_KEY environment variable is not configured';
-  }
-
-  // 4. Audit Redis Dependency
   const redisPing = await serverCache.ping();
   const redisDependency: DependencyHealth = {
     envVarPresent: redisPing.configured,
@@ -171,15 +92,14 @@ export async function GET() {
     error: redisPing.error,
   };
 
-  // 5. Audit Database Dependency (PostgreSQL / Supabase)
   const hasDbUrl = Boolean(process.env.DATABASE_URL?.trim());
   const hasSupabaseUrl = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || process.env.SUPABASE_URL?.trim()
   );
   const databaseDependency: DependencyHealth = {
-    envVarPresent: hasDbUrl || hasSupabaseUrl,
+    envVarPresent: hasDbUrl || hasSupabaseUrl || isSupabaseConfigured,
     testCallSucceeded: false,
-    provider: hasDbUrl ? 'PostgreSQL' : hasSupabaseUrl ? 'Supabase' : 'Local Seed/Memory State',
+    provider: hasDbUrl ? 'PostgreSQL' : isSupabaseConfigured ? 'Persistent DB Store' : 'Local Seed/Memory State',
   };
 
   if (isSupabaseConfigured && supabase) {
@@ -194,17 +114,13 @@ export async function GET() {
       }
     } catch (err: any) {
       databaseDependency.latencyMs = Date.now() - t0;
-      databaseDependency.error = err?.message || 'Supabase query error';
+      databaseDependency.error = err?.message || 'Database query error';
     }
   } else if (hasDbUrl) {
     databaseDependency.testCallSucceeded = true;
     databaseDependency.latencyMs = 1;
-  } else {
-    databaseDependency.error = 'Database credentials not configured in environment; running in resilient demo state.';
   }
 
-  // Overall status check:
-  // Outage in one sport does NOT bring down the other
   const footballOperational = footballDependency.testCallSucceeded;
   const basketballOperational = basketballDependency.testCallSucceeded;
 
@@ -221,11 +137,12 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       responseTimeMs: Date.now() - tStart,
       environment: process.env.NODE_ENV || 'production',
+      visitorExternalApiCalls: 0,
       sports: {
         football: {
           operational: footballOperational,
           api: footballDependency,
-          engine: 'Dixon-Coles Poisson + NegBinomial',
+          engine: 'Dixon Coles Poisson + NegBinomial',
         },
         basketball: {
           operational: basketballOperational,

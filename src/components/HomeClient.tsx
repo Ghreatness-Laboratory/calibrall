@@ -230,12 +230,12 @@ export default function HomeClient() {
           </div>
         </div>
 
-        {/* Notice shown ONLY when stored fixtures are older than the 2 hour limit */}
+        {/* Notice shown ONLY when stored fixtures are older than the 3 day limit */}
         {isDelayed && (
           <div className="p-2.5 rounded-[12px] bg-[#E8B04A]/12 border border-[#E8B04A]/30 text-[#E8B04A] text-[11.5px] flex items-center gap-2">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>
-              Stored fixtures are older than 2 hours (last updated {lastUpdated || 'never'}). Displaying latest verified schedule.
+              Stored fixtures are older than 3 days (last updated {lastUpdated || 'never'}). Displaying latest verified schedule.
             </span>
           </div>
         )}

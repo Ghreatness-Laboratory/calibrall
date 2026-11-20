@@ -33,9 +33,45 @@ export interface SkippedLeagueRecord {
   reason: string;
 }
 
-// Stored fixtures are treated as within SLA until 120 minutes (2 hours) old.
+// Stored fixtures are treated as within SLA until 3 days (72 hours / 4320 minutes) old.
 // Error banners are suppressed while stored real fixtures are newer than this limit.
-export const FIXTURE_STALE_LIMIT_MINUTES = 120;
+export const FIXTURE_STALE_LIMIT_MINUTES = 4320;
+
+// Exact competitions covered on the free tier
+export const FOOTBALL_DATA_ORG_COVERED_CODES = new Set<string>([
+  'BSA',
+  'ELC',
+  'PL',
+  'CL',
+  'EURO', // Football-Data.org returns code 'EC' for UEFA European Championship
+  'FL1',
+  'BL1',
+  'SA',
+  'DED',
+  'PPL',
+  'CLI',
+  'PD',
+  'WC',
+]);
+
+export const SPORTMONKS_FREE_ADDITIONAL_CODES = new Set<string>([
+  'SC0', // Scottish Premiership (league_id 501 / 513)
+  'DNK', // Danish Superliga (league_id 271 / 1659)
+]);
+
+export function hasFreeFixturesCoverage(code: string): {
+  hasFreeSource: boolean;
+  provider: string | null;
+} {
+  const upper = code.trim().toUpperCase();
+  if (FOOTBALL_DATA_ORG_COVERED_CODES.has(upper)) {
+    return { hasFreeSource: true, provider: 'Football-Data.org v4 (Free)' };
+  }
+  if (SPORTMONKS_FREE_ADDITIONAL_CODES.has(upper)) {
+    return { hasFreeSource: true, provider: 'Sportmonks v3 (Free)' };
+  }
+  return { hasFreeSource: false, provider: null };
+}
 
 // Priority Tiers (Tier 1 fetched first; lower tiers skipped first if quota is constrained)
 export const TIER_1_LEAGUES = [
@@ -112,71 +148,71 @@ export const PROVIDER_BUDGETS: Record<ProviderId, ProviderBudgetSpec> = {
     id: 'football-data',
     name: 'Football-Data.org v4',
     sport: 'football',
-    freeQuota: '10 requests/minute (authenticated free tier); 50 requests/day unauthenticated; max 10 days per query window',
+    freeQuota: '10 requests/minute (free tier); max 10 days per /v4/matches query window',
     dailyQuotaLimit: 1000,
-    callsPerLiveRefresh: 1,
+    callsPerLiveRefresh: 0,
     callsPerScheduleRefresh: 2,
-    liveRefreshIntervalMinutes: 15,
-    scheduleRefreshIntervalMinutes: 360,
-    budgetedCallsPerDay: 104,
-    beforeCallsPerDayEstimate: '720+ calls/day per visitor (every 120s) + 100% HTTP 400 failure from 15-day window',
-    notes: 'Live poll checks [today-1..today+1] (1 call every 15m = 96/day). Schedule splits +2..+14d into two <=10d calls every 6h (8/day).',
+    liveRefreshIntervalMinutes: 0,
+    scheduleRefreshIntervalMinutes: 720,
+    budgetedCallsPerDay: 4,
+    beforeCallsPerDayEstimate: '104/day (15m cron) or 720+/day per visitor + HTTP 400 from 15-day window',
+    notes: 'Runs twice daily (06:00 & 18:00 UTC) covering -1..+14d in two <=10d chunks (2 calls/run = 4 calls/day).',
   },
   sportmonks: {
     id: 'sportmonks',
     name: 'Sportmonks v3',
     sport: 'football',
-    freeQuota: '180 requests/hour per endpoint (~3,000/day free/starter)',
+    freeQuota: '180 requests/hour per endpoint (free tier covers PL, BL1, SC0, DNK)',
     dailyQuotaLimit: 3000,
-    callsPerLiveRefresh: 1,
-    callsPerScheduleRefresh: 1,
-    liveRefreshIntervalMinutes: 15,
-    scheduleRefreshIntervalMinutes: 360,
-    budgetedCallsPerDay: 100,
-    beforeCallsPerDayEstimate: '720+ calls/day per visitor whenever Football-Data.org failed',
-    notes: 'Fallback secondary provider; live poll 1 call/15m (96/day), schedule 1 call/6h (4/day).',
+    callsPerLiveRefresh: 0,
+    callsPerScheduleRefresh: 2,
+    liveRefreshIntervalMinutes: 0,
+    scheduleRefreshIntervalMinutes: 720,
+    budgetedCallsPerDay: 4,
+    beforeCallsPerDayEstimate: '100/day (15m fallback) or 720+/day per visitor',
+    notes: 'Runs twice daily (06:00 & 18:00 UTC) to supplement Scottish Premiership (SC0) and Danish Superliga (DNK) free-tier fixtures (2 calls/run = 4 calls/day).',
   },
   'the-odds-api': {
     id: 'the-odds-api',
     name: 'The Odds API v4',
     sport: 'odds',
-    freeQuota: '500 credits/month (~16 credits/day)',
+    freeQuota: '500 credits/month (~16 credits/day average ceiling)',
     dailyQuotaLimit: 16,
     callsPerLiveRefresh: 0,
-    callsPerScheduleRefresh: 4,
+    callsPerScheduleRefresh: 8,
     liveRefreshIntervalMinutes: 0,
-    scheduleRefreshIntervalMinutes: 360,
+    scheduleRefreshIntervalMinutes: 720,
     budgetedCallsPerDay: 16,
-    beforeCallsPerDayEstimate: 'Uncapped if polled per visit; easily exhausts 500/month in <1 day',
-    notes: 'Strict daily cap of 16 calls/day (4 Tier-1 leagues every 6h). Tier 2/3 leagues skipped and reported in diagnostics when credits are low.',
+    beforeCallsPerDayEstimate: 'Uncapped blind polling of 10 leagues every 6h (up to 40/day) exhausting 500/month in <13 days',
+    notes: 'Runs at most twice daily, fetching h2h odds (1 credit/league) ONLY for upcoming leagues that have qualified picks (<=16 credits/day, <=480/month vs 500 allowance).',
   },
   espn_soccer: {
     id: 'espn_soccer',
     name: 'ESPN Soccer Scoreboard',
     sport: 'football',
-    freeQuota: 'Public scoreboard endpoint (soft CDN rate limit; budgeted to <=2,500 calls/day)',
-    dailyQuotaLimit: 2500,
-    callsPerLiveRefresh: 15,
-    callsPerScheduleRefresh: 280,
-    liveRefreshIntervalMinutes: 15,
-    scheduleRefreshIntervalMinutes: 360,
-    budgetedCallsPerDay: 2560,
-    beforeCallsPerDayEstimate: '~465,120 calls/day per active 120s visitor (38 leagues x 17 requests x 720 refreshes)',
-    notes: 'Live cron every 15m only polls leagues with live or near-kickoff matches (<=20 calls/run). Schedule cron every 6h polls +1..+14d prioritising Tier 1 -> Tier 2 -> Tier 3 within daily call budget.',
+    freeQuota: 'Retired from scheduled football ingestion (0 calls/day)',
+    dailyQuotaLimit: 0,
+    callsPerLiveRefresh: 0,
+    callsPerScheduleRefresh: 0,
+    liveRefreshIntervalMinutes: 0,
+    scheduleRefreshIntervalMinutes: 0,
+    budgetedCallsPerDay: 0,
+    beforeCallsPerDayEstimate: '2,560/day (15m/6h crons) and ~465,120/day per active 120s visitor; failed HTTP 400 on SP2/E3',
+    notes: 'Disabled from automated football fixture sync. Covered leagues use Football-Data.org + Sportmonks free tiers; uncovered leagues show stored history only.',
   },
   espn_nba: {
     id: 'espn_nba',
     name: 'ESPN NBA Scoreboard',
     sport: 'basketball',
-    freeQuota: 'Public scoreboard endpoint (budgeted to <=500 calls/day)',
-    dailyQuotaLimit: 500,
-    callsPerLiveRefresh: 2,
-    callsPerScheduleRefresh: 14,
-    liveRefreshIntervalMinutes: 15,
-    scheduleRefreshIntervalMinutes: 360,
-    budgetedCallsPerDay: 248,
-    beforeCallsPerDayEstimate: '~11,520+ calls/day per active 120s visitor (16 dates x 720 refreshes)',
-    notes: 'Live cron every 15m fetches yesterday + today (2 calls = 192/day). Schedule cron every 6h fetches +1..+14d (14 calls = 56/day).',
+    freeQuota: 'Public scoreboard endpoint (scheduled twice daily)',
+    dailyQuotaLimit: 100,
+    callsPerLiveRefresh: 0,
+    callsPerScheduleRefresh: 16,
+    liveRefreshIntervalMinutes: 0,
+    scheduleRefreshIntervalMinutes: 720,
+    budgetedCallsPerDay: 32,
+    beforeCallsPerDayEstimate: '248/day (15m/6h crons) and ~11,520+/day per active 120s visitor',
+    notes: 'Twice-daily cron (06:00 & 18:00 UTC) fetches -1..+14d (16 calls/run = 32 calls/day).',
   },
   balldontlie: {
     id: 'balldontlie',
@@ -187,10 +223,10 @@ export const PROVIDER_BUDGETS: Record<ProviderId, ProviderBudgetSpec> = {
     callsPerLiveRefresh: 0,
     callsPerScheduleRefresh: 1,
     liveRefreshIntervalMinutes: 0,
-    scheduleRefreshIntervalMinutes: 360,
-    budgetedCallsPerDay: 4,
-    beforeCallsPerDayEstimate: 'Manual / health-check only',
-    notes: 'Polled at 6h schedule interval when BALLDONTLIE_API_KEY is configured.',
+    scheduleRefreshIntervalMinutes: 720,
+    budgetedCallsPerDay: 2,
+    beforeCallsPerDayEstimate: '4/day (6h cron)',
+    notes: 'Polled twice daily (1 call/run = 2 calls/day) when BALLDONTLIE_API_KEY is configured.',
   },
 };
 
@@ -200,6 +236,7 @@ export function getBudgetSummary() {
   return {
     totalBudgetedCallsPerDay,
     beforeCallsPerDaySingleVisitor: 465120 + 11520, // ESPN Soccer (646*720) + ESPN NBA (16*720)
+    beforeCallsPerDayPreviousCron: 104 + 100 + 16 + 2560 + 248 + 4, // 3,032 calls/day before twice-daily migration
     staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
     tier1Leagues: [...TIER_1_LEAGUES],
     tier2Leagues: [...TIER_2_LEAGUES],

@@ -90,6 +90,8 @@ export async function GET(request: Request) {
       lastSyncTimestamp: result.lastSyncTimestamp,
       isDelayed: result.isDelayed,
       staleLimitMinutes: result.staleLimitMinutes,
+      hasFreeFixturesSource: result.hasFreeFixturesSource ?? true,
+      storedHistoryMode: result.storedHistoryMode ?? false,
       providerUsed: result.providerUsed,
       failedProvider: result.failedProvider,
       quotaHeaders: result.quotaHeaders,

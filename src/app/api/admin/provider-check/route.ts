@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSecretHeader } from '@/lib/auth/adminAuth';
+import { getUncoveredFootballCompetitions } from '@/lib/data/canonicalCompetitions';
 import {
   PROVIDER_BUDGETS,
   ProviderId,
@@ -30,11 +31,17 @@ export async function GET(req: NextRequest) {
   const shouldProbe = url.searchParams.get('probe') !== 'false';
   const nowIso = new Date().toISOString();
 
-  // Optional live lightweight probe of each provider to report current HTTP status & quota headers
+  let footballDataCoveredCompetitions: Array<{
+    code: string;
+    name: string;
+    area: string;
+    plan: string | null;
+  }> = [];
+
   const probeResults = new Map<
     ProviderId,
     {
-      status: 'ONLINE' | 'ERROR' | 'RATE_LIMITED' | 'UNCONFIGURED';
+      status: 'ONLINE' | 'ERROR' | 'RATE_LIMITED' | 'UNCONFIGURED' | 'RETIRED';
       httpStatus: number | null;
       quotaRemaining: string | null;
       quotaHeaders: Record<string, string>;
@@ -56,13 +63,21 @@ export async function GET(req: NextRequest) {
       process.env.BALL_DONT_LIE_API_KEY?.trim();
 
     await Promise.all([
-      // 1. Football-Data.org
+      // 1. Football-Data.org (v4/competitions returns exact covered free-tier competitions)
       (async () => {
         const res = await loggedProviderFetch('football-data', 'https://api.football-data.org/v4/competitions', {
           headers: fdKey ? { 'X-Auth-Token': fdKey } : undefined,
           syncMode: 'health_probe',
           timeoutMs: 8000,
         });
+        if (res.ok && Array.isArray(res.json?.competitions)) {
+          footballDataCoveredCompetitions = res.json.competitions.map((c: any) => ({
+            code: String(c.code || ''),
+            name: String(c.name || ''),
+            area: String(c.area?.name || ''),
+            plan: c.plan ? String(c.plan) : null,
+          }));
+        }
         const status = !fdKey && !res.ok
           ? 'UNCONFIGURED'
           : res.status === 429
@@ -76,7 +91,9 @@ export async function GET(req: NextRequest) {
           quotaRemaining: res.quotaRemaining,
           quotaHeaders: res.quotaHeaders,
           latencyMs: res.latencyMs,
-          responseBody: res.bodyText.slice(0, 300),
+          responseBody: res.ok
+            ? `OK (${footballDataCoveredCompetitions.length} competitions returned)`
+            : res.bodyText.slice(0, 300),
           error: res.error || null,
         });
         await upsertProviderSyncState('provider:football-data', {
@@ -113,7 +130,9 @@ export async function GET(req: NextRequest) {
           quotaRemaining: res.quotaRemaining,
           quotaHeaders: res.quotaHeaders,
           latencyMs: res.latencyMs,
-          responseBody: res.bodyText.slice(0, 300),
+          responseBody: res.ok
+            ? `OK (${Array.isArray(res.json?.data) ? res.json.data.length : 0} leagues)`
+            : res.bodyText.slice(0, 300),
           error: res.error || null,
         });
         await upsertProviderSyncState('provider:sportmonks', {
@@ -128,7 +147,7 @@ export async function GET(req: NextRequest) {
         });
       })(),
 
-      // 3. The Odds API v4 (free /v4/sports/ metadata endpoint)
+      // 3. The Odds API v4 (0-cost /v4/sports/ metadata endpoint exposes x-requests-remaining & x-requests-used)
       (async () => {
         const oddsUrl = oddsKey
           ? `https://api.the-odds-api.com/v4/sports/?apiKey=${oddsKey}`
@@ -150,7 +169,9 @@ export async function GET(req: NextRequest) {
           quotaRemaining: res.quotaRemaining,
           quotaHeaders: res.quotaHeaders,
           latencyMs: res.latencyMs,
-          responseBody: res.bodyText.slice(0, 300),
+          responseBody: res.ok
+            ? `OK (${Array.isArray(res.json) ? res.json.length : 0} sports active, remaining=${res.quotaRemaining || 'n/a'})`
+            : res.bodyText.slice(0, 300),
           error: res.error || null,
         });
         await upsertProviderSyncState('provider:the-odds-api', {
@@ -161,7 +182,7 @@ export async function GET(req: NextRequest) {
           ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
           quotaRemaining: res.quotaRemaining,
           quotaHeaders: res.quotaHeaders,
-          callsUsedLastRun: 1,
+          callsUsedLastRun: 0, // /v4/sports/ is 0 credits
         });
       })(),
 
@@ -185,7 +206,7 @@ export async function GET(req: NextRequest) {
           quotaRemaining: res.quotaRemaining,
           quotaHeaders: res.quotaHeaders,
           latencyMs: res.latencyMs,
-          responseBody: res.bodyText.slice(0, 300),
+          responseBody: res.ok ? `OK (${Array.isArray(res.json?.data) ? res.json.data.length : 0} NBA teams)` : res.bodyText.slice(0, 300),
           error: res.error || null,
         });
         await upsertProviderSyncState('provider:balldontlie', {
@@ -200,41 +221,7 @@ export async function GET(req: NextRequest) {
         });
       })(),
 
-      // 5. ESPN Soccer Scoreboard
-      (async () => {
-        const res = await loggedProviderFetch(
-          'espn_soccer',
-          'https://site.web.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard',
-          {
-            headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; Calibrall/1.0)' },
-            leagueCode: 'PL',
-            syncMode: 'health_probe',
-            timeoutMs: 8000,
-          }
-        );
-        const status = res.status === 429 ? 'RATE_LIMITED' : res.ok ? 'ONLINE' : 'ERROR';
-        probeResults.set('espn_soccer', {
-          status,
-          httpStatus: res.status,
-          quotaRemaining: res.quotaRemaining,
-          quotaHeaders: res.quotaHeaders,
-          latencyMs: res.latencyMs,
-          responseBody: res.ok ? `OK (${(res.json?.events || []).length} events)` : res.bodyText.slice(0, 300),
-          error: res.error || null,
-        });
-        await upsertProviderSyncState('provider:espn_soccer', {
-          sport: 'football',
-          providerName: 'ESPN Soccer Scoreboard',
-          status,
-          lastAttemptAt: nowIso,
-          ...(res.ok ? { lastSuccessAt: nowIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 300) }),
-          quotaRemaining: res.quotaRemaining,
-          quotaHeaders: res.quotaHeaders,
-          callsUsedLastRun: 1,
-        });
-      })(),
-
-      // 6. ESPN NBA Scoreboard
+      // 5. ESPN NBA Scoreboard (scheduled twice daily)
       (async () => {
         const res = await loggedProviderFetch(
           'espn_nba',
@@ -270,6 +257,17 @@ export async function GET(req: NextRequest) {
     ]);
   }
 
+  // ESPN Soccer is retired and never live-probed
+  probeResults.set('espn_soccer', {
+    status: 'RETIRED',
+    httpStatus: null,
+    quotaRemaining: '0/0 retired',
+    quotaHeaders: {},
+    latencyMs: 0,
+    responseBody: 'Retired from scheduled football ingestion (replaced by Football-Data.org + Sportmonks free tiers).',
+    error: null,
+  });
+
   const syncStates = await getAllProviderSyncStates();
   const stateById = new Map(syncStates.map(s => [s.id, s]));
   const footballFreshness = await getStoredSportFreshness('football');
@@ -286,7 +284,7 @@ export async function GET(req: NextRequest) {
     balldontlie: Boolean(
       process.env.BALLDONTLIE_API_KEY?.trim() || process.env.BALL_DONT_LIE_API_KEY?.trim()
     ),
-    espn_soccer: true,
+    espn_soccer: false,
     espn_nba: true,
   };
 
@@ -295,7 +293,7 @@ export async function GET(req: NextRequest) {
       const budget = PROVIDER_BUDGETS[id];
       const storedState = stateById.get(`provider:${id}`);
       const liveProbe = probeResults.get(id);
-      const callsToday = await getProviderCallCountToday(id);
+      const callsToday = id === 'espn_soccer' ? 0 : await getProviderCallCountToday(id);
 
       const dailyCap = budget.dailyQuotaLimit;
       const budgetLeft =
@@ -303,7 +301,7 @@ export async function GET(req: NextRequest) {
 
       const lastSuccessIso =
         storedState?.lastSuccessAt ||
-        (id === 'espn_soccer' ? footballFreshness.newestUpdatedAt : null) ||
+        ((id === 'football-data' || id === 'sportmonks') ? footballFreshness.newestUpdatedAt : null) ||
         (id === 'espn_nba' ? basketballFreshness.newestUpdatedAt : null);
 
       return {
@@ -351,15 +349,23 @@ export async function GET(req: NextRequest) {
 
   const last20Calls = await getRecentProviderCalls(20);
   const budgetSummary = getBudgetSummary();
+  const uncoveredLeagues = getUncoveredFootballCompetitions();
+
+  // Compute Odds API credit telemetry (excluding 0-cost /v4/sports/ health probes)
+  const allRecentOdds = last20Calls.filter(c => c.provider === 'the-odds-api' && c.syncMode !== 'health_probe');
+  const oddsProbeHeaders = probeResults.get('the-odds-api')?.quotaHeaders || stateById.get('provider:the-odds-api')?.quotaHeaders || {};
+  const oddsState = stateById.get('provider:the-odds-api');
 
   return NextResponse.json(
     {
       success: true,
       timestamp: nowIso,
       probedLive: shouldProbe,
-      architecture: 'scheduled_cron_to_supabase_db_only_reads',
+      architecture: 'scheduled_twice_daily_cron_to_supabase_db_only_reads',
+      cronSchedule: ['0 6 * * *', '0 18 * * *'],
       storedFixturesFreshness: {
         staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
+        staleLimitDays: Math.round(FIXTURE_STALE_LIMIT_MINUTES / 1440),
         football: {
           fixtureCount: footballFreshness.fixtureCount,
           lastUpdated: footballFreshness.lastUpdatedFormatted,
@@ -375,8 +381,28 @@ export async function GET(req: NextRequest) {
           isStaleBeyondLimit: basketballFreshness.isStaleBeyondLimit,
         },
       },
+      footballDataFreeTier: {
+        coveredCompetitionsCount: footballDataCoveredCompetitions.length,
+        coveredCompetitions: footballDataCoveredCompetitions,
+        callsPerRun: 2,
+        runsPerDay: 2,
+        callsPerDayNeeded: 4,
+      },
+      theOddsApiCredits: {
+        freeMonthlyAllowance: 500,
+        maxRunsPerDay: 2,
+        dailyCreditCeiling: PROVIDER_BUDGETS['the-odds-api'].dailyQuotaLimit,
+        projectedMonthlyMax: (PROVIDER_BUDGETS['the-odds-api'].dailyQuotaLimit || 16) * 30,
+        creditsUsedLastRun: oddsState?.callsUsedLastRun ?? 0,
+        creditsUsedThisMonthFromHeader: oddsProbeHeaders['x-requests-used'] || null,
+        creditsRemainingFromHeader: oddsProbeHeaders['x-requests-remaining'] || oddsState?.quotaRemaining || null,
+        recentCreditCallsLogged: allRecentOdds.length,
+      },
+      uncoveredLeaguesCount: uncoveredLeagues.length,
+      uncoveredLeagues,
       callBudgetSummary: {
         beforeCallsPerDaySingleVisitor: budgetSummary.beforeCallsPerDaySingleVisitor,
+        beforeCallsPerDayPreviousCron: budgetSummary.beforeCallsPerDayPreviousCron,
         afterBudgetedCallsPerDay: budgetSummary.totalBudgetedCallsPerDay,
         visitorReadProviderCalls: 0,
       },

@@ -3,6 +3,10 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import { getFootballDataProvider } from '@/lib/data/provider';
 import { getNBADataProvider } from '@/lib/data/nbaProvider';
 import { computeNBADateWindow } from '@/lib/utils/dateWindow';
+import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
+import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { lookupCanonicalTeam } from '@/lib/data/canonicalTeams';
+import { updateFixtureVerifiedOddsInDatabase } from '@/lib/data/fixturesDatabase';
 import {
   SyncMode,
   PROVIDER_BUDGETS,
@@ -16,6 +20,8 @@ import {
   loggedProviderFetch,
   upsertProviderSyncState,
   getProviderCallCountToday,
+  getRecentProviderCalls,
+  getProviderSyncState,
 } from '@/lib/data/providerCallLogger';
 import crypto from 'crypto';
 
@@ -33,7 +39,60 @@ const ODDS_API_LEAGUES: Array<{ code: string; name: string; sportKey: string }> 
   { code: 'BSA', name: 'Campeonato Brasileiro Série A', sportKey: 'soccer_brazil_campeonato' },
   { code: 'DED', name: 'Eredivisie', sportKey: 'soccer_netherlands_eredivisie' },
   { code: 'PPL', name: 'Primeira Liga', sportKey: 'soccer_portugal_primeira_liga' },
+  { code: 'SC0', name: 'Scottish Premiership', sportKey: 'soccer_spl' },
+  { code: 'DNK', name: 'Danish Superliga', sportKey: 'soccer_denmark_superliga' },
 ];
+
+function normalizeTeamToken(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(fc|afc|cf|sc|ac|as|us|rc|sv|vfb|tsg|bv|1\.|fk|bk|if)\b/g, ' ')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function oddsTeamMatchesFixture(apiTeamName: string, fixtureTeamId: string, fixtureTeamName: string, leagueCode: string): boolean {
+  const canon = lookupCanonicalTeam(apiTeamName, leagueCode);
+  if (canon && canon.canonicalId === fixtureTeamId) {
+    return true;
+  }
+  const a = normalizeTeamToken(apiTeamName);
+  const b = normalizeTeamToken(fixtureTeamName);
+  if (!a || !b) return false;
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+  const wordsA = a.split(' ').filter(w => w.length >= 4);
+  const wordsB = new Set(b.split(' ').filter(w => w.length >= 4));
+  return wordsA.some(w => wordsB.has(w));
+}
+
+async function countOddsSyncRunsToday(): Promise<number> {
+  const todayPrefix = new Date().toISOString().slice(0, 10);
+  const recent = await getRecentProviderCalls(100);
+  const oddsSyncTimestamps = recent
+    .filter(
+      l =>
+        l.provider === 'the-odds-api' &&
+        l.timestamp.startsWith(todayPrefix) &&
+        l.syncMode !== 'health_probe'
+    )
+    .map(l => new Date(l.timestamp).getTime())
+    .filter(ms => !isNaN(ms))
+    .sort((a, b) => a - b);
+
+  if (oddsSyncTimestamps.length === 0) return 0;
+
+  // Cluster API calls within 3 minutes into a single scheduled sync run
+  let runs = 1;
+  for (let i = 1; i < oddsSyncTimestamps.length; i++) {
+    if (oddsSyncTimestamps[i] - oddsSyncTimestamps[i - 1] > 180_000) {
+      runs++;
+    }
+  }
+  return runs;
+}
 
 async function handleSync(request: Request) {
   const url = new URL(request.url);
@@ -105,7 +164,7 @@ async function handleSync(request: Request) {
       };
     }
 
-    // BallDontLie stats check (schedule/full only, 4 calls/day budget)
+    // BallDontLie stats check (schedule/full only, 2 calls/day budget)
     const ballDontLieKey = process.env.BALLDONTLIE_API_KEY?.trim() || process.env.BALL_DONT_LIE_API_KEY?.trim();
     if (ballDontLieKey && mode !== 'live') {
       const attemptIso = new Date().toISOString();
@@ -119,7 +178,7 @@ async function handleSync(request: Request) {
         providerName: 'BallDontLie v1',
         status: res.ok ? 'ONLINE' : 'ERROR',
         lastAttemptAt: attemptIso,
-        ...(res.ok ? { lastSuccessAt: attemptIso, lastError: null } : { lastError: res.error, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 400) }),
+        ...(res.ok ? { lastSuccessAt: attemptIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null } : { lastError: res.error, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 400) }),
         quotaRemaining: res.quotaRemaining,
         quotaHeaders: res.quotaHeaders,
         callsUsedLastRun: 1,
@@ -132,11 +191,11 @@ async function handleSync(request: Request) {
     }
   }
 
-  // 2. Football Fixture Sync (Football-Data.org -> Sportmonks -> ESPN Soccer into Supabase/SQLite)
+  // 2. Football Fixture Sync (Football-Data.org -> Sportmonks into Supabase/SQLite)
   if (sportParam === 'all' || sportParam === 'football') {
     const t0 = Date.now();
+    const footballProvider = getFootballDataProvider();
     try {
-      const footballProvider = getFootballDataProvider();
       const syncOut = await footballProvider.ensureSynced({
         force: true,
         mode,
@@ -162,85 +221,218 @@ async function handleSync(request: Request) {
       };
     }
 
-    // 3. The Odds API (Schedule/Full only, strictly capped at 16 calls/day across Tier-1 leagues)
+    // 3. The Odds API: ONLY for odds, ONLY for upcoming matches that have picks, AT MOST twice a day
     const oddsApiKey = process.env.ODDS_API_KEY?.trim();
     if (oddsApiKey && mode !== 'live') {
       const attemptIso = new Date().toISOString();
-      const callsToday = await getProviderCallCountToday('the-odds-api');
+      const runsCompletedToday = await countOddsSyncRunsToday();
+      const callsTodayBeforeRun = await getProviderCallCountToday('the-odds-api');
       const dailyCap = PROVIDER_BUDGETS['the-odds-api'].dailyQuotaLimit ?? 16;
-      const runCap = Math.max(0, Math.min(4, dailyCap - callsToday));
+      const existingOddsState = await getProviderSyncState('provider:the-odds-api');
+
+      // Evaluate stored upcoming DB fixtures and find ONLY those that generate qualified picks
+      const dbFixturesRes = await footballProvider.getLiveFixtures({ status: 'ALL' });
+      const nowMs = Date.now();
+      const upcomingWithPicks = dbFixturesRes.fixtures.filter(f => {
+        if (f.status !== 'TIMED' && f.status !== 'SCHEDULED') return false;
+        const kickoffMs = new Date(f.kickoffTime).getTime();
+        if (isNaN(kickoffMs) || kickoffMs <= nowMs) return false;
+        const stats = f.serverStats || getFixtureStatistics(f);
+        if (f.insufficientData || stats.insufficientData) return false;
+        const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(f, stats));
+        return evalResult.predictions.length > 0 && evalResult.topPick !== null;
+      });
+
+      const pickFixturesByLeague = new Map<string, typeof upcomingWithPicks>();
+      for (const f of upcomingWithPicks) {
+        const code = f.competition.code.toUpperCase();
+        const list = pickFixturesByLeague.get(code) || [];
+        list.push(f);
+        pickFixturesByLeague.set(code, list);
+      }
+
       const oddsSkipped: SkippedLeagueRecord[] = [];
       let oddsCalls = 0;
+      let matchesUpdated = 0;
       let lastOk = false;
       let lastStatus: number | null = null;
       let lastErr: string | null = null;
       let lastBody: string | null = null;
-      let lastQuotaHeaders: Record<string, string> = {};
-      let lastQuotaRemaining: string | null = null;
+      let lastQuotaHeaders: Record<string, string> = existingOddsState?.quotaHeaders || {};
+      let lastQuotaRemaining: string | null = existingOddsState?.quotaRemaining || null;
 
-      for (const item of ODDS_API_LEAGUES) {
-        if (oddsCalls >= runCap) {
-          oddsSkipped.push({
+      if (runsCompletedToday >= 2) {
+        results['theOddsApi'] = {
+          provider: 'the-odds-api.com',
+          status: 'SKIPPED_TWICE_DAILY_CAP',
+          runsCompletedToday,
+          maxRunsPerDay: 2,
+          callsMade: 0,
+          callsToday: callsTodayBeforeRun,
+          dailyCap,
+          quotaRemaining: lastQuotaRemaining,
+          upcomingMatchesWithPicks: upcomingWithPicks.length,
+        };
+      } else {
+        const perRunRemainingDaily = Math.max(0, dailyCap - callsTodayBeforeRun);
+        const runCap = Math.min(8, perRunRemainingDaily);
+        const targetLeagues = ODDS_API_LEAGUES.filter(item => (pickFixturesByLeague.get(item.code)?.length || 0) > 0);
+
+        for (const item of ODDS_API_LEAGUES) {
+          const leaguePickFixtures = pickFixturesByLeague.get(item.code) || [];
+          if (leaguePickFixtures.length === 0) {
+            oddsSkipped.push({
+              leagueCode: item.code,
+              leagueName: item.name,
+              tier: getLeaguePriorityTier(item.code),
+              provider: 'the-odds-api',
+              reason: 'No upcoming matches with qualified picks (0 credits spent)',
+            });
+            continue;
+          }
+
+          if (oddsCalls >= runCap) {
+            oddsSkipped.push({
+              leagueCode: item.code,
+              leagueName: item.name,
+              tier: getLeaguePriorityTier(item.code),
+              provider: 'the-odds-api',
+              reason: `Daily Odds API credit cap reached (${callsTodayBeforeRun + oddsCalls}/${dailyCap} calls/day)`,
+            });
+            continue;
+          }
+
+          oddsCalls++;
+          const oddsUrl = `https://api.the-odds-api.com/v4/sports/${item.sportKey}/odds/?apiKey=${oddsApiKey}&regions=eu&markets=h2h`;
+          const res = await loggedProviderFetch('the-odds-api', oddsUrl, {
             leagueCode: item.code,
-            leagueName: item.name,
-            tier: getLeaguePriorityTier(item.code),
-            provider: 'the-odds-api',
-            reason: `Daily Odds API credit budget reached (${callsToday + oddsCalls}/${dailyCap} calls/day)`,
+            syncMode: mode,
+            timeoutMs: 8000,
           });
-          continue;
-        }
-        oddsCalls++;
-        const oddsUrl = `https://api.the-odds-api.com/v4/sports/${item.sportKey}/odds/?apiKey=${oddsApiKey}&regions=eu&markets=h2h`;
-        const res = await loggedProviderFetch('the-odds-api', oddsUrl, {
-          leagueCode: item.code,
-          syncMode: mode,
-          timeoutMs: 8000,
-        });
-        lastStatus = res.status;
-        lastQuotaHeaders = res.quotaHeaders;
-        lastQuotaRemaining = res.quotaRemaining;
-        if (res.ok) {
-          lastOk = true;
-        } else {
-          lastErr = res.error || `HTTP ${res.status}`;
-          lastBody = res.bodyText.slice(0, 400);
-          const rem = res.quotaRemaining ? parseInt(res.quotaRemaining, 10) : NaN;
-          if (res.status === 401 || res.status === 429 || (!isNaN(rem) && rem <= 10)) {
-            break;
+          lastStatus = res.status;
+          if (Object.keys(res.quotaHeaders).length > 0) lastQuotaHeaders = res.quotaHeaders;
+          if (res.quotaRemaining) lastQuotaRemaining = res.quotaRemaining;
+
+          if (res.ok && Array.isArray(res.json)) {
+            lastOk = true;
+            const updates: Array<{ id: string; providerId: string; verifiedOdds: any }> = [];
+
+            for (const fix of leaguePickFixtures) {
+              const matchedEvent = res.json.find((ev: any) =>
+                oddsTeamMatchesFixture(String(ev.home_team || ''), fix.homeTeam.id, fix.homeTeam.name, item.code) &&
+                oddsTeamMatchesFixture(String(ev.away_team || ''), fix.awayTeam.id, fix.awayTeam.name, item.code)
+              );
+              if (!matchedEvent || !Array.isArray(matchedEvent.bookmakers) || matchedEvent.bookmakers.length === 0) {
+                continue;
+              }
+
+              const homePrices: number[] = [];
+              const drawPrices: number[] = [];
+              const awayPrices: number[] = [];
+              let bookmakerName = '';
+
+              for (const bk of matchedEvent.bookmakers) {
+                const h2hMarket = Array.isArray(bk.markets) ? bk.markets.find((m: any) => m.key === 'h2h') : null;
+                if (!h2hMarket || !Array.isArray(h2hMarket.outcomes)) continue;
+                if (!bookmakerName && bk.title) bookmakerName = String(bk.title);
+
+                for (const outcome of h2hMarket.outcomes) {
+                  const price = Number(outcome.price);
+                  if (!isFinite(price) || price <= 1.01) continue;
+                  const outName = String(outcome.name || '');
+                  if (outName.toLowerCase() === 'draw') {
+                    drawPrices.push(price);
+                  } else if (outName === matchedEvent.home_team) {
+                    homePrices.push(price);
+                  } else if (outName === matchedEvent.away_team) {
+                    awayPrices.push(price);
+                  }
+                }
+              }
+
+              const avg = (arr: number[]) =>
+                arr.length > 0 ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : undefined;
+
+              const homeWin = avg(homePrices);
+              const draw = avg(drawPrices);
+              const awayWin = avg(awayPrices);
+
+              if (homeWin && awayWin) {
+                updates.push({
+                  id: fix.id,
+                  providerId: fix.providerId,
+                  verifiedOdds: {
+                    homeWin,
+                    draw,
+                    awayWin,
+                    bookmakerName: bookmakerName || 'EU Bookmaker Consensus',
+                  },
+                });
+              }
+            }
+
+            if (updates.length > 0) {
+              const updatedCount = await updateFixtureVerifiedOddsInDatabase(updates);
+              matchesUpdated += updatedCount;
+            }
+          } else {
+            lastErr = res.error || `HTTP ${res.status}`;
+            lastBody = res.bodyText.slice(0, 400);
+            const rem = res.quotaRemaining ? parseInt(res.quotaRemaining, 10) : NaN;
+            if (res.status === 401 || res.status === 429 || (!isNaN(rem) && rem <= 10)) {
+              break;
+            }
           }
         }
-      }
 
-      // Note secondary Tier 2 & Tier 3 leagues skipped for odds conservation
-      for (const code of [...TIER_2_LEAGUES, ...TIER_3_LEAGUES]) {
-        oddsSkipped.push({
-          leagueCode: code,
-          leagueName: code,
-          tier: getLeaguePriorityTier(code),
-          provider: 'the-odds-api',
-          reason: 'Excluded from 500 credits/month Odds API tier budget (Tier 1 prioritised)',
+        // Note Tier 2/3 leagues not queried via Odds API to conserve 500 credits/month free allowance
+        for (const code of [...TIER_2_LEAGUES, ...TIER_3_LEAGUES]) {
+          if (ODDS_API_LEAGUES.some(o => o.code === code)) continue;
+          oddsSkipped.push({
+            leagueCode: code,
+            leagueName: code,
+            tier: getLeaguePriorityTier(code),
+            provider: 'the-odds-api',
+            reason: 'Excluded from 500 credits/month free Odds API allowance',
+          });
+        }
+
+        if (targetLeagues.length === 0) {
+          lastOk = true;
+          lastStatus = 200;
+        }
+
+        await upsertProviderSyncState('provider:the-odds-api', {
+          sport: 'odds',
+          providerName: 'The Odds API v4',
+          status: lastOk ? 'ONLINE' : 'ERROR',
+          lastAttemptAt: attemptIso,
+          ...(lastOk
+            ? { lastSuccessAt: attemptIso, lastError: null, lastHttpStatus: lastStatus ?? 200, lastResponseBody: null }
+            : { lastError: lastErr, lastHttpStatus: lastStatus, lastResponseBody: lastBody }),
+          quotaRemaining: lastQuotaRemaining,
+          quotaHeaders: lastQuotaHeaders,
+          skippedLeagues: oddsSkipped,
+          callsUsedLastRun: oddsCalls,
         });
+
+        results['theOddsApi'] = {
+          provider: 'the-odds-api.com',
+          status: lastOk ? 'ONLINE' : 'ERROR',
+          runsToday: oddsCalls > 0 ? runsCompletedToday + 1 : runsCompletedToday,
+          maxRunsPerDay: 2,
+          leaguesWithUpcomingPicks: Array.from(pickFixturesByLeague.entries()).map(([code, list]) => ({
+            code,
+            upcomingMatchesWithPicks: list.length,
+          })),
+          callsMade: oddsCalls,
+          matchesUpdatedWithOdds: matchesUpdated,
+          quotaRemaining: lastQuotaRemaining,
+          quotaUsedThisMonth: lastQuotaHeaders['x-requests-used'] || null,
+          monthlyAllowance: 500,
+          skippedLeaguesCount: oddsSkipped.length,
+        };
       }
-
-      await upsertProviderSyncState('provider:the-odds-api', {
-        sport: 'odds',
-        providerName: 'The Odds API v4',
-        status: lastOk ? 'ONLINE' : 'ERROR',
-        lastAttemptAt: attemptIso,
-        ...(lastOk ? { lastSuccessAt: attemptIso, lastError: null } : { lastError: lastErr, lastHttpStatus: lastStatus, lastResponseBody: lastBody }),
-        quotaRemaining: lastQuotaRemaining,
-        quotaHeaders: lastQuotaHeaders,
-        skippedLeagues: oddsSkipped,
-        callsUsedLastRun: oddsCalls,
-      });
-
-      results['theOddsApi'] = {
-        provider: 'the-odds-api.com',
-        status: lastOk ? 'ONLINE' : 'ERROR',
-        callsMade: oddsCalls,
-        quotaRemaining: lastQuotaRemaining,
-        skippedLeaguesCount: oddsSkipped.length,
-      };
     }
   }
 

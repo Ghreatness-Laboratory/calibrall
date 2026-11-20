@@ -6,7 +6,7 @@
 //    Zero synthetic or hard-coded fixtures are ever generated or inserted.
 // 3. Filter by competition_id only, combined with the day filter.
 
-import { Fixture, MatchStatus } from '@/types';
+import { Fixture, MatchStatus, VerifiedMatchOdds } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { lookupTeamStrength } from './teamDatabase';
 import { lookupCanonicalTeam } from './canonicalTeams';
@@ -361,11 +361,12 @@ export async function syncFootballFixturesToDatabase(
           const pid = String(r.provider_id || '');
           const isLegacySeed = LEGACY_SEED_PROVIDER_PREFIXES.some(prefix => pid.startsWith(prefix));
           const isDemoRow = r.is_demo === 1 || r.is_demo === true || r.source === 'seed';
+          const isRetiredEspnFootball = r.source === 'provider:espn';
           const isNonCanonical = !isCanonicalCompetitionId(r.competition_id);
           const isExpired = Boolean(minIso && r.kickoff_time && String(r.kickoff_time) < minIso);
           const isPlaceholder = isPlaceholderTeamName(r.home_team_name) || isPlaceholderTeamName(r.away_team_name);
 
-          if (isLegacySeed || isDemoRow || isNonCanonical || isExpired || isPlaceholder) {
+          if (isLegacySeed || isDemoRow || isRetiredEspnFootball || isNonCanonical || isExpired || isPlaceholder) {
             if (r.id) idsToDelete.push(String(r.id));
           }
         }
@@ -380,6 +381,56 @@ export async function syncFootballFixturesToDatabase(
   }
 
   return { upserted, rejected };
+}
+
+/**
+ * Updates `payload_json.verifiedOdds` on existing DB fixtures after a scheduled Odds API fetch.
+ */
+export async function updateFixtureVerifiedOddsInDatabase(
+  updates: Array<{ id: string; providerId: string; verifiedOdds: VerifiedMatchOdds }>
+): Promise<number> {
+  if (!isSupabaseConfigured || !supabase || !updates || updates.length === 0) return 0;
+
+  try {
+    const ids = updates.map(u => u.id);
+    const { data: existingRows, error } = await supabase
+      .from('fixtures')
+      .select('id, provider_id, payload_json')
+      .in('id', ids);
+
+    if (error || !existingRows || !Array.isArray(existingRows)) return 0;
+
+    const byId = new Map<string, any>();
+    for (const row of existingRows) {
+      byId.set(String(row.id), row);
+    }
+
+    const patchRows: Record<string, any>[] = [];
+    const nowIso = new Date().toISOString();
+
+    for (const u of updates) {
+      const existing = byId.get(u.id);
+      if (!existing) continue;
+      const payload = safeParsePayloadJson(existing.payload_json) || {};
+      payload.verifiedOdds = {
+        ...(payload.verifiedOdds || {}),
+        ...u.verifiedOdds,
+      };
+      patchRows.push({
+        id: existing.id,
+        provider_id: existing.provider_id || u.providerId,
+        payload_json: JSON.stringify(payload),
+        updated_at: nowIso,
+      });
+    }
+
+    if (patchRows.length === 0) return 0;
+    const res = await upsertFixtureRowsSafely(patchRows);
+    return res.ok ? patchRows.length : 0;
+  } catch (err: any) {
+    console.error('[updateFixtureVerifiedOddsInDatabase Error]:', err?.message || err);
+    return 0;
+  }
 }
 
 /**

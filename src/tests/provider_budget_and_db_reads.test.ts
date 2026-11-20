@@ -36,7 +36,7 @@ async function runTests() {
   // 3. Verify call budget math shows dramatic reduction from per-visit polling
   const summary = getBudgetSummary();
   assert.ok(summary.totalBudgetedCallsPerDay < summary.beforeCallsPerDaySingleVisitor * 0.01);
-  assert.equal(summary.staleLimitMinutes, 120);
+  assert.equal(summary.staleLimitMinutes, 4320);
   console.log(`✓ PASS: Daily budget = ${summary.totalBudgetedCallsPerDay} calls/day (down from ${summary.beforeCallsPerDaySingleVisitor}+/day)`);
 
   // 4. Verify visitor reads make ZERO external provider calls
@@ -60,7 +60,7 @@ async function runTests() {
   assert.ok(comps.length > 0, 'Competitions DB read should return active competitions');
   console.log(`✓ PASS: Visitor reads executed 0 provider calls (returned ${footRes.fixtures.length} football, ${nbaRes.fixtures.length} NBA fixtures, ${comps.length} competitions)`);
 
-  // 5. Verify error banner stays suppressed while stored fixtures are within 120-min limit
+  // 5. Verify error banner stays suppressed while stored fixtures are within 3-day (4320m) limit
   const { getProviderSyncState } = await import('../lib/data/providerCallLogger');
   const prevFootballState = await getProviderSyncState('football');
   await upsertProviderSyncState('football', {
@@ -93,14 +93,14 @@ async function runTests() {
   } else {
     await upsertProviderSyncState('football', {
       sport: 'football',
-      providerName: 'ESPN Public Soccer API',
+      providerName: 'Football-Data.org v4',
       status: 'ONLINE',
       lastAttemptAt: new Date().toISOString(),
       lastSuccessAt: new Date().toISOString(),
       lastError: null,
     });
   }
-  console.log('✓ PASS: Last good DB fixtures preserved and error banner suppressed within 120m SLA');
+  console.log('✓ PASS: Last good DB fixtures preserved and error banner suppressed within 3 day SLA');
 
   console.log('--- ALL PROVIDER BUDGET & DB-ONLY READ TESTS PASSED ---');
 }

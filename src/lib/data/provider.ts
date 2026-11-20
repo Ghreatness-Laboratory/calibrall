@@ -24,6 +24,7 @@ import {
   getCanonicalCompetition,
   isCanonicalCompetitionId,
   logCompetitionIntegrityError,
+  getUncoveredFootballCompetitions,
 } from './canonicalCompetitions';
 import {
   getFixturesFromDatabase,
@@ -35,16 +36,15 @@ import { lookupCanonicalTeam, recordUnresolvedTeam } from './canonicalTeams';
 import {
   SyncMode,
   SkippedLeagueRecord,
-  PROVIDER_BUDGETS,
   FIXTURE_STALE_LIMIT_MINUTES,
+  SPORTMONKS_FREE_ADDITIONAL_CODES,
+  hasFreeFixturesCoverage,
   getLeaguePriorityTier,
-  sortLeaguesByPriority,
 } from './providerBudget';
 import {
   loggedProviderFetch,
   upsertProviderSyncState,
   getStoredSportFreshness,
-  getProviderCallCountToday,
   formatUtcTimeStamp,
 } from './providerCallLogger';
 
@@ -66,6 +66,8 @@ export interface LiveFixturesResult {
   lastSyncTimestamp?: string | null;
   isDelayed?: boolean;
   staleLimitMinutes?: number;
+  hasFreeFixturesSource?: boolean;
+  storedHistoryMode?: boolean;
   error?: string;
   providerUsed?: string;
   failedProvider?: string;
@@ -173,8 +175,12 @@ const ESPN_LEAGUE_MAP: Record<string, { slug: string; name: string; country: str
 
 // Normalize Football-Data.org fixture
 function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
-  const rawCompCode = m.competition?.code || m.competition?.id || '';
-  const comp = getCanonicalCompetition(String(rawCompCode));
+  const rawCompCode = String(m.competition?.code || m.competition?.id || '').trim();
+  // Football-Data.org uses 'EC' for UEFA European Championship (NOT English National League comp_ec)
+  const comp =
+    rawCompCode.toUpperCase() === 'EC'
+      ? CANONICAL_COMPETITIONS.comp_euro
+      : getCanonicalCompetition(rawCompCode);
   if (!comp || !isCanonicalCompetitionId(comp.id)) {
     logCompetitionIntegrityError(
       `fix_${m.id ?? 'unknown'}`,
@@ -263,18 +269,42 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
   };
 }
 
+const SPORTMONKS_LEAGUE_ID_MAP: Record<number, string> = {
+  8: 'PL',
+  82: 'BL1',
+  271: 'DNK',
+  1659: 'DNK',
+  501: 'SC0',
+  513: 'SC0',
+};
+
+const SPORTMONKS_SHORT_CODE_MAP: Record<string, string> = {
+  'UK PL': 'PL',
+  'GER BI': 'BL1',
+  'GER B1': 'BL1',
+  'DNK SL': 'DNK',
+  'SCO P': 'SC0',
+};
+
 // Normalize Sportmonks v3 fixture
 function parseSportmonksMatch(m: any, fetchTime: string): Fixture | null {
   const participants = m.participants || [];
   const home = participants.find((p: any) => p.meta?.location === 'home') || participants[0] || {};
   const away = participants.find((p: any) => p.meta?.location === 'away') || participants[1] || {};
 
-  const rawCompKey = m.league?.short_code || m.league?.name || '';
-  const comp = getCanonicalCompetition(String(rawCompKey));
+  const leagueIdNum = Number(m.league_id ?? m.league?.id);
+  const rawShortCode = String(m.league?.short_code || '').trim().toUpperCase();
+  const mappedCode =
+    SPORTMONKS_LEAGUE_ID_MAP[leagueIdNum] ||
+    SPORTMONKS_SHORT_CODE_MAP[rawShortCode] ||
+    rawShortCode ||
+    String(m.league?.name || '');
+
+  const comp = getCanonicalCompetition(mappedCode);
   if (!comp || !isCanonicalCompetitionId(comp.id)) {
     logCompetitionIntegrityError(
       `fix_sm_${m.id ?? 'unknown'}`,
-      rawCompKey || m.league_id || null,
+      rawShortCode || m.league_id || null,
       'provider:sportmonks'
     );
     return null;
@@ -326,6 +356,40 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture | null {
     hasRealTeamStrength: Boolean(awayCanon || awayLookup.found),
   };
 
+  const smState = String(m.state?.state || m.state?.short_name || m.state?.developer_name || '').toUpperCase();
+  let status: MatchStatus = 'TIMED';
+  if (smState === 'FINISHED' || smState === 'FT' || smState === 'FT_PEN' || smState === 'AET') {
+    status = 'FINISHED';
+  } else if (smState === 'POSTPONED' || smState === 'POSTP') {
+    status = 'POSTPONED';
+  } else if (smState === 'CANCELLED' || smState === 'CANCELED') {
+    status = 'CANCELED';
+  } else if (smState === 'HT' || smState === 'PAUSED') {
+    status = 'PAUSED';
+  } else if (smState.includes('INPLAY') || smState === 'LIVE' || smState === '1ST_HALF' || smState === '2ND_HALF') {
+    status = 'IN_PLAY';
+  }
+
+  const findParticipantScore = (descSet: string[], side: 'home' | 'away', participantId: unknown): number | null => {
+    const scores = Array.isArray(m.scores) ? m.scores : [];
+    const match = scores.find((s: any) => {
+      const d = String(s.description || '').toUpperCase();
+      if (!descSet.includes(d)) return false;
+      const pSide = String(s.score?.participant || '').toLowerCase();
+      if (pSide === side) return true;
+      if (participantId && s.participant_id === participantId) return true;
+      return false;
+    });
+    if (match && typeof match.score?.goals === 'number') {
+      return match.score.goals;
+    }
+    return null;
+  };
+
+  const kickoffIso = m.starting_at
+    ? new Date(String(m.starting_at).includes('T') ? m.starting_at : `${String(m.starting_at).replace(' ', 'T')}Z`).toISOString()
+    : new Date().toISOString();
+
   return {
     id: `fix_sm_${m.id}`,
     providerId: String(m.id),
@@ -337,13 +401,17 @@ function parseSportmonksMatch(m: any, fetchTime: string): Fixture | null {
     seasonYear: '2026/2027',
     homeTeam,
     awayTeam,
-    kickoffTime: m.starting_at ? new Date(m.starting_at).toISOString() : new Date().toISOString(),
-    matchday: Number(m.round?.name?.replace(/[^0-9]/g, '')) || 1, // From provider round
-    status: m.state?.state === 'FINISHED' ? 'FINISHED' : 'TIMED',
-    homeScore: m.scores?.find((s: any) => s.description === 'CURRENT')?.score?.participant1 ?? null,
-    awayScore: m.scores?.find((s: any) => s.description === 'CURRENT')?.score?.participant2 ?? null,
-    homeHalfTimeScore: m.scores?.find((s: any) => s.description === '1ST_HALF' || s.description === 'HT' || s.description === 'HALFTIME')?.score?.participant1 ?? null,
-    awayHalfTimeScore: m.scores?.find((s: any) => s.description === '1ST_HALF' || s.description === 'HT' || s.description === 'HALFTIME')?.score?.participant2 ?? null,
+    kickoffTime: kickoffIso,
+    matchday: Number(String(m.round?.name || '').replace(/[^0-9]/g, '')) || 1,
+    status,
+    homeScore: status === 'FINISHED' || status === 'IN_PLAY' || status === 'PAUSED'
+      ? findParticipantScore(['CURRENT', 'FT'], 'home', home.id)
+      : null,
+    awayScore: status === 'FINISHED' || status === 'IN_PLAY' || status === 'PAUSED'
+      ? findParticipantScore(['CURRENT', 'FT'], 'away', away.id)
+      : null,
+    homeHalfTimeScore: findParticipantScore(['1ST_HALF', 'HT', 'HALFTIME'], 'home', home.id),
+    awayHalfTimeScore: findParticipantScore(['1ST_HALF', 'HT', 'HALFTIME'], 'away', away.id),
     venue: m.venue?.name || 'Stadium',
     dataFreshness: fetchTime,
   };
@@ -600,7 +668,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
   private lastGoodCachedFixtures: Fixture[] = [];
   private lastGoodSyncTime: string = '';
   private lastSyncEpochMs: number = 0;
-  private lastProviderUsed: string = 'ESPN Live Scoreboard';
+  private lastProviderUsed: string = 'Football-Data.org v4 + Sportmonks v3';
   private lastFailedProvider?: string;
   private lastQuotaHeaders?: Record<string, string>;
   private activeSyncPromise: Promise<{ ok: boolean; count: number; providerUsed: string }> | null = null;
@@ -619,31 +687,28 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     const providers: string[] = [];
 
     if (process.env.FOOTBALL_DATA_API_KEY?.trim()) {
-      providers.push('Football-Data.org');
+      providers.push('Football-Data.org v4 (Free)');
     } else {
       missing.push('FOOTBALL_DATA_API_KEY');
     }
 
     const sportmonksKey = process.env.SPORTMONKS_API_TOKEN?.trim() || process.env.SPORTSMONK_API_KEY?.trim() || process.env.SPORTMONKS_API_KEY?.trim();
     if (sportmonksKey) {
-      providers.push('Sportmonks');
+      providers.push('Sportmonks v3 (Free)');
     } else {
       missing.push('SPORTMONKS_API_TOKEN');
     }
-
-    // ESPN is always active as scheduled public live provider
-    providers.push('ESPN Live Scoreboard (Scheduled DB Sync)');
 
     const footballCompCount = Object.keys(CANONICAL_COMPETITIONS).filter(id => id !== 'comp_nba').length;
     const freshness = await getStoredSportFreshness('football');
 
     return {
-      providerName: providers.join(' + '),
-      isConfigured: true,
+      providerName: providers.join(' + ') || 'Unconfigured',
+      isConfigured: providers.length > 0,
       status: freshness.isStaleBeyondLimit && freshness.syncState?.status === 'ERROR' ? 'ERROR' : 'ONLINE',
       lastSyncTimestamp: freshness.newestUpdatedAt || this.lastGoodSyncTime || new Date().toISOString(),
       activeLeaguesCount: footballCompCount,
-      message: `Scheduled cron pipelines active: ${providers.join(', ')}. App reads from Supabase/DB only.`,
+      message: `Scheduled twice-daily cron pipelines active: ${providers.join(', ')}. App reads from Supabase/DB only.`,
       missingEnvVars: missing,
       quotaHeaders: freshness.syncState?.quotaHeaders || this.lastQuotaHeaders,
     };
@@ -819,13 +884,14 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       const apiDateFrom = mode === 'schedule' ? plus2Ymd : dateFrom;
       const apiDateTo = mode === 'live' ? tomorrowYmd : dateTo;
 
-      // 1. Primary Provider: Football-Data.org v4 (chunked into <=10-day spans to avoid HTTP 400!)
+      // 1. Primary Free-Tier Provider: Football-Data.org v4 (chunked into <=10-day spans to avoid HTTP 400!)
       const footballDataKey = process.env.FOOTBALL_DATA_API_KEY?.trim();
+      let fdParsedAll: Fixture[] = [];
       if (footballDataKey) {
         const chunks = splitDateRangeChunks(apiDateFrom, apiDateTo, 10);
-        const fdParsedAll: Fixture[] = [];
         let fdQuotaHeaders: Record<string, string> = {};
         let fdQuotaRemaining: string | null = null;
+        let fdLastHttpStatus: number | null = 200;
         let fdCalls = 0;
         let fdFailed = false;
 
@@ -840,6 +906,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
           });
           fdQuotaHeaders = res.quotaHeaders;
           fdQuotaRemaining = res.quotaRemaining;
+          fdLastHttpStatus = res.status;
 
           if (res.ok && res.json) {
             const rawMatches = res.json.matches || [];
@@ -856,7 +923,6 @@ export class LiveFootballDataProvider implements FootballDataProvider {
             lastFailureBody = res.bodyText.slice(0, 400);
           }
 
-          // Respect minute/daily quota header if nearly exhausted
           const remNum = fdQuotaRemaining ? parseInt(fdQuotaRemaining, 10) : NaN;
           if (!isNaN(remNum) && remNum <= 1) {
             break;
@@ -869,7 +935,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
           status: fdFailed && fdParsedAll.length === 0 ? 'ERROR' : 'ONLINE',
           lastAttemptAt: attemptIso,
           ...(fdParsedAll.length > 0 || !fdFailed
-            ? { lastSuccessAt: attemptIso, lastError: null, lastHttpStatus: 200, lastResponseBody: null }
+            ? { lastSuccessAt: attemptIso, lastError: null, lastHttpStatus: fdLastHttpStatus ?? 200, lastResponseBody: null }
             : { lastError: lastFailureMsg, lastHttpStatus: lastFailureStatus, lastResponseBody: lastFailureBody }),
           quotaRemaining: fdQuotaRemaining,
           quotaHeaders: fdQuotaHeaders,
@@ -877,269 +943,112 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         });
 
         if (fdParsedAll.length > 0) {
-          ingestedFixtures = fdParsedAll;
+          ingestedFixtures.push(...fdParsedAll);
           providerNameUsed = 'Football-Data.org v4';
         }
       }
 
-      // 2. Secondary Provider: Sportmonks (if configured and primary empty)
+      // 2. Secondary Free-Tier Provider: Sportmonks v3 (covers SC0 & DNK, and PL/BL1 fallback if primary failed)
       const sportmonksToken =
         process.env.SPORTMONKS_API_TOKEN?.trim() ||
         process.env.SPORTSMONK_API_KEY?.trim() ||
         process.env.SPORTMONKS_API_KEY?.trim();
-      if (ingestedFixtures.length === 0 && sportmonksToken) {
-        const smUrl = `https://api.sportmonks.com/v3/football/fixtures/between/${apiDateFrom}/${apiDateTo}?api_token=${sportmonksToken}&include=participants;league;round;scores`;
-        totalCallsMade++;
-        const res = await loggedProviderFetch('sportmonks', smUrl, {
-          syncMode: mode,
-          timeoutMs: 10000,
-        });
+      if (sportmonksToken) {
+        let smCalls = 0;
+        let smLastOk = false;
+        let smLastStatus: number | null = null;
+        let smLastErr: string | null = null;
+        let smLastBody: string | null = null;
+        let smQuotaHeaders: Record<string, string> = {};
+        let smQuotaRemaining: string | null = null;
+        const smParsedAll: Fixture[] = [];
+
+        for (let page = 1; page <= 3; page++) {
+          const smUrl = `https://api.sportmonks.com/v3/football/fixtures/between/${apiDateFrom}/${apiDateTo}?api_token=${sportmonksToken}&include=participants;league;round;scores;state&per_page=50&page=${page}`;
+          smCalls++;
+          totalCallsMade++;
+          const res = await loggedProviderFetch('sportmonks', smUrl, {
+            syncMode: mode,
+            timeoutMs: 10000,
+          });
+          smLastStatus = res.status;
+          smQuotaHeaders = res.quotaHeaders;
+          smQuotaRemaining = res.quotaRemaining;
+
+          if (res.ok && res.json) {
+            smLastOk = true;
+            const rawList = res.json.data || [];
+            const parsed = rawList
+              .map((m: any) => parseSportmonksMatch(m, fetchTime))
+              .filter((f: Fixture | null): f is Fixture => f !== null);
+            smParsedAll.push(...parsed);
+            if (!res.json.pagination?.has_more) {
+              break;
+            }
+          } else {
+            smLastErr = res.error || `HTTP ${res.status}`;
+            smLastBody = res.bodyText.slice(0, 400);
+            if (fdParsedAll.length === 0) {
+              this.lastFailedProvider = 'Sportmonks';
+              this.lastQuotaHeaders = res.quotaHeaders;
+              lastFailureMsg = smLastErr;
+              lastFailureStatus = res.status;
+              lastFailureBody = smLastBody;
+            }
+            break;
+          }
+        }
 
         await upsertProviderSyncState('provider:sportmonks', {
           sport: 'football',
           providerName: 'Sportmonks v3',
-          status: res.ok ? 'ONLINE' : 'ERROR',
+          status: smLastOk ? 'ONLINE' : 'ERROR',
           lastAttemptAt: attemptIso,
-          ...(res.ok
-            ? { lastSuccessAt: attemptIso, lastError: null, lastHttpStatus: res.status, lastResponseBody: null }
-            : { lastError: res.error || `HTTP ${res.status}`, lastHttpStatus: res.status, lastResponseBody: res.bodyText.slice(0, 400) }),
-          quotaRemaining: res.quotaRemaining,
-          quotaHeaders: res.quotaHeaders,
-          callsUsedLastRun: 1,
+          ...(smLastOk
+            ? { lastSuccessAt: attemptIso, lastError: null, lastHttpStatus: smLastStatus ?? 200, lastResponseBody: null }
+            : { lastError: smLastErr, lastHttpStatus: smLastStatus, lastResponseBody: smLastBody }),
+          quotaRemaining: smQuotaRemaining,
+          quotaHeaders: smQuotaHeaders,
+          callsUsedLastRun: smCalls,
         });
 
-        if (res.ok && res.json) {
-          const rawList = res.json.data || [];
-          const parsed = rawList
-            .map((m: any) => parseSportmonksMatch(m, fetchTime))
-            .filter((f: Fixture | null): f is Fixture => f !== null);
-          if (parsed.length > 0) {
-            ingestedFixtures = parsed;
-            providerNameUsed = 'Sportmonks v3';
-          }
-        } else {
-          this.lastFailedProvider = 'Sportmonks';
-          this.lastQuotaHeaders = res.quotaHeaders;
-          lastFailureMsg = res.error || `HTTP ${res.status}`;
-          lastFailureStatus = res.status;
-          lastFailureBody = res.bodyText.slice(0, 400);
+        const additionalOnly = fdParsedAll.length > 0
+          ? smParsedAll.filter(f => SPORTMONKS_FREE_ADDITIONAL_CODES.has(f.competition.code))
+          : smParsedAll;
+
+        if (additionalOnly.length > 0) {
+          ingestedFixtures.push(...additionalOnly);
+          providerNameUsed = providerNameUsed
+            ? `${providerNameUsed} + Sportmonks v3`
+            : 'Sportmonks v3';
         }
       }
 
-      // 3. Core Live Provider: ESPN Soccer Scoreboard API with Two-Speed Polling & League Priority Budget
-      if (ingestedFixtures.length === 0) {
-        try {
-          const prioritisedCodes = sortLeaguesByPriority(Object.keys(ESPN_LEAGUE_MAP));
-          const callsAlreadyToday = await getProviderCallCountToday('espn_soccer');
-          const dailyLimit = PROVIDER_BUDGETS.espn_soccer.dailyQuotaLimit ?? 2500;
-          const remainingDailyBudget = Math.max(0, dailyLimit - callsAlreadyToday);
-          const defaultRunCap = mode === 'live' ? 40 : mode === 'schedule' ? 450 : 600;
-          const runCallCap = Math.min(opts.maxCalls ?? defaultRunCap, remainingDailyBudget);
-
-          // Identify leagues with live or near-kickoff matches (+/- 6h) from DB for 'live' mode
-          let activeNearKickoffCodes = new Set<string>();
-          let totalDbFootballFixtures = 0;
-          if (mode === 'live') {
-            const dbCurrent = await getFixturesFromDatabase({ sport: 'football' });
-            totalDbFootballFixtures = dbCurrent.length;
-            const nowMs = Date.now();
-            for (const f of dbCurrent) {
-              const koMs = new Date(f.kickoffTime).getTime();
-              const isLive = f.status === 'IN_PLAY' || f.status === 'PAUSED';
-              const isNearKickoff = !isNaN(koMs) && koMs >= nowMs - 3 * 3600_000 && koMs <= nowMs + 6 * 3600_000;
-              if (isLive || isNearKickoff) {
-                const code = f.competition?.code;
-                if (code) activeNearKickoffCodes.add(code);
-              }
-            }
-          }
-
-          // Determine dates to poll for each mode (never redundant!)
-          const targetDates =
-            mode === 'live'
-              ? datesList.slice(0, 2) // yesterday + today
-              : mode === 'schedule'
-              ? datesList.slice(2) // +1..+14 future days
-              : datesList; // full -1..+14 window
-
-          // Decide which leagues to poll in priority order within call budget
-          const leaguesToPoll: string[] = [];
-          let projectedCalls = 0;
-
-          for (const code of prioritisedCodes) {
-            const tier = getLeaguePriorityTier(code);
-            const leagueInfo = ESPN_LEAGUE_MAP[code];
-            if (!leagueInfo) continue;
-
-            // In 'live' mode (every 15m), only poll leagues that have live/near-kickoff matches,
-            // or Tier 1 today-check if DB is cold or has few near-kickoff hits
-            if (mode === 'live') {
-              const hasActiveMatch = activeNearKickoffCodes.has(code);
-              const isColdDbTier1 = totalDbFootballFixtures === 0 && tier === 1;
-              if (!hasActiveMatch && !isColdDbTier1 && activeNearKickoffCodes.size > 0) {
-                skippedLeagues.push({
-                  leagueCode: code,
-                  leagueName: leagueInfo.name,
-                  tier,
-                  provider: 'espn_soccer',
-                  reason: 'No live or near-kickoff match within 6h (handled by 6h schedule cron)',
-                });
-                continue;
-              }
-              if (activeNearKickoffCodes.size === 0 && tier > 1) {
-                skippedLeagues.push({
-                  leagueCode: code,
-                  leagueName: leagueInfo.name,
-                  tier,
-                  provider: 'espn_soccer',
-                  reason: 'Tier 2/3 deferred to 6h schedule cron when no live match active',
-                });
-                continue;
-              }
-            }
-
-            const datesForLeague =
-              mode === 'live'
-                ? [todayYmd] // 1 call per active/Tier-1 league in live cron
-                : targetDates;
-
-            if (projectedCalls + datesForLeague.length > runCallCap) {
-              skippedLeagues.push({
-                leagueCode: code,
-                leagueName: leagueInfo.name,
-                tier,
-                provider: 'espn_soccer',
-                reason: `Quota budget limit reached (${projectedCalls}/${runCallCap} calls); prioritised Tier 1 leagues first`,
-              });
-              continue;
-            }
-
-            projectedCalls += datesForLeague.length;
-            leaguesToPoll.push(code);
-          }
-
-          const allTasks: Array<{ code: string; leagueInfo: typeof ESPN_LEAGUE_MAP['PL']; url: string }> = [];
-          for (const code of leaguesToPoll) {
-            const leagueInfo = ESPN_LEAGUE_MAP[code];
-            const datesForLeague = mode === 'live' ? [todayYmd] : targetDates;
-            for (const ds of datesForLeague) {
-              allTasks.push({
-                code,
-                leagueInfo,
-                url: `https://site.web.api.espn.com/apis/site/v2/sports/soccer/${leagueInfo.slug}/scoreboard?dates=${ds}`,
-              });
-            }
-          }
-
-          const eventMapByCode = new Map<string, Map<string, any>>();
-          for (const code of leaguesToPoll) {
-            eventMapByCode.set(code, new Map());
-          }
-
-          let espnCalls = 0;
-          let espnLastStatus: number | null = null;
-          let espnLastError: string | null = null;
-          let espnLastBody: string | null = null;
-
-          const fetchJsonWithTimeout = async (url: string, leagueCode: string) => {
-            const candidates = url.includes('site.web.api.espn.com')
-              ? [url, url.replace('site.web.api.espn.com', 'site.api.espn.com')]
-              : [url.replace('site.api.espn.com', 'site.web.api.espn.com'), url];
-            for (const candidateUrl of candidates) {
-              espnCalls++;
-              totalCallsMade++;
-              const res = await loggedProviderFetch('espn_soccer', candidateUrl, {
-                headers: {
-                  Accept: 'application/json',
-                  'User-Agent': 'Mozilla/5.0 (compatible; Calibrall/1.0)',
-                },
-                leagueCode,
-                syncMode: mode,
-                timeoutMs: 8000,
-              });
-              espnLastStatus = res.status;
-              if (res.ok && res.json) {
-                return res.json;
-              }
-              espnLastError = res.error || `HTTP ${res.status}`;
-              espnLastBody = res.bodyText.slice(0, 400);
-            }
-            return null;
-          };
-
-          // Bounded concurrency worker pool (8 workers)
-          let taskIdx = 0;
-          const workerCount = Math.min(8, Math.max(1, allTasks.length));
-          if (allTasks.length > 0) {
-            const workers = Array.from({ length: workerCount }, async () => {
-              while (taskIdx < allTasks.length) {
-                const task = allTasks[taskIdx++];
-                try {
-                  const board = await fetchJsonWithTimeout(task.url, task.code);
-                  const map = eventMapByCode.get(task.code)!;
-                  for (const ev of board?.events || []) {
-                    if (ev?.id && !map.has(String(ev.id))) {
-                      map.set(String(ev.id), ev);
-                    }
-                  }
-                } catch {
-                  // Continue other tasks
-                }
-              }
-            });
-            await Promise.all(workers);
-          }
-
-          const allParsed: Fixture[] = [];
-          for (const code of leaguesToPoll) {
-            const leagueInfo = ESPN_LEAGUE_MAP[code];
-            const events = Array.from(eventMapByCode.get(code)?.values() || []);
-            const leagueMatchday = leagueInfo.defaultMatchday;
-            for (const ev of events) {
-              const parsed = parseESPNMatch(ev, code, leagueInfo, leagueMatchday, fetchTime);
-              if (parsed) {
-                allParsed.push(parsed);
-              }
-            }
-          }
-
-          if (allParsed.length > 0) {
-            const seenKeys = new Set<string>();
-            const deduped: Fixture[] = [];
-            for (const f of allParsed) {
-              const key = f.id || `${f.providerName}_${f.providerId}`;
-              if (!seenKeys.has(key)) {
-                seenKeys.add(key);
-                deduped.push(f);
-              }
-            }
-            ingestedFixtures = deduped;
-            providerNameUsed = 'ESPN Live Scoreboard & DraftKings Lines';
-          } else if (espnLastError) {
-            lastFailureMsg = espnLastError;
-            lastFailureStatus = espnLastStatus;
-            lastFailureBody = espnLastBody;
-          }
-
-          await upsertProviderSyncState('provider:espn_soccer', {
-            sport: 'football',
-            providerName: 'ESPN Soccer Scoreboard',
-            status: allParsed.length > 0 || !espnLastError ? 'ONLINE' : 'ERROR',
-            lastAttemptAt: attemptIso,
-            ...(allParsed.length > 0 || !espnLastError
-              ? { lastSuccessAt: attemptIso, lastError: null, lastHttpStatus: espnLastStatus ?? 200, lastResponseBody: null }
-              : { lastError: espnLastError, lastHttpStatus: espnLastStatus, lastResponseBody: espnLastBody }),
-            quotaRemaining: `${Math.max(0, dailyLimit - (callsAlreadyToday + espnCalls))}/${dailyLimit} daily`,
-            skippedLeagues,
-            callsUsedLastRun: espnCalls,
-          });
-        } catch (err: any) {
-          console.error('[FootballDataProvider] Error fetching ESPN soccer scoreboard:', err?.message || err);
-          lastFailureMsg = err?.message || 'ESPN fetch exception';
-        }
+      // Record uncovered canonical football leagues in skippedLeagues (no ESPN polling)
+      for (const uncovered of getUncoveredFootballCompetitions()) {
+        skippedLeagues.push({
+          leagueCode: uncovered.code,
+          leagueName: uncovered.name,
+          tier: (uncovered.tier === 1 ? 1 : uncovered.tier === 2 ? 2 : 3) as 1 | 2 | 3,
+          provider: 'none',
+          reason: 'No free fixtures API source (showing stored history and picks only)',
+        });
       }
 
-      // 4. Validate Integrity & Persist Canonical Fixtures to Database
+      await upsertProviderSyncState('provider:espn_soccer', {
+        sport: 'football',
+        providerName: 'ESPN Soccer Scoreboard',
+        status: 'RETIRED',
+        lastAttemptAt: attemptIso,
+        lastError: null,
+        lastHttpStatus: null,
+        lastResponseBody: 'Retired from scheduled football fixture sync in favor of Football-Data.org + Sportmonks free tiers.',
+        quotaRemaining: '0/0 retired',
+        callsUsedLastRun: 0,
+        callsToday: 0,
+      });
+
+      // 3. Validate Integrity, Persist Fixtures to `fixtures`, and Persist Finished Results to `matches`
       if (ingestedFixtures.length > 0) {
         const integrityReport = validateFixtureIntegrity(ingestedFixtures, {
           dateFrom,
@@ -1157,11 +1066,48 @@ export class LiveFootballDataProvider implements FootballDataProvider {
             });
           }
 
-          // Only prune expired (< dateFrom) on full or live+schedule syncs when valid fixtures returned
           await syncFootballFixturesToDatabase(
             integrityReport.validFixtures,
             mode === 'schedule' ? undefined : dateFrom
           );
+
+          // Persist FINISHED match results into `matches` + `teams` so Football-Data.org/Sportmonks update results history too
+          const finishedToStore = integrityReport.validFixtures
+            .filter(f => f.status === 'FINISHED' && f.homeScore !== null && f.awayScore !== null)
+            .map(f => {
+              const hs = f.homeScore as number;
+              const as = f.awayScore as number;
+              const prefix = f.source === 'provider:sportmonks' ? 'sm' : 'fdorg';
+              const pid = `${prefix}:${f.providerId}`;
+              return {
+                id: pid,
+                provider_id: pid,
+                competition_code: f.competition.code,
+                season: f.seasonYear.replace('/', ''),
+                matchday: f.matchday ?? null,
+                home_team_id: f.homeTeam.id,
+                away_team_id: f.awayTeam.id,
+                home_team_name: f.homeTeam.name,
+                away_team_name: f.awayTeam.name,
+                kickoff_time: f.kickoffTime,
+                status: 'FINISHED' as const,
+                home_score: hs,
+                away_score: as,
+                home_half_time_score: f.homeHalfTimeScore ?? null,
+                away_half_time_score: f.awayHalfTimeScore ?? null,
+                referee: f.referee ?? null,
+                result: hs > as ? 'H' : hs === as ? 'D' : 'A',
+                source: f.source || 'provider:football-data',
+              };
+            });
+
+          if (finishedToStore.length > 0) {
+            try {
+              await matchesStore.upsertMatches(finishedToStore);
+            } catch (e: any) {
+              console.warn('[FootballDataProvider] Non-fatal matches result sync warning:', e?.message || e);
+            }
+          }
 
           this.lastGoodCachedFixtures = integrityReport.validFixtures;
           this.lastGoodSyncTime = formatUtcTimeStamp(attemptIso);
@@ -1222,15 +1168,16 @@ export class LiveFootballDataProvider implements FootballDataProvider {
   /**
    * Visitor Read Path: Reads STRICTLY from Supabase/DB.
    * NEVER calls external football APIs per visitor.
-   * If a recent cron refresh failed, keeps serving stored DB fixtures with "last updated HH:MM"
-   * and suppresses the error banner unless stored fixtures are older than FIXTURE_STALE_LIMIT_MINUTES (120m) or empty.
+   * If a recent cron refresh failed, keeps serving stored DB fixtures with "last updated HH:MM UTC"
+   * and suppresses the error banner unless stored fixtures are older than 3 days (4320m) or empty.
+   * For competitions without a free fixtures source, serves stored match history & picks only.
    */
   async getLiveFixtures(params?: { competitionId?: string; status?: string; day?: string }): Promise<LiveFixturesResult> {
     checkAndLogStartupEnv();
 
     const { dateFrom, dateTo } = computeRequestDateWindow(14);
+    let selectedCanonicalComp: Competition | null = null;
 
-    // Rule 1 & 3: If filtering by competition_id, validate it is canonical; never fall back.
     if (params?.competitionId && params.competitionId !== 'ALL') {
       if (!isCanonicalCompetitionId(params.competitionId)) {
         logCompetitionIntegrityError('api_filter', params.competitionId, 'getLiveFixtures');
@@ -1242,17 +1189,63 @@ export class LiveFootballDataProvider implements FootballDataProvider {
           lastSyncTimestamp: freshness.newestUpdatedAt,
           isDelayed: freshness.isStaleBeyondLimit,
           staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
+          hasFreeFixturesSource: true,
+          storedHistoryMode: false,
           providerUsed: this.lastProviderUsed,
           dateRange: { dateFrom, dateTo },
         };
       }
+      selectedCanonicalComp = getCanonicalCompetition(params.competitionId);
     }
+
+    const compCoverage = selectedCanonicalComp
+      ? hasFreeFixturesCoverage(selectedCanonicalComp.code)
+      : { hasFreeSource: true, provider: 'Football-Data.org v4 + Sportmonks v3' };
 
     const freshness = await getStoredSportFreshness('football');
     const syncState = freshness.syncState;
     const lastUpdatedStr = freshness.lastUpdatedFormatted !== 'never'
       ? freshness.lastUpdatedFormatted
       : (this.lastGoodSyncTime || 'never');
+
+    // Uncovered League Path: Show history and picks only from stored `matches` (never show an outage error banner)
+    if (selectedCanonicalComp && !compCoverage.hasFreeSource) {
+      let storedList = await getFixturesFromDatabase({
+        competitionId: params?.competitionId,
+        status: params?.status,
+        day: params?.day,
+        sport: 'football',
+      });
+
+      if (storedList.length === 0) {
+        const historicalMatches = await matchesStore.getMatches(selectedCanonicalComp.code);
+        const nowIso = new Date().toISOString();
+        const converted = historicalMatches
+          .slice(0, 30)
+          .map(m => mapDbMatchToFixture(m, nowIso))
+          .filter((f): f is Fixture => f !== null);
+
+        storedList = converted.filter(f => {
+          if (params?.status && params.status !== 'ALL' && f.status !== params.status) return false;
+          if (params?.day && params.day !== 'ALL' && !matchesDayFilter(f.kickoffTime, params.day)) return false;
+          return true;
+        });
+      }
+
+      return {
+        fixtures: storedList.map(f => this.enrichFixtureWithDbStats(f)),
+        liveDataAvailable: true,
+        lastUpdated: lastUpdatedStr,
+        lastSyncTimestamp: freshness.newestUpdatedAt,
+        isDelayed: false,
+        staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
+        hasFreeFixturesSource: false,
+        storedHistoryMode: true,
+        providerUsed: 'Stored Match History (Fixtures Not Available on Free Tier)',
+        skippedLeagues: syncState?.skippedLeagues || [],
+        dateRange: { dateFrom, dateTo },
+      };
+    }
 
     // Primary Single Source of Truth: Database `fixtures` table ONLY
     if (isSupabaseConfigured && supabase) {
@@ -1268,7 +1261,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       if (hasAnyStoredFootball) {
         const isStaleBeyondLimit = freshness.isStaleBeyondLimit;
         const staleError = isStaleBeyondLimit
-          ? `Stored fixtures are older than ${FIXTURE_STALE_LIMIT_MINUTES} minutes. Last updated ${lastUpdatedStr}`
+          ? `Stored fixtures are older than 3 days. Last updated ${lastUpdatedStr}`
           : undefined;
 
         return {
@@ -1278,6 +1271,8 @@ export class LiveFootballDataProvider implements FootballDataProvider {
           lastSyncTimestamp: freshness.newestUpdatedAt,
           isDelayed: isStaleBeyondLimit,
           staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
+          hasFreeFixturesSource: true,
+          storedHistoryMode: false,
           error: staleError,
           providerUsed: syncState?.providerName || 'Supabase Verified Fixtures',
           failedProvider: isStaleBeyondLimit && syncState?.status === 'ERROR' ? syncState.providerName : undefined,
@@ -1298,6 +1293,8 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         lastSyncTimestamp: freshness.newestUpdatedAt,
         isDelayed: freshness.isStaleBeyondLimit,
         staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
+        hasFreeFixturesSource: compCoverage.hasFreeSource,
+        storedHistoryMode: false,
         providerUsed: `${this.lastGoodCachedFixtures[0]?.providerName || 'Provider'} (Cached snapshot)`,
         failedProvider: freshness.isStaleBeyondLimit ? this.lastFailedProvider : undefined,
         quotaHeaders: this.lastQuotaHeaders,
@@ -1315,8 +1312,10 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       lastSyncTimestamp: freshness.newestUpdatedAt,
       isDelayed: true,
       staleLimitMinutes: FIXTURE_STALE_LIMIT_MINUTES,
+      hasFreeFixturesSource: compCoverage.hasFreeSource,
+      storedHistoryMode: false,
       error: errorMsg,
-      failedProvider: syncState?.providerName || this.lastFailedProvider || 'Football-Data.org / Sportmonks / ESPN',
+      failedProvider: syncState?.providerName || this.lastFailedProvider || 'Football-Data.org / Sportmonks',
       quotaHeaders: syncState?.quotaHeaders || this.lastQuotaHeaders,
       skippedLeagues: syncState?.skippedLeagues || [],
       dateRange: { dateFrom, dateTo },
@@ -1330,6 +1329,16 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         const dbFixtures = await getFixturesFromDatabase({ sport: 'football' });
         const dbMatch = dbFixtures.find(f => f.id === id || f.providerId === id);
         if (dbMatch) return this.enrichFixtureWithDbStats(dbMatch);
+      } catch (_) {}
+
+      // Fallback to stored historical matches (covers uncovered leagues & archived results)
+      try {
+        const storedMatches = await matchesStore.getMatches();
+        const matchHit = storedMatches.find(m => m.id === id || m.provider_id === id);
+        if (matchHit) {
+          const converted = mapDbMatchToFixture(matchHit, new Date().toISOString());
+          if (converted) return this.enrichFixtureWithDbStats(converted);
+        }
       } catch (_) {}
     }
 

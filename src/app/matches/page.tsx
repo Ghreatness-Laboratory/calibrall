@@ -64,6 +64,8 @@ export default function MatchesPage() {
     lastUpdated, 
     isDelayed, 
     staleLimitMinutes,
+    hasFreeFixturesSource,
+    storedHistoryMode,
     error, 
     failedProvider, 
     quotaHeaders, 
@@ -210,7 +212,10 @@ export default function MatchesPage() {
     : `${fixtures.length} scheduled`;
 
   const hasActiveFilters = searchQuery.trim() !== '' || selectedCompId !== 'ALL' || selectedDay !== 'ALL' || selectedStatus !== 'ALL' || selectedFootballGroup !== 'ALL';
-  const showStaleBanner = Boolean(isDelayed && (fixtures.length > 0 || error));
+  const showStaleBanner = Boolean(isDelayed && !storedHistoryMode && (fixtures.length > 0 || error));
+  const staleWindowLabel = (staleLimitMinutes || 4320) >= 1440
+    ? `${Math.round((staleLimitMinutes || 4320) / 1440)} days`
+    : `${staleLimitMinutes || 4320} minutes`;
 
   return (
     <div className="space-y-3 py-1">
@@ -226,7 +231,9 @@ export default function MatchesPage() {
             Fixtures and markets
           </h2>
           <p className="text-[12px] text-[#8B9892] leading-tight">
-            {scheduledCount} · Database fixture store · All kickoff times WAT {lastUpdated ? `· Last updated ${lastUpdated}` : ''}
+            {storedHistoryMode
+              ? `${fixtures.length} stored history · Fixtures not available on free tier`
+              : `${scheduledCount} · Database fixture store · All kickoff times WAT ${lastUpdated ? `· Last updated ${lastUpdated}` : ''}`}
           </p>
         </div>
 
@@ -242,15 +249,25 @@ export default function MatchesPage() {
         </button>
       </div>
 
-      {/* Error/staleness banner shown ONLY when stored fixtures exceed the staleness limit */}
+      {/* Notice for leagues without a free fixtures provider */}
+      {(storedHistoryMode || hasFreeFixturesSource === false) && !isBasketball && (
+        <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11.5px] flex items-center gap-2">
+          <Info className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+          <span>
+            Fixtures not available on free tier for this league. Showing stored match history and picks only.
+          </span>
+        </div>
+      )}
+
+      {/* Error/staleness banner shown ONLY when stored fixtures exceed the 3 day staleness limit */}
       {showStaleBanner && (
         <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11.5px] space-y-1.5">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>
               {failedProvider
-                ? `Provider feed ${failedProvider} refresh failed. Showing stored fixtures (last updated ${lastUpdated || 'never'}, older than ${staleLimitMinutes || 120}m limit).`
-                : `Stored fixtures are older than ${staleLimitMinutes || 120} minutes (last updated ${lastUpdated || 'never'}).`}
+                ? `Provider feed ${failedProvider} refresh failed. Showing stored fixtures (last updated ${lastUpdated || 'never'}, older than ${staleWindowLabel} limit).`
+                : `Stored fixtures are older than ${staleWindowLabel} (last updated ${lastUpdated || 'never'}).`}
             </span>
           </div>
           {quotaHeaders && Object.keys(quotaHeaders).length > 0 && (
@@ -450,7 +467,7 @@ export default function MatchesPage() {
             />
           ))}
         </div>
-      ) : (error || !liveDataAvailable) && fixtures.length === 0 ? (
+      ) : !storedHistoryMode && (error || !liveDataAvailable) && fixtures.length === 0 ? (
         /* Loud Error State (Requirement 4) */
         <div className="border border-rose-500/30 bg-rose-500/10 rounded-[14px] p-6 text-center space-y-3">
           <div className="w-[46px] h-[46px] rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">

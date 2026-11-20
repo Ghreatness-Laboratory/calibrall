@@ -106,10 +106,16 @@ export default function CompetitionFilter({
         <span className="truncate flex items-center gap-2">
           {selectedComp ? (
             <>
-              <span className="text-[#E9EFEB] font-medium">{cleanDisplayText(selectedComp.name)}</span>
-              <span className="text-[10.5px] px-1.5 py-0.5 rounded-full bg-[#151D19] border border-[#1F2A24] text-[#8B9892] font-mono">
-                {selectedComp.fixtureCount}
-              </span>
+              <span className="text-[#E9EFEB] font-medium truncate">{cleanDisplayText(selectedComp.name)}</span>
+              {selectedComp.hasFreeFixturesSource === false ? (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 shrink-0">
+                  fixtures not available
+                </span>
+              ) : (
+                <span className="text-[10.5px] px-1.5 py-0.5 rounded-full bg-[#151D19] border border-[#1F2A24] text-[#8B9892] font-mono shrink-0">
+                  {selectedComp.fixtureCount}
+                </span>
+              )}
             </>
           ) : (
             <>
@@ -125,7 +131,7 @@ export default function CompetitionFilter({
 
       {/* Popover list */}
       {isOpen && (
-        <div className="absolute z-50 mt-1.5 w-full min-w-[280px] max-w-[360px] bg-[#0E1410] border border-[#1F2A24] rounded-[14px] shadow-2xl overflow-hidden py-1.5 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute z-50 mt-1.5 w-full min-w-[280px] max-w-[380px] bg-[#0E1410] border border-[#1F2A24] rounded-[14px] shadow-2xl overflow-hidden py-1.5 animate-in fade-in zoom-in-95 duration-100">
           {/* Search box inside dropdown */}
           <div className="p-2 border-b border-[#1F2A24]">
             <div className="relative">
@@ -190,6 +196,7 @@ export default function CompetitionFilter({
                   {/* Competitions in this Country */}
                   {group.competitions.map((comp: CompetitionWithCount) => {
                     const isSelected = selectedCompetitionId === comp.id;
+                    const noFreeSource = comp.hasFreeFixturesSource === false;
                     return (
                       <button
                         key={comp.id}
@@ -205,9 +212,15 @@ export default function CompetitionFilter({
                           {cleanDisplayText(comp.name)}
                         </span>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-[10.5px] px-1.5 py-0.5 rounded-full bg-[#151D19] border border-[#1F2A24] text-[#8B9892] font-mono">
-                            {comp.fixtureCount}
-                          </span>
+                          {noFreeSource ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#151D19] border border-[#1F2A24] text-[#8B9892]">
+                              fixtures not available{(comp.storedMatchCount ?? 0) > 0 ? ` · ${comp.storedMatchCount} stored` : ''}
+                            </span>
+                          ) : (
+                            <span className="text-[10.5px] px-1.5 py-0.5 rounded-full bg-[#151D19] border border-[#1F2A24] text-[#8B9892] font-mono">
+                              {comp.fixtureCount}
+                            </span>
+                          )}
                           {isSelected && <Check className="w-3.5 h-3.5 text-[#B8E636]" />}
                         </div>
                       </button>

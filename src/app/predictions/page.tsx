@@ -62,7 +62,7 @@ export default function PredictionsPage() {
       .catch(err => console.error('[PredictionsPage] Error fetching active competitions:', err));
   }, [isBasketball]);
 
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated, isDelayed } = useLiveFixtures(
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated, isDelayed, hasFreeFixturesSource, storedHistoryMode } = useLiveFixtures(
     isBasketball ? 'comp_nba' : selectedCompId,
     'ALL',
     sport,
@@ -106,10 +106,12 @@ export default function PredictionsPage() {
     }[] = [];
 
     fixtures.forEach(fixture => {
-      // Filter out finished or already started matches
-      if (fixture.status === 'FINISHED' || fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED') return;
-      const kickoffMs = new Date(fixture.kickoffTime).getTime();
-      if (!isNaN(kickoffMs) && kickoffMs <= now) return;
+      // Filter out finished or already started matches unless viewing stored history for an uncovered league
+      if (!storedHistoryMode) {
+        if (fixture.status === 'FINISHED' || fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED') return;
+        const kickoffMs = new Date(fixture.kickoffTime).getTime();
+        if (!isNaN(kickoffMs) && kickoffMs <= now) return;
+      }
 
       if (isBasketball || fixture.sport === 'basketball') {
         const nbaPreds = generateNBAPredictions(fixture);
@@ -179,7 +181,7 @@ export default function PredictionsPage() {
     });
 
     return list;
-  }, [fixtures, isBasketball]);
+  }, [fixtures, isBasketball, storedHistoryMode]);
 
   // Market Group matching helper
   const matchesMarketGroup = (p: MarketPrediction, group: MarketGroupFilter): boolean => {
@@ -346,11 +348,19 @@ export default function PredictionsPage() {
         </p>
       </div>
 
-      {/* Bug 8: Notice if fixtures snapshot is delayed or older than 30 minutes */}
-      {isDelayed && (
+      {/* Uncovered league notice */}
+      {(storedHistoryMode || hasFreeFixturesSource === false) && !isBasketball && (
+        <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11.5px] flex items-center gap-2">
+          <Info className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+          <span>Fixtures not available on free tier for this league. Showing stored match history and picks only.</span>
+        </div>
+      )}
+
+      {/* Notice ONLY when stored fixtures exceed the 3 day staleness limit */}
+      {isDelayed && !storedHistoryMode && (
         <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11.5px] flex items-center gap-2">
           <Info className="w-3.5 h-3.5 shrink-0" />
-          <span>Data may be out of date (snapshot is older than 30 minutes).</span>
+          <span>Stored fixtures are older than 3 days (last updated {lastUpdated || 'never'}).</span>
         </div>
       )}
 

@@ -19,6 +19,8 @@ export interface LiveFixturesHookResult {
   lastSyncTimestamp?: string | null;
   isDelayed?: boolean;
   staleLimitMinutes?: number;
+  hasFreeFixturesSource?: boolean;
+  storedHistoryMode?: boolean;
   error?: string;
   providerUsed?: string;
   failedProvider?: string;
@@ -39,7 +41,9 @@ export function useLiveFixtures(
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [lastSyncTimestamp, setLastSyncTimestamp] = useState<string | null>(null);
   const [isDelayed, setIsDelayed] = useState<boolean>(false);
-  const [staleLimitMinutes, setStaleLimitMinutes] = useState<number>(120);
+  const [staleLimitMinutes, setStaleLimitMinutes] = useState<number>(4320);
+  const [hasFreeFixturesSource, setHasFreeFixturesSource] = useState<boolean>(true);
+  const [storedHistoryMode, setStoredHistoryMode] = useState<boolean>(false);
   const [error, setError] = useState<string | undefined>();
   const [providerUsed, setProviderUsed] = useState<string | undefined>();
   const [failedProvider, setFailedProvider] = useState<string | undefined>();
@@ -92,6 +96,8 @@ export function useLiveFixtures(
       if (typeof json.staleLimitMinutes === 'number') {
         setStaleLimitMinutes(json.staleLimitMinutes);
       }
+      setHasFreeFixturesSource(json.hasFreeFixturesSource !== false);
+      setStoredHistoryMode(Boolean(json.storedHistoryMode));
       setLastSyncTimestamp(json.lastSyncTimestamp || null);
       setProviderUsed(json.providerUsed);
       setFailedProvider(json.failedProvider);
@@ -101,8 +107,8 @@ export function useLiveFixtures(
         setLastUpdated(json.lastUpdated);
       }
 
-      // Show error banner ONLY when stored fixtures exceed the staleness limit or are empty
-      if (json.error && (json.isDelayed || list.length === 0)) {
+      // Show error banner ONLY when stored fixtures exceed the 3-day staleness limit or are empty (and not in stored history mode)
+      if (!json.storedHistoryMode && json.error && (json.isDelayed || list.length === 0)) {
         setError(json.error);
       } else {
         setError(undefined);
@@ -135,6 +141,8 @@ export function useLiveFixtures(
     lastSyncTimestamp,
     isDelayed,
     staleLimitMinutes,
+    hasFreeFixturesSource,
+    storedHistoryMode,
     error,
     providerUsed,
     failedProvider,

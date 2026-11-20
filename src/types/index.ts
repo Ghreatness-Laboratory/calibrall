@@ -246,6 +246,8 @@ export interface Competition {
   avgCornersPerGame: number;
   avgCardsPerGame: number;
   isActive: boolean;
+  hasFreeFixturesSource?: boolean;
+  freeFixturesProvider?: string | null;
 }
 
 export interface Team {

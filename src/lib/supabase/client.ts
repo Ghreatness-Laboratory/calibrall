@@ -8,18 +8,20 @@ const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL || 
   '';
 
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || '';
 const supabaseAnonKey = 
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 
-  process.env.SUPABASE_ANON_KEY || 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+  supabaseServiceKey || 
+  process.env.SUPABASE_ANON_KEY?.trim() || 
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || 
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || 
   '';
 
 const isRemoteSupabase = Boolean(
   supabaseUrl && 
   supabaseAnonKey && 
   supabaseUrl.startsWith('https://') &&
-  !supabaseUrl.includes('your-project-id')
+  !supabaseUrl.includes('your-project-id') &&
+  (typeof window !== 'undefined' || Boolean(supabaseServiceKey))
 );
 
 // We consider Supabase configured whenever remote credentials exist OR local persistence is active
