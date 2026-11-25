@@ -42,7 +42,9 @@ type MarketGroupFilter =
   | 'results'
   | 'halves'
   | 'goal_bounds'
-  | BasketballMarketCategory;
+  | 'game_total'
+  | 'team_total'
+  | 'h1_total';
 
 const BB_CATEGORY_LABELS: Record<BasketballMarketCategory, string> = {
   game_total: 'Game Total O/U',
@@ -196,6 +198,10 @@ export default function PredictionsPage() {
     }> = [];
 
     for (const fixture of fixtures) {
+      const gameLeague = fixture.basketballStats?.league || fixture.competition?.code;
+      if (selectedBbLeague !== 'ALL' && gameLeague !== selectedBbLeague) {
+        continue;
+      }
       if (fixture.status === 'FINISHED' || fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED' || fixture.status === 'POSTPONED' || fixture.status === 'CANCELED') {
         continue;
       }
@@ -227,14 +233,22 @@ export default function PredictionsPage() {
           if (selectedRiskTier === 'MEDIUM' && p.tier !== 'MEDIUM') return false;
           if (selectedRiskTier === 'LOW' && p.tier !== 'SPECULATIVE') return false;
         }
+        if (selectedMarketGroup === 'game_total' && p.marketCategory !== 'game_total') {
+          return false;
+        }
         if (
-          selectedMarketGroup === 'game_total' ||
-          selectedMarketGroup === 'home_total' ||
-          selectedMarketGroup === 'away_total' ||
-          selectedMarketGroup === 'h1_game_total' ||
-          selectedMarketGroup === 'h1_team_total'
+          selectedMarketGroup === 'team_total' &&
+          p.marketCategory !== 'home_total' &&
+          p.marketCategory !== 'away_total'
         ) {
-          if (p.marketCategory !== selectedMarketGroup) return false;
+          return false;
+        }
+        if (
+          selectedMarketGroup === 'h1_total' &&
+          p.marketCategory !== 'h1_game_total' &&
+          p.marketCategory !== 'h1_team_total'
+        ) {
+          return false;
         }
         if (onlyValuePicks && (p.isModelLine || p.expectedValue === null || p.expectedValue <= 0)) {
           return false;
@@ -261,7 +275,7 @@ export default function PredictionsPage() {
       const probB = b.picks[0]?.calibratedProbability ?? 0;
       return probB - probA;
     });
-  }, [fixtures, evaluations, isBasketball, selectedRiskTier, selectedMarketGroup, onlyValuePicks, minProb]);
+  }, [fixtures, evaluations, isBasketball, selectedBbLeague, selectedRiskTier, selectedMarketGroup, onlyValuePicks, minProb]);
 
   // Market Group matching helper (Football)
   const matchesMarketGroup = (p: MarketPrediction, group: MarketGroupFilter): boolean => {
@@ -376,12 +390,10 @@ export default function PredictionsPage() {
   ];
 
   const basketballMarketFilters: { id: MarketGroupFilter; label: string }[] = [
-    { id: 'ALL', label: 'All totals' },
-    { id: 'game_total', label: 'Game Total' },
-    { id: 'home_total', label: 'Home Total' },
-    { id: 'away_total', label: 'Away Total' },
-    { id: 'h1_game_total', label: '1st Half Total' },
-    { id: 'h1_team_total', label: '1st Half Team' },
+    { id: 'ALL', label: 'All' },
+    { id: 'game_total', label: 'Game total' },
+    { id: 'team_total', label: 'Team total' },
+    { id: 'h1_total', label: '1st half' },
   ];
 
   const activeMarketFilters = isBasketball ? basketballMarketFilters : footballMarketFilters;
@@ -416,7 +428,7 @@ export default function PredictionsPage() {
         </h1>
         <p className="text-[12px] text-[#8B9892]">
           {isBasketball
-            ? 'Calibrated NBA, NCAAB Division I & EuroLeague game, team & 1st half totals · All times WAT'
+            ? 'Calibrated NBA, NCAAB Division I & EuroLeague game, team & 1st half totals · Local tip-off times'
             : 'Pre-kickoff probability models and statistical evaluations · All times WAT'}
           {lastUpdated ? ` · Last updated ${lastUpdated}` : ''}
         </p>
@@ -457,12 +469,12 @@ export default function PredictionsPage() {
         basketballMatches.some(m => m.hasRealOdds) ? (
           <div className="p-2.5 rounded-[10px] bg-[#B8E636]/[0.08] border border-[#B8E636]/20 text-[#B8E636] text-[11.5px] flex items-center gap-2 font-mono">
             <Info className="w-3.5 h-3.5 text-[#B8E636] shrink-0" />
-            <span>Bookmaker totals connected for priced selections. Unpriced lines show &quot;model line - no market price&quot; without EV.</span>
+            <span>Bookmaker totals connected for priced selections. Unpriced lines show &quot;Model line - no market price&quot; without EV.</span>
           </div>
         ) : (
           <div className="p-2.5 rounded-[10px] bg-[#151D19] border border-[#1F2A24] text-[#8B9892] text-[11.5px] flex items-center gap-2">
             <Info className="w-3.5 h-3.5 text-[#B8E636] shrink-0" />
-            <span>Unpriced selections show &quot;model line - no market price&quot; with zero EV calculation.</span>
+            <span>Awaiting lines — unpriced selections show &quot;Model line - no market price&quot; with zero EV calculation.</span>
           </div>
         )
       ) : fixtures.some(f => Boolean(f.verifiedOdds)) ? (
@@ -487,17 +499,33 @@ export default function PredictionsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {isBasketball ? (
             <div>
-              <label className="block text-[#8B9890] mb-1 text-[11px] font-normal">League</label>
-              <select
-                value={selectedBbLeague}
-                onChange={(e) => setSelectedBbLeague(e.target.value as 'ALL' | BasketballLeague)}
-                className="w-full h-10 bg-[#151E19] border border-white/[0.07] px-3 rounded-[12px] text-[12.5px] text-[#ECF1EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B6E63B]/40 cursor-pointer"
-              >
-                <option value="ALL">All leagues (NBA · NCAAB · EuroLeague)</option>
-                <option value="NBA">NBA</option>
-                <option value="NCAAB">NCAAB Division I</option>
-                <option value="EUROLEAGUE">EuroLeague</option>
-              </select>
+              <label className="block text-[#8B9890] mb-1.5 text-[11px] font-normal">League</label>
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+                {(
+                  [
+                    { id: 'ALL', label: 'All' },
+                    { id: 'NBA', label: 'NBA' },
+                    { id: 'NCAAB', label: 'NCAAB' },
+                    { id: 'EUROLEAGUE', label: 'EuroLeague' },
+                  ] as const
+                ).map((chip) => {
+                  const isActive = selectedBbLeague === chip.id;
+                  return (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      onClick={() => setSelectedBbLeague(chip.id)}
+                      className={`h-[32px] px-3.5 rounded-full text-[11.5px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
+                        isActive
+                          ? 'bg-[#B8E636]/15 border-[#B8E636] text-[#B8E636] font-semibold'
+                          : 'bg-[#151E19] border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <CompetitionFilter
@@ -638,8 +666,8 @@ export default function PredictionsPage() {
                           </span>
                         )}
                       </div>
-                      <span className="tabular-nums shrink-0">
-                        {formatMatchTime(fixture.kickoffTime, 'Africa/Lagos')} WAT
+                      <span className="tabular-nums shrink-0" suppressHydrationWarning>
+                        {new Date(fixture.kickoffTime).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
 
@@ -713,7 +741,7 @@ export default function PredictionsPage() {
                                 Proj {p.projectedMean.toFixed(1)} (±{p.projectedStd.toFixed(1)})
                               </span>
                               {p.isModelLine ? (
-                                <span className="text-[#8B9890] tabular-nums">{p.priceSource}</span>
+                                <span className="text-[#8B9890] tabular-nums">Model line - no market price</span>
                               ) : (
                                 <span className="bg-[#101713] px-2 py-0.5 rounded-[5px] border border-white/[0.07] text-[#ECF1EE] tabular-nums">
                                   {p.priceSource} @{p.marketOdds?.toFixed(2)}
@@ -725,7 +753,7 @@ export default function PredictionsPage() {
                             </div>
 
                             {p.evidenceLine && (
-                              <p className="text-[11px] text-[#8B9890] leading-snug pt-0.5">
+                              <p className="text-[11px] text-[#8B9890] leading-snug pt-0.5 truncate" title={cleanDisplayText(p.evidenceLine)}>
                                 {cleanDisplayText(p.evidenceLine)}
                               </p>
                             )}
@@ -740,7 +768,9 @@ export default function PredictionsPage() {
           </div>
         ) : (
           <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-6 text-center space-y-1.5">
-            <p className="text-[13px] font-semibold text-[#ECF1EE]">No basketball totals match current filters</p>
+            <p className="text-[13px] font-semibold text-[#ECF1EE]">
+              {selectedDay === 'today' ? 'No games today' : 'No basketball totals match current filters'}
+            </p>
             <p className="text-[11.5px] text-[#8B9890]">Try lowering minimum probability, switching league, or unchecking priced-only filter.</p>
           </div>
         )

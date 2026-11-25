@@ -15,14 +15,20 @@ export default function SavedMatchesPage() {
   const { sport } = useSport();
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const { fixtures, liveDataAvailable, lastUpdated, error, isOffline, isSavedCopy } = useLiveFixtures(undefined, undefined, sport);
+  const { fixtures, evaluations, liveDataAvailable, lastUpdated, error, isOffline, isSavedCopy } = useLiveFixtures(undefined, undefined, sport);
 
   useEffect(() => {
     setSavedIds(getStoredSavedFixtures());
     setIsLoaded(true);
   }, []);
 
+  const savedBasketballFixtures = useMemo(() => {
+    if (sport !== 'basketball') return [];
+    return fixtures.filter(f => savedIds.includes(f.id));
+  }, [fixtures, savedIds, sport]);
+
   const savedFixtures = useMemo(() => {
+    if (sport === 'basketball') return [];
     const raw = fixtures.filter(f => savedIds.includes(f.id)).map(fixture => {
       const stats = getFixtureStatistics(fixture);
       const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
@@ -36,7 +42,7 @@ export default function SavedMatchesPage() {
       };
     });
     return selectDiversifiedSlatePicks(raw, 0.40);
-  }, [fixtures, savedIds]);
+  }, [fixtures, savedIds, sport]);
 
   const handleClearAll = () => {
     if (typeof window !== 'undefined') {
@@ -83,21 +89,26 @@ export default function SavedMatchesPage() {
       )}
 
       {/* Content */}
-      {isLoaded && savedFixtures.length > 0 ? (
+      {isLoaded && (sport === 'basketball' ? savedBasketballFixtures.length > 0 : savedFixtures.length > 0) ? (
         <div className="space-y-3">
-          {savedFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
-            fixture.sport === 'basketball' ? (
-              <NBAGameCard key={fixture.id} fixture={fixture} />
-            ) : (
-              <FixtureCard
-                key={fixture.id}
-                fixture={fixture}
-                topPrediction={topPick}
-                noRecommendationReason={noRecommendationReason}
-                isSavedInitial={true}
-              />
-            )
-          ))}
+          {sport === 'basketball'
+            ? savedBasketballFixtures.map((fixture) => (
+                <NBAGameCard
+                  key={fixture.id}
+                  fixture={fixture}
+                  evaluation={evaluations?.[fixture.id]}
+                  isSavedInitial={true}
+                />
+              ))
+            : savedFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
+                <FixtureCard
+                  key={fixture.id}
+                  fixture={fixture}
+                  topPrediction={topPick}
+                  noRecommendationReason={noRecommendationReason}
+                  isSavedInitial={true}
+                />
+              ))}
         </div>
       ) : isLoaded && savedIds.length > 0 && !liveDataAvailable ? (
         <div className="p-8 text-center bg-[#101713] border border-white/[0.07] rounded-[14px] space-y-2.5">

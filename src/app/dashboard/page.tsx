@@ -110,11 +110,15 @@ export default function DashboardPage() {
   const filteredBasketball = useMemo(() => {
     if (!isBasketball) return [];
     return fixtures.filter(fixture => {
+      const gameLeague = fixture.basketballStats?.league || fixture.competition?.code;
+      if (selectedBbLeague !== 'ALL' && gameLeague !== selectedBbLeague) {
+        return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesHome = fixture.homeTeam.name.toLowerCase().includes(q);
         const matchesAway = fixture.awayTeam.name.toLowerCase().includes(q);
-        const matchesLeague = (fixture.basketballStats?.league || fixture.competition.code || '').toLowerCase().includes(q);
+        const matchesLeague = (gameLeague || '').toLowerCase().includes(q);
         if (!matchesHome && !matchesAway && !matchesLeague) return false;
       }
       if (activeTab === 'completed') {
@@ -124,7 +128,7 @@ export default function DashboardPage() {
       }
       return fixture.status !== 'FINISHED';
     });
-  }, [fixtures, searchQuery, activeTab, isBasketball]);
+  }, [fixtures, selectedBbLeague, searchQuery, activeTab, isBasketball]);
 
   // Aggregate top market models across football fixtures
   const topOpportunities = useMemo(() => {
@@ -313,18 +317,31 @@ export default function DashboardPage() {
 
         {/* Database-driven competition selector for Football or League selector for Basketball */}
         {isBasketball ? (
-          <div className="w-full sm:w-64">
-            <select
-              value={selectedBbLeague}
-              onChange={(e) => setSelectedBbLeague(e.target.value as 'ALL' | BasketballLeague)}
-              className="w-full h-[36px] px-3 rounded-[10px] bg-[var(--surface)] border border-[var(--border)] text-[12px] text-[var(--text)] focus:outline-hidden focus:border-[var(--accent)] cursor-pointer"
-              aria-label="Filter basketball league"
-            >
-              <option value="ALL">All leagues (NBA · NCAAB · EuroLeague)</option>
-              <option value="NBA">NBA</option>
-              <option value="NCAAB">NCAAB Division I</option>
-              <option value="EUROLEAGUE">EuroLeague</option>
-            </select>
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+            {(
+              [
+                { id: 'ALL', label: 'All' },
+                { id: 'NBA', label: 'NBA' },
+                { id: 'NCAAB', label: 'NCAAB' },
+                { id: 'EUROLEAGUE', label: 'EuroLeague' },
+              ] as const
+            ).map((chip) => {
+              const active = selectedBbLeague === chip.id;
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setSelectedBbLeague(chip.id)}
+                  className={`h-[30px] px-3.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
+                    active
+                      ? 'bg-[#B8E636]/15 border-[#B8E636] text-[#B8E636] font-semibold'
+                      : 'bg-[var(--surface)] border-[var(--border)] text-[var(--text-2)] hover:text-[var(--text)]'
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
           </div>
         ) : (
           <div className="w-full sm:w-72">
@@ -351,7 +368,9 @@ export default function DashboardPage() {
             <div className="w-[34px] h-[34px] rounded-[8px] bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center mx-auto text-[var(--text-3)]">
               <Calendar className="w-4 h-4" strokeWidth={1.75} />
             </div>
-            <h3 className="text-[var(--text)] font-[600] text-[12.5px]">No games scheduled</h3>
+            <h3 className="text-[var(--text)] font-[600] text-[12.5px]">
+              {activeTab === 'today' ? 'No games today' : 'No games scheduled'}
+            </h3>
             <p className="text-[11.5px] text-[var(--text-3)] max-w-sm mx-auto">
               No basketball matchups matching your current filter. Scheduled games will appear on matchday.
             </p>

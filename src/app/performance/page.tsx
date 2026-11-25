@@ -156,7 +156,7 @@ export default function PerformancePage() {
           </div>
         )}
 
-        {/* 2x2 Separate Basketball Forward KPI Grid */}
+        {/* 2x2 Separate Basketball Forward KPI Grid (Brier, Log Loss, Hit Rate + ROI, Settled) */}
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between min-h-[76px]">
             <div className="text-[10.5px] text-[#8B9892]">Forward Brier (Basketball)</div>
@@ -170,7 +170,7 @@ export default function PerformancePage() {
           </div>
 
           <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between min-h-[76px]">
-            <div className="text-[10.5px] text-[#8B9892]">Forward Log Loss</div>
+            <div className="text-[10.5px] text-[#8B9892]">Log loss (Basketball)</div>
             <div className="flex items-baseline gap-1.5">
               <div className="text-[18px] font-[650] text-[#E9EFEB] tabular-nums leading-none">
                 {bbLoading ? '...' : fwd && fwd.logLoss !== null ? fwd.logLoss.toFixed(4) : 'N/A'}
@@ -180,26 +180,30 @@ export default function PerformancePage() {
           </div>
 
           <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between min-h-[76px]">
-            <div className="text-[10.5px] text-[#8B9892]">Forward ROI (Priced)</div>
-            <div className="flex items-baseline gap-1.5">
+            <div className="text-[10.5px] text-[#8B9892]">Hit rate (Basketball)</div>
+            <div className="flex items-baseline gap-1.5 flex-wrap">
               <div className="text-[18px] font-[650] text-[#B8E636] tabular-nums leading-none">
                 {bbLoading
                   ? '...'
-                  : fwd && fwd.yieldRoi !== null
-                  ? `${fwd.yieldRoi >= 0 ? '+' : ''}${fwd.yieldRoi.toFixed(1)}%`
-                  : 'No priced picks'}
+                  : fwd && fwd.wonCount + fwd.lostCount > 0
+                  ? `${((fwd.wonCount / (fwd.wonCount + fwd.lostCount)) * 100).toFixed(1)}%`
+                  : 'N/A'}
               </div>
-              {fwd && (
-                <div className="text-[10px] text-[#8B9892] tabular-nums">
-                  {fwd.pricedSettledCount} priced
-                </div>
-              )}
+              <div className="text-[10px] text-[#8B9892] tabular-nums font-medium">
+                {bbLoading
+                  ? ''
+                  : fwd && fwd.pricedSettledCount > 0 && fwd.yieldRoi !== null
+                  ? `${fwd.yieldRoi >= 0 ? '+' : ''}${fwd.yieldRoi.toFixed(1)}% ROI`
+                  : 'Awaiting lines'}
+              </div>
             </div>
-            <div className="text-[9.5px] text-[#5E6B65]">Real market odds only</div>
+            <div className="text-[9.5px] text-[#5E6B65]">
+              {fwd ? `${fwd.pricedSettledCount} priced settled` : 'Real market odds only'}
+            </div>
           </div>
 
           <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between min-h-[76px]">
-            <div className="text-[10.5px] text-[#8B9892]">Settled Records</div>
+            <div className="text-[10.5px] text-[#8B9892]">Settled (Basketball)</div>
             <div className="flex items-baseline gap-1.5">
               <div className="text-[18px] font-[650] text-[#E9EFEB] tabular-nums leading-none">
                 {bbLoading ? '...' : fwd ? fwd.settledCount : 0}
@@ -215,6 +219,19 @@ export default function PerformancePage() {
             </div>
           </div>
         </div>
+
+        {/* Sample-size caveat under 100 settled picks */}
+        {(!fwd || fwd.settledCount < 100) && (
+          <div className="rounded-[12px] p-3 border border-[#E8B04A]/35 bg-[#E8B04A]/10 flex items-start gap-2.5 text-[11.5px] text-[#E9EFEB]">
+            <AlertTriangle className="w-4 h-4 text-[#E8B04A] shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold text-[#E8B04A]">Sample-size caveat (&lt; 100 settled picks): </span>
+              <span>
+                Only {fwd?.settledCount ?? 0} settled basketball forward picks recorded so far. Live forward hit rate, Brier, and log loss carry wide sampling variance until at least 100 picks settle; review the out-of-sample walk-forward calibration curve below.
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Walk-Forward Out-of-Sample Calibration & Baseline Gate */}
         <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3.5 space-y-3">
@@ -344,42 +361,23 @@ export default function PerformancePage() {
               </div>
 
               {activeFamily && activeFamily.calibrationTable.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-semibold text-[#ECF1EE]">
-                      Calibration Reliability Table · {bbLeague === 'EUROLEAGUE' ? 'EuroLeague' : bbLeague} {bbCategoryLabel[activeFamily.marketCategory]}
-                    </span>
-                    <span className="text-[10.5px] font-mono text-[#8B9890]">
-                      Out of sample bins
-                    </span>
-                  </div>
-                  <div className="border border-white/[0.07] rounded-[10px] overflow-hidden bg-[#0E1512]">
-                    <div className="grid grid-cols-4 px-3 py-2 text-[10px] font-mono text-[#8B9890] border-b border-white/[0.07] bg-[#151E19]">
-                      <span>Prob Bin</span>
-                      <span className="text-right">Pred Mean</span>
-                      <span className="text-right">Observed</span>
-                      <span className="text-right">Samples</span>
-                    </div>
-                    <div className="divide-y divide-white/[0.06]">
-                      {activeFamily.calibrationTable.map((bin, i) => (
-                        <div
-                          key={i}
-                          className="grid grid-cols-4 px-3 py-1.5 text-[11px] font-mono tabular-nums"
-                        >
-                          <span className="text-[#ECF1EE]">{cleanDisplayText(bin.binRange)}</span>
-                          <span className="text-right text-[#8B9892]">
-                            {(bin.predictedProbMean * 100).toFixed(1)}%
-                          </span>
-                          <span className="text-right text-[#B8E636] font-semibold">
-                            {(bin.observedFrequency * 100).toFixed(1)}%
-                          </span>
-                          <span className="text-right text-[#8B9892]">
-                            {bin.sampleCount.toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                <div className="pt-1">
+                  <PerformanceChart
+                    buckets={activeFamily.calibrationTable.map((bin) => ({
+                      binRange: cleanDisplayText(bin.binRange),
+                      binCenter: bin.predictedProbMean,
+                      predictedProbMean: bin.predictedProbMean,
+                      observedFrequency: bin.observedFrequency,
+                      sampleCount: bin.sampleCount,
+                    }))}
+                    brierScore={activeFamily.calibratedBrier}
+                    logLoss={activeFamily.calibratedLogLoss}
+                    hitRate={activeFamily.hitRateAt60 ?? 0}
+                    roi={0}
+                    title={`Basketball calibration curve · ${bbLeague === 'EUROLEAGUE' ? 'EuroLeague' : bbLeague} ${bbCategoryLabel[activeFamily.marketCategory]}`}
+                    subtitle={`Walk-forward out-of-sample reliability across N=${activeFamily.sampleSize.toLocaleString()} evaluated observations.`}
+                    badgeText={`ECE: ${(activeFamily.ece * 100).toFixed(2)}%`}
+                  />
                 </div>
               )}
             </>
@@ -464,7 +462,7 @@ export default function PerformancePage() {
                         {!row.isModelLine && row.marketOdds !== null ? (
                           <> · @{row.marketOdds.toFixed(2)} ({row.priceSource}) {row.expectedValue !== null ? `· EV ${(row.expectedValue * 100 >= 0 ? '+' : '')}${(row.expectedValue * 100).toFixed(1)}%` : ''}</>
                         ) : (
-                          <> · model line - no market price</>
+                          <> · Model line - no market price</>
                         )}
                       </span>
                       <span>
@@ -577,6 +575,19 @@ export default function PerformancePage() {
           <div className="text-[9.5px] text-[#5E6B65]">Official match stats</div>
         </div>
       </div>
+
+      {/* Sample-size caveat under 100 settled picks */}
+      {forwardMetrics.totalSettled < 100 && (
+        <div className="rounded-[12px] p-3 border border-[#E8B04A]/35 bg-[#E8B04A]/10 flex items-start gap-2.5 text-[11.5px] text-[#E9EFEB]">
+          <AlertTriangle className="w-4 h-4 text-[#E8B04A] shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold text-[#E8B04A]">Sample-size caveat (&lt; 100 settled picks): </span>
+            <span>
+              Only {forwardMetrics.totalSettled} settled football forward picks recorded so far. Early live hit rate and Brier carry elevated sampling variance until 100+ picks settle; refer to the held-out calibration curve below.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 4. PROBABILITY CALIBRATION CURVE */}
       <PerformanceChart

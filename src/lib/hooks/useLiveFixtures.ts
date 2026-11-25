@@ -320,10 +320,14 @@ export function useLiveFixtures(
       fixturesRef.current = stored.fixtures;
       evaluationsRef.current = stored.evaluations || {};
       lastUpdatedRef.current = stored.lastUpdated || '';
+      setFixtures(stored.fixtures);
+      setEvaluations(stored.evaluations || {});
     } else {
       fixturesRef.current = [];
       evaluationsRef.current = {};
       lastUpdatedRef.current = '';
+      setFixtures([]);
+      setEvaluations({});
     }
     load();
     // Poll DB-backed API every 120 seconds (0 external provider calls per visitor)

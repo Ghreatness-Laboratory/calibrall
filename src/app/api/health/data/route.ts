@@ -3,6 +3,7 @@ import { getMatchesStore } from '@/lib/data/matchesStore';
 import { getUnmatchedNames, getUnresolvedTeamsLog, CANONICAL_TEAMS } from '@/lib/data/canonicalTeams';
 import { getMissingBadges } from '@/lib/data/sources/theSportsDb';
 import { isTeamNewsEnabled } from '@/lib/prediction/featureFlags';
+import { getBasketballDataStatus } from '@/lib/basketball/store';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -11,6 +12,7 @@ export async function GET() {
   const store = getMatchesStore();
   const allMatches = store.getAllMatches();
   const storeStats = store.getStats();
+  const basketballDataStatus = await getBasketballDataStatus().catch(() => null);
 
   // 1. Group newest match per league
   const leagueLatestMap = new Map<string, {
@@ -147,5 +149,6 @@ export async function GET() {
       log: getUnresolvedTeamsLog(),
     },
     completenessDistribution,
+    basketball: basketballDataStatus,
   });
 }

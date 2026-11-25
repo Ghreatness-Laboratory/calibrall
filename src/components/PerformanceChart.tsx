@@ -10,6 +10,9 @@ interface Props {
   logLoss: number;
   hitRate: number;
   roi: number;
+  title?: string;
+  subtitle?: string;
+  badgeText?: string;
 }
 
 export default function PerformanceChart({
@@ -18,6 +21,9 @@ export default function PerformanceChart({
   logLoss,
   hitRate,
   roi,
+  title = 'Probability calibration curve',
+  subtitle = 'Comparison between model projected probability and empirical realized frequency across probability bins.',
+  badgeText = 'Slope: 0.984',
 }: Props) {
   return (
     <div className="space-y-3">
@@ -27,14 +33,14 @@ export default function PerformanceChart({
           <div>
             <h4 className="text-[14px] font-[600] text-[#E9EFEB] flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-[#B8E636]" strokeWidth={2} />
-              <span>Probability calibration curve</span>
+              <span>{title}</span>
             </h4>
             <p className="text-[11.5px] text-[#8B9892] mt-0.5 leading-normal">
-              Comparison between model projected probability and empirical realized frequency across probability bins.
+              {subtitle}
             </p>
           </div>
           <span className="text-[10.5px] text-[#B8E636] bg-[#151D19] border border-[#1F2A24] px-2 py-0.5 rounded-full self-start sm:self-auto tabular-nums font-semibold">
-            Slope: 0.984
+            {badgeText}
           </span>
         </div>
 

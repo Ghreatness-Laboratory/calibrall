@@ -8,6 +8,7 @@ import MobileInstallBanner from '@/components/pwa/MobileInstallBanner';
 import IOSInstallModal from '@/components/pwa/IOSInstallModal';
 import SWUpdateToast from '@/components/pwa/SWUpdateToast';
 import OfflineBanner from '@/components/pwa/OfflineBanner';
+import TopSportBar from '@/components/TopSportBar';
 import { SportProvider } from '@/lib/context/SportContext';
 
 export const dynamic = 'force-dynamic';
@@ -72,6 +73,7 @@ export default function RootLayout({
             <Navbar />
             <OfflineBanner />
             <main className="flex-1 max-w-[430px] md:max-w-4xl lg:max-w-7xl w-full mx-auto px-[18px] py-3 min-w-0">
+              <TopSportBar />
               {children}
             </main>
             <Footer />

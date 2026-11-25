@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   ArrowRight,
@@ -21,13 +21,25 @@ import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import NBAScoreProjectionTool from '@/components/nba/NBAScoreProjectionTool';
 import HomeCreatorsTeaser from '@/components/creators/HomeCreatorsTeaser';
-import SportSwitcher from '@/components/SportSwitcher';
+import type { BasketballLeague } from '@/lib/basketball/markets';
 
 export default function HomeClient() {
   const { sport, isSwitching } = useSport();
-  const { fixtures, evaluations, lastUpdated, isDelayed, error, isSavedCopy, isOffline } = useLiveFixtures('ALL', 'ALL', sport);
-
+  const [selectedBbLeague, setSelectedBbLeague] = useState<'ALL' | BasketballLeague>('ALL');
   const isBasketball = sport === 'basketball';
+  const { fixtures, evaluations, lastUpdated, isDelayed, error, isSavedCopy, isOffline } = useLiveFixtures(
+    isBasketball ? selectedBbLeague : 'ALL',
+    'ALL',
+    sport
+  );
+
+  const visibleBasketballFixtures = useMemo(() => {
+    if (!isBasketball) return [];
+    if (selectedBbLeague === 'ALL') return fixtures;
+    return fixtures.filter(
+      (f) => (f.basketballStats?.league || f.competition?.code) === selectedBbLeague
+    );
+  }, [fixtures, isBasketball, selectedBbLeague]);
 
   // Football evaluated fixtures with 40% family diversity cap
   const showcaseFootballFixtures = selectDiversifiedSlatePicks(
@@ -67,11 +79,6 @@ export default function HomeClient() {
 
   return (
     <div className="space-y-4 py-1">
-      {/* Sport switcher control */}
-      <div className="pt-0.5">
-        <SportSwitcher />
-      </div>
-
       {/* 4. HOME SCREEN HERO */}
       <section className="space-y-2.5 pt-1">
         {/* Eyebrow: 10px uppercase, letter-spacing 0.16em, colour #5E6B65 */}
@@ -263,11 +270,41 @@ export default function HomeClient() {
           </div>
         )}
 
+        {/* Basketball league filter chips: All, NBA, NCAAB, EuroLeague */}
+        {isBasketball && (
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+            {(
+              [
+                { id: 'ALL', label: 'All' },
+                { id: 'NBA', label: 'NBA' },
+                { id: 'NCAAB', label: 'NCAAB' },
+                { id: 'EUROLEAGUE', label: 'EuroLeague' },
+              ] as const
+            ).map((chip) => {
+              const active = selectedBbLeague === chip.id;
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setSelectedBbLeague(chip.id)}
+                  className={`h-[30px] px-3.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
+                    active
+                      ? 'bg-[#B8E636]/15 border-[#B8E636] text-[#B8E636] font-semibold'
+                      : 'bg-[#101613] border-[#1F2A24] text-[#8B9892] hover:text-[#E9EFEB]'
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Fixtures list: 8px/12px gaps */}
-        {fixtures.length > 0 ? (
+        {(isBasketball ? visibleBasketballFixtures.length > 0 : fixtures.length > 0) ? (
           <div className="space-y-2.5">
             {isBasketball
-              ? fixtures.slice(0, 3).map((f) => (
+              ? visibleBasketballFixtures.slice(0, 3).map((f) => (
                   <NBAGameCard key={f.id} fixture={f} evaluation={evaluations?.[f.id]} />
                 ))
               : showcaseFootballFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
@@ -281,7 +318,9 @@ export default function HomeClient() {
 
             <div className="pt-1 flex items-center justify-between text-[11px] text-[#5E6B65]">
               <span>
-                Showing {Math.min(3, fixtures.length)} of {fixtures.length} {isBasketball ? 'games' : 'fixtures'}
+                Showing {Math.min(3, isBasketball ? visibleBasketballFixtures.length : fixtures.length)} of{' '}
+                {isBasketball ? visibleBasketballFixtures.length : fixtures.length}{' '}
+                {isBasketball ? 'games' : 'fixtures'}
               </span>
               <Link href="/matches" className="text-[#B8E636] hover:underline flex items-center gap-1 font-semibold text-[12px]">
                 <span>View all fixtures</span>
@@ -295,12 +334,12 @@ export default function HomeClient() {
               <Calendar className="w-4 h-4" strokeWidth={2} />
             </div>
             <div className="text-[13px] font-semibold text-[#E9EFEB]">
-              {isBasketball ? 'No games scheduled in current window' : 'No games scheduled today'}
+              No games today
             </div>
             <p className="text-[12px] text-[#8B9892] max-w-xs leading-relaxed">
               {isBasketball
-                ? 'No NBA, NCAAB or EuroLeague matchups found in the current window (-10 to +14 days).'
-                : 'Upcoming matchups will appear here automatically. Check the upcoming tab in Fixtures.'}
+                ? `No ${selectedBbLeague === 'ALL' ? 'NBA, NCAAB, or EuroLeague' : selectedBbLeague === 'EUROLEAGUE' ? 'EuroLeague' : selectedBbLeague} matchups found in the active window.`
+                : 'Upcoming matchups will appear here automatically when football feeds are connected.'}
             </p>
           </div>
         )}

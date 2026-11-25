@@ -82,7 +82,7 @@ interface DataStatusData {
   }[];
   unmappedFixtureNamesCount?: number;
   unmappedFixtureNames?: { name: string; provider: string }[];
-  storeUsed?: 'supabase' | 'in-memory';
+  storeUsed?: 'supabase' | 'local-sqlite' | 'in-memory';
   persistenceMode?: string;
   skippedLeagues?: {
     leagueCode: string;
@@ -138,6 +138,7 @@ export default function DataStatusDiagnostics() {
   const [data, setData] = useState<DataStatusData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [publicNote, setPublicNote] = useState<string | null>(null);
   const [adminSecretInput, setAdminSecretInput] = useState<string>('');
   const [isSecretSaved, setIsSecretSaved] = useState<boolean>(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -174,12 +175,39 @@ export default function DataStatusDiagnostics() {
     { league: 'BSA', season: '2025', desc: 'Brazil Série A 2025 (Extra League /new/BRA.csv) · No Corners/Cards' },
   ];
 
+  const fetchPublicHealthFallback = async (reasonMsg: string) => {
+    const res = await fetch('/api/health/data', { cache: 'no-store' });
+    if (!res.ok) {
+      throw new Error(reasonMsg);
+    }
+    const json = await res.json();
+    setData({
+      totalMatches: json.storeStats?.totalMatches ?? 0,
+      earliestDate: json.storeStats?.earliestDate ?? null,
+      latestDate: json.storeStats?.latestDate ?? null,
+      matchesPerLeagueAndSeason: [],
+      teamsWithFewerThan10Matches: [],
+      unmatchedNamesCount: json.unmatchedTeams?.count ?? 0,
+      unresolvedTeamsCount: json.unresolvedTeams?.count ?? 0,
+      storeUsed: json.basketball?.storeUsed || 'local-sqlite',
+      basketball: json.basketball || undefined,
+    });
+    setPublicNote(reasonMsg);
+  };
+
   const fetchDataStatus = async (secretOverride?: string) => {
     setLoading(true);
     setError(null);
+    setPublicNote(null);
     const secret = secretOverride !== undefined ? secretOverride : adminSecretInput;
 
     try {
+      const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+      if (!secret && !isAdminRoute) {
+        await fetchPublicHealthFallback('Public database coverage summary.');
+        return;
+      }
+
       const headers: Record<string, string> = {};
       if (secret) {
         headers['x-admin-secret'] = secret;
@@ -191,11 +219,17 @@ export default function DataStatusDiagnostics() {
       });
 
       if (res.status === 503) {
-        throw new Error('ADMIN_SECRET environment variable is not configured on the server (503 Service Unavailable). Configure it in Vercel/environment to activate status inspection.');
+        await fetchPublicHealthFallback(
+          'ADMIN_SECRET is not configured — displaying public database coverage summary.'
+        );
+        return;
       }
 
       if (res.status === 401) {
-        throw new Error('Unauthorized (401). Provide a valid ADMIN_SECRET (>= 32 chars) via the input below or x-admin-secret header.');
+        await fetchPublicHealthFallback(
+          'Admin diagnostics locked (enter x-admin-secret to unlock full per-team logs) — displaying public database coverage.'
+        );
+        return;
       }
 
       if (!res.ok) {
@@ -292,6 +326,13 @@ export default function DataStatusDiagnostics() {
         </div>
       )}
 
+      {publicNote && (
+        <div className="p-2.5 bg-[#151E19] border border-white/[0.08] rounded-[10px] text-[11.5px] text-[#8B9890]">
+          <span className="font-semibold text-[#ECF1EE]">Public Coverage Mode: </span>
+          {publicNote}
+        </div>
+      )}
+
       {error && (
         <div className="p-3 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] text-[12px] text-[#E2AE45]">
           <span className="font-semibold text-[#ECF1EE]">Admin Status: </span>
@@ -307,9 +348,15 @@ export default function DataStatusDiagnostics() {
             <span className={`font-semibold px-2 py-0.5 rounded ${
               data.storeUsed === 'supabase'
                 ? 'bg-[#B6E63B]/10 text-[#B6E63B] border border-[#B6E63B]/30'
+                : data.storeUsed === 'local-sqlite'
+                ? 'bg-[#B6E63B]/10 text-[#B6E63B] border border-[#B6E63B]/30'
                 : 'bg-[#E2AE45]/10 text-[#E2AE45] border border-[#E2AE45]/30'
             }`}>
-              {data.storeUsed === 'supabase' ? 'Supabase Production Database' : 'In-Memory Sandbox Store'}
+              {data.storeUsed === 'supabase'
+                ? 'Supabase Production Database'
+                : data.storeUsed === 'local-sqlite'
+                ? 'Local SQLite Store'
+                : 'In-Memory Sandbox Store'}
             </span>
           </div>
 

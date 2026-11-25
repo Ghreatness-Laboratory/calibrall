@@ -6,13 +6,12 @@ import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
 import FixtureCard from '@/components/FixtureCard';
-import NBAGameCard from '@/components/nba/NBAGameCard';
-import SportSwitcher from '@/components/SportSwitcher';
+import NBAGameCard, { BasketballMarketGroupFilter } from '@/components/nba/NBAGameCard';
 import CompetitionFilter from '@/components/CompetitionFilter';
 import { CountryCompetitionGroup } from '@/lib/data/canonicalCompetitions';
 import { matchesDayFilter, DayFilterType } from '@/lib/data/fixturesDatabase';
-import { MarketPrediction, MatchStatus } from '@/types';
-import type { BasketballLeague, BasketballMarketCategory } from '@/lib/basketball/markets';
+import { MarketPrediction } from '@/types';
+import type { BasketballLeague } from '@/lib/basketball/markets';
 import { 
   RotateCw, 
   Info, 
@@ -25,7 +24,7 @@ import { cleanDisplayText } from '@/lib/utils/formatText';
 
 type FootballMarketGroup = 'ALL' | 'results' | 'goals' | 'corners' | 'cards';
 type BasketballLeagueFilter = 'ALL' | BasketballLeague;
-type BasketballMarketFilter = 'ALL' | BasketballMarketCategory;
+type BasketballMarketFilter = BasketballMarketGroupFilter;
 
 export default function MatchesPage() {
   const { sport, isSwitching } = useSport();
@@ -190,22 +189,41 @@ export default function MatchesPage() {
   const filteredBasketball = useMemo(() => {
     if (!isBasketball) return [];
     return fixtures.filter(f => {
+      const gameLeague = f.basketballStats?.league || f.competition?.code;
+      if (selectedBbLeague !== 'ALL' && gameLeague !== selectedBbLeague) {
+        return false;
+      }
+      if (selectedDay !== 'ALL' && !matchesDayFilter(f.kickoffTime, selectedDay)) {
+        return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const home = f.homeTeam.name.toLowerCase();
         const away = f.awayTeam.name.toLowerCase();
-        const league = (f.basketballStats?.league || f.competition?.code || '').toLowerCase();
+        const league = (gameLeague || '').toLowerCase();
         if (!home.includes(q) && !away.includes(q) && !league.includes(q)) return false;
       }
       if (selectedBbGroup !== 'ALL') {
         const ev = evaluations?.[f.id];
-        if (!ev || ev.needsHistory || !ev.picks.some(p => p.marketCategory === selectedBbGroup)) {
+        if (!ev || ev.needsHistory) {
           return false;
+        }
+        if (selectedBbGroup === 'game_total') {
+          return ev.picks.some(p => p.marketCategory === 'game_total');
+        }
+        if (selectedBbGroup === 'team_total') {
+          return ev.picks.some(p => p.marketCategory === 'home_total' || p.marketCategory === 'away_total');
+        }
+        if (selectedBbGroup === 'h1_total') {
+          return (
+            ev.picks.some(p => p.marketCategory === 'h1_game_total' || p.marketCategory === 'h1_team_total') ||
+            Boolean(f.basketballStats?.needsH1History)
+          );
         }
       }
       return true;
     });
-  }, [fixtures, searchQuery, isBasketball, selectedBbGroup, evaluations]);
+  }, [fixtures, searchQuery, isBasketball, selectedBbLeague, selectedDay, selectedBbGroup, evaluations]);
 
   const footballMarketFilters: { id: FootballMarketGroup; label: string }[] = [
     { id: 'ALL', label: 'All markets' },
@@ -216,12 +234,10 @@ export default function MatchesPage() {
   ];
 
   const basketballMarketFilters: { id: BasketballMarketFilter; label: string }[] = [
-    { id: 'ALL', label: 'All totals' },
-    { id: 'game_total', label: 'Game Total' },
-    { id: 'home_total', label: 'Home Total' },
-    { id: 'away_total', label: 'Away Total' },
-    { id: 'h1_game_total', label: '1st Half Total' },
-    { id: 'h1_team_total', label: '1st Half Team' },
+    { id: 'ALL', label: 'All' },
+    { id: 'game_total', label: 'Game total' },
+    { id: 'team_total', label: 'Team total' },
+    { id: 'h1_total', label: '1st half' },
   ];
 
   if (isSwitching) {
@@ -237,7 +253,7 @@ export default function MatchesPage() {
   }
 
   const scheduledCount = isBasketball 
-    ? `${fixtures.length} matchups` 
+    ? `${filteredBasketball.length} matchups` 
     : `${fixtures.length} scheduled`;
 
   const hasActiveFilters = isBasketball
@@ -250,11 +266,6 @@ export default function MatchesPage() {
 
   return (
     <div className="space-y-3 py-1">
-      {/* Sport switcher control */}
-      <div className="pt-0.5">
-        <SportSwitcher />
-      </div>
-
       {/* Header: H2 "Fixtures and markets" at 20px with one line subtitle, and 34px square outlined refresh icon button on right */}
       <div className="flex items-center justify-between pt-1">
         <div className="space-y-0.5">
@@ -264,6 +275,8 @@ export default function MatchesPage() {
           <p className="text-[12px] text-[#8B9892] leading-tight">
             {storedHistoryMode
               ? `${fixtures.length} stored history · Fixtures not available on free tier`
+              : isBasketball
+              ? `${scheduledCount} · Local tip-off times ${lastUpdated ? `· Last updated ${lastUpdated}` : ''}`
               : `${scheduledCount} · Database fixture store · All kickoff times WAT ${lastUpdated ? `· Last updated ${lastUpdated}` : ''}`}
           </p>
         </div>
@@ -329,12 +342,12 @@ export default function MatchesPage() {
         Object.values(evaluations || {}).some(ev => ev.picks.some(p => !p.isModelLine)) ? (
           <div className="p-2.5 rounded-[10px] bg-[#B8E636]/[0.08] border border-[#B8E636]/20 text-[#B8E636] text-[11.5px] flex items-center gap-2 font-mono">
             <Info className="w-3.5 h-3.5 text-[#B8E636] shrink-0" />
-            <span>Bookmaker totals matched where available. Unpriced totals display &quot;model line - no market price&quot; with no EV.</span>
+            <span>Bookmaker totals matched where available. Unpriced totals display &quot;Model line - no market price&quot; with no EV.</span>
           </div>
         ) : (
           <div className="p-2.5 rounded-[10px] bg-[#151D19] border border-[#1F2A24] text-[#8B9892] text-[11.5px] flex items-center gap-2">
             <Info className="w-3.5 h-3.5 text-[#B8E636] shrink-0" />
-            <span>Model totals active across NBA, NCAAB Division I, and EuroLeague. Unpriced lines display &quot;model line - no market price&quot; without EV.</span>
+            <span>Awaiting lines — no bookmaker odds connected. Unpriced totals display &quot;Model line - no market price&quot; without EV.</span>
           </div>
         )
       ) : fixtures.some(f => Boolean(f.verifiedOdds)) ? (
@@ -383,23 +396,39 @@ export default function MatchesPage() {
         )}
       </div>
 
-      {/* Competition / League and Status selects: 2-column grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {/* Competition / League and Status controls */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-end">
         {isBasketball ? (
           <div>
-            <label className="text-[11px] text-[#8B9892] font-normal mb-1 block">
+            <label className="text-[11px] text-[#8B9892] font-normal mb-1.5 block">
               League
             </label>
-            <select
-              value={selectedBbLeague}
-              onChange={(e) => setSelectedBbLeague(e.target.value as BasketballLeagueFilter)}
-              className="w-full h-10 px-3 rounded-[12px] bg-[#101613] border border-[#1F2A24] text-[13px] text-[#E9EFEB] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#B8E636] appearance-none cursor-pointer"
-            >
-              <option value="ALL">All leagues (NBA · NCAAB · EuroLeague)</option>
-              <option value="NBA">NBA</option>
-              <option value="NCAAB">NCAAB Division I</option>
-              <option value="EUROLEAGUE">EuroLeague</option>
-            </select>
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+              {(
+                [
+                  { id: 'ALL', label: 'All' },
+                  { id: 'NBA', label: 'NBA' },
+                  { id: 'NCAAB', label: 'NCAAB' },
+                  { id: 'EUROLEAGUE', label: 'EuroLeague' },
+                ] as const
+              ).map((chip) => {
+                const isActive = selectedBbLeague === chip.id;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => setSelectedBbLeague(chip.id)}
+                    className={`h-[32px] px-3.5 rounded-full text-[11.5px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
+                      isActive
+                        ? 'bg-[#B8E636]/15 border-[#B8E636] text-[#B8E636] font-semibold'
+                        : 'bg-[#101613] border-[#1F2A24] text-[#8B9892] hover:text-[#E9EFEB]'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <CompetitionFilter
@@ -514,7 +543,12 @@ export default function MatchesPage() {
         filteredBasketball.length > 0 ? (
           <div className="space-y-3">
             {filteredBasketball.map(f => (
-              <NBAGameCard key={f.id} fixture={f} evaluation={evaluations?.[f.id]} />
+              <NBAGameCard
+                key={f.id}
+                fixture={f}
+                evaluation={evaluations?.[f.id]}
+                marketGroupFilter={selectedBbGroup}
+              />
             ))}
           </div>
         ) : (
@@ -524,10 +558,12 @@ export default function MatchesPage() {
               <Calendar className="w-5 h-5" strokeWidth={2} />
             </div>
             <div className="text-[15px] font-[600] text-[#ECF1EE]">
-              No games scheduled
+              {selectedDay === 'today' ? 'No games today' : 'No games scheduled'}
             </div>
             <p className="text-[12.5px] text-[#8B9890] max-w-xs mx-auto leading-relaxed">
-              No NBA, NCAAB, or EuroLeague matchups matched your filter criteria. Try adjusting your query or resetting filters.
+              {selectedDay === 'today'
+                ? `No ${selectedBbLeague === 'ALL' ? 'NBA, NCAAB, or EuroLeague' : selectedBbLeague === 'EUROLEAGUE' ? 'EuroLeague' : selectedBbLeague} games tip off today with the current filters.`
+                : 'No NBA, NCAAB, or EuroLeague matchups matched your filter criteria. Try adjusting your query or resetting filters.'}
             </p>
             {hasActiveFilters && (
               <div className="pt-1">

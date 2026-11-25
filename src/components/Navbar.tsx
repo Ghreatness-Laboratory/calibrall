@@ -16,9 +16,12 @@ import { getStoredUser, setStoredUser } from '@/lib/supabase/client';
 import { UserProfile } from '@/types';
 import DesktopInstallButton from '@/components/pwa/DesktopInstallButton';
 import DropdownInstallItem from '@/components/pwa/DropdownInstallItem';
+import { useSport } from '@/lib/context/SportContext';
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { sport } = useSport();
+  const isBasketball = sport === 'basketball';
   const [user, setUser] = useState<UserProfile | null>(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [isMonochrome, setIsMonochrome] = useState<boolean>(false);
@@ -269,7 +272,7 @@ export default function Navbar() {
         <div className="max-w-[430px] md:max-w-4xl lg:max-w-7xl mx-auto flex items-center justify-between text-[10.5px] text-[#8B9892]">
           <div className="flex items-center gap-1.5 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-[#B8E636] shrink-0" />
-            <span>Dixon Coles v2.5 online</span>
+            <span>{isBasketball ? 'Totals & 1H engine v1 online' : 'Dixon Coles v2.5 online'}</span>
           </div>
           <span className="tabular-nums font-medium text-[#8B9892]" suppressHydrationWarning>
             {utcTime}

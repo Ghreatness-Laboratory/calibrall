@@ -73,6 +73,15 @@ export default function MarketExplorerPage() {
   const filteredOptions = useMemo(() => {
     if (isBasketball) {
       if (selectedOptionType === 'ALL') return BASKETBALL_MARKET_OPTIONS;
+      if (selectedOptionType === 'game_total') {
+        return BASKETBALL_MARKET_OPTIONS.filter((o) => o.category === 'game_total');
+      }
+      if (selectedOptionType === 'team_total') {
+        return BASKETBALL_MARKET_OPTIONS.filter((o) => o.category === 'home_total' || o.category === 'away_total');
+      }
+      if (selectedOptionType === 'h1_total') {
+        return BASKETBALL_MARKET_OPTIONS.filter((o) => o.category === 'h1_game_total' || o.category === 'h1_team_total');
+      }
       return BASKETBALL_MARKET_OPTIONS.filter((o) => o.category === selectedOptionType);
     }
     if (selectedOptionType === 'ALL') return FOOTBALL_MARKET_OPTIONS;
@@ -92,7 +101,11 @@ export default function MarketExplorerPage() {
       }[] = [];
 
       fixtures
-        .filter((f) => f.status !== 'FINISHED' && f.status !== 'POSTPONED' && f.status !== 'CANCELED')
+        .filter((f) => {
+          const gameLeague = f.basketballStats?.league || f.competition?.code;
+          if (basketballLeagueFilter !== 'ALL' && gameLeague !== basketballLeagueFilter) return false;
+          return f.status !== 'FINISHED' && f.status !== 'POSTPONED' && f.status !== 'CANCELED';
+        })
         .forEach((fixture) => {
           const ev = evaluations?.[fixture.id];
           if (!ev || ev.needsHistory || fixture.basketballStats?.needsHistory) {
@@ -158,7 +171,7 @@ export default function MarketExplorerPage() {
       });
 
     return list.sort((a, b) => b.prediction.modelProbability - a.prediction.modelProbability);
-  }, [fixtures, evaluations, isBasketball, selectedBasketballCat, selectedFootballLine]);
+  }, [fixtures, evaluations, isBasketball, basketballLeagueFilter, selectedBasketballCat, selectedFootballLine]);
 
   const activeOption =
     marketOptions.find((o) => o.code === selectedMarketLine) || marketOptions[0];
@@ -178,12 +191,10 @@ export default function MarketExplorerPage() {
   ];
 
   const basketballOptionTabs = [
-    { id: 'ALL', label: 'All 5 totals markets' },
-    { id: 'game_total', label: '1. Game total' },
-    { id: 'home_total', label: '2. Home total' },
-    { id: 'away_total', label: '3. Away total' },
-    { id: 'h1_game_total', label: '4. 1st half game' },
-    { id: 'h1_team_total', label: '5. 1st half team' },
+    { id: 'ALL', label: 'All' },
+    { id: 'game_total', label: 'Game total' },
+    { id: 'team_total', label: 'Team total' },
+    { id: 'h1_total', label: '1st half' },
   ];
 
   const optionFilterTabs = isBasketball ? basketballOptionTabs : footballOptionTabs;
@@ -239,7 +250,7 @@ export default function MarketExplorerPage() {
                   : 'bg-[#101713] border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
               }`}
             >
-              {lg === 'ALL' ? 'All 3 leagues' : lg === 'EUROLEAGUE' ? 'EuroLeague' : lg}
+              {lg === 'ALL' ? 'All' : lg === 'EUROLEAGUE' ? 'EuroLeague' : lg}
             </button>
           ))}
         </div>
@@ -256,7 +267,13 @@ export default function MarketExplorerPage() {
                 setSelectedOptionType(tab.id);
                 if (tab.id !== 'ALL') {
                   if (isBasketball) {
-                    setSelectedBasketballCat(tab.id as BasketballMarketCategory);
+                    const mappedCat: BasketballMarketCategory =
+                      tab.id === 'team_total'
+                        ? 'home_total'
+                        : tab.id === 'h1_total'
+                        ? 'h1_game_total'
+                        : 'game_total';
+                    setSelectedBasketballCat(mappedCat);
                   } else {
                     const firstMatch = FOOTBALL_MARKET_OPTIONS.find((o) => o.optionType === tab.id);
                     if (firstMatch) setSelectedFootballLine(firstMatch.code);
@@ -374,7 +391,7 @@ export default function MarketExplorerPage() {
                           {needsHistory || !pick
                             ? cleanDisplayText(abstentionReason || 'Needs history')
                             : pick.isModelLine
-                            ? pick.priceSource
+                            ? 'Model line - no market price'
                             : `${pick.priceSource} @${pick.marketOdds?.toFixed(2)}${
                                 pick.expectedValue !== null
                                   ? ` (EV ${pick.expectedValue >= 0 ? '+' : ''}${(pick.expectedValue * 100).toFixed(1)}%)`

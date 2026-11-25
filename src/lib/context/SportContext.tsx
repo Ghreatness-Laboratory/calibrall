@@ -35,6 +35,11 @@ function SportContextProviderInner({ children }: { children: React.ReactNode }) 
     const param = searchParams.get('sport')?.toLowerCase();
     if (param === 'basketball' || param === 'football') {
       initialSport = param as Sport;
+      try {
+        localStorage.setItem(STORAGE_KEY, initialSport);
+      } catch {
+        // Safe fallback
+      }
     } else {
       // 2. Check localStorage
       try {
