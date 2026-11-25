@@ -100,6 +100,38 @@ interface DataStatusData {
     callsToday: number;
     lastError: string | null;
   }[];
+  basketball?: {
+    totalGames: number;
+    totalTeams: number;
+    earliestDate: string | null;
+    latestDate: string | null;
+    unresolvedTeamsCount: number;
+    unresolvedTeams: {
+      sourceName: string;
+      sourceProvider: string;
+      count: number;
+    }[];
+    leagueSummary: {
+      league: string;
+      count: number;
+      finishedCount: number;
+      withHalfScoresCount: number;
+      halfScoresPct: number;
+      earliestDate: string | null;
+      latestDate: string | null;
+      daysAgo: number | null;
+    }[];
+    gamesPerLeagueAndSeason: {
+      league: string;
+      season: string;
+      count: number;
+      finishedCount: number;
+      withHalfScoresCount: number;
+      halfScoresPct: number;
+      earliestDate: string | null;
+      latestDate: string | null;
+    }[];
+  };
 }
 
 export default function DataStatusDiagnostics() {
@@ -611,6 +643,91 @@ export default function DataStatusDiagnostics() {
               </div>
             )}
           </div>
+
+          {/* Basketball Historical Coverage Panel */}
+          {data.basketball && (
+            <div className="space-y-2.5 pt-2 border-t border-white/[0.07]">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-semibold text-[#ECF1EE] flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-[#B6E63B]" />
+                  <span>Basketball Coverage (NBA, NCAAB D1, EuroLeague)</span>
+                </span>
+                <span className="text-[10px] font-mono text-[#8B9890]">
+                  {data.basketball.totalGames.toLocaleString()} games · Latest {data.basketball.latestDate || 'None'}
+                </span>
+              </div>
+
+              {data.basketball.leagueSummary.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {data.basketball.leagueSummary.map((ls) => (
+                    <div key={ls.league} className="bg-[#151E19] rounded-[10px] p-2.5 border border-white/[0.07] space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono font-semibold text-[#B6E63B]">{ls.league}</span>
+                        <span className="text-[10px] font-mono text-[#8B9890]">
+                          Half scores: {ls.halfScoresPct}%
+                        </span>
+                      </div>
+                      <div className="text-[16px] font-bold font-mono text-[#ECF1EE] tabular-nums">
+                        {ls.count.toLocaleString()} games
+                      </div>
+                      <div className="text-[10px] font-mono text-[#8B9890]">
+                        Latest: {ls.latestDate || 'Needs history'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {data.basketball.gamesPerLeagueAndSeason.length === 0 ? (
+                <div className="p-2.5 rounded-[10px] bg-[#151E19] border border-white/[0.07] text-[11.5px] text-[#8B9890]">
+                  Needs history: no basketball seasons ingested yet.
+                </div>
+              ) : (
+                <div className="border border-white/[0.07] bg-[#151E19] rounded-[10px] overflow-hidden text-[11px] font-mono">
+                  <div className="grid grid-cols-5 px-3 py-1.5 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
+                    <span>League</span>
+                    <span>Season</span>
+                    <span className="text-right">Games</span>
+                    <span className="text-right">Half Scores %</span>
+                    <span className="text-right">Latest Date</span>
+                  </div>
+                  <div className="divide-y divide-white/[0.04] max-h-56 overflow-y-auto">
+                    {data.basketball.gamesPerLeagueAndSeason.map((row) => (
+                      <div key={`${row.league}-${row.season}`} className="grid grid-cols-5 px-3 py-1.5 text-[#8B9890] hover:text-[#ECF1EE]">
+                        <span className="font-semibold text-[#ECF1EE]">{row.league}</span>
+                        <span>{row.season}</span>
+                        <span className="text-right text-[#B6E63B] font-bold tabular-nums">{row.count}</span>
+                        <span className="text-right text-[#ECF1EE] tabular-nums">{row.halfScoresPct}%</span>
+                        <span className="text-right text-[#5E6A63]">{row.latestDate || 'None'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {data.basketball.unresolvedTeams.length > 0 ? (
+                <div className="p-2.5 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] space-y-1.5">
+                  <span className="text-[11px] font-semibold text-[#E2AE45] flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>Unresolved Basketball Teams ({data.basketball.unresolvedTeams.length})</span>
+                  </span>
+                  <div className="divide-y divide-white/[0.05] max-h-28 overflow-y-auto text-[10.5px] font-mono">
+                    {data.basketball.unresolvedTeams.map((u, i) => (
+                      <div key={i} className="py-1 flex items-center justify-between gap-2">
+                        <span className="text-[#ECF1EE] truncate">{u.sourceName}</span>
+                        <span className="text-[#8B9890] shrink-0">{u.sourceProvider} ({u.count}x)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2 rounded-[10px] bg-[#151E19] border border-white/[0.07] text-[11px] text-[#B6E636] flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Unresolved basketball teams: 0</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

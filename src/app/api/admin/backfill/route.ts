@@ -19,6 +19,24 @@ import {
   parseBrazilCsvDate,
   getCanonicalTeamForCsv,
 } from '@/lib/data/backfillCatalog';
+import {
+  BasketballLeague,
+  BASKETBALL_LEAGUE_SEASONS,
+  CURRENT_BASKETBALL_SEASON,
+  generateBasketballBackfillCallList,
+} from '@/lib/basketball/markets';
+import {
+  upsertBasketballData,
+  getGameDatesMissingHalfScores,
+} from '@/lib/basketball/store';
+import { fetchHoopRSeason } from '@/lib/basketball/sources/hoopRSource';
+import {
+  fetchEspnScoreboardDates,
+  getCurrentSeasonDateWindow,
+} from '@/lib/basketball/sources/espnScoreboardSource';
+import { fetchEuroLeagueSeason } from '@/lib/basketball/sources/euroleagueSource';
+
+const BASKETBALL_LEAGUES = new Set<string>(['NBA', 'NCAAB', 'EUROLEAGUE']);
 
 export async function GET(req: NextRequest) {
   // Authenticate with ADMIN_SECRET via x-admin-secret header only
@@ -32,6 +50,8 @@ export async function GET(req: NextRequest) {
   const baseUrl = `${protocol}://${host}`;
   const callList = generateBackfillCallList(baseUrl);
 
+  const basketballCallList = generateBasketballBackfillCallList();
+
   return NextResponse.json({
     service: 'Calibrall Admin Backfill Pipeline',
     status: 'ACTIVE',
@@ -43,6 +63,10 @@ export async function GET(req: NextRequest) {
     droppedSeasons: ['1920', '2019'],
     callListTotal: callList.length,
     callList,
+    basketballSupportedLeagues: ['NBA', 'NCAAB', 'EUROLEAGUE'],
+    basketballSeasons: BASKETBALL_LEAGUE_SEASONS,
+    basketballCallListTotal: basketballCallList.length,
+    basketballCallList,
     idempotencyRule: 'provider_id format: fdco:{div}:{season}:{yyyymmdd}:{homeRaw}:{awayRaw}',
     unmatchedNames: matchesStore.getUnmatchedNames(),
     unmappedFixtureNames: matchesStore.getUnmappedFixtureNames(),
@@ -58,9 +82,170 @@ export async function POST(req: NextRequest) {
 
   // 2. Extract parameters
   const url = new URL(req.url);
+  const sport = (url.searchParams.get('sport') || '').toLowerCase().trim();
   const league = (url.searchParams.get('league') || 'SA').toUpperCase().trim();
   const season = (url.searchParams.get('season') || '2425').trim();
   const dryRun = url.searchParams.get('dryRun') === 'true';
+
+  // 2b. Dedicated BASKETBALL pipeline branch (keeps football completely untouched)
+  if (sport === 'basketball' || BASKETBALL_LEAGUES.has(league)) {
+    if (!BASKETBALL_LEAGUES.has(league)) {
+      return NextResponse.json(
+        { error: `Unsupported basketball league '${league}'. Expected NBA, NCAAB, or EUROLEAGUE.` },
+        { status: 400 }
+      );
+    }
+
+    const bbLeague = league as BasketballLeague;
+    const validSeasons = BASKETBALL_LEAGUE_SEASONS[bbLeague];
+    const bbSeason = url.searchParams.get('season')?.trim() || CURRENT_BASKETBALL_SEASON;
+    if (!validSeasons.includes(bbSeason)) {
+      return NextResponse.json(
+        {
+          error: `Unsupported season '${bbSeason}' for ${bbLeague}. Supported: ${validSeasons.join(', ')}`,
+          supportedSeasons: validSeasons,
+        },
+        { status: 400 }
+      );
+    }
+
+    const requestedSource = (url.searchParams.get('source') || '').toLowerCase().trim();
+    const fillHalfScores = url.searchParams.get('fillHalfScores') === 'true';
+    const explicitDates = (url.searchParams.get('dates') || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s));
+
+    try {
+      let sourceUsed = '';
+      let rowsFetched = 0;
+      let rowsSkipped = 0;
+      let teams: any[] = [];
+      let games: any[] = [];
+      let unresolvedTeams: any[] = [];
+
+      if (bbLeague === 'EUROLEAGUE') {
+        const res = await fetchEuroLeagueSeason(bbSeason);
+        sourceUsed = res.sourceUsed;
+        rowsFetched = res.rowsRead;
+        rowsSkipped = res.rowsSkipped;
+        teams = res.teams;
+        games = res.games;
+        unresolvedTeams = res.unresolvedTeams;
+      } else {
+        const useEspn = requestedSource === 'espn' || fillHalfScores || explicitDates.length > 0;
+        if (useEspn) {
+          let targetDates = explicitDates;
+          if (targetDates.length === 0 && fillHalfScores) {
+            const missing = await getGameDatesMissingHalfScores(bbLeague, bbSeason);
+            targetDates = missing.dates;
+          } else if (targetDates.length === 0) {
+            targetDates = getCurrentSeasonDateWindow(bbSeason);
+          }
+
+          if (targetDates.length === 0) {
+            return NextResponse.json({
+              success: true,
+              sport: 'basketball',
+              dryRun,
+              league: bbLeague,
+              season: bbSeason,
+              sourceUsed: `espn:${bbLeague.toLowerCase()}:scoreboard`,
+              rowsFetched: 0,
+              rowsInserted: 0,
+              rowsSkipped: 0,
+              withHalfScoresCount: 0,
+              halfScoresPct: 0,
+              earliestDate: null,
+              latestDate: null,
+              unresolvedTeamsCount: 0,
+              unresolvedTeams: [],
+              persistenceTarget: dryRun ? 'Dry Run Preview (No writes performed)' : 'No missing-half-score dates to fetch',
+            });
+          }
+
+          const res = await fetchEspnScoreboardDates({
+            league: bbLeague,
+            season: bbSeason,
+            dates: targetDates,
+          });
+          sourceUsed = `${res.sourceUsed} (${res.datesQueried} dates)`;
+          rowsFetched = res.eventsRead;
+          rowsSkipped = res.rowsSkipped;
+          teams = res.teams;
+          games = res.games;
+          unresolvedTeams = res.unresolvedTeams;
+        } else {
+          const res = await fetchHoopRSeason(bbLeague, bbSeason);
+          sourceUsed = res.sourceUsed;
+          rowsFetched = res.rowsRead;
+          rowsSkipped = res.rowsSkipped;
+          teams = res.teams;
+          games = res.games;
+          unresolvedTeams = res.unresolvedTeams;
+        }
+      }
+
+      const sortedDates = games.map((g) => g.game_date).filter(Boolean).sort();
+      const earliestDate = sortedDates[0] || null;
+      const latestDate = sortedDates[sortedDates.length - 1] || null;
+      const withHalfScoresCount = games.filter((g) => g.h1_home !== null && g.h1_away !== null).length;
+      const halfScoresPct = games.length > 0 ? Math.round((withHalfScoresCount * 1000) / games.length) / 10 : 0;
+
+      const upsertRes = await upsertBasketballData(teams, games, unresolvedTeams, dryRun);
+      if (upsertRes.errors.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            sport: 'basketball',
+            dryRun,
+            league: bbLeague,
+            season: bbSeason,
+            sourceUsed,
+            error: upsertRes.errors.join(' | '),
+            errors: upsertRes.errors,
+          },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        sport: 'basketball',
+        dryRun,
+        league: bbLeague,
+        season: bbSeason,
+        sourceUsed,
+        rowsFetched,
+        rowsInserted: dryRun ? games.length : upsertRes.inserted,
+        rowsSkipped,
+        withHalfScoresCount,
+        halfScoresPct,
+        earliestDate,
+        latestDate,
+        unresolvedTeamsCount: unresolvedTeams.length,
+        unresolvedTeams,
+        environment: process.env.NODE_ENV || 'development',
+        persistenceTarget: dryRun
+          ? 'Dry Run Preview (No writes performed)'
+          : isSupabaseConfigured && supabase
+          ? 'Supabase / Local DB'
+          : 'Unconfigured',
+      });
+    } catch (bbError: any) {
+      console.error(`[AdminBackfill][Basketball] Error backfilling ${bbLeague} ${bbSeason}:`, bbError);
+      return NextResponse.json(
+        {
+          success: false,
+          sport: 'basketball',
+          league: bbLeague,
+          season: bbSeason,
+          error: bbError?.message || 'Basketball backfill failed',
+        },
+        { status: 500 }
+      );
+    }
+  }
 
   // Validate that season is not dropped season 1920 or 2019
   if (season === '1920' || season === '2019') {

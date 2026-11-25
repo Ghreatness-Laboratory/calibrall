@@ -3,6 +3,7 @@ import { matchesStore } from '@/lib/data/matchesStore';
 import { verifyAdminSecretHeader } from '@/lib/auth/adminAuth';
 import { getAllProviderSyncStates, getStoredSportFreshness } from '@/lib/data/providerCallLogger';
 import { getBudgetSummary, SkippedLeagueRecord } from '@/lib/data/providerBudget';
+import { getBasketballDataStatus } from '@/lib/basketball/store';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,11 +16,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [report, syncStates, footballFreshness, basketballFreshness] = await Promise.all([
+    const [report, syncStates, footballFreshness, basketballFreshness, basketballDataStatus] = await Promise.all([
       matchesStore.getDataStatus(),
       getAllProviderSyncStates(),
       getStoredSportFreshness('football'),
       getStoredSportFreshness('basketball'),
+      getBasketballDataStatus(),
     ]);
 
     const skippedMap = new Map<string, SkippedLeagueRecord>();
@@ -35,6 +37,7 @@ export async function GET(req: NextRequest) {
         success: true,
         timestamp: new Date().toISOString(),
         ...report,
+        basketball: basketballDataStatus,
         providerSyncStates: syncStates,
         skippedLeagues: Array.from(skippedMap.values()),
         providerBudget: getBudgetSummary(),

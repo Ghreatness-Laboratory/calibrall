@@ -100,6 +100,65 @@ interface DataStatusPayload {
   unresolvedTeams: UnresolvedTeamEntry[];
   unmappedFixtureNamesCount: number;
   unmappedFixtureNames: { name: string; provider: string }[];
+  basketball?: {
+    totalGames: number;
+    totalTeams: number;
+    earliestDate: string | null;
+    latestDate: string | null;
+    aggregationMethod: 'rpc' | 'paginated';
+    storeUsed: 'supabase' | 'local-sqlite';
+    unresolvedTeamsCount: number;
+    unresolvedTeams: UnresolvedTeamEntry[];
+    leagueSummary: {
+      league: 'NBA' | 'NCAAB' | 'EUROLEAGUE';
+      count: number;
+      finishedCount: number;
+      withHalfScoresCount: number;
+      halfScoresPct: number;
+      earliestDate: string | null;
+      latestDate: string | null;
+      daysAgo: number | null;
+    }[];
+    gamesPerLeagueAndSeason: {
+      league: 'NBA' | 'NCAAB' | 'EUROLEAGUE';
+      season: string;
+      count: number;
+      finishedCount: number;
+      withHalfScoresCount: number;
+      halfScoresPct: number;
+      earliestDate: string | null;
+      latestDate: string | null;
+    }[];
+  };
+}
+
+interface BasketballCallListItem {
+  sport: 'basketball';
+  league: 'NBA' | 'NCAAB' | 'EUROLEAGUE';
+  season: string;
+  source: 'hoopr' | 'espn' | 'euroleague';
+  description: string;
+  fillHalfScores?: boolean;
+}
+
+interface BasketballStepResult {
+  index: number;
+  league: string;
+  season: string;
+  source: string;
+  description: string;
+  status: 'ok' | 'error';
+  dryRun: boolean;
+  sourceUsed?: string;
+  rowsFetched: number;
+  rowsInserted: number;
+  rowsSkipped: number;
+  withHalfScoresCount: number;
+  halfScoresPct: number;
+  earliestDate: string | null;
+  latestDate: string | null;
+  unresolvedTeamsCount: number;
+  error?: string;
 }
 
 type RunState = 'idle' | 'running' | 'stopped' | 'error' | 'completed';
@@ -166,13 +225,28 @@ export default function AdminBackfillClient() {
   const [dataStatusError, setDataStatusError] = useState<string | null>(null);
   const [showEmptyLeagues, setShowEmptyLeagues] = useState<boolean>(false);
 
+  // Basketball Backfill Section State
+  const [bbLeagueFilter, setBbLeagueFilter] = useState<'ALL' | 'NBA' | 'NCAAB' | 'EUROLEAGUE'>('ALL');
+  const [bbMode, setBbMode] = useState<'primary' | 'half_fill'>('primary');
+  const [bbRunState, setBbRunState] = useState<RunState>('idle');
+  const [bbQueue, setBbQueue] = useState<BasketballCallListItem[]>([]);
+  const [bbCurrentIndex, setBbCurrentIndex] = useState<number>(-1);
+  const [bbFailedIndex, setBbFailedIndex] = useState<number | null>(null);
+  const [bbWaitingDelay, setBbWaitingDelay] = useState<boolean>(false);
+  const [bbErrorMessage, setBbErrorMessage] = useState<string | null>(null);
+  const [bbResults, setBbResults] = useState<BasketballStepResult[]>([]);
+
   const abortRef = useRef<AbortController | null>(null);
   const stopRequestedRef = useRef<boolean>(false);
+  const bbAbortRef = useRef<AbortController | null>(null);
+  const bbStopRequestedRef = useRef<boolean>(false);
 
   useEffect(() => {
     return () => {
       stopRequestedRef.current = true;
       abortRef.current?.abort();
+      bbStopRequestedRef.current = true;
+      bbAbortRef.current?.abort();
     };
   }, []);
 
@@ -464,6 +538,242 @@ export default function AdminBackfillClient() {
   const handleStop = () => {
     stopRequestedRef.current = true;
     abortRef.current?.abort();
+  };
+
+  const executeBasketballSequence = useCallback(
+    async (startIndex: number, existingQueue?: BasketballCallListItem[]) => {
+      const trimmedSecret = adminSecret;
+      if (!trimmedSecret) {
+        setBbRunState('error');
+        setBbErrorMessage('Enter the admin secret above before running the basketball backfill.');
+        return;
+      }
+
+      bbAbortRef.current?.abort();
+      const controller = new AbortController();
+      bbAbortRef.current = controller;
+      bbStopRequestedRef.current = false;
+
+      setBbRunState('running');
+      setBbErrorMessage(null);
+      setBbWaitingDelay(false);
+      setDataStatusError(null);
+
+      let activeQueue = existingQueue || bbQueue;
+
+      if (startIndex === 0 || activeQueue.length === 0) {
+        setBbResults([]);
+        setBbFailedIndex(null);
+        setBbCurrentIndex(-1);
+
+        try {
+          const listRes = await fetch('/api/admin/backfill', {
+            method: 'GET',
+            headers: { 'x-admin-secret': trimmedSecret },
+            cache: 'no-store',
+            signal: controller.signal,
+          });
+          const listJson = await listRes.json().catch(() => null);
+          if (!listRes.ok) {
+            setBbRunState('error');
+            setBbErrorMessage(`HTTP ${listRes.status}: ${listJson?.error || listRes.statusText || 'Unauthorized'}`);
+            return;
+          }
+
+          const rawList: BasketballCallListItem[] = Array.isArray(listJson?.basketballCallList)
+            ? listJson.basketballCallList
+            : [];
+
+          if (bbMode === 'half_fill') {
+            const seasonsMap = (listJson?.basketballSeasons || {}) as Record<string, string[]>;
+            const halfQueue: BasketballCallListItem[] = [];
+            for (const lg of ['NBA', 'NCAAB'] as const) {
+              if (bbLeagueFilter !== 'ALL' && bbLeagueFilter !== lg) continue;
+              const seasons = seasonsMap[lg] || [];
+              for (const s of seasons) {
+                halfQueue.push({
+                  sport: 'basketball',
+                  league: lg,
+                  season: s,
+                  source: 'espn',
+                  description: `${lg} ${s} ESPN half-score gap-fill`,
+                  fillHalfScores: true,
+                });
+              }
+            }
+            activeQueue = halfQueue;
+          } else {
+            activeQueue = rawList.filter((item) =>
+              bbLeagueFilter === 'ALL' ? true : item.league === bbLeagueFilter
+            );
+          }
+
+          setBbQueue(activeQueue);
+        } catch (err: any) {
+          if (err?.name === 'AbortError') {
+            setBbRunState('stopped');
+            return;
+          }
+          setBbRunState('error');
+          setBbErrorMessage(err?.message || 'Failed to fetch basketball backfill queue.');
+          return;
+        }
+      }
+
+      if (activeQueue.length === 0) {
+        setBbRunState('error');
+        setBbErrorMessage('No basketball league and season steps match the selected filter.');
+        return;
+      }
+
+      for (let i = startIndex; i < activeQueue.length; i++) {
+        if (bbStopRequestedRef.current || controller.signal.aborted) {
+          setBbFailedIndex(i);
+          setBbRunState('stopped');
+          setBbWaitingDelay(false);
+          return;
+        }
+
+        const item = activeQueue[i];
+        setBbCurrentIndex(i);
+        setBbWaitingDelay(false);
+
+        const endpoint = `/api/admin/backfill?sport=basketball&league=${encodeURIComponent(
+          item.league
+        )}&season=${encodeURIComponent(item.season)}&source=${encodeURIComponent(
+          item.source
+        )}&dryRun=${dryRun ? 'true' : 'false'}${item.fillHalfScores ? '&fillHalfScores=true' : ''}`;
+
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'x-admin-secret': trimmedSecret },
+            cache: 'no-store',
+            signal: controller.signal,
+          });
+          const text = await res.text();
+          let json: any = null;
+          try {
+            json = JSON.parse(text);
+          } catch {
+            json = null;
+          }
+
+          if (!res.ok || !json?.success) {
+            const exactError = json?.error || (text && text.length < 300 ? text : `HTTP ${res.status} ${res.statusText}`);
+            setBbResults((prev) => [
+              {
+                index: i,
+                league: item.league,
+                season: item.season,
+                source: item.source,
+                description: item.description,
+                status: 'error',
+                dryRun,
+                rowsFetched: Number(json?.rowsFetched ?? 0),
+                rowsInserted: 0,
+                rowsSkipped: Number(json?.rowsSkipped ?? 0),
+                withHalfScoresCount: 0,
+                halfScoresPct: 0,
+                earliestDate: null,
+                latestDate: null,
+                unresolvedTeamsCount: 0,
+                error: `HTTP ${res.status}: ${exactError}`,
+              },
+              ...prev.filter((r) => r.index !== i),
+            ]);
+            setBbFailedIndex(i);
+            setBbErrorMessage(`${item.league} ${item.season}: HTTP ${res.status} — ${exactError}`);
+            setBbRunState('error');
+            setBbWaitingDelay(false);
+            return;
+          }
+
+          setBbResults((prev) => [
+            {
+              index: i,
+              league: item.league,
+              season: item.season,
+              source: item.source,
+              description: item.description,
+              status: 'ok',
+              dryRun: Boolean(json.dryRun),
+              sourceUsed: json.sourceUsed,
+              rowsFetched: Number(json.rowsFetched ?? 0),
+              rowsInserted: json.dryRun ? 0 : Number(json.rowsInserted ?? 0),
+              rowsSkipped: Number(json.rowsSkipped ?? 0),
+              withHalfScoresCount: Number(json.withHalfScoresCount ?? 0),
+              halfScoresPct: Number(json.halfScoresPct ?? 0),
+              earliestDate: json.earliestDate ?? null,
+              latestDate: json.latestDate ?? null,
+              unresolvedTeamsCount: Number(json.unresolvedTeamsCount ?? 0),
+            },
+            ...prev.filter((r) => r.index !== i),
+          ]);
+          setBbFailedIndex(null);
+        } catch (err: any) {
+          if (err?.name === 'AbortError') {
+            setBbFailedIndex(i);
+            setBbRunState('stopped');
+            setBbWaitingDelay(false);
+            return;
+          }
+          const errMsg = err?.message || 'Network request failed';
+          setBbResults((prev) => [
+            {
+              index: i,
+              league: item.league,
+              season: item.season,
+              source: item.source,
+              description: item.description,
+              status: 'error',
+              dryRun,
+              rowsFetched: 0,
+              rowsInserted: 0,
+              rowsSkipped: 0,
+              withHalfScoresCount: 0,
+              halfScoresPct: 0,
+              earliestDate: null,
+              latestDate: null,
+              unresolvedTeamsCount: 0,
+              error: errMsg,
+            },
+            ...prev.filter((r) => r.index !== i),
+          ]);
+          setBbFailedIndex(i);
+          setBbErrorMessage(`${item.league} ${item.season}: ${errMsg}`);
+          setBbRunState('error');
+          setBbWaitingDelay(false);
+          return;
+        }
+
+        if (i < activeQueue.length - 1) {
+          setBbWaitingDelay(true);
+          try {
+            await sleepAbortable(750, controller.signal);
+          } catch (err: any) {
+            if (err?.name === 'AbortError') {
+              setBbFailedIndex(i + 1);
+              setBbRunState('stopped');
+              setBbWaitingDelay(false);
+              return;
+            }
+          }
+          setBbWaitingDelay(false);
+        }
+      }
+
+      setBbCurrentIndex(-1);
+      setBbFailedIndex(null);
+      setBbRunState('completed');
+      await fetchDataStatusReport(trimmedSecret, controller.signal);
+    },
+    [adminSecret, bbLeagueFilter, bbMode, bbQueue, dryRun, fetchDataStatusReport, sleepAbortable]
+  );
+
+  const handleBasketballStop = () => {
+    bbStopRequestedRef.current = true;
+    bbAbortRef.current?.abort();
   };
 
   const completedOkCount = results.filter((r) => r.status === 'ok').length;
@@ -1126,6 +1436,253 @@ export default function AdminBackfillClient() {
           </section>
         </div>
       )}
+
+      {/* ===================================================================== */}
+      {/* BASKETBALL SECTION (Separate sport: NBA, NCAAB D1, EuroLeague)        */}
+      {/* ===================================================================== */}
+      <section className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-4 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#1F2A24] pb-3">
+          <div>
+            <h2 className="text-[15px] font-semibold text-[#E9EFEB]">
+              Basketball Backfill (NBA, NCAAB D1, EuroLeague)
+            </h2>
+            <p className="text-[12px] text-[#8B9892] mt-0.5">
+              Compact game and team totals with real quarter/half scores (hoopR, ESPN scoreboard, EuroLeague API v2). Shares the admin secret and dry run toggle above.
+            </p>
+          </div>
+          {adminSecret.length > 0 && (
+            <button
+              type="button"
+              onClick={() => fetchDataStatusReport(adminSecret)}
+              disabled={dataStatusLoading}
+              className="min-h-[38px] px-3 rounded-[8px] border border-[#1F2A24] bg-[#151D19] text-[11.5px] font-medium text-[#E9EFEB] hover:border-[#B8E636]/50 whitespace-nowrap shrink-0"
+            >
+              {dataStatusLoading ? 'Refreshing...' : 'Load Basketball Status'}
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label htmlFor="bb-league-select" className="block text-[11.5px] font-medium text-[#8B9892]">
+              Basketball league filter
+            </label>
+            <select
+              id="bb-league-select"
+              value={bbLeagueFilter}
+              disabled={bbRunState === 'running'}
+              onChange={(e) => setBbLeagueFilter(e.target.value as 'ALL' | 'NBA' | 'NCAAB' | 'EUROLEAGUE')}
+              className="w-full min-h-[44px] px-3 rounded-[10px] bg-[#0A0E0C] border border-[#1F2A24] text-[12.5px] text-[#E9EFEB] focus:border-[#B8E636] focus:outline-none disabled:opacity-50"
+            >
+              <option value="ALL">All Leagues (NBA, NCAAB D1, EuroLeague)</option>
+              <option value="NBA">NBA (last 8 completed seasons + 2026/27)</option>
+              <option value="NCAAB">NCAAB D1 vs D1 (last 4 completed seasons + 2026/27)</option>
+              <option value="EUROLEAGUE">EuroLeague (last 8 completed seasons + 2026/27)</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="bb-mode-select" className="block text-[11.5px] font-medium text-[#8B9892]">
+              Pipeline stage
+            </label>
+            <select
+              id="bb-mode-select"
+              value={bbMode}
+              disabled={bbRunState === 'running'}
+              onChange={(e) => setBbMode(e.target.value as 'primary' | 'half_fill')}
+              className="w-full min-h-[44px] px-3 rounded-[10px] bg-[#0A0E0C] border border-[#1F2A24] text-[12.5px] text-[#E9EFEB] focus:border-[#B8E636] focus:outline-none disabled:opacity-50"
+            >
+              <option value="primary">Primary history + current gap fill (hoopR, EuroLeague, ESPN 2026/27)</option>
+              <option value="half_fill">ESPN historical half score gap fill (for games missing h1)</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2.5">
+          {bbRunState !== 'running' ? (
+            <button
+              type="button"
+              onClick={() => executeBasketballSequence(0)}
+              className="w-full sm:w-auto flex-1 min-h-[46px] px-4 rounded-[10px] bg-[#B8E636] hover:bg-[#c5ef4b] text-[#0A0E0C] font-semibold text-[13.5px] flex items-center justify-center gap-2 transition-all whitespace-nowrap"
+            >
+              <Play className="w-4 h-4 shrink-0" />
+              <span>{dryRun ? 'Run Basketball Backfill (Dry run)' : 'Run Basketball Backfill (Live write)'}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleBasketballStop}
+              className="w-full sm:w-auto flex-1 min-h-[46px] px-4 rounded-[10px] bg-[#151D19] hover:bg-[#1b2620] border border-[#E8B04A]/40 text-[#E8B04A] font-semibold text-[13.5px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+            >
+              <Square className="w-4 h-4 shrink-0" />
+              <span>Stop basketball run</span>
+            </button>
+          )}
+
+          {(bbRunState === 'error' || bbRunState === 'stopped') &&
+            bbFailedIndex !== null &&
+            bbQueue.length > 0 && (
+              <button
+                type="button"
+                onClick={() => executeBasketballSequence(bbFailedIndex, bbQueue)}
+                className="w-full sm:w-auto min-h-[46px] px-4 rounded-[10px] bg-[#151D19] hover:bg-[#1c2621] border border-[#B8E636]/50 text-[#B8E636] font-semibold text-[13.5px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+              >
+                <RotateCcw className="w-4 h-4 shrink-0" />
+                <span>
+                  Resume ({bbQueue[bbFailedIndex]?.league} {bbQueue[bbFailedIndex]?.season})
+                </span>
+              </button>
+            )}
+        </div>
+
+        {bbErrorMessage && (
+          <div role="alert" className="p-3 rounded-[10px] bg-[#1A1011] border border-red-500/40 text-[12px] font-mono text-red-200 break-words">
+            {bbErrorMessage}
+          </div>
+        )}
+
+        {(bbQueue.length > 0 || bbResults.length > 0) && (
+          <div className="space-y-3 pt-2 border-t border-[#1F2A24]">
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="font-semibold text-[#E9EFEB]">
+                {bbRunState === 'running' && bbCurrentIndex >= 0 && bbQueue[bbCurrentIndex]
+                  ? bbWaitingDelay
+                    ? `Completed ${bbQueue[bbCurrentIndex].league} ${bbQueue[bbCurrentIndex].season} · waiting`
+                    : `Fetching ${bbQueue[bbCurrentIndex].league} ${bbQueue[bbCurrentIndex].season} (${bbQueue[bbCurrentIndex].source})`
+                  : `Basketball progress: ${bbResults.filter((r) => r.status === 'ok').length} / ${bbQueue.length}`}
+              </span>
+              <span className="font-mono tabular-nums text-[#8B9892]">
+                {bbResults.filter((r) => r.status === 'ok').length} / {bbQueue.length}
+              </span>
+            </div>
+
+            {bbResults.length > 0 && (
+              <div className="border border-[#1F2A24] rounded-[10px] bg-[#0A0E0C] max-h-[300px] overflow-y-auto overflow-x-auto">
+                <table className="w-full text-left text-[11.5px]">
+                  <thead className="sticky top-0 bg-[#101613] text-[#8B9892] border-b border-[#1F2A24] text-[11px]">
+                    <tr>
+                      <th className="py-2 px-3 font-medium">League</th>
+                      <th className="py-2 px-3 font-medium">Season</th>
+                      <th className="py-2 px-3 font-medium">Source</th>
+                      <th className="py-2 px-3 font-medium text-right">Fetched</th>
+                      <th className="py-2 px-3 font-medium text-right">Written</th>
+                      <th className="py-2 px-3 font-medium text-right">Half Scores %</th>
+                      <th className="py-2 px-3 font-medium text-right">Unresolved</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1F2A24] font-mono tabular-nums">
+                    {bbResults.map((r) => (
+                      <tr key={`${r.league}-${r.season}-${r.source}-${r.index}`} className="hover:bg-[#151D19]/60">
+                        <td className="py-2 px-3 text-[#E9EFEB] font-semibold">{r.league}</td>
+                        <td className="py-2 px-3 text-[#8B9892]">{r.season}</td>
+                        <td className="py-2 px-3 text-[#8B9892]">{r.sourceUsed || r.source}</td>
+                        <td className="py-2 px-3 text-right text-[#E9EFEB]">{r.rowsFetched}</td>
+                        <td className="py-2 px-3 text-right text-[#B8E636]">
+                          {r.dryRun ? '0 (dry)' : r.rowsInserted}
+                        </td>
+                        <td className="py-2 px-3 text-right text-[#E9EFEB]">{r.halfScoresPct}%</td>
+                        <td className={`py-2 px-3 text-right ${r.unresolvedTeamsCount > 0 ? 'text-[#E8B04A]' : 'text-[#8B9892]'}`}>
+                          {r.unresolvedTeamsCount}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Basketball Data Status View */}
+        {dataStatus?.basketball && (
+          <div className="space-y-3 pt-2 border-t border-[#1F2A24]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h3 className="text-[13.5px] font-semibold text-[#E9EFEB]">
+                Basketball Database Status
+              </h3>
+              <span className="text-[11px] font-mono text-[#8B9892]">
+                {dataStatus.basketball.storeUsed} · {dataStatus.basketball.aggregationMethod}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="p-2.5 rounded-[10px] bg-[#0A0E0C] border border-[#1F2A24]">
+                <div className="text-[10.5px] text-[#8B9892]">Basketball games</div>
+                <div className="text-[16px] font-semibold font-mono tabular-nums text-[#E9EFEB] mt-0.5">
+                  {dataStatus.basketball.totalGames.toLocaleString()}
+                </div>
+              </div>
+              <div className="p-2.5 rounded-[10px] bg-[#0A0E0C] border border-[#1F2A24]">
+                <div className="text-[10.5px] text-[#8B9892]">Canonical teams</div>
+                <div className="text-[16px] font-semibold font-mono tabular-nums text-[#E9EFEB] mt-0.5">
+                  {dataStatus.basketball.totalTeams.toLocaleString()}
+                </div>
+              </div>
+              <div className="p-2.5 rounded-[10px] bg-[#0A0E0C] border border-[#1F2A24]">
+                <div className="text-[10.5px] text-[#8B9892]">Latest game date</div>
+                <div className="text-[14px] font-semibold font-mono tabular-nums text-[#B8E636] mt-1">
+                  {dataStatus.basketball.latestDate || 'None'}
+                </div>
+              </div>
+              <div className="p-2.5 rounded-[10px] bg-[#0A0E0C] border border-[#1F2A24]">
+                <div className="text-[10.5px] text-[#8B9892]">Unresolved BB names</div>
+                <div className="text-[16px] font-semibold font-mono tabular-nums text-[#E9EFEB] mt-0.5">
+                  {dataStatus.basketball.unresolvedTeamsCount}
+                </div>
+              </div>
+            </div>
+
+            {dataStatus.basketball.gamesPerLeagueAndSeason.length === 0 ? (
+              <div className="p-3 rounded-[10px] bg-[#0A0E0C] border border-[#1F2A24] text-[12px] text-[#8B9892]">
+                Needs history: no basketball games persisted yet.
+              </div>
+            ) : (
+              <div className="border border-[#1F2A24] rounded-[10px] bg-[#0A0E0C] overflow-x-auto max-h-[340px] overflow-y-auto">
+                <table className="w-full text-left text-[11.5px]">
+                  <thead className="sticky top-0 bg-[#151D19] text-[#8B9892] border-b border-[#1F2A24] text-[11px]">
+                    <tr>
+                      <th className="py-2 px-3 font-medium">League</th>
+                      <th className="py-2 px-3 font-medium">Season</th>
+                      <th className="py-2 px-3 font-medium text-right">Games</th>
+                      <th className="py-2 px-3 font-medium text-right">Finished</th>
+                      <th className="py-2 px-3 font-medium text-right">With Half Scores</th>
+                      <th className="py-2 px-3 font-medium text-right">Half Scores %</th>
+                      <th className="py-2 px-3 font-medium">Latest Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1F2A24] font-mono tabular-nums">
+                    {dataStatus.basketball.gamesPerLeagueAndSeason.map((row) => (
+                      <tr key={`${row.league}-${row.season}`} className="hover:bg-[#151D19]/50">
+                        <td className="py-2 px-3 text-[#B8E636] font-semibold">{row.league}</td>
+                        <td className="py-2 px-3 text-[#E9EFEB]">{row.season}</td>
+                        <td className="py-2 px-3 text-right text-[#E9EFEB]">{row.count.toLocaleString()}</td>
+                        <td className="py-2 px-3 text-right text-[#8B9892]">{row.finishedCount.toLocaleString()}</td>
+                        <td className="py-2 px-3 text-right text-[#E9EFEB]">{row.withHalfScoresCount.toLocaleString()}</td>
+                        <td className="py-2 px-3 text-right text-[#B8E636]">{row.halfScoresPct}%</td>
+                        <td className="py-2 px-3 text-[#8B9892]">{row.latestDate || 'N/A'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {dataStatus.basketball.unresolvedTeams.length > 0 && (
+              <div className="border border-[#E8B04A]/40 rounded-[10px] bg-[#0A0E0C] divide-y divide-[#1F2A24] max-h-[200px] overflow-y-auto">
+                {dataStatus.basketball.unresolvedTeams.map((u, idx) => (
+                  <div key={`${u.sourceProvider}-${u.sourceName}-${idx}`} className="p-2.5 px-3 flex items-center justify-between gap-2 text-[11.5px]">
+                    <div className="min-w-0">
+                      <div className="font-mono text-[#E9EFEB] truncate">{u.sourceName}</div>
+                      <div className="text-[10.5px] text-[#8B9892] truncate">{u.sourceProvider}</div>
+                    </div>
+                    <span className="font-mono tabular-nums text-[#E8B04A] shrink-0">{u.count}x</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

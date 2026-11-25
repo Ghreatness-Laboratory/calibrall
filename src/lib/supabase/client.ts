@@ -274,8 +274,9 @@ class LocalSupabaseQueryBuilder {
           const sql = `INSERT INTO "${this.table}" (${quotedKeys}) VALUES (${placeholders}) ON CONFLICT (${conflictClause}) ${doUpdate}`;
           const values = keys.map(k => {
             const val = row[k];
-            if (val === undefined) return null;
+            if (val === undefined || val === null) return null;
             if (typeof val === 'boolean') return val ? 1 : 0;
+            if (Array.isArray(val) || typeof val === 'object') return JSON.stringify(val);
             return val;
           });
 
@@ -553,6 +554,71 @@ export function getLocalDatabase(): any {
           budget_date TEXT,
           updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS bb_teams (
+          id TEXT PRIMARY KEY,
+          league TEXT NOT NULL,
+          name TEXT NOT NULL,
+          aliases TEXT NOT NULL DEFAULT '[]',
+          provider_ids TEXT NOT NULL DEFAULT '{}',
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS bb_games (
+          id TEXT PRIMARY KEY,
+          league TEXT NOT NULL,
+          season TEXT NOT NULL,
+          game_date TEXT NOT NULL,
+          kickoff_utc TEXT,
+          home_id TEXT NOT NULL,
+          away_id TEXT NOT NULL,
+          neutral INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'SCHEDULED',
+          home_pts INTEGER,
+          away_pts INTEGER,
+          h1_home INTEGER,
+          h1_away INTEGER,
+          ot_periods INTEGER NOT NULL DEFAULT 0,
+          q_scores TEXT,
+          source TEXT NOT NULL,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS bb_picks (
+          id TEXT PRIMARY KEY,
+          game_id TEXT NOT NULL,
+          sport TEXT NOT NULL DEFAULT 'basketball',
+          league TEXT NOT NULL,
+          season TEXT NOT NULL,
+          market_code TEXT NOT NULL,
+          market_category TEXT NOT NULL,
+          selection TEXT NOT NULL,
+          line REAL NOT NULL,
+          projected_mean REAL,
+          model_probability REAL NOT NULL,
+          market_odds REAL,
+          implied_probability REAL,
+          expected_value REAL,
+          model_version TEXT NOT NULL,
+          model_confidence TEXT NOT NULL,
+          qualification_status TEXT NOT NULL,
+          is_top_pick INTEGER NOT NULL DEFAULT 0,
+          record_hash TEXT,
+          recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          kickoff_utc TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS bb_settlements (
+          id TEXT PRIMARY KEY,
+          pick_id TEXT UNIQUE NOT NULL,
+          game_id TEXT NOT NULL,
+          sport TEXT NOT NULL DEFAULT 'basketball',
+          settlement_status TEXT NOT NULL DEFAULT 'PENDING',
+          actual_value REAL,
+          actual_score TEXT,
+          brier_error REAL,
+          log_loss REAL,
+          settled_at TEXT,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
       `);
 
       // Ensure columns exist on older tables
@@ -738,6 +804,100 @@ function createLocalSupabaseClient(): any {
           };
         } catch (err: any) {
           return { data: null, error: { message: err?.message || 'Local RPC error', code: 'LOCAL_RPC_ERROR' } };
+        }
+      }
+      if (fnName === 'get_bb_data_status_aggregates') {
+        try {
+          const db = getLocalDatabase();
+          if (!db) {
+            return {
+              data: {
+                totalGames: 0,
+                totalTeams: 0,
+                earliestDate: null,
+                latestDate: null,
+                gamesPerLeagueAndSeason: [],
+                leagueSummary: [],
+              },
+              error: null,
+            };
+          }
+
+          const totals = db.prepare(`
+            SELECT
+              COUNT(*) AS totalGames,
+              MIN(game_date) AS earliestDate,
+              COALESCE(MAX(CASE WHEN status = 'FINISHED' THEN game_date END), MAX(game_date)) AS latestDate
+            FROM bb_games
+          `).get() as { totalGames: number; earliestDate: string | null; latestDate: string | null } | undefined;
+
+          const teamRow = db.prepare('SELECT COUNT(*) AS c FROM bb_teams').get() as { c: number } | undefined;
+
+          const byLeagueSeason = db.prepare(`
+            SELECT
+              league,
+              season,
+              COUNT(*) AS count,
+              SUM(CASE WHEN status = 'FINISHED' THEN 1 ELSE 0 END) AS finishedCount,
+              SUM(CASE WHEN h1_home IS NOT NULL AND h1_away IS NOT NULL THEN 1 ELSE 0 END) AS withHalfScoresCount,
+              MIN(game_date) AS earliestDate,
+              COALESCE(MAX(CASE WHEN status = 'FINISHED' THEN game_date END), MAX(game_date)) AS latestDate
+            FROM bb_games
+            GROUP BY league, season
+            ORDER BY league ASC, season DESC
+          `).all() as Array<any>;
+
+          const byLeague = db.prepare(`
+            SELECT
+              league,
+              COUNT(*) AS count,
+              SUM(CASE WHEN status = 'FINISHED' THEN 1 ELSE 0 END) AS finishedCount,
+              SUM(CASE WHEN h1_home IS NOT NULL AND h1_away IS NOT NULL THEN 1 ELSE 0 END) AS withHalfScoresCount,
+              MIN(game_date) AS earliestDate,
+              COALESCE(MAX(CASE WHEN status = 'FINISHED' THEN game_date END), MAX(game_date)) AS latestDate
+            FROM bb_games
+            GROUP BY league
+            ORDER BY league ASC
+          `).all() as Array<any>;
+
+          return {
+            data: {
+              totalGames: Number(totals?.totalGames) || 0,
+              totalTeams: Number(teamRow?.c) || 0,
+              earliestDate: totals?.earliestDate || null,
+              latestDate: totals?.latestDate || null,
+              gamesPerLeagueAndSeason: byLeagueSeason.map((r) => {
+                const count = Number(r.count) || 0;
+                const withHalf = Number(r.withHalfScoresCount) || 0;
+                return {
+                  league: r.league,
+                  season: r.season,
+                  count,
+                  finishedCount: Number(r.finishedCount) || 0,
+                  withHalfScoresCount: withHalf,
+                  halfScoresPct: count > 0 ? Math.round((withHalf * 1000) / count) / 10 : 0,
+                  earliestDate: r.earliestDate || null,
+                  latestDate: r.latestDate || null,
+                };
+              }),
+              leagueSummary: byLeague.map((r) => {
+                const count = Number(r.count) || 0;
+                const withHalf = Number(r.withHalfScoresCount) || 0;
+                return {
+                  league: r.league,
+                  count,
+                  finishedCount: Number(r.finishedCount) || 0,
+                  withHalfScoresCount: withHalf,
+                  halfScoresPct: count > 0 ? Math.round((withHalf * 1000) / count) / 10 : 0,
+                  earliestDate: r.earliestDate || null,
+                  latestDate: r.latestDate || null,
+                };
+              }),
+            },
+            error: null,
+          };
+        } catch (err: any) {
+          return { data: null, error: { message: err?.message || 'Local BB RPC error', code: 'LOCAL_RPC_ERROR' } };
         }
       }
       return {
