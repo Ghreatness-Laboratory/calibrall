@@ -371,6 +371,11 @@ export interface Fixture {
   };
   // Basketball specific fields
   basketballStats?: {
+    league?: 'NBA' | 'NCAAB' | 'EUROLEAGUE';
+    neutral?: boolean;
+    needsHistory?: boolean;
+    needsH1History?: boolean;
+    abstentionReason?: string | null;
     homeOffEff: number;
     homeDefEff: number;
     homePoss: number;
@@ -386,7 +391,17 @@ export interface Fixture {
     projectedTotal: number;
     projectedMargin: number;
     projectedWinner: string;
+    projectedTotalStd?: number;
+    h1HomeProjected?: number;
+    h1AwayProjected?: number;
+    h1ProjectedTotal?: number;
+    h1ProjectedTotalStd?: number;
+    homeRestDays?: number | null;
+    awayRestDays?: number | null;
+    homeIsB2B?: boolean;
+    awayIsB2B?: boolean;
     sportsbookTotal?: number;
+    sportsbookTotalBookmaker?: string;
     sportsbookSpreadHome?: number;
     totalLean?: 'OVER' | 'UNDER' | 'PUSH';
     spreadLean?: string;

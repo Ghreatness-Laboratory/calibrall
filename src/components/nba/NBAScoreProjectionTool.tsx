@@ -24,8 +24,7 @@ import {
   RotateCcw, 
   CheckCircle2, 
   TrendingUp, 
-  ShieldCheck, 
-  HelpCircle,
+  Clock, 
   AlertTriangle,
   Sparkles,
   Info
@@ -53,9 +52,9 @@ export default function NBAScoreProjectionTool() {
   const [statsError, setStatsError] = useState<string | null>(null);
   const [apiStats, setApiStats] = useState<Record<string, NBATeamStats>>({});
 
-  // Sportsbook optional lines
-  const [sportsbookTotal, setSportsbookTotal] = useState<string>('224.5');
-  const [sportsbookSpreadTeamA, setSportsbookSpreadTeamA] = useState<string>('−5.5');
+  // Optional user-entered totals lines (no spreads)
+  const [sportsbookTotal, setSportsbookTotal] = useState<string>('');
+  const [sportsbookH1Total, setSportsbookH1Total] = useState<string>('');
 
   const allTeams = useMemo(() => getAllNBATeamsList(), []);
 
@@ -171,12 +170,6 @@ export default function NBAScoreProjectionTool() {
     const temp = { ...teamA };
     setTeamA({ ...teamB });
     setTeamB(temp);
-
-    // Also invert spread line if present
-    const spreadNum = parseFloat(sportsbookSpreadTeamA);
-    if (!isNaN(spreadNum)) {
-      setSportsbookSpreadTeamA((-spreadNum).toString());
-    }
   };
 
   // Reset Team A to Auto
@@ -231,7 +224,7 @@ export default function NBAScoreProjectionTool() {
     return validateTeamInputs(inputA, inputB);
   }, [inputA, inputB]);
 
-  // Calculation Results
+  // Calculation Results (strictly totals + 1st half totals, no spreads)
   const calculationResult: StepByStepCalculation | null = useMemo(() => {
     if (!validation.isValid) return null;
     return calculateNBAScoreProjection(
@@ -239,10 +232,23 @@ export default function NBAScoreProjectionTool() {
       inputB,
       {
         totalLine: sportsbookTotal ? parseFloat(sportsbookTotal) : undefined,
-        spreadLineTeamA: sportsbookSpreadTeamA ? parseFloat(sportsbookSpreadTeamA) : undefined,
       }
     );
-  }, [inputA, inputB, validation.isValid, sportsbookTotal, sportsbookSpreadTeamA]);
+  }, [inputA, inputB, validation.isValid, sportsbookTotal]);
+
+  const h1ProjectedTotal = useMemo(() => {
+    if (!calculationResult) return null;
+    return calculationResult.total * 0.503;
+  }, [calculationResult]);
+
+  const h1Lean = useMemo(() => {
+    if (h1ProjectedTotal === null || !sportsbookH1Total) return null;
+    const line = parseFloat(sportsbookH1Total);
+    if (isNaN(line)) return null;
+    const diff = h1ProjectedTotal - line;
+    const lean = diff > 0.5 ? 'OVER' : diff < -0.5 ? 'UNDER' : 'EVEN';
+    return { line, diff, lean };
+  }, [h1ProjectedTotal, sportsbookH1Total]);
 
   return (
     <div className="space-y-6">
@@ -583,31 +589,31 @@ export default function NBAScoreProjectionTool() {
           <span>Swap teams</span>
         </button>
 
-        {/* Sportsbook Line Inputs (Optional) */}
-        <div className="flex items-center gap-2.5 bg-[var(--surface)] border border-[var(--border)] px-3 py-1.5 rounded-[12px] text-[11.5px]">
+        {/* Optional Totals Line Inputs (Game Total & 1st Half Total only) */}
+        <div className="flex flex-wrap items-center gap-2.5 bg-[var(--surface)] border border-[var(--border)] px-3 py-1.5 rounded-[12px] text-[11.5px]">
           <div className="flex items-center gap-1.5">
-            <span className="text-[var(--text-3)]">Total Line:</span>
+            <span className="text-[var(--text-3)]">Game Total Line:</span>
             <input
               type="number"
               step="0.5"
-              placeholder="e.g. 224.5"
+              placeholder="Optional"
               value={sportsbookTotal}
               onChange={(e) => setSportsbookTotal(e.target.value)}
-              className="h-[40px] w-20 bg-[var(--surface-2)] border border-[var(--border)] px-2.5 rounded-[12px] text-center text-[var(--text)] text-[13px] tabular-nums"
+              className="h-[40px] w-24 bg-[var(--surface-2)] border border-[var(--border)] px-2.5 rounded-[12px] text-center text-[var(--text)] text-[13px] tabular-nums"
             />
           </div>
 
           <div className="h-5 w-px bg-[var(--border)]" />
 
           <div className="flex items-center gap-1.5">
-            <span className="text-[var(--text-3)]">{teamA.name.split(' ').pop()} Spread:</span>
+            <span className="text-[var(--text-3)]">1st Half Line:</span>
             <input
               type="number"
               step="0.5"
-              placeholder="e.g. −5.5"
-              value={sportsbookSpreadTeamA}
-              onChange={(e) => setSportsbookSpreadTeamA(e.target.value)}
-              className="h-[40px] w-20 bg-[var(--surface-2)] border border-[var(--border)] px-2.5 rounded-[12px] text-center text-[var(--text)] text-[13px] tabular-nums"
+              placeholder="Optional"
+              value={sportsbookH1Total}
+              onChange={(e) => setSportsbookH1Total(e.target.value)}
+              className="h-[40px] w-24 bg-[var(--surface-2)] border border-[var(--border)] px-2.5 rounded-[12px] text-center text-[var(--text)] text-[13px] tabular-nums"
             />
           </div>
         </div>
@@ -631,25 +637,25 @@ export default function NBAScoreProjectionTool() {
             </div>
 
             <div className="text-left sm:text-right bg-[var(--surface-2)] border border-[var(--border)] px-3.5 py-2 rounded-[10px]">
-              <div className="text-[10.5px] text-[var(--text-3)]">Projected Winner & Margin</div>
-              <div className="text-[14px] font-[620] text-[var(--text)]">
-                {calculationResult.projectedWinner} by {calculationResult.margin.toFixed(2)} pts
+              <div className="text-[10.5px] text-[var(--text-3)]">Projected Game &amp; 1H Totals</div>
+              <div className="text-[14px] font-[620] text-[var(--accent)] tabular-nums">
+                Game Total: {calculationResult.total.toFixed(2)} pts
               </div>
-              <div className="text-[11.5px] font-mono text-[var(--accent)] mt-0.5">
-                Total: {calculationResult.total.toFixed(2)} pts
+              <div className="text-[11.5px] font-mono text-[var(--text)] mt-0.5 tabular-nums">
+                1st Half Est: {h1ProjectedTotal !== null ? h1ProjectedTotal.toFixed(2) : '—'} pts
               </div>
             </div>
           </div>
 
-          {/* Sportsbook Lean Cards */}
-          {(calculationResult.totalLean || calculationResult.spreadLean) && (
+          {/* Optional Totals Line Comparison Cards */}
+          {(calculationResult.totalLean || h1Lean) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
               {calculationResult.totalLean && (
                 <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-[10px] space-y-1">
                   <div className="flex items-center justify-between text-[10.5px]">
                     <span className="text-[var(--text-3)] flex items-center gap-1">
                       <TrendingUp className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
-                      <span>Total Line Market ({calculationResult.totalLean.line})</span>
+                      <span>Game Total Line ({calculationResult.totalLean.line})</span>
                     </span>
                     <span className={`px-1.5 py-0.5 rounded-[4px] font-mono font-semibold text-[10px] ${
                       calculationResult.totalLean.lean === 'OVER' 
@@ -667,19 +673,19 @@ export default function NBAScoreProjectionTool() {
                 </div>
               )}
 
-              {calculationResult.spreadLean && (
+              {h1Lean && (
                 <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-[10px] space-y-1">
                   <div className="flex items-center justify-between text-[10.5px]">
                     <span className="text-[var(--text-3)] flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
-                      <span>Spread Against The Spread (ATS)</span>
+                      <Clock className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
+                      <span>1st Half Total Line ({h1Lean.line})</span>
                     </span>
                     <span className="px-1.5 py-0.5 rounded-[4px] font-mono font-semibold text-[10px] bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30">
-                      MARGIN PROJECTION
+                      {h1Lean.lean} LEAN
                     </span>
                   </div>
                   <div className="text-[12.5px] font-medium text-[var(--text)]">
-                    {calculationResult.spreadLean.recommendation}
+                    1st half projection {(h1Lean.diff >= 0 ? '+' : '') + h1Lean.diff.toFixed(2)} pts vs {h1Lean.line}
                   </div>
                 </div>
               )}
@@ -760,24 +766,24 @@ export default function NBAScoreProjectionTool() {
                 </div>
               </div>
 
-              {/* Step 4: Total & Margin */}
+              {/* Step 4: Game & 1st Half Totals */}
               <div className="p-2.5 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1">
                 <div className="text-[11px] text-[var(--accent)] font-semibold">
-                  Step 4: Total, Margin & Winner
+                  Step 4: Game &amp; 1st Half Totals
                 </div>
                 <div className="text-[var(--muted)] text-[12px]">
-                  Formula: Projected Total = A proj + B proj; Margin = |A − B|
+                  Formula: Game Total = A proj + B proj; 1st Half = 50.3% share
                 </div>
                 <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums text-[12px]">
                   <div>
-                    <span className="text-[var(--muted)]">Projected Total: </span>
+                    <span className="text-[var(--muted)]">Projected Game Total: </span>
                     <span>{calculationResult.aProjected.toFixed(2)} + {calculationResult.bProjected.toFixed(2)} = </span>
                     <span className="text-[var(--accent)] font-semibold text-[13px]">{calculationResult.total.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--muted)]">Spread Margin: </span>
-                    <span>|{calculationResult.aProjected.toFixed(2)} − {calculationResult.bProjected.toFixed(2)}| = </span>
-                    <span className="text-[var(--text)] font-semibold">{calculationResult.margin.toFixed(2)} pts</span>
+                    <span className="text-[var(--muted)]">Projected 1st Half Total: </span>
+                    <span>{calculationResult.total.toFixed(2)} × 0.503 = </span>
+                    <span className="text-[var(--text)] font-semibold">{h1ProjectedTotal !== null ? h1ProjectedTotal.toFixed(2) : '—'} pts</span>
                   </div>
                 </div>
               </div>

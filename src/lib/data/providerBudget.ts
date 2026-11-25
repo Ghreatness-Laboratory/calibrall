@@ -33,8 +33,8 @@ export interface SkippedLeagueRecord {
   reason: string;
 }
 
-// Disable NBA & basketball syncing until basketball module is built
-export const BASKETBALL_SYNC_ENABLED = false;
+// Basketball live schedule, scoreboard & results sync enabled (NBA, NCAAB D1, EuroLeague)
+export const BASKETBALL_SYNC_ENABLED = true;
 
 // Stored fixtures are treated as within SLA until 3 days (72 hours / 4320 minutes) old.
 // Error banners are suppressed while stored real fixtures are newer than this limit.
@@ -205,23 +205,23 @@ export const PROVIDER_BUDGETS: Record<ProviderId, ProviderBudgetSpec> = {
   },
   espn_nba: {
     id: 'espn_nba',
-    name: 'ESPN NBA Scoreboard',
+    name: 'ESPN NBA/NCAAB & EuroLeague v2',
     sport: 'basketball',
-    freeQuota: 'Disabled until basketball module is built (0 calls/day)',
-    dailyQuotaLimit: 0,
-    callsPerLiveRefresh: 0,
-    callsPerScheduleRefresh: 0,
-    liveRefreshIntervalMinutes: 0,
-    scheduleRefreshIntervalMinutes: 0,
-    budgetedCallsPerDay: 0,
+    freeQuota: 'Public scoreboards + EuroLeague v2 (~14 calls/run twice daily = ~28/day) + 8/day BB Odds cap',
+    dailyQuotaLimit: 40,
+    callsPerLiveRefresh: 5,
+    callsPerScheduleRefresh: 13,
+    liveRefreshIntervalMinutes: 720,
+    scheduleRefreshIntervalMinutes: 720,
+    budgetedCallsPerDay: 28,
     beforeCallsPerDayEstimate: '248/day (15m/6h crons) and ~11,520+/day per active 120s visitor',
-    notes: 'Disabled until basketball module is built (0 calls/day).',
+    notes: 'Runs inside existing scheduled /api/v1/sync for NBA, NCAAB D1, and EuroLeague (0 visitor calls). Basketball Odds API sub-cap strictly <= 8 credits/day inside shared 500/month cap.',
   },
   balldontlie: {
     id: 'balldontlie',
     name: 'BallDontLie v1',
     sport: 'basketball',
-    freeQuota: 'Disabled until basketball module is built (0 calls/day)',
+    freeQuota: 'Not used (replaced by hoopR + ESPN + EuroLeague v2)',
     dailyQuotaLimit: 0,
     callsPerLiveRefresh: 0,
     callsPerScheduleRefresh: 0,
@@ -229,7 +229,7 @@ export const PROVIDER_BUDGETS: Record<ProviderId, ProviderBudgetSpec> = {
     scheduleRefreshIntervalMinutes: 0,
     budgetedCallsPerDay: 0,
     beforeCallsPerDayEstimate: '4/day (6h cron)',
-    notes: 'Disabled until basketball module is built (0 calls/day).',
+    notes: 'Not required; NBA, NCAAB D1, and EuroLeague use hoopR, ESPN scoreboards, and EuroLeague official API v2.',
   },
 };
 

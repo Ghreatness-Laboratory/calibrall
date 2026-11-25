@@ -2,12 +2,56 @@ import { NextResponse } from 'next/server';
 import { getFootballDataProvider } from '@/lib/data/provider';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
+import { getBasketballFixturesAndEvaluations } from '@/lib/basketball/readService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 120;
 export const maxDuration = 60;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const sport = searchParams.get('sport')?.toLowerCase() || 'football';
+
+  if (sport === 'basketball') {
+    const league = searchParams.get('league') || searchParams.get('competition_id') || undefined;
+    const day = searchParams.get('day') || undefined;
+    const bb = await getBasketballFixturesAndEvaluations({
+      league,
+      competitionId: league,
+      status: 'SCHEDULED',
+      day,
+    });
+
+    const recommendations = bb.fixtures
+      .map((f) => ({ fixture: f, evaluation: bb.evaluationsById[f.id] }))
+      .filter((item) => item.evaluation && !item.evaluation.needsHistory && item.evaluation.topPick !== null)
+      .map((item) => ({
+        fixtureId: item.fixture.id,
+        league: item.evaluation.league,
+        match: `${item.fixture.homeTeam.name} vs ${item.fixture.awayTeam.name}`,
+        competition: item.fixture.competition.name,
+        kickoff: item.fixture.kickoffTime,
+        topPick: item.evaluation.topPick,
+        picks: item.evaluation.picks,
+      }));
+
+    return NextResponse.json(
+      {
+        sport: 'basketball',
+        totalQualified: recommendations.length,
+        recommendations,
+        liveDataAvailable: bb.liveDataAvailable,
+        lastUpdated: bb.lastUpdated,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=60',
+        },
+      }
+    );
+  }
+
   const provider = getFootballDataProvider();
   const liveResult = await provider.getLiveFixtures();
 

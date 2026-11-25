@@ -1,0 +1,3104 @@
+{
+  "generatedAt": "2026-11-25T17:27:32.003Z",
+  "modelVersion": "bb_totals_v1.0",
+  "totalsOnly": true,
+  "leagues": {
+    "NBA": {
+      "league": "NBA",
+      "totalGamesAnalyzed": 10492,
+      "evaluatedGames": 10395,
+      "abstainedNeedsHistoryGames": 97,
+      "h1EvaluatedGames": 10395,
+      "empiricalLeagueStats": {
+        "regTeamMean": 112.43,
+        "homeAdv": 1.77,
+        "regVarH": 138.25,
+        "regVarA": 143.44,
+        "regCovHA": 28.08,
+        "otMeanTotal": 1.28,
+        "h1Share": 0.5043,
+        "h1CovHA": 3.26
+      },
+      "families": [
+        {
+          "league": "NBA",
+          "marketCategory": "game_total",
+          "sampleSize": 10395,
+          "rawBrier": 0.228,
+          "calibratedBrier": 0.228,
+          "baselineBrier": 0.25,
+          "brierDiffVsBaseline": -0.022,
+          "rawLogLoss": 0.6476,
+          "calibratedLogLoss": 0.6476,
+          "baselineLogLoss": 0.6931,
+          "logLossDiffVsBaseline": -0.0455,
+          "ece": 0.0098,
+          "hitRateAt60": 0.6852,
+          "sampleAt60": 5597,
+          "passedBaseline": true,
+          "calibratorType": "platt",
+          "platt": {
+            "a": 1.058,
+            "b": -0.0625
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.1085,
+              "pCal": 0.0267,
+              "count": 13
+            },
+            {
+              "pRaw": 0.1388,
+              "pCal": 0.0989,
+              "count": 21
+            },
+            {
+              "pRaw": 0.1649,
+              "pCal": 0.1622,
+              "count": 37
+            },
+            {
+              "pRaw": 0.2051,
+              "pCal": 0.1837,
+              "count": 133
+            },
+            {
+              "pRaw": 0.2381,
+              "pCal": 0.2264,
+              "count": 137
+            },
+            {
+              "pRaw": 0.2785,
+              "pCal": 0.2713,
+              "count": 448
+            },
+            {
+              "pRaw": 0.3125,
+              "pCal": 0.294,
+              "count": 296
+            },
+            {
+              "pRaw": 0.3382,
+              "pCal": 0.3027,
+              "count": 400
+            },
+            {
+              "pRaw": 0.3631,
+              "pCal": 0.355,
+              "count": 417
+            },
+            {
+              "pRaw": 0.4,
+              "pCal": 0.3675,
+              "count": 1107
+            },
+            {
+              "pRaw": 0.4373,
+              "pCal": 0.4169,
+              "count": 631
+            },
+            {
+              "pRaw": 0.463,
+              "pCal": 0.423,
+              "count": 655
+            },
+            {
+              "pRaw": 0.4874,
+              "pCal": 0.4484,
+              "count": 687
+            },
+            {
+              "pRaw": 0.5123,
+              "pCal": 0.4961,
+              "count": 635
+            },
+            {
+              "pRaw": 0.5375,
+              "pCal": 0.5352,
+              "count": 654
+            },
+            {
+              "pRaw": 0.5746,
+              "pCal": 0.5806,
+              "count": 1304
+            },
+            {
+              "pRaw": 0.6123,
+              "pCal": 0.6158,
+              "count": 544
+            },
+            {
+              "pRaw": 0.6374,
+              "pCal": 0.6517,
+              "count": 491
+            },
+            {
+              "pRaw": 0.6736,
+              "pCal": 0.6744,
+              "count": 819
+            },
+            {
+              "pRaw": 0.7121,
+              "pCal": 0.6967,
+              "count": 290
+            },
+            {
+              "pRaw": 0.7473,
+              "pCal": 0.7315,
+              "count": 430
+            },
+            {
+              "pRaw": 0.7861,
+              "pCal": 0.7733,
+              "count": 119
+            },
+            {
+              "pRaw": 0.8239,
+              "pCal": 0.815,
+              "count": 133
+            },
+            {
+              "pRaw": 0.8875,
+              "pCal": 0.825,
+              "count": 5
+            },
+            {
+              "pRaw": 0.9166,
+              "pCal": 0.9563,
+              "count": 2
+            },
+            {
+              "pRaw": 0.9391,
+              "pCal": 0.9821,
+              "count": 5
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.0893,
+              "observedFrequency": 0,
+              "sampleCount": 9
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1664,
+              "observedFrequency": 0.1722,
+              "sampleCount": 180
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.259,
+              "observedFrequency": 0.2635,
+              "sampleCount": 850
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3544,
+              "observedFrequency": 0.3527,
+              "sampleCount": 1786
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4511,
+              "observedFrequency": 0.4317,
+              "sampleCount": 2432
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5492,
+              "observedFrequency": 0.5554,
+              "sampleCount": 2366
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6458,
+              "observedFrequency": 0.651,
+              "sampleCount": 1725
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7427,
+              "observedFrequency": 0.7234,
+              "sampleCount": 864
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8302,
+              "observedFrequency": 0.7989,
+              "sampleCount": 174
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.9358,
+              "observedFrequency": 0.8889,
+              "sampleCount": 9
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "NBA",
+          "marketCategory": "home_total",
+          "sampleSize": 10395,
+          "rawBrier": 0.2265,
+          "calibratedBrier": 0.2263,
+          "baselineBrier": 0.2498,
+          "brierDiffVsBaseline": -0.0235,
+          "rawLogLoss": 0.6444,
+          "calibratedLogLoss": 0.644,
+          "baselineLogLoss": 0.6928,
+          "logLossDiffVsBaseline": -0.0488,
+          "ece": 0.0101,
+          "hitRateAt60": 0.6936,
+          "sampleAt60": 5598,
+          "passedBaseline": true,
+          "calibratorType": "platt",
+          "platt": {
+            "a": 1.1233,
+            "b": -0.0607
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.1716,
+              "pCal": 0.1921,
+              "count": 124
+            },
+            {
+              "pRaw": 0.2444,
+              "pCal": 0.2244,
+              "count": 392
+            },
+            {
+              "pRaw": 0.2884,
+              "pCal": 0.2266,
+              "count": 230
+            },
+            {
+              "pRaw": 0.313,
+              "pCal": 0.2352,
+              "count": 328
+            },
+            {
+              "pRaw": 0.3375,
+              "pCal": 0.3033,
+              "count": 386
+            },
+            {
+              "pRaw": 0.3621,
+              "pCal": 0.3153,
+              "count": 419
+            },
+            {
+              "pRaw": 0.3879,
+              "pCal": 0.3618,
+              "count": 564
+            },
+            {
+              "pRaw": 0.4132,
+              "pCal": 0.3665,
+              "count": 625
+            },
+            {
+              "pRaw": 0.4375,
+              "pCal": 0.4237,
+              "count": 609
+            },
+            {
+              "pRaw": 0.4624,
+              "pCal": 0.4579,
+              "count": 677
+            },
+            {
+              "pRaw": 0.4868,
+              "pCal": 0.4772,
+              "count": 679
+            },
+            {
+              "pRaw": 0.5122,
+              "pCal": 0.5166,
+              "count": 751
+            },
+            {
+              "pRaw": 0.5372,
+              "pCal": 0.5296,
+              "count": 676
+            },
+            {
+              "pRaw": 0.5627,
+              "pCal": 0.5477,
+              "count": 608
+            },
+            {
+              "pRaw": 0.5993,
+              "pCal": 0.6007,
+              "count": 1159
+            },
+            {
+              "pRaw": 0.6374,
+              "pCal": 0.6463,
+              "count": 475
+            },
+            {
+              "pRaw": 0.6736,
+              "pCal": 0.6667,
+              "count": 794
+            },
+            {
+              "pRaw": 0.7122,
+              "pCal": 0.7488,
+              "count": 271
+            },
+            {
+              "pRaw": 0.7469,
+              "pCal": 0.75,
+              "count": 406
+            },
+            {
+              "pRaw": 0.7874,
+              "pCal": 0.7858,
+              "count": 98
+            },
+            {
+              "pRaw": 0.8106,
+              "pCal": 0.8004,
+              "count": 60
+            },
+            {
+              "pRaw": 0.8548,
+              "pCal": 0.8986,
+              "count": 88
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.0861,
+              "observedFrequency": 0.2857,
+              "sampleCount": 7
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1667,
+              "observedFrequency": 0.2228,
+              "sampleCount": 202
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2597,
+              "observedFrequency": 0.2267,
+              "sampleCount": 847
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3546,
+              "observedFrequency": 0.3388,
+              "sampleCount": 1830
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4509,
+              "observedFrequency": 0.4517,
+              "sampleCount": 2473
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5475,
+              "observedFrequency": 0.5564,
+              "sampleCount": 2324
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6457,
+              "observedFrequency": 0.6429,
+              "sampleCount": 1686
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7406,
+              "observedFrequency": 0.7354,
+              "sampleCount": 824
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8349,
+              "observedFrequency": 0.8238,
+              "sampleCount": 193
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.9219,
+              "observedFrequency": 0.7778,
+              "sampleCount": 9
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "NBA",
+          "marketCategory": "away_total",
+          "sampleSize": 10395,
+          "rawBrier": 0.2265,
+          "calibratedBrier": 0.2265,
+          "baselineBrier": 0.2499,
+          "brierDiffVsBaseline": -0.0235,
+          "rawLogLoss": 0.6439,
+          "calibratedLogLoss": 0.6439,
+          "baselineLogLoss": 0.693,
+          "logLossDiffVsBaseline": -0.0492,
+          "ece": 0.015,
+          "hitRateAt60": 0.6988,
+          "sampleAt60": 5202,
+          "passedBaseline": true,
+          "calibratorType": "raw",
+          "platt": {
+            "a": 1.1128,
+            "b": -0.0378
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.0893,
+              "pCal": 0.0583,
+              "count": 1
+            },
+            {
+              "pRaw": 0.1291,
+              "pCal": 0.0893,
+              "count": 26
+            },
+            {
+              "pRaw": 0.1645,
+              "pCal": 0.0924,
+              "count": 34
+            },
+            {
+              "pRaw": 0.2049,
+              "pCal": 0.2,
+              "count": 147
+            },
+            {
+              "pRaw": 0.2526,
+              "pCal": 0.2201,
+              "count": 307
+            },
+            {
+              "pRaw": 0.2871,
+              "pCal": 0.2671,
+              "count": 251
+            },
+            {
+              "pRaw": 0.3126,
+              "pCal": 0.2903,
+              "count": 324
+            },
+            {
+              "pRaw": 0.3381,
+              "pCal": 0.3146,
+              "count": 353
+            },
+            {
+              "pRaw": 0.3622,
+              "pCal": 0.3515,
+              "count": 424
+            },
+            {
+              "pRaw": 0.3875,
+              "pCal": 0.3593,
+              "count": 529
+            },
+            {
+              "pRaw": 0.413,
+              "pCal": 0.4075,
+              "count": 616
+            },
+            {
+              "pRaw": 0.438,
+              "pCal": 0.4174,
+              "count": 702
+            },
+            {
+              "pRaw": 0.4624,
+              "pCal": 0.4356,
+              "count": 721
+            },
+            {
+              "pRaw": 0.4875,
+              "pCal": 0.4776,
+              "count": 712
+            },
+            {
+              "pRaw": 0.5124,
+              "pCal": 0.4853,
+              "count": 643
+            },
+            {
+              "pRaw": 0.5373,
+              "pCal": 0.5381,
+              "count": 656
+            },
+            {
+              "pRaw": 0.5618,
+              "pCal": 0.559,
+              "count": 585
+            },
+            {
+              "pRaw": 0.5871,
+              "pCal": 0.586,
+              "count": 558
+            },
+            {
+              "pRaw": 0.6126,
+              "pCal": 0.6201,
+              "count": 566
+            },
+            {
+              "pRaw": 0.6375,
+              "pCal": 0.6366,
+              "count": 476
+            },
+            {
+              "pRaw": 0.6625,
+              "pCal": 0.681,
+              "count": 439
+            },
+            {
+              "pRaw": 0.6879,
+              "pCal": 0.713,
+              "count": 380
+            },
+            {
+              "pRaw": 0.7124,
+              "pCal": 0.7332,
+              "count": 270
+            },
+            {
+              "pRaw": 0.736,
+              "pCal": 0.7427,
+              "count": 241
+            },
+            {
+              "pRaw": 0.7613,
+              "pCal": 0.7517,
+              "count": 161
+            },
+            {
+              "pRaw": 0.7865,
+              "pCal": 0.7847,
+              "count": 130
+            },
+            {
+              "pRaw": 0.8116,
+              "pCal": 0.875,
+              "count": 65
+            },
+            {
+              "pRaw": 0.8433,
+              "pCal": 0.8771,
+              "count": 68
+            },
+            {
+              "pRaw": 0.8941,
+              "pCal": 0.9781,
+              "count": 22
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.0929,
+              "observedFrequency": 0,
+              "sampleCount": 1
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1679,
+              "observedFrequency": 0.1759,
+              "sampleCount": 108
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2602,
+              "observedFrequency": 0.2289,
+              "sampleCount": 651
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3553,
+              "observedFrequency": 0.3337,
+              "sampleCount": 1630
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4516,
+              "observedFrequency": 0.4355,
+              "sampleCount": 2751
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.548,
+              "observedFrequency": 0.5401,
+              "sampleCount": 2442
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6461,
+              "observedFrequency": 0.6577,
+              "sampleCount": 1861
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7413,
+              "observedFrequency": 0.7481,
+              "sampleCount": 802
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8329,
+              "observedFrequency": 0.8904,
+              "sampleCount": 146
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.9198,
+              "observedFrequency": 1,
+              "sampleCount": 3
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "NBA",
+          "marketCategory": "h1_game_total",
+          "sampleSize": 10395,
+          "rawBrier": 0.2342,
+          "calibratedBrier": 0.2342,
+          "baselineBrier": 0.25,
+          "brierDiffVsBaseline": -0.0158,
+          "rawLogLoss": 0.6609,
+          "calibratedLogLoss": 0.6609,
+          "baselineLogLoss": 0.6931,
+          "logLossDiffVsBaseline": -0.0322,
+          "ece": 0.0198,
+          "hitRateAt60": 0.6733,
+          "sampleAt60": 4258,
+          "passedBaseline": true,
+          "calibratorType": "raw",
+          "platt": {
+            "a": 1.0851,
+            "b": -0.0222
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.1387,
+              "pCal": 0.0688,
+              "count": 2
+            },
+            {
+              "pRaw": 0.1997,
+              "pCal": 0.1987,
+              "count": 54
+            },
+            {
+              "pRaw": 0.3071,
+              "pCal": 0.2933,
+              "count": 959
+            },
+            {
+              "pRaw": 0.3635,
+              "pCal": 0.3614,
+              "count": 440
+            },
+            {
+              "pRaw": 0.3878,
+              "pCal": 0.3765,
+              "count": 579
+            },
+            {
+              "pRaw": 0.4261,
+              "pCal": 0.3944,
+              "count": 1407
+            },
+            {
+              "pRaw": 0.4621,
+              "pCal": 0.4425,
+              "count": 834
+            },
+            {
+              "pRaw": 0.4877,
+              "pCal": 0.4497,
+              "count": 863
+            },
+            {
+              "pRaw": 0.5124,
+              "pCal": 0.5257,
+              "count": 835
+            },
+            {
+              "pRaw": 0.5494,
+              "pCal": 0.5666,
+              "count": 1518
+            },
+            {
+              "pRaw": 0.5869,
+              "pCal": 0.5921,
+              "count": 684
+            },
+            {
+              "pRaw": 0.6125,
+              "pCal": 0.6042,
+              "count": 576
+            },
+            {
+              "pRaw": 0.6494,
+              "pCal": 0.6662,
+              "count": 844
+            },
+            {
+              "pRaw": 0.6973,
+              "pCal": 0.7209,
+              "count": 529
+            },
+            {
+              "pRaw": 0.7358,
+              "pCal": 0.7397,
+              "count": 146
+            },
+            {
+              "pRaw": 0.7695,
+              "pCal": 0.7795,
+              "count": 120
+            },
+            {
+              "pRaw": 0.8091,
+              "pCal": 0.7917,
+              "count": 19
+            },
+            {
+              "pRaw": 0.8704,
+              "pCal": 0.8696,
+              "count": 12
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.05,
+              "observedFrequency": 0.05,
+              "sampleCount": 0
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1795,
+              "observedFrequency": 0.3333,
+              "sampleCount": 24
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2673,
+              "observedFrequency": 0.2926,
+              "sampleCount": 376
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.359,
+              "observedFrequency": 0.3379,
+              "sampleCount": 1622
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4529,
+              "observedFrequency": 0.4226,
+              "sampleCount": 3102
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5477,
+              "observedFrequency": 0.5611,
+              "sampleCount": 3035
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6436,
+              "observedFrequency": 0.6558,
+              "sampleCount": 1723
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7332,
+              "observedFrequency": 0.7387,
+              "sampleCount": 486
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8288,
+              "observedFrequency": 0.8148,
+              "sampleCount": 27
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.95,
+              "observedFrequency": 0.95,
+              "sampleCount": 0
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "NBA",
+          "marketCategory": "h1_team_total",
+          "sampleSize": 20790,
+          "rawBrier": 0.2343,
+          "calibratedBrier": 0.2342,
+          "baselineBrier": 0.2499,
+          "brierDiffVsBaseline": -0.0156,
+          "rawLogLoss": 0.6609,
+          "calibratedLogLoss": 0.6609,
+          "baselineLogLoss": 0.6929,
+          "logLossDiffVsBaseline": -0.032,
+          "ece": 0.0082,
+          "hitRateAt60": 0.668,
+          "sampleAt60": 9312,
+          "passedBaseline": true,
+          "calibratorType": "platt",
+          "platt": {
+            "a": 1.172,
+            "b": -0.0387
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.1412,
+              "pCal": 0.0917,
+              "count": 1
+            },
+            {
+              "pRaw": 0.2025,
+              "pCal": 0.2014,
+              "count": 88
+            },
+            {
+              "pRaw": 0.2732,
+              "pCal": 0.2568,
+              "count": 557
+            },
+            {
+              "pRaw": 0.3129,
+              "pCal": 0.257,
+              "count": 483
+            },
+            {
+              "pRaw": 0.338,
+              "pCal": 0.3222,
+              "count": 655
+            },
+            {
+              "pRaw": 0.3631,
+              "pCal": 0.3401,
+              "count": 850
+            },
+            {
+              "pRaw": 0.3876,
+              "pCal": 0.3499,
+              "count": 1149
+            },
+            {
+              "pRaw": 0.4128,
+              "pCal": 0.3773,
+              "count": 1381
+            },
+            {
+              "pRaw": 0.4375,
+              "pCal": 0.4085,
+              "count": 1655
+            },
+            {
+              "pRaw": 0.4626,
+              "pCal": 0.4466,
+              "count": 1789
+            },
+            {
+              "pRaw": 0.4874,
+              "pCal": 0.4796,
+              "count": 1766
+            },
+            {
+              "pRaw": 0.5124,
+              "pCal": 0.4902,
+              "count": 1877
+            },
+            {
+              "pRaw": 0.5369,
+              "pCal": 0.5448,
+              "count": 1674
+            },
+            {
+              "pRaw": 0.5623,
+              "pCal": 0.5821,
+              "count": 1546
+            },
+            {
+              "pRaw": 0.5872,
+              "pCal": 0.5848,
+              "count": 1368
+            },
+            {
+              "pRaw": 0.6121,
+              "pCal": 0.6142,
+              "count": 1112
+            },
+            {
+              "pRaw": 0.6478,
+              "pCal": 0.6632,
+              "count": 1561
+            },
+            {
+              "pRaw": 0.6864,
+              "pCal": 0.7281,
+              "count": 530
+            },
+            {
+              "pRaw": 0.7109,
+              "pCal": 0.7328,
+              "count": 337
+            },
+            {
+              "pRaw": 0.7365,
+              "pCal": 0.7596,
+              "count": 204
+            },
+            {
+              "pRaw": 0.7616,
+              "pCal": 0.7722,
+              "count": 123
+            },
+            {
+              "pRaw": 0.7949,
+              "pCal": 0.8355,
+              "count": 96
+            },
+            {
+              "pRaw": 0.8829,
+              "pCal": 0.9438,
+              "count": 2
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.0949,
+              "observedFrequency": 0,
+              "sampleCount": 1
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1701,
+              "observedFrequency": 0.2614,
+              "sampleCount": 153
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2643,
+              "observedFrequency": 0.269,
+              "sampleCount": 1130
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3573,
+              "observedFrequency": 0.351,
+              "sampleCount": 3516
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4515,
+              "observedFrequency": 0.4406,
+              "sampleCount": 5917
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5472,
+              "observedFrequency": 0.5495,
+              "sampleCount": 5561
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6432,
+              "observedFrequency": 0.6309,
+              "sampleCount": 3257
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.737,
+              "observedFrequency": 0.7449,
+              "sampleCount": 1125
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8219,
+              "observedFrequency": 0.8031,
+              "sampleCount": 127
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.9061,
+              "observedFrequency": 1,
+              "sampleCount": 3
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        }
+      ]
+    },
+    "NCAAB": {
+      "league": "NCAAB",
+      "totalGamesAnalyzed": 24021,
+      "evaluatedGames": 20603,
+      "abstainedNeedsHistoryGames": 3418,
+      "h1EvaluatedGames": 20597,
+      "empiricalLeagueStats": {
+        "regTeamMean": 74.36,
+        "homeAdv": 6.5,
+        "regVarH": 126.23,
+        "regVarA": 112.72,
+        "regCovHA": 17.3,
+        "otMeanTotal": 1.4,
+        "h1Share": 0.4771,
+        "h1CovHA": -0.76
+      },
+      "families": [
+        {
+          "league": "NCAAB",
+          "marketCategory": "game_total",
+          "sampleSize": 20603,
+          "rawBrier": 0.2229,
+          "calibratedBrier": 0.2193,
+          "baselineBrier": 0.25,
+          "brierDiffVsBaseline": -0.0307,
+          "rawLogLoss": 0.6368,
+          "calibratedLogLoss": 0.6283,
+          "baselineLogLoss": 0.6931,
+          "logLossDiffVsBaseline": -0.0649,
+          "ece": 0.0096,
+          "hitRateAt60": 0.708,
+          "sampleAt60": 12450,
+          "passedBaseline": true,
+          "calibratorType": "platt",
+          "platt": {
+            "a": 1.6145,
+            "b": -0.077
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.1496,
+              "pCal": 0.0359,
+              "count": 21
+            },
+            {
+              "pRaw": 0.2046,
+              "pCal": 0.099,
+              "count": 97
+            },
+            {
+              "pRaw": 0.2387,
+              "pCal": 0.1266,
+              "count": 136
+            },
+            {
+              "pRaw": 0.2633,
+              "pCal": 0.1695,
+              "count": 243
+            },
+            {
+              "pRaw": 0.2884,
+              "pCal": 0.1798,
+              "count": 346
+            },
+            {
+              "pRaw": 0.3134,
+              "pCal": 0.2324,
+              "count": 530
+            },
+            {
+              "pRaw": 0.3382,
+              "pCal": 0.2616,
+              "count": 700
+            },
+            {
+              "pRaw": 0.3629,
+              "pCal": 0.2761,
+              "count": 906
+            },
+            {
+              "pRaw": 0.3877,
+              "pCal": 0.2887,
+              "count": 1137
+            },
+            {
+              "pRaw": 0.4128,
+              "pCal": 0.3317,
+              "count": 1330
+            },
+            {
+              "pRaw": 0.4374,
+              "pCal": 0.362,
+              "count": 1542
+            },
+            {
+              "pRaw": 0.4624,
+              "pCal": 0.416,
+              "count": 1522
+            },
+            {
+              "pRaw": 0.4874,
+              "pCal": 0.4714,
+              "count": 1729
+            },
+            {
+              "pRaw": 0.5127,
+              "pCal": 0.5197,
+              "count": 1797
+            },
+            {
+              "pRaw": 0.5374,
+              "pCal": 0.5419,
+              "count": 1672
+            },
+            {
+              "pRaw": 0.5623,
+              "pCal": 0.5763,
+              "count": 1494
+            },
+            {
+              "pRaw": 0.5872,
+              "pCal": 0.6029,
+              "count": 1297
+            },
+            {
+              "pRaw": 0.6119,
+              "pCal": 0.6583,
+              "count": 1089
+            },
+            {
+              "pRaw": 0.6368,
+              "pCal": 0.6882,
+              "count": 876
+            },
+            {
+              "pRaw": 0.6624,
+              "pCal": 0.7435,
+              "count": 644
+            },
+            {
+              "pRaw": 0.6967,
+              "pCal": 0.7955,
+              "count": 889
+            },
+            {
+              "pRaw": 0.7374,
+              "pCal": 0.8271,
+              "count": 244
+            },
+            {
+              "pRaw": 0.7776,
+              "pCal": 0.8718,
+              "count": 320
+            },
+            {
+              "pRaw": 0.8446,
+              "pCal": 0.9469,
+              "count": 47
+            },
+            {
+              "pRaw": 0.8932,
+              "pCal": 0.9692,
+              "count": 11
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.082,
+              "observedFrequency": 0.0659,
+              "sampleCount": 91
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1622,
+              "observedFrequency": 0.1706,
+              "sampleCount": 885
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2549,
+              "observedFrequency": 0.2668,
+              "sampleCount": 2234
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3524,
+              "observedFrequency": 0.3293,
+              "sampleCount": 3489
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4507,
+              "observedFrequency": 0.4479,
+              "sampleCount": 4050
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5479,
+              "observedFrequency": 0.5472,
+              "sampleCount": 4103
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6468,
+              "observedFrequency": 0.6284,
+              "sampleCount": 3033
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7459,
+              "observedFrequency": 0.7415,
+              "sampleCount": 1822
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8419,
+              "observedFrequency": 0.838,
+              "sampleCount": 778
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.9264,
+              "observedFrequency": 0.9153,
+              "sampleCount": 118
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "NCAAB",
+          "marketCategory": "home_total",
+          "sampleSize": 20603,
+          "rawBrier": 0.2183,
+          "calibratedBrier": 0.2128,
+          "baselineBrier": 0.2498,
+          "brierDiffVsBaseline": -0.0371,
+          "rawLogLoss": 0.6272,
+          "calibratedLogLoss": 0.6136,
+          "baselineLogLoss": 0.6928,
+          "logLossDiffVsBaseline": -0.0792,
+          "ece": 0.0093,
+          "hitRateAt60": 0.7215,
+          "sampleAt60": 13293,
+          "passedBaseline": true,
+          "calibratorType": "platt",
+          "platt": {
+            "a": 1.801,
+            "b": 0.064
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.1354,
+              "pCal": 0.0458,
+              "count": 4
+            },
+            {
+              "pRaw": 0.1629,
+              "pCal": 0.0576,
+              "count": 21
+            },
+            {
+              "pRaw": 0.2053,
+              "pCal": 0.1179,
+              "count": 149
+            },
+            {
+              "pRaw": 0.2391,
+              "pCal": 0.1287,
+              "count": 196
+            },
+            {
+              "pRaw": 0.2637,
+              "pCal": 0.1427,
+              "count": 331
+            },
+            {
+              "pRaw": 0.2884,
+              "pCal": 0.1957,
+              "count": 471
+            },
+            {
+              "pRaw": 0.3131,
+              "pCal": 0.2185,
+              "count": 669
+            },
+            {
+              "pRaw": 0.3377,
+              "pCal": 0.2203,
+              "count": 868
+            },
+            {
+              "pRaw": 0.3627,
+              "pCal": 0.2934,
+              "count": 1064
+            },
+            {
+              "pRaw": 0.3875,
+              "pCal": 0.3243,
+              "count": 1283
+            },
+            {
+              "pRaw": 0.4127,
+              "pCal": 0.3665,
+              "count": 1468
+            },
+            {
+              "pRaw": 0.4377,
+              "pCal": 0.379,
+              "count": 1578
+            },
+            {
+              "pRaw": 0.4625,
+              "pCal": 0.4478,
+              "count": 1742
+            },
+            {
+              "pRaw": 0.4875,
+              "pCal": 0.4879,
+              "count": 1730
+            },
+            {
+              "pRaw": 0.5125,
+              "pCal": 0.5395,
+              "count": 1568
+            },
+            {
+              "pRaw": 0.5372,
+              "pCal": 0.5775,
+              "count": 1489
+            },
+            {
+              "pRaw": 0.5626,
+              "pCal": 0.6039,
+              "count": 1323
+            },
+            {
+              "pRaw": 0.5874,
+              "pCal": 0.6727,
+              "count": 1070
+            },
+            {
+              "pRaw": 0.6124,
+              "pCal": 0.7132,
+              "count": 935
+            },
+            {
+              "pRaw": 0.6482,
+              "pCal": 0.7888,
+              "count": 1425
+            },
+            {
+              "pRaw": 0.6864,
+              "pCal": 0.8224,
+              "count": 435
+            },
+            {
+              "pRaw": 0.7119,
+              "pCal": 0.839,
+              "count": 306
+            },
+            {
+              "pRaw": 0.7362,
+              "pCal": 0.8689,
+              "count": 208
+            },
+            {
+              "pRaw": 0.7621,
+              "pCal": 0.8715,
+              "count": 134
+            },
+            {
+              "pRaw": 0.7883,
+              "pCal": 0.9309,
+              "count": 62
+            },
+            {
+              "pRaw": 0.8116,
+              "pCal": 0.9325,
+              "count": 48
+            },
+            {
+              "pRaw": 0.8334,
+              "pCal": 0.9398,
+              "count": 20
+            },
+            {
+              "pRaw": 0.8668,
+              "pCal": 0.9643,
+              "count": 12
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.0766,
+              "observedFrequency": 0.109,
+              "sampleCount": 156
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1581,
+              "observedFrequency": 0.1783,
+              "sampleCount": 1262
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.254,
+              "observedFrequency": 0.2568,
+              "sampleCount": 2434
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3516,
+              "observedFrequency": 0.3474,
+              "sampleCount": 3273
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4506,
+              "observedFrequency": 0.4488,
+              "sampleCount": 3815
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5491,
+              "observedFrequency": 0.5382,
+              "sampleCount": 3495
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6467,
+              "observedFrequency": 0.6345,
+              "sampleCount": 2804
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7466,
+              "observedFrequency": 0.7712,
+              "sampleCount": 2111
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8416,
+              "observedFrequency": 0.8327,
+              "sampleCount": 1046
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.9256,
+              "observedFrequency": 0.9275,
+              "sampleCount": 207
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "NCAAB",
+          "marketCategory": "away_total",
+          "sampleSize": 20603,
+          "rawBrier": 0.2203,
+          "calibratedBrier": 0.2163,
+          "baselineBrier": 0.2498,
+          "brierDiffVsBaseline": -0.0335,
+          "rawLogLoss": 0.6312,
+          "calibratedLogLoss": 0.6215,
+          "baselineLogLoss": 0.6927,
+          "logLossDiffVsBaseline": -0.0712,
+          "ece": 0.0075,
+          "hitRateAt60": 0.7168,
+          "sampleAt60": 12703,
+          "passedBaseline": true,
+          "calibratorType": "platt",
+          "platt": {
+            "a": 1.5985,
+            "b": -0.1441
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.1324,
+              "pCal": 0.05,
+              "count": 8
+            },
+            {
+              "pRaw": 0.1995,
+              "pCal": 0.0978,
+              "count": 122
+            },
+            {
+              "pRaw": 0.2386,
+              "pCal": 0.1278,
+              "count": 166
+            },
+            {
+              "pRaw": 0.2635,
+              "pCal": 0.1378,
+              "count": 234
+            },
+            {
+              "pRaw": 0.3028,
+              "pCal": 0.165,
+              "count": 793
+            },
+            {
+              "pRaw": 0.3388,
+              "pCal": 0.2403,
+              "count": 600
+            },
+            {
+              "pRaw": 0.3628,
+              "pCal": 0.2833,
+              "count": 816
+            },
+            {
+              "pRaw": 0.3877,
+              "pCal": 0.2903,
+              "count": 1003
+            },
+            {
+              "pRaw": 0.4131,
+              "pCal": 0.3354,
+              "count": 1205
+            },
+            {
+              "pRaw": 0.4379,
+              "pCal": 0.3473,
+              "count": 1377
+            },
+            {
+              "pRaw": 0.4625,
+              "pCal": 0.423,
+              "count": 1473
+            },
+            {
+              "pRaw": 0.4876,
+              "pCal": 0.4362,
+              "count": 1582
+            },
+            {
+              "pRaw": 0.5125,
+              "pCal": 0.4843,
+              "count": 1590
+            },
+            {
+              "pRaw": 0.5375,
+              "pCal": 0.5221,
+              "count": 1519
+            },
+            {
+              "pRaw": 0.5621,
+              "pCal": 0.5627,
+              "count": 1491
+            },
+            {
+              "pRaw": 0.5873,
+              "pCal": 0.614,
+              "count": 1337
+            },
+            {
+              "pRaw": 0.6123,
+              "pCal": 0.6588,
+              "count": 1152
+            },
+            {
+              "pRaw": 0.6374,
+              "pCal": 0.6734,
+              "count": 1035
+            },
+            {
+              "pRaw": 0.6619,
+              "pCal": 0.6988,
+              "count": 870
+            },
+            {
+              "pRaw": 0.6869,
+              "pCal": 0.7306,
+              "count": 687
+            },
+            {
+              "pRaw": 0.7117,
+              "pCal": 0.7997,
+              "count": 545
+            },
+            {
+              "pRaw": 0.7364,
+              "pCal": 0.8304,
+              "count": 402
+            },
+            {
+              "pRaw": 0.7617,
+              "pCal": 0.8685,
+              "count": 283
+            },
+            {
+              "pRaw": 0.7971,
+              "pCal": 0.8705,
+              "count": 259
+            },
+            {
+              "pRaw": 0.8353,
+              "pCal": 0.8842,
+              "count": 44
+            },
+            {
+              "pRaw": 0.8677,
+              "pCal": 0.9375,
+              "count": 22
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.0822,
+              "observedFrequency": 0.1071,
+              "sampleCount": 84
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1604,
+              "observedFrequency": 0.1433,
+              "sampleCount": 921
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2559,
+              "observedFrequency": 0.2511,
+              "sampleCount": 2127
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3523,
+              "observedFrequency": 0.3409,
+              "sampleCount": 3414
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4501,
+              "observedFrequency": 0.4463,
+              "sampleCount": 4026
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5491,
+              "observedFrequency": 0.5441,
+              "sampleCount": 3874
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.648,
+              "observedFrequency": 0.6542,
+              "sampleCount": 3036
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7454,
+              "observedFrequency": 0.7325,
+              "sampleCount": 2090
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8398,
+              "observedFrequency": 0.8481,
+              "sampleCount": 928
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.9195,
+              "observedFrequency": 0.9126,
+              "sampleCount": 103
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "NCAAB",
+          "marketCategory": "h1_game_total",
+          "sampleSize": 20597,
+          "rawBrier": 0.2302,
+          "calibratedBrier": 0.2274,
+          "baselineBrier": 0.2498,
+          "brierDiffVsBaseline": -0.0225,
+          "rawLogLoss": 0.6524,
+          "calibratedLogLoss": 0.6462,
+          "baselineLogLoss": 0.6928,
+          "logLossDiffVsBaseline": -0.0467,
+          "ece": 0.0052,
+          "hitRateAt60": 0.6882,
+          "sampleAt60": 11015,
+          "passedBaseline": true,
+          "calibratorType": "platt",
+          "platt": {
+            "a": 1.6133,
+            "b": -0.069
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.1805,
+              "pCal": 0.07,
+              "count": 8
+            },
+            {
+              "pRaw": 0.2327,
+              "pCal": 0.0952,
+              "count": 60
+            },
+            {
+              "pRaw": 0.2632,
+              "pCal": 0.1826,
+              "count": 94
+            },
+            {
+              "pRaw": 0.3039,
+              "pCal": 0.1946,
+              "count": 518
+            },
+            {
+              "pRaw": 0.3384,
+              "pCal": 0.2449,
+              "count": 548
+            },
+            {
+              "pRaw": 0.3627,
+              "pCal": 0.2928,
+              "count": 803
+            },
+            {
+              "pRaw": 0.3879,
+              "pCal": 0.3,
+              "count": 1094
+            },
+            {
+              "pRaw": 0.4132,
+              "pCal": 0.3369,
+              "count": 1443
+            },
+            {
+              "pRaw": 0.4381,
+              "pCal": 0.38,
+              "count": 1745
+            },
+            {
+              "pRaw": 0.4629,
+              "pCal": 0.4099,
+              "count": 1857
+            },
+            {
+              "pRaw": 0.4877,
+              "pCal": 0.4611,
+              "count": 1978
+            },
+            {
+              "pRaw": 0.5125,
+              "pCal": 0.5211,
+              "count": 2157
+            },
+            {
+              "pRaw": 0.5372,
+              "pCal": 0.5415,
+              "count": 1917
+            },
+            {
+              "pRaw": 0.5623,
+              "pCal": 0.5819,
+              "count": 1696
+            },
+            {
+              "pRaw": 0.5978,
+              "pCal": 0.6537,
+              "count": 2411
+            },
+            {
+              "pRaw": 0.6368,
+              "pCal": 0.6942,
+              "count": 831
+            },
+            {
+              "pRaw": 0.6614,
+              "pCal": 0.7113,
+              "count": 558
+            },
+            {
+              "pRaw": 0.6863,
+              "pCal": 0.7655,
+              "count": 376
+            },
+            {
+              "pRaw": 0.712,
+              "pCal": 0.7952,
+              "count": 245
+            },
+            {
+              "pRaw": 0.7462,
+              "pCal": 0.8019,
+              "count": 210
+            },
+            {
+              "pRaw": 0.7872,
+              "pCal": 0.825,
+              "count": 29
+            },
+            {
+              "pRaw": 0.8103,
+              "pCal": 0.8681,
+              "count": 16
+            },
+            {
+              "pRaw": 0.8361,
+              "pCal": 0.9054,
+              "count": 12
+            },
+            {
+              "pRaw": 0.864,
+              "pCal": 0.9083,
+              "count": 1
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.0896,
+              "observedFrequency": 0,
+              "sampleCount": 13
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1679,
+              "observedFrequency": 0.179,
+              "sampleCount": 419
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2582,
+              "observedFrequency": 0.2582,
+              "sampleCount": 1851
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3546,
+              "observedFrequency": 0.3504,
+              "sampleCount": 3799
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4514,
+              "observedFrequency": 0.4455,
+              "sampleCount": 4860
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5472,
+              "observedFrequency": 0.5521,
+              "sampleCount": 4722
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.645,
+              "observedFrequency": 0.6461,
+              "sampleCount": 3026
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7423,
+              "observedFrequency": 0.7358,
+              "sampleCount": 1465
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8351,
+              "observedFrequency": 0.7848,
+              "sampleCount": 409
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.9159,
+              "observedFrequency": 0.8788,
+              "sampleCount": 33
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "NCAAB",
+          "marketCategory": "h1_team_total",
+          "sampleSize": 41194,
+          "rawBrier": 0.2259,
+          "calibratedBrier": 0.2227,
+          "baselineBrier": 0.2497,
+          "brierDiffVsBaseline": -0.027,
+          "rawLogLoss": 0.6433,
+          "calibratedLogLoss": 0.6353,
+          "baselineLogLoss": 0.6926,
+          "logLossDiffVsBaseline": -0.0572,
+          "ece": 0.0088,
+          "hitRateAt60": 0.6985,
+          "sampleAt60": 24032,
+          "passedBaseline": true,
+          "calibratorType": "platt",
+          "platt": {
+            "a": 1.6165,
+            "b": -0.0732
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.1803,
+              "pCal": 0.0207,
+              "count": 45
+            },
+            {
+              "pRaw": 0.2152,
+              "pCal": 0.0362,
+              "count": 65
+            },
+            {
+              "pRaw": 0.2388,
+              "pCal": 0.0891,
+              "count": 183
+            },
+            {
+              "pRaw": 0.264,
+              "pCal": 0.1448,
+              "count": 347
+            },
+            {
+              "pRaw": 0.3031,
+              "pCal": 0.198,
+              "count": 1580
+            },
+            {
+              "pRaw": 0.338,
+              "pCal": 0.2432,
+              "count": 1403
+            },
+            {
+              "pRaw": 0.3629,
+              "pCal": 0.2893,
+              "count": 1819
+            },
+            {
+              "pRaw": 0.3877,
+              "pCal": 0.3266,
+              "count": 2367
+            },
+            {
+              "pRaw": 0.4129,
+              "pCal": 0.3532,
+              "count": 2718
+            },
+            {
+              "pRaw": 0.4377,
+              "pCal": 0.3815,
+              "count": 3062
+            },
+            {
+              "pRaw": 0.4625,
+              "pCal": 0.4274,
+              "count": 3346
+            },
+            {
+              "pRaw": 0.4875,
+              "pCal": 0.4536,
+              "count": 3620
+            },
+            {
+              "pRaw": 0.5124,
+              "pCal": 0.4903,
+              "count": 3494
+            },
+            {
+              "pRaw": 0.5375,
+              "pCal": 0.5359,
+              "count": 3357
+            },
+            {
+              "pRaw": 0.5621,
+              "pCal": 0.5583,
+              "count": 3088
+            },
+            {
+              "pRaw": 0.5869,
+              "pCal": 0.6141,
+              "count": 2804
+            },
+            {
+              "pRaw": 0.6119,
+              "pCal": 0.6554,
+              "count": 2322
+            },
+            {
+              "pRaw": 0.6369,
+              "pCal": 0.6978,
+              "count": 1867
+            },
+            {
+              "pRaw": 0.6617,
+              "pCal": 0.7573,
+              "count": 1439
+            },
+            {
+              "pRaw": 0.6863,
+              "pCal": 0.7804,
+              "count": 948
+            },
+            {
+              "pRaw": 0.7117,
+              "pCal": 0.8263,
+              "count": 629
+            },
+            {
+              "pRaw": 0.7445,
+              "pCal": 0.8685,
+              "count": 553
+            },
+            {
+              "pRaw": 0.7858,
+              "pCal": 0.9048,
+              "count": 97
+            },
+            {
+              "pRaw": 0.8232,
+              "pCal": 0.9614,
+              "count": 55
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.0845,
+              "observedFrequency": 0,
+              "sampleCount": 52
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1663,
+              "observedFrequency": 0.1575,
+              "sampleCount": 1302
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2564,
+              "observedFrequency": 0.2578,
+              "sampleCount": 4364
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3523,
+              "observedFrequency": 0.3558,
+              "sampleCount": 7311
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4507,
+              "observedFrequency": 0.4436,
+              "sampleCount": 8792
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5488,
+              "observedFrequency": 0.5315,
+              "sampleCount": 8370
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6464,
+              "observedFrequency": 0.6418,
+              "sampleCount": 6494
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7417,
+              "observedFrequency": 0.7555,
+              "sampleCount": 3514
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8337,
+              "observedFrequency": 0.8645,
+              "sampleCount": 952
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.9145,
+              "observedFrequency": 0.9767,
+              "sampleCount": 43
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        }
+      ]
+    },
+    "EUROLEAGUE": {
+      "league": "EUROLEAGUE",
+      "totalGamesAnalyzed": 2666,
+      "evaluatedGames": 2557,
+      "abstainedNeedsHistoryGames": 109,
+      "h1EvaluatedGames": 2557,
+      "empiricalLeagueStats": {
+        "regTeamMean": 85.78,
+        "homeAdv": 3.22,
+        "regVarH": 103.42,
+        "regVarA": 95.93,
+        "regCovHA": 31.93,
+        "otMeanTotal": 1.24,
+        "h1Share": 0.5045,
+        "h1CovHA": 5.42
+      },
+      "families": [
+        {
+          "league": "EUROLEAGUE",
+          "marketCategory": "game_total",
+          "sampleSize": 2557,
+          "rawBrier": 0.2348,
+          "calibratedBrier": 0.2348,
+          "baselineBrier": 0.2498,
+          "brierDiffVsBaseline": -0.015,
+          "rawLogLoss": 0.6619,
+          "calibratedLogLoss": 0.6619,
+          "baselineLogLoss": 0.6927,
+          "logLossDiffVsBaseline": -0.0308,
+          "ece": 0.0198,
+          "hitRateAt60": 0.6792,
+          "sampleAt60": 1116,
+          "passedBaseline": true,
+          "calibratorType": "raw",
+          "platt": {
+            "a": 0.9958,
+            "b": -0.0091
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.2645,
+              "pCal": 0.3009,
+              "count": 79
+            },
+            {
+              "pRaw": 0.3278,
+              "pCal": 0.3272,
+              "count": 112
+            },
+            {
+              "pRaw": 0.3776,
+              "pCal": 0.3841,
+              "count": 205
+            },
+            {
+              "pRaw": 0.4382,
+              "pCal": 0.4429,
+              "count": 469
+            },
+            {
+              "pRaw": 0.4869,
+              "pCal": 0.4738,
+              "count": 209
+            },
+            {
+              "pRaw": 0.5242,
+              "pCal": 0.4821,
+              "count": 384
+            },
+            {
+              "pRaw": 0.5621,
+              "pCal": 0.543,
+              "count": 210
+            },
+            {
+              "pRaw": 0.5874,
+              "pCal": 0.5603,
+              "count": 175
+            },
+            {
+              "pRaw": 0.6123,
+              "pCal": 0.6327,
+              "count": 158
+            },
+            {
+              "pRaw": 0.6384,
+              "pCal": 0.6662,
+              "count": 129
+            },
+            {
+              "pRaw": 0.6853,
+              "pCal": 0.6966,
+              "count": 314
+            },
+            {
+              "pRaw": 0.7373,
+              "pCal": 0.7579,
+              "count": 58
+            },
+            {
+              "pRaw": 0.784,
+              "pCal": 0.829,
+              "count": 85
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.05,
+              "observedFrequency": 0.05,
+              "sampleCount": 0
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1853,
+              "observedFrequency": 0.5,
+              "sampleCount": 2
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2708,
+              "observedFrequency": 0.3043,
+              "sampleCount": 69
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3602,
+              "observedFrequency": 0.3642,
+              "sampleCount": 313
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4533,
+              "observedFrequency": 0.4525,
+              "sampleCount": 674
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.549,
+              "observedFrequency": 0.5163,
+              "sampleCount": 767
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6468,
+              "observedFrequency": 0.6823,
+              "sampleCount": 513
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.736,
+              "observedFrequency": 0.7304,
+              "sampleCount": 204
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8258,
+              "observedFrequency": 0.7333,
+              "sampleCount": 15
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.95,
+              "observedFrequency": 0.95,
+              "sampleCount": 0
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "EUROLEAGUE",
+          "marketCategory": "home_total",
+          "sampleSize": 2557,
+          "rawBrier": 0.2342,
+          "calibratedBrier": 0.2342,
+          "baselineBrier": 0.2499,
+          "brierDiffVsBaseline": -0.0157,
+          "rawLogLoss": 0.6609,
+          "calibratedLogLoss": 0.6609,
+          "baselineLogLoss": 0.693,
+          "logLossDiffVsBaseline": -0.032,
+          "ece": 0.0252,
+          "hitRateAt60": 0.6708,
+          "sampleAt60": 1057,
+          "passedBaseline": true,
+          "calibratorType": "raw",
+          "platt": {
+            "a": 1.0609,
+            "b": 0.0144
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.1593,
+              "pCal": 0.1083,
+              "count": 1
+            },
+            {
+              "pRaw": 0.2849,
+              "pCal": 0.2932,
+              "count": 131
+            },
+            {
+              "pRaw": 0.3385,
+              "pCal": 0.342,
+              "count": 76
+            },
+            {
+              "pRaw": 0.3639,
+              "pCal": 0.3858,
+              "count": 88
+            },
+            {
+              "pRaw": 0.401,
+              "pCal": 0.3957,
+              "count": 275
+            },
+            {
+              "pRaw": 0.4525,
+              "pCal": 0.411,
+              "count": 360
+            },
+            {
+              "pRaw": 0.4868,
+              "pCal": 0.4651,
+              "count": 185
+            },
+            {
+              "pRaw": 0.5124,
+              "pCal": 0.5378,
+              "count": 184
+            },
+            {
+              "pRaw": 0.5504,
+              "pCal": 0.555,
+              "count": 447
+            },
+            {
+              "pRaw": 0.5989,
+              "pCal": 0.6451,
+              "count": 335
+            },
+            {
+              "pRaw": 0.6583,
+              "pCal": 0.6566,
+              "count": 330
+            },
+            {
+              "pRaw": 0.7306,
+              "pCal": 0.7599,
+              "count": 142
+            },
+            {
+              "pRaw": 0.8024,
+              "pCal": 0.8836,
+              "count": 33
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.05,
+              "observedFrequency": 0.05,
+              "sampleCount": 0
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1655,
+              "observedFrequency": 0.5,
+              "sampleCount": 2
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2737,
+              "observedFrequency": 0.3784,
+              "sampleCount": 74
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3596,
+              "observedFrequency": 0.3474,
+              "sampleCount": 331
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4529,
+              "observedFrequency": 0.4216,
+              "sampleCount": 695
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5498,
+              "observedFrequency": 0.5714,
+              "sampleCount": 805
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6432,
+              "observedFrequency": 0.6522,
+              "sampleCount": 483
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7367,
+              "observedFrequency": 0.7871,
+              "sampleCount": 155
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8136,
+              "observedFrequency": 0.75,
+              "sampleCount": 12
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.95,
+              "observedFrequency": 0.95,
+              "sampleCount": 0
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "EUROLEAGUE",
+          "marketCategory": "away_total",
+          "sampleSize": 2557,
+          "rawBrier": 0.236,
+          "calibratedBrier": 0.236,
+          "baselineBrier": 0.2502,
+          "brierDiffVsBaseline": -0.0142,
+          "rawLogLoss": 0.6643,
+          "calibratedLogLoss": 0.6644,
+          "baselineLogLoss": 0.6935,
+          "logLossDiffVsBaseline": -0.0291,
+          "ece": 0.0172,
+          "hitRateAt60": 0.6703,
+          "sampleAt60": 1089,
+          "passedBaseline": true,
+          "calibratorType": "platt",
+          "platt": {
+            "a": 1.0246,
+            "b": -0.1004
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.3073,
+              "pCal": 0.2836,
+              "count": 193
+            },
+            {
+              "pRaw": 0.3776,
+              "pCal": 0.3436,
+              "count": 209
+            },
+            {
+              "pRaw": 0.4132,
+              "pCal": 0.4016,
+              "count": 137
+            },
+            {
+              "pRaw": 0.4375,
+              "pCal": 0.4103,
+              "count": 161
+            },
+            {
+              "pRaw": 0.4617,
+              "pCal": 0.4197,
+              "count": 167
+            },
+            {
+              "pRaw": 0.4991,
+              "pCal": 0.4987,
+              "count": 397
+            },
+            {
+              "pRaw": 0.5615,
+              "pCal": 0.5205,
+              "count": 577
+            },
+            {
+              "pRaw": 0.6124,
+              "pCal": 0.5865,
+              "count": 174
+            },
+            {
+              "pRaw": 0.6369,
+              "pCal": 0.6226,
+              "count": 143
+            },
+            {
+              "pRaw": 0.6621,
+              "pCal": 0.6368,
+              "count": 132
+            },
+            {
+              "pRaw": 0.686,
+              "pCal": 0.6497,
+              "count": 94
+            },
+            {
+              "pRaw": 0.7124,
+              "pCal": 0.7053,
+              "count": 78
+            },
+            {
+              "pRaw": 0.7376,
+              "pCal": 0.7825,
+              "count": 51
+            },
+            {
+              "pRaw": 0.773,
+              "pCal": 0.8018,
+              "count": 53
+            },
+            {
+              "pRaw": 0.8199,
+              "pCal": 0.82,
+              "count": 13
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.05,
+              "observedFrequency": 0.05,
+              "sampleCount": 0
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1905,
+              "observedFrequency": 0.6,
+              "sampleCount": 5
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2681,
+              "observedFrequency": 0.3162,
+              "sampleCount": 117
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3588,
+              "observedFrequency": 0.3441,
+              "sampleCount": 401
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4521,
+              "observedFrequency": 0.4599,
+              "sampleCount": 711
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.549,
+              "observedFrequency": 0.5284,
+              "sampleCount": 757
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6432,
+              "observedFrequency": 0.6508,
+              "sampleCount": 441
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7346,
+              "observedFrequency": 0.7833,
+              "sampleCount": 120
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8218,
+              "observedFrequency": 0.8,
+              "sampleCount": 5
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.95,
+              "observedFrequency": 0.95,
+              "sampleCount": 0
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "EUROLEAGUE",
+          "marketCategory": "h1_game_total",
+          "sampleSize": 2557,
+          "rawBrier": 0.237,
+          "calibratedBrier": 0.2365,
+          "baselineBrier": 0.2495,
+          "brierDiffVsBaseline": -0.013,
+          "rawLogLoss": 0.6663,
+          "calibratedLogLoss": 0.6658,
+          "baselineLogLoss": 0.6922,
+          "logLossDiffVsBaseline": -0.0264,
+          "ece": 0.0231,
+          "hitRateAt60": 0.6442,
+          "sampleAt60": 1099,
+          "passedBaseline": true,
+          "calibratorType": "isotonic",
+          "platt": {
+            "a": 1.1438,
+            "b": -0.0642
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.2523,
+              "pCal": 0.2,
+              "count": 13
+            },
+            {
+              "pRaw": 0.287,
+              "pCal": 0.303,
+              "count": 23
+            },
+            {
+              "pRaw": 0.3305,
+              "pCal": 0.3372,
+              "count": 76
+            },
+            {
+              "pRaw": 0.4091,
+              "pCal": 0.4034,
+              "count": 524
+            },
+            {
+              "pRaw": 0.4766,
+              "pCal": 0.4303,
+              "count": 430
+            },
+            {
+              "pRaw": 0.5124,
+              "pCal": 0.4463,
+              "count": 249
+            },
+            {
+              "pRaw": 0.5366,
+              "pCal": 0.4803,
+              "count": 223
+            },
+            {
+              "pRaw": 0.5627,
+              "pCal": 0.5682,
+              "count": 227
+            },
+            {
+              "pRaw": 0.5881,
+              "pCal": 0.6075,
+              "count": 209
+            },
+            {
+              "pRaw": 0.6249,
+              "pCal": 0.6292,
+              "count": 296
+            },
+            {
+              "pRaw": 0.6609,
+              "pCal": 0.7086,
+              "count": 117
+            },
+            {
+              "pRaw": 0.695,
+              "pCal": 0.7138,
+              "count": 128
+            },
+            {
+              "pRaw": 0.7475,
+              "pCal": 0.8448,
+              "count": 56
+            },
+            {
+              "pRaw": 0.7848,
+              "pCal": 0.8583,
+              "count": 1
+            },
+            {
+              "pRaw": 0.8111,
+              "pCal": 0.875,
+              "count": 1
+            },
+            {
+              "pRaw": 0.8366,
+              "pCal": 0.9188,
+              "count": 2
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.05,
+              "observedFrequency": 0.05,
+              "sampleCount": 0
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.1599,
+              "observedFrequency": 0.1818,
+              "sampleCount": 11
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2522,
+              "observedFrequency": 0.35,
+              "sampleCount": 40
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3689,
+              "observedFrequency": 0.3927,
+              "sampleCount": 247
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4391,
+              "observedFrequency": 0.4226,
+              "sampleCount": 1046
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5493,
+              "observedFrequency": 0.5607,
+              "sampleCount": 412
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6438,
+              "observedFrequency": 0.6136,
+              "sampleCount": 559
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.746,
+              "observedFrequency": 0.7297,
+              "sampleCount": 148
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8449,
+              "observedFrequency": 0.7614,
+              "sampleCount": 88
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.9145,
+              "observedFrequency": 0.8333,
+              "sampleCount": 6
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        },
+        {
+          "league": "EUROLEAGUE",
+          "marketCategory": "h1_team_total",
+          "sampleSize": 5114,
+          "rawBrier": 0.2378,
+          "calibratedBrier": 0.2378,
+          "baselineBrier": 0.25,
+          "brierDiffVsBaseline": -0.0122,
+          "rawLogLoss": 0.6683,
+          "calibratedLogLoss": 0.6683,
+          "baselineLogLoss": 0.6932,
+          "logLossDiffVsBaseline": -0.0249,
+          "ece": 0.0129,
+          "hitRateAt60": 0.6629,
+          "sampleAt60": 1679,
+          "passedBaseline": true,
+          "calibratorType": "raw",
+          "platt": {
+            "a": 1.1205,
+            "b": -0.0202
+          },
+          "isotonicCurve": [
+            {
+              "pRaw": 0.2403,
+              "pCal": 0.1475,
+              "count": 8
+            },
+            {
+              "pRaw": 0.335,
+              "pCal": 0.335,
+              "count": 473
+            },
+            {
+              "pRaw": 0.3882,
+              "pCal": 0.3756,
+              "count": 253
+            },
+            {
+              "pRaw": 0.4132,
+              "pCal": 0.3821,
+              "count": 343
+            },
+            {
+              "pRaw": 0.4371,
+              "pCal": 0.4191,
+              "count": 420
+            },
+            {
+              "pRaw": 0.4631,
+              "pCal": 0.4412,
+              "count": 433
+            },
+            {
+              "pRaw": 0.4871,
+              "pCal": 0.4954,
+              "count": 440
+            },
+            {
+              "pRaw": 0.5244,
+              "pCal": 0.4965,
+              "count": 959
+            },
+            {
+              "pRaw": 0.5831,
+              "pCal": 0.5939,
+              "count": 1127
+            },
+            {
+              "pRaw": 0.6365,
+              "pCal": 0.6624,
+              "count": 246
+            },
+            {
+              "pRaw": 0.6699,
+              "pCal": 0.6934,
+              "count": 286
+            },
+            {
+              "pRaw": 0.7112,
+              "pCal": 0.7489,
+              "count": 68
+            },
+            {
+              "pRaw": 0.7431,
+              "pCal": 0.8406,
+              "count": 67
+            },
+            {
+              "pRaw": 0.7969,
+              "pCal": 0.85,
+              "count": 10
+            },
+            {
+              "pRaw": 0.8371,
+              "pCal": 0.8917,
+              "count": 1
+            }
+          ],
+          "calibrationTable": [
+            {
+              "binRange": "0.0 to 0.1",
+              "binCenter": 0.05,
+              "predictedProbMean": 0.05,
+              "observedFrequency": 0.05,
+              "sampleCount": 0
+            },
+            {
+              "binRange": "0.1 to 0.2",
+              "binCenter": 0.15,
+              "predictedProbMean": 0.15,
+              "observedFrequency": 0.15,
+              "sampleCount": 0
+            },
+            {
+              "binRange": "0.2 to 0.3",
+              "binCenter": 0.25,
+              "predictedProbMean": 0.2778,
+              "observedFrequency": 0.3571,
+              "sampleCount": 84
+            },
+            {
+              "binRange": "0.3 to 0.4",
+              "binCenter": 0.35,
+              "predictedProbMean": 0.3627,
+              "observedFrequency": 0.3458,
+              "sampleCount": 642
+            },
+            {
+              "binRange": "0.4 to 0.5",
+              "binCenter": 0.45,
+              "predictedProbMean": 0.4524,
+              "observedFrequency": 0.4377,
+              "sampleCount": 1636
+            },
+            {
+              "binRange": "0.5 to 0.6",
+              "binCenter": 0.55,
+              "predictedProbMean": 0.5473,
+              "observedFrequency": 0.5431,
+              "sampleCount": 1799
+            },
+            {
+              "binRange": "0.6 to 0.7",
+              "binCenter": 0.65,
+              "predictedProbMean": 0.6398,
+              "observedFrequency": 0.6473,
+              "sampleCount": 811
+            },
+            {
+              "binRange": "0.7 to 0.8",
+              "binCenter": 0.75,
+              "predictedProbMean": 0.7289,
+              "observedFrequency": 0.8043,
+              "sampleCount": 138
+            },
+            {
+              "binRange": "0.8 to 0.9",
+              "binCenter": 0.85,
+              "predictedProbMean": 0.8118,
+              "observedFrequency": 0.75,
+              "sampleCount": 4
+            },
+            {
+              "binRange": "0.9 to 1.0",
+              "binCenter": 0.95,
+              "predictedProbMean": 0.95,
+              "observedFrequency": 0.95,
+              "sampleCount": 0
+            }
+          ],
+          "gateAction": "ALLOW_TIERS"
+        }
+      ]
+    }
+  }
+}

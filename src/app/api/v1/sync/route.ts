@@ -26,6 +26,7 @@ import {
   getRecentProviderCalls,
   getProviderSyncState,
 } from '@/lib/data/providerCallLogger';
+import { syncBasketballLivePipeline } from '@/lib/basketball/liveSync';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -171,48 +172,62 @@ async function handleSync(request: Request) {
 
   const results: Record<string, any> = {};
 
-  // 1. Basketball Sync (NBA) - Disabled until basketball module is built
+  // 1. Basketball Sync (NBA, NCAAB D1, EuroLeague + credit-safe Odds + Pre-tipoff picks & Settlement)
   if (sportParam === 'all' || sportParam === 'basketball') {
     const attemptIso = new Date().toISOString();
     if (!BASKETBALL_SYNC_ENABLED) {
       await Promise.all([
         upsertProviderSyncState('basketball', {
           sport: 'basketball',
-          providerName: 'ESPN NBA Scoreboard + BallDontLie v1',
+          providerName: 'ESPN NBA/NCAAB + EuroLeague v2',
           status: 'DISABLED',
           lastAttemptAt: attemptIso,
           lastError: null,
-          lastResponseBody: 'NBA and basketball syncing disabled until basketball module is built',
-          callsUsedLastRun: 0,
-        }),
-        upsertProviderSyncState('provider:espn_nba', {
-          sport: 'basketball',
-          providerName: 'ESPN NBA Scoreboard',
-          status: 'DISABLED',
-          lastAttemptAt: attemptIso,
-          lastError: null,
-          lastResponseBody: 'Disabled until basketball module is built (0 calls/day)',
-          callsUsedLastRun: 0,
-        }),
-        upsertProviderSyncState('provider:balldontlie', {
-          sport: 'basketball',
-          providerName: 'BallDontLie v1',
-          status: 'DISABLED',
-          lastAttemptAt: attemptIso,
-          lastError: null,
-          lastResponseBody: 'Disabled until basketball module is built (0 calls/day)',
+          lastResponseBody: 'Basketball syncing disabled',
           callsUsedLastRun: 0,
         }),
       ]);
 
       results['basketball'] = {
         enabled: false,
-        provider: 'ESPN NBA / BallDontLie',
+        provider: 'ESPN NBA/NCAAB + EuroLeague v2',
         status: 'DISABLED',
-        reason: 'NBA and basketball syncing disabled until basketball module is built',
+        reason: 'Basketball syncing disabled',
         records: 0,
         callsMade: 0,
       };
+    } else {
+      try {
+        const bbSync = await syncBasketballLivePipeline(mode);
+        results['basketball'] = {
+          enabled: bbSync.enabled,
+          provider: 'ESPN NBA/NCAAB + EuroLeague v2',
+          mode: bbSync.mode,
+          status: bbSync.status,
+          records: bbSync.totalGamesUpserted,
+          nbaGamesUpserted: bbSync.nbaGamesUpserted,
+          ncaabGamesUpserted: bbSync.ncaabGamesUpserted,
+          euroleagueGamesUpserted: bbSync.euroleagueGamesUpserted,
+          unresolvedTeamsCount: bbSync.unresolvedTeamsCount,
+          callsMade: bbSync.callsMade,
+          odds: bbSync.oddsResult,
+          picksRecorded: bbSync.picksRecorded,
+          picksSkippedExisting: bbSync.picksSkippedExisting,
+          settlement: bbSync.settlementResult,
+          latencyMs: bbSync.latencyMs,
+          ...(bbSync.error ? { error: bbSync.error } : {}),
+        };
+      } catch (e: any) {
+        results['basketball'] = {
+          enabled: true,
+          provider: 'ESPN NBA/NCAAB + EuroLeague v2',
+          mode,
+          status: 'ERROR',
+          records: 0,
+          callsMade: 0,
+          error: e?.message || 'Basketball sync failed',
+        };
+      }
     }
   }
 
@@ -571,9 +586,11 @@ async function handleSync(request: Request) {
       const [
         { count: fixturesTotalCount, error: fixErr },
         { count: syncStateCount, error: syncErr },
+        { count: bbGamesTotalCount },
       ] = await Promise.all([
         supabase.from('fixtures').select('id', { count: 'exact', head: true }),
         supabase.from('provider_sync_state').select('id', { count: 'exact', head: true }),
+        supabase.from('bb_games').select('id', { count: 'exact', head: true }),
       ]);
       const dbOk = !fixErr && !syncErr;
       dbHealthy = dbOk;
@@ -593,9 +610,11 @@ async function handleSync(request: Request) {
         message: persistence.message,
         status: dbOk ? 'ONLINE' : 'ERROR',
         fixturesTotalCount: typeof fixturesTotalCount === 'number' ? fixturesTotalCount : null,
+        bbGamesTotalCount: typeof bbGamesTotalCount === 'number' ? bbGamesTotalCount : null,
         syncStateTotalCount: typeof syncStateCount === 'number' ? syncStateCount : null,
         tables: {
           fixtures: fixErr ? fixErr.message : 'OK',
+          bb_games: typeof bbGamesTotalCount === 'number' ? 'OK' : 'PENDING_MIGRATION',
           provider_sync_state: syncErr ? syncErr.message : 'OK',
         },
         latencyMs: Date.now() - t0,
@@ -614,6 +633,7 @@ async function handleSync(request: Request) {
 
   const hasFatalError =
     results['football']?.status === 'ERROR' ||
+    (sportParam === 'basketball' && results['basketball']?.status === 'ERROR') ||
     !dbHealthy;
 
   return NextResponse.json(

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { getStoredSavedFixtures } from '@/lib/supabase/client';
 import { Team } from '@/types';
+import type { BasketballLeague } from '@/lib/basketball/markets';
 import { formatExpectedValue, formatOdds, formatSelectionName } from '@/lib/prediction/marketCatalog';
 import { displayName } from '@/lib/utils/formatText';
 
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   const isBasketball = sport === 'basketball';
 
   const [selectedCompId, setSelectedCompId] = useState<string>('ALL');
+  const [selectedBbLeague, setSelectedBbLeague] = useState<'ALL' | BasketballLeague>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'completed'>('upcoming');
   const [compGroups, setCompGroups] = useState<CountryCompetitionGroup[]>([]);
@@ -53,11 +55,11 @@ export default function DashboardPage() {
       .catch(err => console.error('[DashboardPage] Error fetching active competitions:', err));
   }, [isBasketball]);
 
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated, error, isOffline, isSavedCopy } = useLiveFixtures(
-    isBasketball ? 'comp_nba' : selectedCompId,
+  const { fixtures, isLoading, liveDataAvailable, lastUpdated, error, isOffline, isSavedCopy, evaluations } = useLiveFixtures(
+    isBasketball ? selectedBbLeague : selectedCompId,
     'ALL',
     sport,
-    !isBasketball && activeTab === 'today' ? 'today' : 'ALL'
+    activeTab === 'today' ? 'today' : 'ALL'
   );
 
   const savedFixtureIds = useMemo(() => getStoredSavedFixtures(), []);
@@ -112,14 +114,15 @@ export default function DashboardPage() {
         const q = searchQuery.toLowerCase();
         const matchesHome = fixture.homeTeam.name.toLowerCase().includes(q);
         const matchesAway = fixture.awayTeam.name.toLowerCase().includes(q);
-        if (!matchesHome && !matchesAway) return false;
+        const matchesLeague = (fixture.basketballStats?.league || fixture.competition.code || '').toLowerCase().includes(q);
+        if (!matchesHome && !matchesAway && !matchesLeague) return false;
       }
       if (activeTab === 'completed') {
         return fixture.status === 'FINISHED';
       } else if (activeTab === 'today') {
-        return fixture.status !== 'FINISHED';
+        return fixture.status !== 'FINISHED' && matchesDayFilter(fixture.kickoffTime, 'today');
       }
-      return true;
+      return fixture.status !== 'FINISHED';
     });
   }, [fixtures, searchQuery, activeTab, isBasketball]);
 
@@ -179,14 +182,14 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-white/[0.07]">
         <div>
           <h2 className="text-[19px] font-bold leading-[1.25] tracking-[-0.02em] text-[#ECF1EE] flex items-center gap-2">
-            <span>{isBasketball ? 'NBA Analytics & Market Terminal' : 'Market Intelligence Dashboard'}</span>
+            <span>{isBasketball ? 'Basketball Totals Terminal' : 'Market Intelligence Dashboard'}</span>
             <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded-[5px] border border-[#B6E63B]/40 text-[#B6E63B] font-semibold">
               LIVE
             </span>
           </h2>
           <p className="text-[12px] text-[#8B9890] mt-0.5">
             {isBasketball 
-              ? 'Multi team efficiency modeling, projected totals, spreads, and pace analysis for all 30 NBA franchises.'
+              ? 'NBA, NCAAB Division I, and EuroLeague game totals, team totals, and 1st half totals models.'
               : 'Real time multi market evaluation across the authorized catalog types. Every call, on record.'}
           </p>
         </div>
@@ -196,7 +199,7 @@ export default function DashboardPage() {
           <Search className="w-4 h-4 absolute left-3 top-3 text-[#5E6A63]" strokeWidth={2} />
           <input
             type="text"
-            placeholder={isBasketball ? "Search NBA franchise..." : "Search club or league..."}
+            placeholder={isBasketball ? "Search NBA, NCAAB or EuroLeague..." : "Search club or league..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full sm:w-64 h-[40px] bg-[#151E19] border border-white/[0.07] pl-9 pr-3 rounded-[11px] text-[13px] text-[#ECF1EE] placeholder-[#5E6A63] focus:outline-hidden focus:border-[#B6E63B]"
@@ -308,8 +311,22 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Database-driven competition selector for Football only */}
-        {!isBasketball && (
+        {/* Database-driven competition selector for Football or League selector for Basketball */}
+        {isBasketball ? (
+          <div className="w-full sm:w-64">
+            <select
+              value={selectedBbLeague}
+              onChange={(e) => setSelectedBbLeague(e.target.value as 'ALL' | BasketballLeague)}
+              className="w-full h-[36px] px-3 rounded-[10px] bg-[var(--surface)] border border-[var(--border)] text-[12px] text-[var(--text)] focus:outline-hidden focus:border-[var(--accent)] cursor-pointer"
+              aria-label="Filter basketball league"
+            >
+              <option value="ALL">All leagues (NBA · NCAAB · EuroLeague)</option>
+              <option value="NBA">NBA</option>
+              <option value="NCAAB">NCAAB Division I</option>
+              <option value="EUROLEAGUE">EuroLeague</option>
+            </select>
+          </div>
+        ) : (
           <div className="w-full sm:w-72">
             <CompetitionFilter
               selectedCompetitionId={selectedCompId}
@@ -326,7 +343,7 @@ export default function DashboardPage() {
         filteredBasketball.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {filteredBasketball.map(f => (
-              <NBAGameCard key={f.id} fixture={f} />
+              <NBAGameCard key={f.id} fixture={f} evaluation={evaluations?.[f.id]} />
             ))}
           </div>
         ) : (
@@ -336,7 +353,7 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-[var(--text)] font-[600] text-[12.5px]">No games scheduled</h3>
             <p className="text-[11.5px] text-[var(--text-3)] max-w-sm mx-auto">
-              No NBA matchups matching your current filter. Scheduled games will appear on matchday.
+              No basketball matchups matching your current filter. Scheduled games will appear on matchday.
             </p>
           </div>
         )

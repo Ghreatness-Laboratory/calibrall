@@ -27,7 +27,8 @@ import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase
 import { Fixture, MarketPrediction } from '@/types';
 import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import { checkDerby } from '@/lib/prediction/contextFactors';
-import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
+import type { BasketballGameEvaluation, BasketballPickCandidate } from '@/lib/basketball/picker';
+import type { BasketballMarketCategory } from '@/lib/basketball/markets';
 import { evaluateLiveMatchState } from '@/lib/prediction/liveMatchState';
 import { extractMatchStats, settleMarketPrediction } from '@/lib/prediction/settlementEngine';
 import QuantitativeFactorsAuditPanel from '@/components/QuantitativeFactorsAuditPanel';
@@ -37,11 +38,61 @@ import { getFixtureLineupState } from '@/lib/data/lineupsService';
 import { forwardPickLedger } from '@/lib/prediction/forwardPickLedger';
 import { displayName, formatMatchTime, cleanDisplayText } from '@/lib/utils/formatText';
 
+const BB_CAT_TITLES: Record<BasketballMarketCategory, string> = {
+  game_total: 'Game Total Over/Under',
+  home_total: 'Home Team Total Over/Under',
+  away_total: 'Away Team Total Over/Under',
+  h1_game_total: '1st Half Game Total Over/Under',
+  h1_team_total: '1st Half Team Total Over/Under',
+};
+
+function getClientBbSettlement(pick: BasketballPickCandidate, fixture: Fixture): {
+  status: 'PENDING' | 'WON' | 'LOST' | 'PUSH' | 'VOID';
+  actualLabel: string | null;
+} {
+  if (fixture.status === 'POSTPONED' || fixture.status === 'CANCELED') {
+    return { status: 'VOID', actualLabel: fixture.status };
+  }
+  if (fixture.status !== 'FINISHED') {
+    return { status: 'PENDING', actualLabel: null };
+  }
+  const h = fixture.homeScore ?? null;
+  const a = fixture.awayScore ?? null;
+  const h1h = fixture.homeHalfTimeScore ?? null;
+  const h1a = fixture.awayHalfTimeScore ?? null;
+  let actual: number | null = null;
+  let label: string | null = h !== null && a !== null ? `${h} - ${a}` : null;
+
+  if (pick.marketCategory === 'game_total' && h !== null && a !== null) actual = h + a;
+  else if (pick.marketCategory === 'home_total' && h !== null) actual = h;
+  else if (pick.marketCategory === 'away_total' && a !== null) actual = a;
+  else if (pick.marketCategory === 'h1_game_total' && h1h !== null && h1a !== null) {
+    actual = h1h + h1a;
+    label = `1H ${h1h} - ${h1a}`;
+  } else if (pick.marketCategory === 'h1_team_total') {
+    if (pick.side === 'away' && h1a !== null) {
+      actual = h1a;
+      label = `1H Away ${h1a}`;
+    } else if (pick.side !== 'away' && h1h !== null) {
+      actual = h1h;
+      label = `1H Home ${h1h}`;
+    }
+  }
+
+  if (actual === null) return { status: 'PENDING', actualLabel: 'Missing official period breakdown' };
+  if (Math.abs(actual - pick.line) < 1e-6) return { status: 'PUSH', actualLabel: `${actual.toFixed(0)} (${label})` };
+  const isOver = pick.marketCode.endsWith('_OVER');
+  const won = isOver ? actual > pick.line : actual < pick.line;
+  return { status: won ? 'WON' : 'LOST', actualLabel: `${actual.toFixed(0)} (${label})` };
+}
+
 export default function MatchAnalysisPage() {
   const params = useParams();
   const id = (Array.isArray(params?.id) ? params.id[0] : params?.id) as string;
 
   const [fixture, setFixture] = useState<Fixture | null>(null);
+  const [bbEvaluation, setBbEvaluation] = useState<BasketballGameEvaluation | null>(null);
+  const [selectedBbPickKey, setSelectedBbPickKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [lastUpdated, setLastUpdated] = useState<string>('');
 
@@ -49,10 +100,11 @@ export default function MatchAnalysisPage() {
     async function loadFixture() {
       try {
         setIsLoading(true);
-        const isNba = id?.startsWith('nba_');
-        const res = await fetch(`/api/v1/fixtures?sport=${isNba ? 'basketball' : 'football'}&id=${encodeURIComponent(id)}`, { cache: 'no-store' });
+        const isBb = id?.startsWith('bbg_') || id?.startsWith('nba_');
+        const res = await fetch(`/api/v1/fixtures?sport=${isBb ? 'basketball' : 'football'}&id=${encodeURIComponent(id)}`, { cache: 'no-store' });
         if (!res.ok) {
           setFixture(null);
+          setBbEvaluation(null);
           return;
         }
         const text = await res.text();
@@ -61,13 +113,16 @@ export default function MatchAnalysisPage() {
           json = JSON.parse(text);
         } catch {
           setFixture(null);
+          setBbEvaluation(null);
           return;
         }
         if (json.lastUpdated) setLastUpdated(json.lastUpdated);
         const found = (json.data || []).find((f: Fixture) => f.id === id);
         setFixture(found || null);
+        setBbEvaluation(json.evaluations?.[id] || null);
       } catch {
         setFixture(null);
+        setBbEvaluation(null);
       } finally {
         setIsLoading(false);
       }
@@ -79,7 +134,7 @@ export default function MatchAnalysisPage() {
     return getStoredSavedFixtures().includes(id);
   });
 
-  const isBasketball = fixture?.sport === 'basketball' || id?.startsWith('nba_');
+  const isBasketball = fixture?.sport === 'basketball' || id?.startsWith('bbg_') || id?.startsWith('nba_');
 
   const stats = useMemo(() => {
     if (!fixture || isBasketball) return null;
@@ -91,19 +146,15 @@ export default function MatchAnalysisPage() {
     return evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
   }, [fixture, isBasketball, stats]);
 
-  const basketballPredictions = useMemo(() => {
-    if (!fixture || !isBasketball) return [];
-    return generateNBAPredictions(fixture);
-  }, [fixture, isBasketball]);
-
   // Match stats summary for finished matches
   const matchStats = useMemo(() => {
-    if (!fixture || fixture.status !== 'FINISHED') return null;
+    if (!fixture || isBasketball || fixture.status !== 'FINISHED') return null;
     return extractMatchStats(fixture);
-  }, [fixture]);
+  }, [fixture, isBasketball]);
 
   const predictions = useMemo(() => {
-    const raw = isBasketball ? basketballPredictions : (footballEvaluation?.predictions || []);
+    if (isBasketball) return [];
+    const raw = footballEvaluation?.predictions || [];
     if (!matchStats) return raw;
     return raw.map((p) => {
       const settled = settleMarketPrediction(p, matchStats);
@@ -114,9 +165,9 @@ export default function MatchAnalysisPage() {
         lineComparisonText: settled.lineComparisonText,
       };
     });
-  }, [isBasketball, basketballPredictions, footballEvaluation, matchStats]);
+  }, [isBasketball, footballEvaluation, matchStats]);
 
-  const topPick = isBasketball ? (predictions[0] || null) : (predictions.find(p => p.isTopPick) || (footballEvaluation?.noRecommendationReason ? null : predictions[0]) || null);
+  const topPick = isBasketball ? null : (predictions.find(p => p.isTopPick) || (footballEvaluation?.noRecommendationReason ? null : predictions[0]) || null);
   const noRecommendationReason = isBasketball ? undefined : footballEvaluation?.noRecommendationReason;
 
   // Live match state tracking
@@ -210,7 +261,7 @@ export default function MatchAnalysisPage() {
     );
   }
 
-  if (!fixture || (!isBasketball && (!stats || !footballEvaluation)) || (isBasketball && basketballPredictions.length === 0)) {
+  if (!fixture || (!isBasketball && (!stats || !footballEvaluation))) {
     return (
       <div className="py-16 text-center space-y-3 bg-[#101613] border border-[#1F2A24] rounded-[14px] p-6">
         <h2 suppressHydrationWarning className="text-[15px] font-semibold text-[#E9EFEB]">
@@ -218,7 +269,7 @@ export default function MatchAnalysisPage() {
         </h2>
         <p className="text-[12px] text-[#8B9892] max-w-sm mx-auto">
           {isBasketball 
-            ? 'The requested NBA matchup data could not be retrieved.' 
+            ? 'The requested basketball matchup data could not be retrieved.' 
             : 'The requested match data could not be retrieved.'}
         </p>
         <Link href="/matches" className="inline-block px-4 py-2 rounded-[13px] bg-[#151D19] border border-[#1F2A24] text-[13px] text-[#E9EFEB] hover:bg-white/[0.05]">
@@ -234,10 +285,449 @@ export default function MatchAnalysisPage() {
   };
 
   const kickoff = new Date(fixture.kickoffTime);
-  const totalXg = stats ? stats.homeXg + stats.awayXg : 0;
-  const totalCorners = stats ? stats.expectedCornersHome + stats.expectedCornersAway : 0;
   const homeName = displayName(fixture.homeTeam);
   const awayName = displayName(fixture.awayTeam);
+
+  if (isBasketball) {
+    const bStats = fixture.basketballStats;
+    const proj = bbEvaluation?.projection;
+    const needsHistory = Boolean(bbEvaluation?.needsHistory ?? bStats?.needsHistory ?? fixture.insufficientData);
+    const needsH1History = Boolean(proj?.needsH1History ?? bStats?.needsH1History);
+    const abstentionReason = bbEvaluation?.abstentionReason || bStats?.abstentionReason || 'Needs history';
+    const bbPicks = bbEvaluation?.picks || [];
+    const bbTopPick = bbEvaluation?.topPick || null;
+    const activeBbPick =
+      bbPicks.find((p) => `${p.marketCode}_${p.line}` === selectedBbPickKey) ||
+      bbTopPick ||
+      bbPicks[0] ||
+      null;
+
+    const leagueCode = bStats?.league || fixture.competition?.code || 'NBA';
+    const isFinished = fixture.status === 'FINISHED';
+    const isLive = fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED';
+    const hasFinalScore =
+      (isFinished || isLive) &&
+      fixture.homeScore !== null &&
+      fixture.homeScore !== undefined &&
+      fixture.awayScore !== null &&
+      fixture.awayScore !== undefined;
+    const hasH1Score =
+      fixture.homeHalfTimeScore !== null &&
+      fixture.homeHalfTimeScore !== undefined &&
+      fixture.awayHalfTimeScore !== null &&
+      fixture.awayHalfTimeScore !== undefined;
+
+    const totalMean = proj ? proj.gameTotalMean : bStats?.projectedTotal;
+    const totalStd = proj ? proj.gameTotalStd : bStats?.projectedTotalStd;
+    const h1TotalMean = proj ? proj.h1TotalMean : bStats?.h1ProjectedTotal;
+    const h1TotalStd = proj ? proj.h1TotalStd : bStats?.h1ProjectedTotalStd;
+    const homeMean = proj ? proj.homeMean : bStats?.homeProjected;
+    const awayMean = proj ? proj.awayMean : bStats?.awayProjected;
+
+    const tierStyle = (t: BasketballPickCandidate['tier']) =>
+      t === 'HIGH'
+        ? 'bg-[#B8E636]/15 text-[#B8E636] border-[#B8E636]/30'
+        : t === 'MEDIUM'
+        ? 'bg-[#E8B04A]/15 text-[#E8B04A] border-[#E8B04A]/30'
+        : 'bg-[#151D19] text-[#8B9892] border-[#1F2A24]';
+
+    return (
+      <div className="space-y-3 py-1">
+        {/* Back and Save */}
+        <div className="flex items-center justify-between pb-0.5">
+          <Link
+            href="/matches"
+            className="inline-flex items-center gap-1.5 text-[12.5px] text-[#8B9892] hover:text-[#E9EFEB] transition-colors touch-press font-medium"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to fixtures</span>
+          </Link>
+
+          <button
+            onClick={handleToggleBookmark}
+            type="button"
+            className={`flex items-center gap-1.5 px-3 h-[36px] rounded-full text-[12px] font-semibold border transition-colors touch-press ${
+              isSaved
+                ? 'bg-[#E8B04A]/12 text-[#E8B04A] border-[#E8B04A]/30'
+                : 'bg-[#101613] border-[#1F2A24] text-[#8B9892] hover:text-[#E9EFEB]'
+            }`}
+          >
+            <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-[#E8B04A]' : ''}`} strokeWidth={2} />
+            <span>{isSaved ? 'Saved' : 'Save'}</span>
+          </button>
+        </div>
+
+        {/* Basketball Header Card */}
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3.5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-[#8B9892] border-b border-[#1F2A24] pb-2.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold text-[#E9EFEB]">{leagueCode}</span>
+              <span className="text-[#5E6B65]">·</span>
+              <span>{cleanDisplayText(fixture.seasonYear || '2026 to 2027')}</span>
+              {bStats?.neutral && (
+                <span className="px-2 py-0.5 rounded-full bg-[#151D19] border border-[#1F2A24] text-[10px] text-[#E9EFEB]">
+                  Neutral court
+                </span>
+              )}
+              {isFinished ? (
+                <span className="px-2 py-0.5 rounded-full bg-[#B8E636]/12 text-[#B8E636] text-[10px] font-semibold border border-[#B8E636]/30">
+                  Final
+                </span>
+              ) : isLive ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E5684F]/15 text-[#E5684F] text-[10px] font-semibold border border-[#E5684F]/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#E5684F] animate-pulse" />
+                  LIVE
+                </span>
+              ) : fixture.status === 'POSTPONED' || fixture.status === 'CANCELED' ? (
+                <span className="px-2 py-0.5 rounded-full bg-[#E8B04A]/15 text-[#E8B04A] text-[10px] font-semibold border border-[#E8B04A]/30">
+                  {fixture.status}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full bg-[#151D19] text-[#8B9892] text-[10px] font-medium border border-[#1F2A24]">
+                  Scheduled
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5 text-[11px] text-[#8B9892] tabular-nums">
+              <span className="flex items-center gap-1" suppressHydrationWarning>
+                <Calendar className="w-3.5 h-3.5 text-[#5E6B65]" strokeWidth={1.8} />
+                <span suppressHydrationWarning>
+                  {kickoff.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Africa/Lagos' })}
+                </span>
+              </span>
+              <span className="flex items-center gap-1" suppressHydrationWarning>
+                <Clock className="w-3.5 h-3.5 text-[#5E6B65]" strokeWidth={1.8} />
+                <span suppressHydrationWarning>
+                  {formatMatchTime(fixture.kickoffTime, 'Africa/Lagos')}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          {/* Teams */}
+          <div className="space-y-2 py-0.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <TeamCrest canonicalTeamId={fixture.homeTeam.id} crestUrl={fixture.homeTeam.crestUrl} teamName={homeName} size={24} />
+                <div className="min-w-0">
+                  <div className="text-[14px] font-semibold text-[#E9EFEB] truncate">{cleanDisplayText(homeName)}</div>
+                  {!needsHistory && bStats && (
+                    <div className="text-[10.5px] text-[#8B9892] tabular-nums truncate">
+                      Avg {bStats.homeOff.toFixed(1)} scored · {bStats.homeDef.toFixed(1)} allowed
+                      {bStats.homeIsB2B ? ' · Back to back' : bStats.homeRestDays !== null && bStats.homeRestDays !== undefined ? ` · ${bStats.homeRestDays}d rest` : ''}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {hasFinalScore ? (
+                  <span className="text-[16px] font-semibold text-[#E9EFEB] tabular-nums">{fixture.homeScore}</span>
+                ) : !needsHistory && homeMean !== undefined ? (
+                  <span className="text-[14px] font-semibold text-[#8B9892] tabular-nums">{homeMean.toFixed(1)} proj</span>
+                ) : null}
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#151D19] text-[#5E6B65] font-medium border border-[#1F2A24]">
+                  Home
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <TeamCrest canonicalTeamId={fixture.awayTeam.id} crestUrl={fixture.awayTeam.crestUrl} teamName={awayName} size={24} />
+                <div className="min-w-0">
+                  <div className="text-[14px] font-semibold text-[#E9EFEB] truncate">{cleanDisplayText(awayName)}</div>
+                  {!needsHistory && bStats && (
+                    <div className="text-[10.5px] text-[#8B9892] tabular-nums truncate">
+                      Avg {bStats.awayOff.toFixed(1)} scored · {bStats.awayDef.toFixed(1)} allowed
+                      {bStats.awayIsB2B ? ' · Back to back' : bStats.awayRestDays !== null && bStats.awayRestDays !== undefined ? ` · ${bStats.awayRestDays}d rest` : ''}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {hasFinalScore ? (
+                  <span className="text-[16px] font-semibold text-[#E9EFEB] tabular-nums">{fixture.awayScore}</span>
+                ) : !needsHistory && awayMean !== undefined ? (
+                  <span className="text-[14px] font-semibold text-[#8B9892] tabular-nums">{awayMean.toFixed(1)} proj</span>
+                ) : null}
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#151D19] text-[#5E6B65] font-medium border border-[#1F2A24]">
+                  Away
+                </span>
+              </div>
+            </div>
+
+            {hasH1Score && (
+              <div className="text-[11px] text-[#8B9892] tabular-nums pt-0.5">
+                Official 1st half score: <strong className="text-[#E9EFEB]">{fixture.homeHalfTimeScore} to {fixture.awayHalfTimeScore}</strong> (Total {(fixture.homeHalfTimeScore! + fixture.awayHalfTimeScore!)})
+              </div>
+            )}
+          </div>
+
+          {/* 2x2 Projection Grid */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#1F2A24]">
+            <div className="p-2.5 bg-[#151D19] rounded-[10px]">
+              <span className="text-[10.5px] text-[#8B9892] block">Projected Game Total</span>
+              <div className="mt-0.5 text-[14px] font-semibold text-[#E9EFEB] tabular-nums">
+                {!needsHistory && totalMean !== undefined ? (
+                  <>
+                    {totalMean.toFixed(1)}{totalStd ? ` ± ${totalStd.toFixed(1)}` : ''}
+                  </>
+                ) : (
+                  <span className="text-[#5E6B65]">—</span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-[#151D19] rounded-[10px]">
+              <span className="text-[10.5px] text-[#8B9892] block">1st Half Total Projection</span>
+              <div className="mt-0.5 text-[14px] font-semibold text-[#E9EFEB] tabular-nums">
+                {!needsHistory && !needsH1History && h1TotalMean !== undefined ? (
+                  <>
+                    {h1TotalMean.toFixed(1)}{h1TotalStd ? ` ± ${h1TotalStd.toFixed(1)}` : ''}
+                  </>
+                ) : (
+                  <span className="text-[#E8B04A] text-[12px]">Needs history</span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-[#151D19] rounded-[10px]">
+              <span className="text-[10.5px] text-[#8B9892] block">Team Totals Projection</span>
+              <div className="mt-0.5 text-[14px] font-semibold text-[#E9EFEB] tabular-nums">
+                {!needsHistory && homeMean !== undefined && awayMean !== undefined ? (
+                  `${homeMean.toFixed(1)} to ${awayMean.toFixed(1)}`
+                ) : (
+                  <span className="text-[#5E6B65]">—</span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-[#151D19] rounded-[10px]">
+              <span className="text-[10.5px] text-[#8B9892] block">Site &amp; OT / H2H Context</span>
+              <div className="mt-0.5 text-[12px] font-semibold text-[#E9EFEB] tabular-nums truncate">
+                {proj ? (
+                  <>
+                    {proj.neutral ? 'Neutral (0 edge)' : `Home +${proj.homeAdvantagePts.toFixed(1)}`}
+                    {proj.h2hMeetings >= 2 && proj.h2hAvgTotal !== null ? ` · H2H ${proj.h2hAvgTotal.toFixed(1)}` : ''}
+                  </>
+                ) : (
+                  <span className="text-[#5E6B65]">—</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Honest Needs history vs Totals Evaluation */}
+        {needsHistory ? (
+          <div className="rounded-[14px] p-3.5 border border-[#E8B04A]/30 bg-[#E8B04A]/10 space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#E8B04A]">
+              <AlertCircle className="w-4 h-4 text-[#E8B04A] shrink-0" strokeWidth={2} />
+              <span>Needs history</span>
+            </div>
+            <p className="text-[12px] text-[#E9EFEB] leading-[1.5]">
+              {cleanDisplayText(abstentionReason)}. Model lines and probabilities are withheld rather than invented from incomplete sample history.
+            </p>
+          </div>
+        ) : (
+          <>
+            {bbTopPick && (
+              <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3.5 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="inline-flex items-center gap-1.5 text-[11.5px] text-[#B8E636] font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={2} />
+                    <span>Top Totals Selection</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${tierStyle(bbTopPick.tier)}`}>
+                    {bbTopPick.tier}
+                  </span>
+                  {bbTopPick.isModelLine ? (
+                    <span className="text-[11px] text-[#8B9892] bg-[#151D19] px-2 py-0.5 rounded-full border border-[#1F2A24]">
+                      {bbTopPick.priceSource}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-[#E9EFEB] bg-[#151D19] px-2 py-0.5 rounded-full border border-[#1F2A24] tabular-nums">
+                      {bbTopPick.priceSource} @{bbTopPick.marketOdds?.toFixed(2)}
+                      {bbTopPick.expectedValue !== null
+                        ? ` · EV ${bbTopPick.expectedValue >= 0 ? '+' : ''}${(bbTopPick.expectedValue * 100).toFixed(1)}%`
+                        : ''}
+                    </span>
+                  )}
+                </div>
+
+                <h3 className="text-[15px] font-semibold text-[#E9EFEB]">
+                  {cleanDisplayText(bbTopPick.selection)} · {(bbTopPick.calibratedProbability * 100).toFixed(1)}% calibrated probability
+                </h3>
+
+                <p className="text-[12px] text-[#8B9892] leading-normal">
+                  {cleanDisplayText(bbTopPick.evidenceLine)}
+                </p>
+              </div>
+            )}
+
+            {needsH1History && (
+              <div className="rounded-[12px] p-3 border border-[#E8B04A]/25 bg-[#E8B04A]/8 text-[12px] text-[#E9EFEB] flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-[#E8B04A] shrink-0" />
+                <span>
+                  1st half totals withheld (Needs history): {cleanDisplayText(proj?.h1AbstentionReason || 'Insufficient verified half scores')}.
+                </span>
+              </div>
+            )}
+
+            {/* Authorized Totals Markets Board & Evidence Inspector */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+              <div className="lg:col-span-7 bg-[#101613] border border-[#1F2A24] rounded-[14px] overflow-hidden divide-y divide-[#1F2A24]">
+                <div className="p-3 flex items-center justify-between">
+                  <h3 className="text-[13px] font-semibold text-[#E9EFEB]">Authorized Totals Markets</h3>
+                  <span className="text-[10.5px] text-[#8B9892]">Game · Team · 1st Half</span>
+                </div>
+                {bbPicks.length > 0 ? (
+                  bbPicks.map((p) => {
+                    const key = `${p.marketCode}_${p.line}`;
+                    const isSelected = activeBbPick ? `${activeBbPick.marketCode}_${activeBbPick.line}` === key : false;
+                    const sett = getClientBbSettlement(p, fixture);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setSelectedBbPickKey(key)}
+                        className={`w-full text-left p-3 space-y-1.5 transition-colors ${
+                          isSelected ? 'bg-[#151D19]' : 'hover:bg-[#151D19]/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10.5px] text-[#8B9892]">
+                            {BB_CAT_TITLES[p.marketCategory]}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {isFinished && (
+                              <span
+                                className={`text-[9.5px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                                  sett.status === 'WON'
+                                    ? 'bg-[#B8E636]/12 text-[#B8E636] border-[#B8E636]/30'
+                                    : sett.status === 'LOST'
+                                    ? 'bg-[#E5684F]/15 text-[#E5684F] border-[#E5684F]/30'
+                                    : 'bg-[#151D19] text-[#8B9892] border-[#1F2A24]'
+                                }`}
+                              >
+                                {sett.status}
+                              </span>
+                            )}
+                            <span className={`text-[9.5px] px-1.5 py-0.5 rounded-full border font-semibold ${tierStyle(p.tier)}`}>
+                              {p.tier}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[13.5px] font-semibold text-[#E9EFEB]">
+                            {cleanDisplayText(p.selection)}
+                          </span>
+                          <span className="text-[13.5px] font-semibold text-[#B8E636] tabular-nums">
+                            {(p.calibratedProbability * 100).toFixed(1)}%
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-[#8B9892] tabular-nums">
+                          <span>Proj {p.projectedMean.toFixed(1)} (±{p.projectedStd.toFixed(1)})</span>
+                          <span>
+                            {p.isModelLine
+                              ? p.priceSource
+                              : `${p.priceSource} @${p.marketOdds?.toFixed(2)}${
+                                  p.expectedValue !== null
+                                    ? ` · EV ${p.expectedValue >= 0 ? '+' : ''}${(p.expectedValue * 100).toFixed(1)}%`
+                                    : ''
+                                }`}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="p-4 text-[12px] text-[#8B9892]">
+                    No totals markets cleared evaluation gates for this matchup.
+                  </div>
+                )}
+              </div>
+
+              {/* Inspector Panel */}
+              <div className="lg:col-span-5 bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[14px] font-semibold text-[#E9EFEB]">Selected line evidence audit</h3>
+                  <span className="text-[11px] text-[#B8E636] font-semibold">Real numbers only</span>
+                </div>
+
+                {activeBbPick ? (
+                  <div className="space-y-2.5 text-[12px]">
+                    <div className="bg-[#151D19] rounded-[10px] p-2.5 space-y-1">
+                      <div className="text-[10.5px] text-[#8B9892]">{BB_CAT_TITLES[activeBbPick.marketCategory]}</div>
+                      <div className="text-[14px] font-semibold text-[#E9EFEB]">
+                        {cleanDisplayText(activeBbPick.selection)}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] tabular-nums">
+                      <div className="bg-[#151D19] rounded-[8px] p-2">
+                        <span className="text-[#8B9892] block">Raw → Calibrated</span>
+                        <span className="text-[#E9EFEB] font-semibold">
+                          {(activeBbPick.rawProbability * 100).toFixed(1)}% → {(activeBbPick.calibratedProbability * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="bg-[#151D19] rounded-[8px] p-2">
+                        <span className="text-[#8B9892] block">Walk-forward gate</span>
+                        <span className={activeBbPick.passedBaselineGate ? 'text-[#B8E636] font-semibold' : 'text-[#E8B04A] font-semibold'}>
+                          {activeBbPick.passedBaselineGate ? 'Passed baseline' : 'Speculative only'}
+                        </span>
+                      </div>
+                      <div className="bg-[#151D19] rounded-[8px] p-2">
+                        <span className="text-[#8B9892] block">Price source</span>
+                        <span className="text-[#E9EFEB] font-medium">
+                          {activeBbPick.isModelLine
+                            ? activeBbPick.priceSource
+                            : `${activeBbPick.priceSource} @${activeBbPick.marketOdds?.toFixed(2)}`}
+                        </span>
+                      </div>
+                      <div className="bg-[#151D19] rounded-[8px] p-2">
+                        <span className="text-[#8B9892] block">Expected Value (EV)</span>
+                        <span className="text-[#E9EFEB] font-semibold">
+                          {activeBbPick.isModelLine || activeBbPick.expectedValue === null
+                            ? 'N/A (no price)'
+                            : `${activeBbPick.expectedValue >= 0 ? '+' : ''}${(activeBbPick.expectedValue * 100).toFixed(1)}%`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {isFinished && (
+                      <div className="bg-[#151D19] rounded-[8px] p-2 text-[11.5px] flex items-center justify-between">
+                        <span className="text-[#8B9892]">Official settlement</span>
+                        <span className="font-semibold text-[#E9EFEB]">
+                          {(() => {
+                            const s = getClientBbSettlement(activeBbPick, fixture);
+                            return `${s.status}${s.actualLabel ? ` · ${s.actualLabel}` : ''}`;
+                          })()}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="text-[11.5px] text-[#8B9892] leading-relaxed bg-[#0A0F0D] border border-white/[0.04] rounded-[8px] p-2.5">
+                      <span className="text-[#E9EFEB] font-medium">Evidence: </span>
+                      {cleanDisplayText(activeBbPick.evidenceLine)}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[12px] text-[#8B9892]">Select a totals line to inspect model evidence.</p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  const totalXg = stats ? stats.homeXg + stats.awayXg : 0;
+  const totalCorners = stats ? stats.expectedCornersHome + stats.expectedCornersAway : 0;
 
   return (
     <div className="space-y-3 py-1">

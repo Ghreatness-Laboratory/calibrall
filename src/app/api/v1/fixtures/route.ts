@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getFootballDataProvider } from '@/lib/data/provider';
-import { getNBADataProvider } from '@/lib/data/nbaProvider';
 import { isCanonicalCompetitionId, logCompetitionIntegrityError } from '@/lib/data/canonicalCompetitions';
+import {
+  getBasketballFixturesAndEvaluations,
+  getBasketballFixtureByIdFromDb,
+} from '@/lib/basketball/readService';
 import { Sport } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -12,19 +15,34 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const sport = (searchParams.get('sport') as Sport) || 'football';
-    const rawCompetitionId = searchParams.get('competition_id') || undefined;
+    const rawCompetitionId = searchParams.get('competition_id') || searchParams.get('league') || undefined;
     const day = searchParams.get('day') || undefined;
     const status = searchParams.get('status') || undefined;
     const fixtureId = searchParams.get('id') || undefined;
 
     if (sport === 'basketball') {
-      const nbaProvider = getNBADataProvider();
-      const result = await nbaProvider.getFixtures(status);
+      const result = await getBasketballFixturesAndEvaluations({
+        league: rawCompetitionId,
+        competitionId: rawCompetitionId,
+        status,
+        day,
+      });
+
+      if (fixtureId) {
+        const single = await getBasketballFixtureByIdFromDb(fixtureId);
+        if (single) {
+          if (!result.fixtures.some((f) => f.id === fixtureId)) {
+            result.fixtures.unshift(single.fixture);
+          }
+          result.evaluationsById[fixtureId] = single.evaluation;
+        }
+      }
 
       return NextResponse.json(
         {
           sport: 'basketball',
           data: result.fixtures,
+          evaluations: result.evaluationsById,
           total: result.fixtures.length,
           liveDataAvailable: result.liveDataAvailable,
           lastUpdated: result.lastUpdated,
@@ -34,7 +52,7 @@ export async function GET(request: Request) {
           error: result.error,
           failedProvider: result.failedProvider,
           season: result.season,
-          filters: { sport, competition_id: 'comp_nba', status: status || 'ALL', day: day || 'ALL' },
+          filters: { sport, competition_id: rawCompetitionId || 'ALL', status: status || 'ALL', day: day || 'ALL' },
           timestamp: new Date().toISOString(),
         },
         {

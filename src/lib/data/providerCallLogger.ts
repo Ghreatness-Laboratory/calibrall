@@ -502,31 +502,41 @@ export async function getStoredSportFreshness(sport: 'football' | 'basketball'):
 
   if (isSupabaseConfigured && supabase) {
     try {
-      let countQuery = supabase
-        .from('fixtures')
-        .select('id', { count: 'exact', head: true });
-      let latestQuery = supabase
-        .from('fixtures')
-        .select('updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(1);
-
       if (sport === 'basketball') {
-        countQuery = countQuery.eq('competition_id', 'comp_nba');
-        latestQuery = latestQuery.eq('competition_id', 'comp_nba');
+        const [countRes, latestRes] = await Promise.all([
+          supabase.from('bb_games').select('id', { count: 'exact', head: true }),
+          supabase.from('bb_games').select('updated_at').order('updated_at', { ascending: false }).limit(1),
+        ]);
+        if (!countRes.error && typeof countRes.count === 'number') {
+          fixtureCount = countRes.count;
+        }
+        if (!latestRes.error && Array.isArray(latestRes.data) && latestRes.data[0]?.updated_at) {
+          const candidateTs = String(latestRes.data[0].updated_at);
+          if (!newestUpdatedAt || candidateTs > newestUpdatedAt) {
+            newestUpdatedAt = candidateTs;
+          }
+        }
       } else {
-        countQuery = countQuery.neq('competition_id', 'comp_nba');
-        latestQuery = latestQuery.neq('competition_id', 'comp_nba');
-      }
-
-      const [countRes, latestRes] = await Promise.all([countQuery, latestQuery]);
-      if (!countRes.error && typeof countRes.count === 'number') {
-        fixtureCount = countRes.count;
-      }
-      if (!latestRes.error && Array.isArray(latestRes.data) && latestRes.data[0]?.updated_at) {
-        const candidateTs = String(latestRes.data[0].updated_at);
-        if (!newestUpdatedAt || candidateTs > newestUpdatedAt) {
-          newestUpdatedAt = candidateTs;
+        const [countRes, latestRes] = await Promise.all([
+          supabase
+            .from('fixtures')
+            .select('id', { count: 'exact', head: true })
+            .neq('competition_id', 'comp_nba'),
+          supabase
+            .from('fixtures')
+            .select('updated_at')
+            .neq('competition_id', 'comp_nba')
+            .order('updated_at', { ascending: false })
+            .limit(1),
+        ]);
+        if (!countRes.error && typeof countRes.count === 'number') {
+          fixtureCount = countRes.count;
+        }
+        if (!latestRes.error && Array.isArray(latestRes.data) && latestRes.data[0]?.updated_at) {
+          const candidateTs = String(latestRes.data[0].updated_at);
+          if (!newestUpdatedAt || candidateTs > newestUpdatedAt) {
+            newestUpdatedAt = candidateTs;
+          }
         }
       }
     } catch {

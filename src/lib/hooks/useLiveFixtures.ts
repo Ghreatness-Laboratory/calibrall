@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Fixture, Sport } from '@/types';
+import type { BasketballGameEvaluation } from '@/lib/basketball/picker';
 
 export interface SkippedLeagueDiagnostic {
   leagueCode: string;
@@ -30,11 +31,13 @@ export interface LiveFixturesHookResult {
   failedProvider?: string;
   quotaHeaders?: Record<string, string>;
   skippedLeagues?: SkippedLeagueDiagnostic[];
+  evaluations?: Record<string, BasketballGameEvaluation>;
   refetch: () => Promise<void>;
 }
 
 interface SavedFixturesPayload {
   fixtures: Fixture[];
+  evaluations?: Record<string, BasketballGameEvaluation>;
   lastUpdated: string;
   lastSyncTimestamp: string | null;
   providerUsed?: string;
@@ -144,7 +147,9 @@ export function useLiveFixtures(
   const [failedProvider, setFailedProvider] = useState<string | undefined>();
   const [quotaHeaders, setQuotaHeaders] = useState<Record<string, string> | undefined>();
   const [skippedLeagues, setSkippedLeagues] = useState<SkippedLeagueDiagnostic[]>([]);
+  const [evaluations, setEvaluations] = useState<Record<string, BasketballGameEvaluation>>({});
   const fixturesRef = useRef<Fixture[]>([]);
+  const evaluationsRef = useRef<Record<string, BasketballGameEvaluation>>({});
   const lastUpdatedRef = useRef<string>('');
 
   const applySavedFallback = useCallback(
@@ -164,8 +169,10 @@ export function useLiveFixtures(
       const stored = readSavedFixturesFromStorage(storageKey);
       if (stored && stored.fixtures.length > 0) {
         fixturesRef.current = stored.fixtures;
+        evaluationsRef.current = stored.evaluations || {};
         lastUpdatedRef.current = stored.lastUpdated || lastUpdatedRef.current;
         setFixtures(stored.fixtures);
+        setEvaluations(stored.evaluations || {});
         if (stored.lastUpdated) setLastUpdated(stored.lastUpdated);
         if (stored.lastSyncTimestamp) setLastSyncTimestamp(stored.lastSyncTimestamp);
         if (stored.providerUsed) setProviderUsed(stored.providerUsed);
@@ -237,11 +244,15 @@ export function useLiveFixtures(
       const swServerStatus = swServerStatusRaw > 0 ? swServerStatusRaw : res.status;
 
       const list: Fixture[] = json.data || [];
+      const evalMap: Record<string, BasketballGameEvaluation> =
+        json.evaluations && typeof json.evaluations === 'object' ? json.evaluations : {};
       if (list.length > 0) {
         fixturesRef.current = list;
+        evaluationsRef.current = evalMap;
         if (!swSavedCopyHeader) {
           writeSavedFixturesToStorage(storageKey, {
             fixtures: list,
+            evaluations: evalMap,
             lastUpdated: json.lastUpdated || '',
             lastSyncTimestamp: json.lastSyncTimestamp || null,
             providerUsed: json.providerUsed,
@@ -251,6 +262,7 @@ export function useLiveFixtures(
       }
 
       setFixtures(list);
+      setEvaluations(evalMap);
       setLiveDataAvailable(Boolean(json.liveDataAvailable || list.length > 0));
       setIsDelayed(Boolean(json.isDelayed || swSavedCopyHeader));
       if (typeof json.staleLimitMinutes === 'number') {
@@ -306,9 +318,11 @@ export function useLiveFixtures(
     const stored = readSavedFixturesFromStorage(storageKey);
     if (stored) {
       fixturesRef.current = stored.fixtures;
+      evaluationsRef.current = stored.evaluations || {};
       lastUpdatedRef.current = stored.lastUpdated || '';
     } else {
       fixturesRef.current = [];
+      evaluationsRef.current = {};
       lastUpdatedRef.current = '';
     }
     load();
@@ -336,6 +350,7 @@ export function useLiveFixtures(
     failedProvider,
     quotaHeaders,
     skippedLeagues,
+    evaluations,
     refetch: load,
   };
 }

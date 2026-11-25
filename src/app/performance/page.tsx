@@ -1,8 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { VERIFIED_PERFORMANCE_REPORT } from '@/lib/data/seedData';
 import { VERIFIED_NBA_PERFORMANCE_REPORT } from '@/lib/data/nbaSeedData';
+import type { CalibratedBasketballParamsFile } from '@/lib/basketball/calibration';
+import type { BasketballLeague, BasketballMarketCategory } from '@/lib/basketball/markets';
+import type {
+  BasketballForwardSummary,
+  BasketballForwardPickRow,
+} from '@/lib/basketball/settlementService';
 import PerformanceChart from '@/components/PerformanceChart';
 import { useSport } from '@/lib/context/SportContext';
 import { ValidationAndBenchmarksEngine } from '@/lib/prediction/validationAndBenchmarks';
@@ -43,6 +49,47 @@ export default function PerformancePage() {
   const report = sport === 'basketball' ? VERIFIED_NBA_PERFORMANCE_REPORT : VERIFIED_PERFORMANCE_REPORT;
   const isBasketball = sport === 'basketball';
 
+  const [bbData, setBbData] = useState<{
+    walkForward?: CalibratedBasketballParamsFile;
+    forwardSummary?: BasketballForwardSummary;
+    forwardPicks?: BasketballForwardPickRow[];
+  } | null>(null);
+  const [bbLoading, setBbLoading] = useState(false);
+  const [bbError, setBbError] = useState<string | null>(null);
+  const [bbLeague, setBbLeague] = useState<BasketballLeague>('NBA');
+  const [bbSelectedCategory, setBbSelectedCategory] = useState<BasketballMarketCategory>('game_total');
+  const [bbForwardFilter, setBbForwardFilter] = useState<'ALL' | 'GRADED' | 'PENDING'>('ALL');
+
+  useEffect(() => {
+    if (!isBasketball || isSwitching) return;
+    let active = true;
+    setBbLoading(true);
+    setBbError(null);
+    fetch('/api/v1/performance/summary?sport=basketball', { cache: 'no-store' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((json) => {
+        if (!active) return;
+        setBbData({
+          walkForward: json.walkForward,
+          forwardSummary: json.forwardSummary,
+          forwardPicks: Array.isArray(json.forwardPicks) ? json.forwardPicks : [],
+        });
+      })
+      .catch((err) => {
+        if (!active) return;
+        setBbError(err instanceof Error ? err.message : 'Failed to load basketball performance summary');
+      })
+      .finally(() => {
+        if (active) setBbLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isBasketball, isSwitching]);
+
   // Load verified forward record metrics (the only platform accuracy measure)
   const forwardMetrics = forwardPickLedger.getForwardRecordMetrics();
   const researchAudit = ValidationAndBenchmarksEngine.runFullResearchAudit();
@@ -55,6 +102,385 @@ export default function PerformancePage() {
         <div className="h-6 w-48 bg-[#151E19] rounded-[6px]" />
         <div className="h-28 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
         <div className="h-48 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
+      </div>
+    );
+  }
+
+  if (isBasketball) {
+    const bbCategoryLabel: Record<BasketballMarketCategory, string> = {
+      game_total: 'Game Total',
+      home_total: 'Home Team Total',
+      away_total: 'Away Team Total',
+      h1_game_total: '1st Half Game Total',
+      h1_team_total: '1st Half Team Totals',
+    };
+
+    const fwd = bbData?.forwardSummary;
+    const fwdPicks = bbData?.forwardPicks || [];
+    const filteredBbPicks = fwdPicks.filter((p) => {
+      if (bbForwardFilter === 'PENDING') return p.settlementStatus === 'PENDING';
+      if (bbForwardFilter === 'GRADED') return p.settlementStatus !== 'PENDING';
+      return true;
+    });
+
+    const walkForwardLeague = bbData?.walkForward?.leagues?.[bbLeague] || null;
+    const activeFamily =
+      walkForwardLeague?.families.find((f) => f.marketCategory === bbSelectedCategory) ||
+      walkForwardLeague?.families[0] ||
+      null;
+
+    return (
+      <div className="space-y-4 py-1">
+        <div className="space-y-1">
+          <h1 className="text-[23px] font-[700] leading-[1.22] text-[#E9EFEB] tracking-[-0.025em]">
+            Basketball Forward Record &amp; Calibration
+          </h1>
+          <p className="text-[12.5px] leading-[1.55] text-[#8B9892]">
+            Strict Totals &amp; 1st Half engine across NBA, NCAAB (D1 vs D1), and EuroLeague. Basketball picks, Brier scores, Log Loss, and ROI are isolated in a separate ledger and never mixed with football.
+          </p>
+        </div>
+
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3 space-y-1">
+          <div className="flex items-center gap-2 text-[#B8E636] font-[600] text-[13px]">
+            <ShieldCheck className="w-4 h-4 shrink-0 text-[#B8E636]" strokeWidth={2} />
+            <span>Separate Basketball Forward Ledger &amp; Settlement Rules</span>
+          </div>
+          <p className="text-[12px] leading-[1.5] text-[#8B9892]">
+            Pre-tipoff picks are hashed before scheduled start, settled strictly from official final scores (and verified half scores for 1st half markets, never estimated), push on exact integer line hits, and compute EV exclusively when a real bookmaker price is recorded.
+          </p>
+        </div>
+
+        {bbError && (
+          <div className="bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-[12px] p-3 text-[12px] text-[#EF4444]">
+            Failed to load live basketball ledger: {bbError}
+          </div>
+        )}
+
+        {/* 2x2 Separate Basketball Forward KPI Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between min-h-[76px]">
+            <div className="text-[10.5px] text-[#8B9892]">Forward Brier (Basketball)</div>
+            <div className="flex items-baseline gap-1.5">
+              <div className="text-[18px] font-[650] text-[#B8E636] tabular-nums leading-none">
+                {bbLoading ? '...' : fwd && fwd.brierScore !== null ? fwd.brierScore.toFixed(4) : 'N/A'}
+              </div>
+              <div className="text-[10px] text-[#8B9892] font-medium">totals v1</div>
+            </div>
+            <div className="text-[9.5px] text-[#5E6B65]">Graded pre-tipoff picks</div>
+          </div>
+
+          <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between min-h-[76px]">
+            <div className="text-[10.5px] text-[#8B9892]">Forward Log Loss</div>
+            <div className="flex items-baseline gap-1.5">
+              <div className="text-[18px] font-[650] text-[#E9EFEB] tabular-nums leading-none">
+                {bbLoading ? '...' : fwd && fwd.logLoss !== null ? fwd.logLoss.toFixed(4) : 'N/A'}
+              </div>
+            </div>
+            <div className="text-[9.5px] text-[#5E6B65]">Separate from football</div>
+          </div>
+
+          <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between min-h-[76px]">
+            <div className="text-[10.5px] text-[#8B9892]">Forward ROI (Priced)</div>
+            <div className="flex items-baseline gap-1.5">
+              <div className="text-[18px] font-[650] text-[#B8E636] tabular-nums leading-none">
+                {bbLoading
+                  ? '...'
+                  : fwd && fwd.yieldRoi !== null
+                  ? `${fwd.yieldRoi >= 0 ? '+' : ''}${fwd.yieldRoi.toFixed(1)}%`
+                  : 'No priced picks'}
+              </div>
+              {fwd && (
+                <div className="text-[10px] text-[#8B9892] tabular-nums">
+                  {fwd.pricedSettledCount} priced
+                </div>
+              )}
+            </div>
+            <div className="text-[9.5px] text-[#5E6B65]">Real market odds only</div>
+          </div>
+
+          <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-2.5 flex flex-col justify-between min-h-[76px]">
+            <div className="text-[10.5px] text-[#8B9892]">Settled Records</div>
+            <div className="flex items-baseline gap-1.5">
+              <div className="text-[18px] font-[650] text-[#E9EFEB] tabular-nums leading-none">
+                {bbLoading ? '...' : fwd ? fwd.settledCount : 0}
+              </div>
+              {fwd && (
+                <div className="text-[10px] text-[#8B9892] tabular-nums">
+                  {fwd.wonCount}W · {fwd.lostCount}L · {fwd.pushCount}P
+                </div>
+              )}
+            </div>
+            <div className="text-[9.5px] text-[#5E6B65]">
+              {fwd ? `${fwd.pendingCount} pending · ${fwd.voidCount} void` : '0 pending'}
+            </div>
+          </div>
+        </div>
+
+        {/* Walk-Forward Out-of-Sample Calibration & Baseline Gate */}
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3.5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-[15px] font-[650] text-[#ECF1EE]">
+                Walk Forward Out of Sample Calibration
+              </h2>
+              <p className="text-[11px] text-[#8B9892]">
+                Strict chronological evaluation vs naive league average totals baseline
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {(['NBA', 'NCAAB', 'EUROLEAGUE'] as BasketballLeague[]).map((lg) => (
+                <button
+                  key={lg}
+                  type="button"
+                  onClick={() => setBbLeague(lg)}
+                  className={`h-[30px] px-3 rounded-full text-[11px] font-semibold transition-colors ${
+                    bbLeague === lg
+                      ? 'bg-[rgba(182,230,59,0.12)] border border-[#B6E63B] text-[#B6E63B]'
+                      : 'bg-[#151E19] border border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
+                  }`}
+                >
+                  {lg === 'EUROLEAGUE' ? 'EuroLeague' : lg}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {walkForwardLeague ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-[#151E19] rounded-[10px] p-2.5">
+                <div>
+                  <span className="text-[#8B9890] block text-[10px]">Evaluated Games</span>
+                  <span className="text-[#ECF1EE] font-semibold tabular-nums">
+                    {walkForwardLeague.evaluatedGames.toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[#8B9890] block text-[10px]">Abstained (Needs history)</span>
+                  <span className="text-[#E8B04A] font-semibold tabular-nums">
+                    {walkForwardLeague.abstainedNeedsHistoryGames.toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[#8B9890] block text-[10px]">1st Half Sample</span>
+                  <span className="text-[#ECF1EE] font-semibold tabular-nums">
+                    {walkForwardLeague.h1EvaluatedGames.toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[#8B9890] block text-[10px]">League Team Mean / H1 Share</span>
+                  <span className="text-[#B8E636] font-semibold tabular-nums">
+                    {walkForwardLeague.empiricalLeagueStats.regTeamMean.toFixed(1)} pts · {(walkForwardLeague.empiricalLeagueStats.h1Share * 100).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+
+              <div className="border border-white/[0.07] rounded-[10px] overflow-hidden divide-y divide-white/[0.07]">
+                {walkForwardLeague.families.map((fam) => {
+                  const selected = activeFamily?.marketCategory === fam.marketCategory;
+                  return (
+                    <button
+                      key={fam.marketCategory}
+                      type="button"
+                      onClick={() => setBbSelectedCategory(fam.marketCategory)}
+                      className={`w-full text-left p-3 transition-colors space-y-2 ${
+                        selected ? 'bg-[#151E19]/80' : 'bg-[#0E1512] hover:bg-[#151E19]/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[13px] font-semibold text-[#ECF1EE] truncate">
+                            {bbCategoryLabel[fam.marketCategory]}
+                          </span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#101613] border border-white/[0.08] text-[#8B9892]">
+                            {fam.calibratorType}
+                          </span>
+                        </div>
+
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${
+                            fam.passedBaseline
+                              ? 'bg-[#B8E636]/12 border-[#B8E636]/40 text-[#B8E636]'
+                              : 'bg-[#E8B04A]/12 border-[#E8B04A]/40 text-[#E8B04A]'
+                          }`}
+                        >
+                          {fam.passedBaseline ? 'PASS BASELINE' : 'FAIL · SPECULATIVE ONLY'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono tabular-nums">
+                        <div>
+                          <span className="text-[#8B9890] block text-[9.5px]">Cal Brier vs Naive</span>
+                          <span className="text-[#ECF1EE] font-semibold">
+                            {fam.calibratedBrier.toFixed(4)}
+                          </span>{' '}
+                          <span className="text-[#5E6A63]">vs {fam.baselineBrier.toFixed(4)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[#8B9890] block text-[9.5px]">Cal LogLoss vs Naive</span>
+                          <span className="text-[#ECF1EE] font-semibold">
+                            {fam.calibratedLogLoss.toFixed(4)}
+                          </span>{' '}
+                          <span className="text-[#5E6A63]">vs {fam.baselineLogLoss.toFixed(4)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[#8B9890] block text-[9.5px]">ECE / Sample</span>
+                          <span className="text-[#ECF1EE]">
+                            {(fam.ece * 100).toFixed(2)}%
+                          </span>{' '}
+                          <span className="text-[#5E6A63]">(N={fam.sampleSize.toLocaleString()})</span>
+                        </div>
+                        <div>
+                          <span className="text-[#8B9890] block text-[9.5px]">Hit Rate at 60%+</span>
+                          <span className="text-[#B8E636] font-semibold">
+                            {fam.hitRateAt60 !== null ? `${(fam.hitRateAt60 * 100).toFixed(1)}%` : 'N/A'}
+                          </span>{' '}
+                          <span className="text-[#5E6A63]">({fam.sampleAt60.toLocaleString()})</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeFamily && activeFamily.calibrationTable.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-semibold text-[#ECF1EE]">
+                      Calibration Reliability Table · {bbLeague === 'EUROLEAGUE' ? 'EuroLeague' : bbLeague} {bbCategoryLabel[activeFamily.marketCategory]}
+                    </span>
+                    <span className="text-[10.5px] font-mono text-[#8B9890]">
+                      Out of sample bins
+                    </span>
+                  </div>
+                  <div className="border border-white/[0.07] rounded-[10px] overflow-hidden bg-[#0E1512]">
+                    <div className="grid grid-cols-4 px-3 py-2 text-[10px] font-mono text-[#8B9890] border-b border-white/[0.07] bg-[#151E19]">
+                      <span>Prob Bin</span>
+                      <span className="text-right">Pred Mean</span>
+                      <span className="text-right">Observed</span>
+                      <span className="text-right">Samples</span>
+                    </div>
+                    <div className="divide-y divide-white/[0.06]">
+                      {activeFamily.calibrationTable.map((bin, i) => (
+                        <div
+                          key={i}
+                          className="grid grid-cols-4 px-3 py-1.5 text-[11px] font-mono tabular-nums"
+                        >
+                          <span className="text-[#ECF1EE]">{cleanDisplayText(bin.binRange)}</span>
+                          <span className="text-right text-[#8B9892]">
+                            {(bin.predictedProbMean * 100).toFixed(1)}%
+                          </span>
+                          <span className="text-right text-[#B8E636] font-semibold">
+                            {(bin.observedFrequency * 100).toFixed(1)}%
+                          </span>
+                          <span className="text-right text-[#8B9892]">
+                            {bin.sampleCount.toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-[12px] text-[#8B9892] py-4 text-center">
+              {bbLoading ? 'Loading walk forward calibration summary...' : 'No calibration parameters available.'}
+            </div>
+          )}
+        </div>
+
+        {/* Separate Basketball Forward Picks Ledger */}
+        <div className="bg-[#101613] border border-[#1F2A24] rounded-[14px] p-3.5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-[15px] font-[650] text-[#ECF1EE]">
+                Basketball Pre Tipoff Forward Picks
+              </h2>
+              <p className="text-[11px] text-[#8B9892]">
+                Stored in bb_picks &amp; settled in bb_settlements
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {(['ALL', 'GRADED', 'PENDING'] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setBbForwardFilter(f)}
+                  className={`h-[28px] px-3 rounded-full text-[11px] font-medium transition-colors ${
+                    bbForwardFilter === f
+                      ? 'bg-[rgba(182,230,59,0.12)] border border-[#B6E63B] text-[#B6E63B]'
+                      : 'bg-[#151E19] border border-white/[0.07] text-[#8B9890]'
+                  }`}
+                >
+                  {f === 'ALL' ? 'All' : f === 'GRADED' ? 'Graded' : 'Pending'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredBbPicks.length === 0 ? (
+            <div className="bg-[#151E19] border border-white/[0.06] rounded-[10px] p-4 text-center space-y-1">
+              <div className="text-[13px] font-semibold text-[#E9EFEB]">
+                No pre-tipoff basketball forward picks recorded yet
+              </div>
+              <p className="text-[11.5px] text-[#8B9892]">
+                Live sync automatically records diversified HIGH and MEDIUM picks before scheduled tipoff and grades them once games finish.
+              </p>
+            </div>
+          ) : (
+            <div className="border border-white/[0.07] rounded-[10px] divide-y divide-white/[0.07] overflow-hidden">
+              {filteredBbPicks.map((row) => {
+                const statusColors: Record<string, string> = {
+                  WON: 'bg-[#B8E636]/15 text-[#B8E636] border-[#B8E636]/40',
+                  LOST: 'bg-[#EF4444]/15 text-[#EF4444] border-[#EF4444]/40',
+                  PUSH: 'bg-[#E8B04A]/15 text-[#E8B04A] border-[#E8B04A]/40',
+                  VOID: 'bg-[#151D19] text-[#8B9892] border-white/10',
+                  PENDING: 'bg-[#151D19] text-[#8B9892] border-white/10',
+                };
+                return (
+                  <div key={row.id} className="p-3 bg-[#0E1512] space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold text-[#ECF1EE] truncate">
+                          {cleanDisplayText(row.matchLabel)}
+                        </div>
+                        <div className="text-[11px] text-[#8B9892]">
+                          {row.league === 'EUROLEAGUE' ? 'EuroLeague' : row.league} · {cleanDisplayText(row.season)} · {cleanDisplayText(row.selection)}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${
+                          statusColors[row.settlementStatus] || statusColors.PENDING
+                        }`}
+                      >
+                        {row.settlementStatus}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono tabular-nums text-[#8B9892]">
+                      <span>
+                        Model: <strong className="text-[#B8E636]">{(row.modelProbability * 100).toFixed(1)}%</strong>
+                        {!row.isModelLine && row.marketOdds !== null ? (
+                          <> · @{row.marketOdds.toFixed(2)} ({row.priceSource}) {row.expectedValue !== null ? `· EV ${(row.expectedValue * 100 >= 0 ? '+' : '')}${(row.expectedValue * 100).toFixed(1)}%` : ''}</>
+                        ) : (
+                          <> · model line - no market price</>
+                        )}
+                      </span>
+                      <span>
+                        {row.actualScore ? `Score: ${row.actualScore}` : 'Pending tipoff/final'}
+                        {row.brierError !== null ? ` · Brier ${row.brierError.toFixed(4)}` : ''}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Basketball Database & History Coverage Diagnostics */}
+        <DataStatusDiagnostics />
       </div>
     );
   }

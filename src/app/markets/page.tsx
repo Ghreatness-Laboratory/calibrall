@@ -3,14 +3,15 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
-import { generateNBAPredictions } from '@/lib/data/nbaSeedData';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { ArrowUpRight, Clock, Info } from 'lucide-react';
 import { SupportedOptionType, Fixture } from '@/types';
-import { formatExpectedValue, formatOdds } from '@/lib/prediction/marketCatalog';
+import { formatOdds } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import type { BasketballMarketCategory } from '@/lib/basketball/markets';
+import type { BasketballPickCandidate } from '@/lib/basketball/picker';
 
 const FOOTBALL_MARKET_OPTIONS: {
   code: string;
@@ -38,83 +39,129 @@ const FOOTBALL_MARKET_OPTIONS: {
 ];
 
 const BASKETBALL_MARKET_OPTIONS: {
-  code: string;
+  code: BasketballMarketCategory;
   label: string;
-  optionType: SupportedOptionType;
-  category: string;
+  optionType: string;
+  category: BasketballMarketCategory;
   period: string;
 }[] = [
-  { code: 'BASKETBALL_MONEYLINE', label: '1. Moneyline: Winner', optionType: 'moneyline', category: 'moneyline', period: 'Full game' },
-  { code: 'BASKETBALL_SPREAD', label: '2. Point Spread (ATS)', optionType: 'spread', category: 'spread', period: 'Full game' },
-  { code: 'BASKETBALL_TOTAL_POINTS', label: '3. Total Points (Over / Under)', optionType: 'total_points', category: 'total_points', period: 'Full game' },
+  { code: 'game_total', label: '1. Game Total Over/Under', optionType: 'game_total', category: 'game_total', period: 'Full game (incl. OT)' },
+  { code: 'home_total', label: '2. Home Team Total Over/Under', optionType: 'home_total', category: 'home_total', period: 'Full game (incl. OT)' },
+  { code: 'away_total', label: '3. Away Team Total Over/Under', optionType: 'away_total', category: 'away_total', period: 'Full game (incl. OT)' },
+  { code: 'h1_game_total', label: '4. 1st Half Game Total Over/Under', optionType: 'h1_game_total', category: 'h1_game_total', period: '1st half (no OT)' },
+  { code: 'h1_team_total', label: '5. 1st Half Team Totals Over/Under', optionType: 'h1_team_total', category: 'h1_team_total', period: '1st half (no OT)' },
 ];
 
 export default function MarketExplorerPage() {
   const { sport, isSwitching } = useSport();
   const isBasketball = sport === 'basketball';
 
-  const marketOptions = isBasketball ? BASKETBALL_MARKET_OPTIONS : FOOTBALL_MARKET_OPTIONS;
-
   const [selectedOptionType, setSelectedOptionType] = useState<string>('ALL');
-  const [selectedMarketLine, setSelectedMarketLine] = useState<string>(
-    isBasketball ? 'BASKETBALL_MONEYLINE' : 'TOTAL_GOALS_O25'
-  );
+  const [selectedFootballLine, setSelectedFootballLine] = useState<string>('TOTAL_GOALS_O25');
+  const [selectedBasketballCat, setSelectedBasketballCat] = useState<BasketballMarketCategory>('game_total');
+  const [basketballLeagueFilter, setBasketballLeagueFilter] = useState<'ALL' | 'NBA' | 'NCAAB' | 'EUROLEAGUE'>('ALL');
 
-  const { fixtures, isLoading, liveDataAvailable, lastUpdated, error, isOffline, isSavedCopy } = useLiveFixtures(
-    isBasketball ? 'NBA' : undefined,
+  const { fixtures, evaluations, lastUpdated, error, isOffline, isSavedCopy } = useLiveFixtures(
+    isBasketball ? basketballLeagueFilter : undefined,
     'ALL',
     sport
   );
 
-  const filteredOptions = useMemo(() => {
-    if (selectedOptionType === 'ALL') return marketOptions;
-    return marketOptions.filter(o => o.optionType === selectedOptionType);
-  }, [marketOptions, selectedOptionType]);
+  const marketOptions = isBasketball ? BASKETBALL_MARKET_OPTIONS : FOOTBALL_MARKET_OPTIONS;
+  const selectedMarketLine = isBasketball ? selectedBasketballCat : selectedFootballLine;
 
-  // Evaluate upcoming fixtures for this specific market code
+  const filteredOptions = useMemo(() => {
+    if (isBasketball) {
+      if (selectedOptionType === 'ALL') return BASKETBALL_MARKET_OPTIONS;
+      return BASKETBALL_MARKET_OPTIONS.filter((o) => o.category === selectedOptionType);
+    }
+    if (selectedOptionType === 'ALL') return FOOTBALL_MARKET_OPTIONS;
+    return FOOTBALL_MARKET_OPTIONS.filter((o) => o.optionType === selectedOptionType);
+  }, [isBasketball, selectedOptionType]);
+
+  // Evaluate upcoming fixtures for this specific market code / category
   const comparisons = useMemo(() => {
+    if (isBasketball) {
+      const list: {
+        fixtureId: string;
+        fixture: Fixture;
+        pick: BasketballPickCandidate | null;
+        needsHistory: boolean;
+        abstentionReason: string | null;
+        prob: number;
+      }[] = [];
+
+      fixtures
+        .filter((f) => f.status !== 'FINISHED' && f.status !== 'POSTPONED' && f.status !== 'CANCELED')
+        .forEach((fixture) => {
+          const ev = evaluations?.[fixture.id];
+          if (!ev || ev.needsHistory || fixture.basketballStats?.needsHistory) {
+            list.push({
+              fixtureId: fixture.id,
+              fixture,
+              pick: null,
+              needsHistory: true,
+              abstentionReason: ev?.abstentionReason || fixture.basketballStats?.abstentionReason || 'Needs history',
+              prob: 0,
+            });
+            return;
+          }
+          const matchedPicks = ev.picks.filter((p) => p.marketCategory === selectedBasketballCat);
+          if (matchedPicks.length === 0) {
+            list.push({
+              fixtureId: fixture.id,
+              fixture,
+              pick: null,
+              needsHistory: true,
+              abstentionReason: 'Needs history',
+              prob: 0,
+            });
+            return;
+          }
+          matchedPicks.sort((a, b) => b.calibratedProbability - a.calibratedProbability);
+          const best = matchedPicks[0];
+          list.push({
+            fixtureId: fixture.id,
+            fixture,
+            pick: best,
+            needsHistory: false,
+            abstentionReason: null,
+            prob: best.calibratedProbability,
+          });
+        });
+
+      return list.sort((a, b) => {
+        if (a.needsHistory !== b.needsHistory) return a.needsHistory ? 1 : -1;
+        return b.prob - a.prob;
+      });
+    }
+
     const list: {
       fixtureId: string;
       fixture: Fixture;
       prediction: any;
-      homeMetric?: string;
-      awayMetric?: string;
     }[] = [];
 
-    fixtures.filter(f => f.status !== 'FINISHED').forEach(fixture => {
-      if (isBasketball || fixture.sport === 'basketball') {
-        const preds = generateNBAPredictions(fixture);
-        const matched = preds.find(p => p.marketCode === selectedMarketLine);
-        if (matched) {
-          list.push({
-            fixtureId: fixture.id,
-            fixture,
-            prediction: matched,
-            homeMetric: fixture.basketballStats ? `${fixture.basketballStats.homeProjected.toFixed(1)} pts` : undefined,
-            awayMetric: fixture.basketballStats ? `${fixture.basketballStats.awayProjected.toFixed(1)} pts` : undefined,
-          });
-        }
-      } else {
+    fixtures
+      .filter((f) => f.status !== 'FINISHED')
+      .forEach((fixture) => {
         const stats = getFixtureStatistics(fixture);
         const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
-
-        const matchedPred = evalResult.predictions.find(p => p.marketCode === selectedMarketLine);
+        const matchedPred = evalResult.predictions.find((p) => p.marketCode === selectedFootballLine);
         if (matchedPred) {
           list.push({
             fixtureId: fixture.id,
             fixture,
             prediction: matchedPred,
-            homeMetric: `${stats.homeXg.toFixed(2)} xG`,
-            awayMetric: `${stats.awayXg.toFixed(2)} xG`,
           });
         }
-      }
-    });
+      });
 
     return list.sort((a, b) => b.prediction.modelProbability - a.prediction.modelProbability);
-  }, [fixtures, selectedMarketLine, isBasketball]);
+  }, [fixtures, evaluations, isBasketball, selectedBasketballCat, selectedFootballLine]);
 
-  const activeOption = marketOptions.find(o => o.code === selectedMarketLine) || marketOptions[0];
+  const activeOption =
+    marketOptions.find((o) => o.code === selectedMarketLine) || marketOptions[0];
 
   const footballOptionTabs = [
     { id: 'ALL', label: 'All 10 option types' },
@@ -131,10 +178,12 @@ export default function MarketExplorerPage() {
   ];
 
   const basketballOptionTabs = [
-    { id: 'ALL', label: 'All NBA options' },
-    { id: 'moneyline', label: '1. Moneyline' },
-    { id: 'spread', label: '2. Point Spread' },
-    { id: 'total_points', label: '3. Total Points' },
+    { id: 'ALL', label: 'All 5 totals markets' },
+    { id: 'game_total', label: '1. Game total' },
+    { id: 'home_total', label: '2. Home total' },
+    { id: 'away_total', label: '3. Away total' },
+    { id: 'h1_game_total', label: '4. 1st half game' },
+    { id: 'h1_team_total', label: '5. 1st half team' },
   ];
 
   const optionFilterTabs = isBasketball ? basketballOptionTabs : footballOptionTabs;
@@ -153,11 +202,11 @@ export default function MarketExplorerPage() {
       {/* Header */}
       <div className="space-y-0.5 pb-1 border-b border-white/[0.07]">
         <h1 className="text-[23px] font-[700] leading-[1.2] text-[#ECF1EE] tracking-[-0.025em]">
-          {isBasketball ? 'NBA cross match market explorer' : 'Cross match market explorer'}
+          {isBasketball ? 'Basketball cross match totals explorer' : 'Cross match market explorer'}
         </h1>
         <p className="text-[12px] text-[#8B9890]">
           {isBasketball
-            ? 'Compare model probability, pricing, and margin differential across NBA matchups.'
+            ? 'Compare calibrated game total, team total, and 1st half total probabilities across NBA, NCAAB, and EuroLeague.'
             : 'Compare model probability, pricing, and calibration status for specific option lines across all European fixtures.'}
         </p>
       </div>
@@ -176,18 +225,42 @@ export default function MarketExplorerPage() {
         </div>
       )}
 
+      {/* Basketball League Selector */}
+      {isBasketball && (
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+          {(['ALL', 'NBA', 'NCAAB', 'EUROLEAGUE'] as const).map((lg) => (
+            <button
+              key={lg}
+              type="button"
+              onClick={() => setBasketballLeagueFilter(lg)}
+              className={`h-[30px] px-3 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
+                basketballLeagueFilter === lg
+                  ? 'bg-[#B8E636]/15 border-[#B8E636] text-[#B8E636] font-semibold'
+                  : 'bg-[#101713] border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
+              }`}
+            >
+              {lg === 'ALL' ? 'All 3 leagues' : lg === 'EUROLEAGUE' ? 'EuroLeague' : lg}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Market Selector Card */}
       <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
         {/* Step 1: Option Type Filter */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
-          {optionFilterTabs.map(tab => (
+          {optionFilterTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => {
                 setSelectedOptionType(tab.id);
                 if (tab.id !== 'ALL') {
-                  const firstMatch = marketOptions.find(o => o.optionType === tab.id);
-                  if (firstMatch) setSelectedMarketLine(firstMatch.code);
+                  if (isBasketball) {
+                    setSelectedBasketballCat(tab.id as BasketballMarketCategory);
+                  } else {
+                    const firstMatch = FOOTBALL_MARKET_OPTIONS.find((o) => o.optionType === tab.id);
+                    if (firstMatch) setSelectedFootballLine(firstMatch.code);
+                  }
                 }
               }}
               type="button"
@@ -205,13 +278,19 @@ export default function MarketExplorerPage() {
         {/* Step 2: Target Line Selector */}
         <div className="pt-2 border-t border-white/[0.07]">
           <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8B9890] mb-2">
-            TARGET LINE ({filteredOptions.length} AVAILABLE):
+            TARGET MARKET ({filteredOptions.length} AVAILABLE):
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            {filteredOptions.map(opt => (
+            {filteredOptions.map((opt) => (
               <button
                 key={opt.code}
-                onClick={() => setSelectedMarketLine(opt.code)}
+                onClick={() => {
+                  if (isBasketball) {
+                    setSelectedBasketballCat(opt.code as BasketballMarketCategory);
+                  } else {
+                    setSelectedFootballLine(opt.code);
+                  }
+                }}
                 type="button"
                 className={`px-2.5 py-1 rounded-[8px] text-[12px] transition-colors font-medium touch-press ${
                   selectedMarketLine === opt.code
@@ -240,10 +319,12 @@ export default function MarketExplorerPage() {
                 <span>Period: {cleanDisplayText(activeOption?.period)}</span>
               </span>
               <span>·</span>
-              <span>Ranked by modeled probability</span>
+              <span>Ranked by calibrated probability</span>
             </div>
           </div>
-          <span className="font-mono text-[#8B9890] text-[11px] tabular-nums">{comparisons.length} fixtures</span>
+          <span className="font-mono text-[#8B9890] text-[11px] tabular-nums">
+            {comparisons.length} {isBasketball ? 'games' : 'fixtures'}
+          </span>
         </div>
 
         {comparisons.length > 0 ? (
@@ -251,48 +332,110 @@ export default function MarketExplorerPage() {
             <table className="w-full text-left text-[12px]">
               <thead className="bg-[#101713] text-[#8B9890] text-[10px] font-mono uppercase tracking-[0.14em] border-b border-white/[0.07]">
                 <tr>
-                  <th className="py-2.5 px-3">Fixture</th>
+                  <th className="py-2.5 px-3">Matchup</th>
                   <th className="py-2.5 px-3">Modeled selection</th>
                   <th className="py-2.5 px-3">Probability</th>
-                  <th className="py-2.5 px-3">Odds</th>
-                  <th className="py-2.5 px-3">Calibration status</th>
+                  <th className="py-2.5 px-3">Price / Line source</th>
+                  <th className="py-2.5 px-3">Status</th>
                   <th className="py-2.5 px-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.05]">
-                {comparisons.map(({ fixture, prediction }) => (
-                  <tr key={fixture.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="py-3 px-3">
-                      <div className="font-medium text-[#ECF1EE]">
-                        {fixture.homeTeam.name} vs {fixture.awayTeam.name}
-                      </div>
-                      <div className="text-[11px] text-[#8B9890] font-mono">
-                        {fixture.competition.name}
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-[#ECF1EE] font-medium">
-                      {cleanDisplayText(prediction.selection)}
-                    </td>
-                    <td className="py-3 px-3 font-mono font-semibold text-[#B6E63B] tabular-nums">
-                      {(prediction.modelProbability * 100).toFixed(1)}%
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[#ECF1EE] tabular-nums">
-                      {prediction.marketOdds ? `@${formatOdds(prediction.marketOdds)}` : 'N/A'}
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px] tabular-nums">
-                      <span className="text-[#8B9890]">Withheld: analysis only</span>
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <Link
-                        href={`/matches/${fixture.id}`}
-                        className="inline-flex items-center gap-1 text-[11px] text-[#8B9890] hover:text-[#B6E63B] font-medium touch-press"
-                      >
-                        <span>Analyze</span>
-                        <ArrowUpRight className="w-3 h-3" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {isBasketball
+                  ? (comparisons as Array<{
+                      fixtureId: string;
+                      fixture: Fixture;
+                      pick: BasketballPickCandidate | null;
+                      needsHistory: boolean;
+                      abstentionReason: string | null;
+                      prob: number;
+                    }>).map(({ fixture, pick, needsHistory, abstentionReason }) => (
+                      <tr key={fixture.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-3 px-3">
+                          <div className="font-medium text-[#ECF1EE]">
+                            {cleanDisplayText(fixture.homeTeam.name)} vs {cleanDisplayText(fixture.awayTeam.name)}
+                          </div>
+                          <div className="text-[11px] text-[#8B9890] font-mono">
+                            {fixture.basketballStats?.league || fixture.competition.code}
+                            {fixture.basketballStats?.neutral ? ' · Neutral' : ''}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-[#ECF1EE] font-medium">
+                          {needsHistory || !pick ? (
+                            <span className="text-[#E8B04A]">Needs history</span>
+                          ) : (
+                            cleanDisplayText(pick.selection)
+                          )}
+                        </td>
+                        <td className="py-3 px-3 font-mono font-semibold text-[#B6E63B] tabular-nums">
+                          {needsHistory || !pick ? '—' : `${(pick.calibratedProbability * 100).toFixed(1)}%`}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[#ECF1EE] tabular-nums text-[11px]">
+                          {needsHistory || !pick
+                            ? cleanDisplayText(abstentionReason || 'Needs history')
+                            : pick.isModelLine
+                            ? pick.priceSource
+                            : `${pick.priceSource} @${pick.marketOdds?.toFixed(2)}${
+                                pick.expectedValue !== null
+                                  ? ` (EV ${pick.expectedValue >= 0 ? '+' : ''}${(pick.expectedValue * 100).toFixed(1)}%)`
+                                  : ''
+                              }`}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[11px]">
+                          {needsHistory || !pick ? (
+                            <span className="text-[#E8B04A]">ABSTAIN</span>
+                          ) : (
+                            <span className={pick.tier === 'HIGH' ? 'text-[#B6E63B]' : 'text-[#8B9890]'}>
+                              {pick.tier}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <Link
+                            href={`/matches/${fixture.id}`}
+                            className="inline-flex items-center gap-1 text-[11px] text-[#8B9890] hover:text-[#B6E63B] font-medium touch-press"
+                          >
+                            <span>Analyze</span>
+                            <ArrowUpRight className="w-3 h-3" />
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  : (comparisons as Array<{ fixtureId: string; fixture: Fixture; prediction: any }>).map(
+                      ({ fixture, prediction }) => (
+                        <tr key={fixture.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="py-3 px-3">
+                            <div className="font-medium text-[#ECF1EE]">
+                              {fixture.homeTeam.name} vs {fixture.awayTeam.name}
+                            </div>
+                            <div className="text-[11px] text-[#8B9890] font-mono">
+                              {fixture.competition.name}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-[#ECF1EE] font-medium">
+                            {cleanDisplayText(prediction.selection)}
+                          </td>
+                          <td className="py-3 px-3 font-mono font-semibold text-[#B6E63B] tabular-nums">
+                            {(prediction.modelProbability * 100).toFixed(1)}%
+                          </td>
+                          <td className="py-3 px-3 font-mono text-[#ECF1EE] tabular-nums">
+                            {prediction.marketOdds ? `@${formatOdds(prediction.marketOdds)}` : 'N/A'}
+                          </td>
+                          <td className="py-3 px-3 font-mono text-[11px] tabular-nums">
+                            <span className="text-[#8B9890]">Withheld: analysis only</span>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <Link
+                              href={`/matches/${fixture.id}`}
+                              className="inline-flex items-center gap-1 text-[11px] text-[#8B9890] hover:text-[#B6E63B] font-medium touch-press"
+                            >
+                              <span>Analyze</span>
+                              <ArrowUpRight className="w-3 h-3" />
+                            </Link>
+                          </td>
+                        </tr>
+                      )
+                    )}
               </tbody>
             </table>
           </div>

@@ -52,22 +52,28 @@ export class FootballSportEngine implements SportEngine {
   }
 }
 
+import { BASKETBALL_COMPETITIONS } from '../basketball/readService';
+
 export class BasketballSportEngine implements SportEngine {
   sport: Sport = 'basketball';
   name = 'Basketball';
-  defaultLeague = 'NBA';
+  defaultLeague = 'ALL';
 
   async getCompetitions(): Promise<Competition[]> {
-    return [NBA_COMPETITION];
+    return Object.values(BASKETBALL_COMPETITIONS);
   }
 
   async getFixtures(params?: { competitionId?: string; status?: string; day?: string }) {
     const provider = getNBADataProvider();
-    const result = await provider.getFixtures(params?.status);
+    const result = await provider.getFixtures(params?.status, {
+      competitionId: params?.competitionId,
+      day: params?.day,
+    });
     return {
       fixtures: result.fixtures,
       liveDataAvailable: result.liveDataAvailable,
       lastUpdated: result.lastUpdated,
+      error: result.error,
     };
   }
 

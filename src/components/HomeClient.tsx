@@ -25,7 +25,7 @@ import SportSwitcher from '@/components/SportSwitcher';
 
 export default function HomeClient() {
   const { sport, isSwitching } = useSport();
-  const { fixtures, lastUpdated, isDelayed, error, isSavedCopy, isOffline } = useLiveFixtures('ALL', 'ALL', sport);
+  const { fixtures, evaluations, lastUpdated, isDelayed, error, isSavedCopy, isOffline } = useLiveFixtures('ALL', 'ALL', sport);
 
   const isBasketball = sport === 'basketball';
 
@@ -83,7 +83,7 @@ export default function HomeClient() {
         <h1 className="text-[23px] leading-[1.22] font-[700] tracking-[-0.025em] text-[#E9EFEB]">
           {isBasketball ? (
             <>
-              Stop guessing NBA margins.<br />
+              Stop guessing basketball totals.<br />
               <span className="text-[#B8E636]">Calibrated probabilistic models.</span>
             </>
           ) : (
@@ -97,7 +97,7 @@ export default function HomeClient() {
         {/* Short description 2 to 3 lines (12.5px, line height 1.55) */}
         <p className="text-[12.5px] leading-[1.55] text-[#8B9892]">
           {isBasketball
-            ? 'Calibrall evaluates possession efficiency, offensive ratings, and sportsbook margins to project calibrated probabilities, and abstains when data is thin.'
+            ? 'Calibrall models NBA, NCAAB Division I, and EuroLeague game totals, team totals, and 1st half totals using shrunk team efficiency, pace, rest, and empirical variance, and abstains when history is thin.'
             : 'Calibrall evaluates goals, corners, both teams to score, cards and 1X2 lines to project calibrated probabilities, and abstains when data is thin.'}
         </p>
 
@@ -141,7 +141,7 @@ export default function HomeClient() {
               Markets
             </span>
             <span className="text-[18px] font-[650] text-[#E9EFEB] tabular-nums leading-none">
-              {isBasketball ? '3' : '18'}
+              {isBasketball ? '5' : '18'}
             </span>
           </div>
 
@@ -164,10 +164,12 @@ export default function HomeClient() {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[13px] font-[600] text-[#E9EFEB] leading-tight truncate">
-                  Dixon Coles goals model
+                  {isBasketball ? 'Team points + pace + shrinkage' : 'Dixon Coles goals model'}
                 </span>
                 <span className="text-[11px] text-[#8B9892] leading-tight truncate mt-0.5">
-                  Bivariate Poisson joint distributions
+                  {isBasketball
+                    ? 'Time decayed scoring, rest, and neutral court adjustments'
+                    : 'Bivariate Poisson joint distributions'}
                 </span>
               </div>
             </div>
@@ -178,10 +180,12 @@ export default function HomeClient() {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[13px] font-[600] text-[#E9EFEB] leading-tight truncate">
-                  NegBinomial corner lines
+                  {isBasketball ? 'Empirical covariance & OT model' : 'NegBinomial corner lines'}
                 </span>
                 <span className="text-[11px] text-[#8B9892] leading-tight truncate mt-0.5">
-                  Volume variance and game state
+                  {isBasketball
+                    ? 'League variance, score correlation, and 1st half share'
+                    : 'Volume variance and game state'}
                 </span>
               </div>
             </div>
@@ -192,10 +196,12 @@ export default function HomeClient() {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[13px] font-[600] text-[#E9EFEB] leading-tight truncate">
-                  Grounded explanations
+                  {isBasketball ? 'Walk forward calibrated totals' : 'Grounded explanations'}
                 </span>
                 <span className="text-[11px] text-[#8B9892] leading-tight truncate mt-0.5">
-                  Quantitative audits, zero hype
+                  {isBasketball
+                    ? 'Game, team, and 1st half totals gated vs baseline'
+                    : 'Quantitative audits, zero hype'}
                 </span>
               </div>
             </div>
@@ -261,7 +267,9 @@ export default function HomeClient() {
         {fixtures.length > 0 ? (
           <div className="space-y-2.5">
             {isBasketball
-              ? fixtures.slice(0, 3).map((f) => <NBAGameCard key={f.id} fixture={f} />)
+              ? fixtures.slice(0, 3).map((f) => (
+                  <NBAGameCard key={f.id} fixture={f} evaluation={evaluations?.[f.id]} />
+                ))
               : showcaseFootballFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
                   <FixtureCard
                     key={fixture.id}
@@ -291,7 +299,7 @@ export default function HomeClient() {
             </div>
             <p className="text-[12px] text-[#8B9892] max-w-xs leading-relaxed">
               {isBasketball
-                ? 'No NBA matchups found for the window (today - 1 to +14 days). Live sync checks every 15 minutes.'
+                ? 'No NBA, NCAAB or EuroLeague matchups found in the current window (-10 to +14 days).'
                 : 'Upcoming matchups will appear here automatically. Check the upcoming tab in Fixtures.'}
             </p>
           </div>

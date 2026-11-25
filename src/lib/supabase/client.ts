@@ -619,9 +619,28 @@ export function getLocalDatabase(): any {
           settled_at TEXT,
           updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS bb_odds_snapshots (
+          id TEXT PRIMARY KEY,
+          game_id TEXT NOT NULL,
+          league TEXT NOT NULL,
+          market_category TEXT NOT NULL,
+          side TEXT NOT NULL DEFAULT 'game',
+          line REAL NOT NULL,
+          over_odds REAL,
+          under_odds REAL,
+          bookmaker TEXT NOT NULL,
+          observed_at TEXT NOT NULL,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
       `);
 
       // Ensure columns exist on older tables
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN raw_probability REAL;'); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN projected_std REAL;'); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN confidence_tier TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN is_model_line INTEGER NOT NULL DEFAULT 1;'); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN price_source TEXT;'); } catch (_) {}
+      try { db.exec("ALTER TABLE bb_picks ADD COLUMN evidence_json TEXT DEFAULT '{}';"); } catch (_) {}
       try { db.exec('ALTER TABLE teams ADD COLUMN is_promoted INTEGER DEFAULT 0;'); } catch (_) {}
       try { db.exec('ALTER TABLE matches ADD COLUMN referee TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE matches ADD COLUMN result TEXT;'); } catch (_) {}
@@ -898,6 +917,113 @@ function createLocalSupabaseClient(): any {
           };
         } catch (err: any) {
           return { data: null, error: { message: err?.message || 'Local BB RPC error', code: 'LOCAL_RPC_ERROR' } };
+        }
+      }
+      if (fnName === 'get_bb_forward_summary') {
+        try {
+          const db = getLocalDatabase();
+          if (!db) {
+            return {
+              data: {
+                sport: 'basketball',
+                totalPicks: 0,
+                settledCount: 0,
+                pendingCount: 0,
+                wonCount: 0,
+                lostCount: 0,
+                pushCount: 0,
+                voidCount: 0,
+                brierScore: null,
+                logLoss: null,
+                pricedSettledCount: 0,
+                yieldRoi: null,
+                byLeague: [],
+                byMarketCategory: [],
+              },
+              error: null,
+            };
+          }
+
+          const totals = db.prepare(`
+            SELECT
+              COUNT(*) AS totalPicks,
+              SUM(CASE WHEN s.settlement_status IN ('WON', 'LOST', 'PUSH') THEN 1 ELSE 0 END) AS settledCount,
+              SUM(CASE WHEN COALESCE(s.settlement_status, 'PENDING') = 'PENDING' THEN 1 ELSE 0 END) AS pendingCount,
+              SUM(CASE WHEN s.settlement_status = 'WON' THEN 1 ELSE 0 END) AS wonCount,
+              SUM(CASE WHEN s.settlement_status = 'LOST' THEN 1 ELSE 0 END) AS lostCount,
+              SUM(CASE WHEN s.settlement_status = 'PUSH' THEN 1 ELSE 0 END) AS pushCount,
+              SUM(CASE WHEN s.settlement_status = 'VOID' THEN 1 ELSE 0 END) AS voidCount,
+              AVG(CASE WHEN s.settlement_status IN ('WON', 'LOST') AND s.brier_error IS NOT NULL THEN s.brier_error END) AS brierScore,
+              AVG(CASE WHEN s.settlement_status IN ('WON', 'LOST') AND s.log_loss IS NOT NULL THEN s.log_loss END) AS logLoss,
+              SUM(CASE WHEN s.settlement_status IN ('WON', 'LOST', 'PUSH') AND p.market_odds IS NOT NULL THEN 1 ELSE 0 END) AS pricedSettledCount,
+              SUM(CASE
+                WHEN p.market_odds IS NOT NULL AND s.settlement_status = 'WON' THEN (p.market_odds - 1.0)
+                WHEN p.market_odds IS NOT NULL AND s.settlement_status = 'LOST' THEN -1.0
+                ELSE 0.0
+              END) AS pricedProfitUnits
+            FROM bb_picks p
+            LEFT JOIN bb_settlements s ON s.pick_id = p.id
+          `).get() as any;
+
+          const pricedCount = Number(totals?.pricedSettledCount) || 0;
+          const pricedRoi =
+            pricedCount > 0 && totals?.pricedProfitUnits !== null && totals?.pricedProfitUnits !== undefined
+              ? Math.round(((Number(totals.pricedProfitUnits) * 100) / pricedCount) * 100) / 100
+              : null;
+
+          const byLeague = db.prepare(`
+            SELECT
+              p.league AS league,
+              COUNT(*) AS totalPicks,
+              SUM(CASE WHEN s.settlement_status IN ('WON', 'LOST') THEN 1 ELSE 0 END) AS gradedCount,
+              SUM(CASE WHEN s.settlement_status = 'WON' THEN 1 ELSE 0 END) AS won,
+              SUM(CASE WHEN s.settlement_status = 'LOST' THEN 1 ELSE 0 END) AS lost,
+              SUM(CASE WHEN s.settlement_status = 'PUSH' THEN 1 ELSE 0 END) AS pushed,
+              AVG(CASE WHEN s.settlement_status IN ('WON', 'LOST') THEN s.brier_error END) AS brierScore,
+              AVG(CASE WHEN s.settlement_status IN ('WON', 'LOST') THEN s.log_loss END) AS logLoss
+            FROM bb_picks p
+            LEFT JOIN bb_settlements s ON s.pick_id = p.id
+            GROUP BY p.league
+            ORDER BY p.league ASC
+          `).all() as Array<any>;
+
+          const byMarketCategory = db.prepare(`
+            SELECT
+              p.market_category AS marketCategory,
+              COUNT(*) AS totalPicks,
+              SUM(CASE WHEN s.settlement_status IN ('WON', 'LOST') THEN 1 ELSE 0 END) AS gradedCount,
+              SUM(CASE WHEN s.settlement_status = 'WON' THEN 1 ELSE 0 END) AS won,
+              SUM(CASE WHEN s.settlement_status = 'LOST' THEN 1 ELSE 0 END) AS lost,
+              SUM(CASE WHEN s.settlement_status = 'PUSH' THEN 1 ELSE 0 END) AS pushed,
+              AVG(CASE WHEN s.settlement_status IN ('WON', 'LOST') THEN s.brier_error END) AS brierScore,
+              AVG(CASE WHEN s.settlement_status IN ('WON', 'LOST') THEN s.log_loss END) AS logLoss
+            FROM bb_picks p
+            LEFT JOIN bb_settlements s ON s.pick_id = p.id
+            GROUP BY p.market_category
+            ORDER BY p.market_category ASC
+          `).all() as Array<any>;
+
+          return {
+            data: {
+              sport: 'basketball',
+              totalPicks: Number(totals?.totalPicks) || 0,
+              settledCount: Number(totals?.settledCount) || 0,
+              pendingCount: Number(totals?.pendingCount) || 0,
+              wonCount: Number(totals?.wonCount) || 0,
+              lostCount: Number(totals?.lostCount) || 0,
+              pushCount: Number(totals?.pushCount) || 0,
+              voidCount: Number(totals?.voidCount) || 0,
+              brierScore: totals?.brierScore !== null && totals?.brierScore !== undefined ? Number(totals.brierScore) : null,
+              logLoss: totals?.logLoss !== null && totals?.logLoss !== undefined ? Number(totals.logLoss) : null,
+              pricedSettledCount: pricedCount,
+              yieldRoi: pricedRoi,
+              byLeague,
+              byMarketCategory,
+            },
+            error: null,
+          };
+        } catch (err: any) {
+          return { data: null, error: { message: err?.message || 'Local BB forward RPC error', code: 'LOCAL_RPC_ERROR' } };
         }
       }
       return {

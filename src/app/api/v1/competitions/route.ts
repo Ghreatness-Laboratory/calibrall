@@ -1,9 +1,9 @@
 // CALIBRALL: Dynamic Database-Driven Competitions API Route
-// Requirement 2: Build the competition filter from the database, not a hard-coded list.
-// Shows every competition that has fixtures, grouped by country, with exact fixture counts.
+// Shows competitions with exact DB fixture counts. Basketball returns NBA, NCAAB, EuroLeague cleanly.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCompetitionsFromDatabase } from '@/lib/data/canonicalCompetitions';
+import { getBasketballCompetitionsSummary } from '@/lib/basketball/readService';
 import { Sport } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,27 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const sport = (searchParams.get('sport') as Sport | 'all') || 'football';
   const day = searchParams.get('day') || undefined;
+
+  if (sport === 'basketball') {
+    const bb = await getBasketballCompetitionsSummary(day);
+    return NextResponse.json(
+      {
+        data: bb.competitions,
+        groupedByCountry: bb.groupedByCountry,
+        total: bb.total,
+        totalFixtures: bb.totalFixtures,
+        sport: 'basketball',
+        day: day || 'ALL',
+        source: 'database:bb_games',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, max-age=0',
+        },
+      }
+    );
+  }
 
   const { competitions, groupedByCountry, total, totalFixtures } = await getCompetitionsFromDatabase(
     sport,
