@@ -6,7 +6,8 @@ import {
   getBasketballForwardSummary,
   getBasketballForwardRecords,
 } from '@/lib/basketball/settlementService';
-import { resolveRequestTier, FREE_DAILY_SUMMARY_LIMIT } from '@/lib/auth/tierAccess';
+import { resolveTierFromSession, FREE_DAILY_SUMMARY_LIMIT } from '@/lib/auth/tierAccess';
+import { requireApiUser } from '@/lib/supabase/serverAuth';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,11 @@ function firstSentenceSummary(text?: string): string | undefined {
 }
 
 export async function GET(request: Request) {
-  const tier = resolveRequestTier(request);
+  const auth = await requireApiUser(request);
+  if (!auth.authorized) {
+    return auth.errorResponse;
+  }
+  const tier = resolveTierFromSession(auth.session);
   const { searchParams } = new URL(request.url);
   const sport = searchParams.get('sport')?.toLowerCase() || 'football';
 

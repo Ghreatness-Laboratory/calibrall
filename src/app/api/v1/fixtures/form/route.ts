@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { matchesStore } from '@/lib/data/matchesStore';
+import { requireApiUser } from '@/lib/supabase/serverAuth';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 60;
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
+  const auth = await requireApiUser(req);
+  if (!auth.authorized) {
+    return auth.errorResponse;
+  }
+
   const url = new URL(req.url);
   const home = url.searchParams.get('home') || '';
   const away = url.searchParams.get('away') || '';

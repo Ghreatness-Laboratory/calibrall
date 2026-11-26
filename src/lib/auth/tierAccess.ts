@@ -1,48 +1,28 @@
 // CALIBRALL: Server-Side Subscription Tier Resolution & Redaction
-// Enforces tier boundaries on API routes before payloads leave the server.
-// Unauthenticated requests with no tier header/cookie strictly default to 'free'.
+// Enforces tier boundaries strictly from server-verified Supabase session + profiles table.
+// NEVER trusts client headers (x-calibrall-tier) or client cookies (calibrall_tier).
 
 import { WrittenMatchExplanation } from '@/types';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import {
+  getServerAuthSession,
+  type ServerAuthSession,
+  type AccountTier,
+} from '@/lib/supabase/serverAuth';
 
-export type ResolvedUserTier = 'free' | 'pro' | 'premium';
+export type ResolvedUserTier = AccountTier;
 export const FREE_DAILY_SUMMARY_LIMIT = 3;
 
-function normalizeTier(raw: string | null | undefined): ResolvedUserTier | null {
-  if (!raw) return null;
-  const v = raw.trim().toLowerCase();
-  if (v === 'premium') return 'premium';
-  if (v === 'pro') return 'pro';
-  if (v === 'free') return 'free';
-  return null;
+export function resolveTierFromSession(
+  session: ServerAuthSession | null | undefined
+): ResolvedUserTier {
+  if (!session) return 'free';
+  return session.effectiveTier;
 }
 
-function readCookieValue(cookieHeader: string | null, key: string): string | null {
-  if (!cookieHeader) return null;
-  const parts = cookieHeader.split(';');
-  for (const part of parts) {
-    const eq = part.indexOf('=');
-    if (eq === -1) continue;
-    const k = part.slice(0, eq).trim();
-    if (k === key) {
-      try {
-        return decodeURIComponent(part.slice(eq + 1).trim());
-      } catch {
-        return part.slice(eq + 1).trim();
-      }
-    }
-  }
-  return null;
-}
-
-export function resolveRequestTier(request: Request): ResolvedUserTier {
-  const headerTier = normalizeTier(request.headers.get('x-calibrall-tier'));
-  if (headerTier) return headerTier;
-
-  const cookieTier = normalizeTier(readCookieValue(request.headers.get('cookie'), 'calibrall_tier'));
-  if (cookieTier) return cookieTier;
-
-  return 'free';
+export async function resolveRequestTier(request: Request): Promise<ResolvedUserTier> {
+  const session = await getServerAuthSession(request);
+  return resolveTierFromSession(session);
 }
 
 export function redactExplanationForTier(

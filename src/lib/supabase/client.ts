@@ -1,6 +1,6 @@
 // MATCHMIND: Supabase Client Integration & Local Development Adapter
 import { createClient } from '@supabase/supabase-js';
-import { UserProfile, UserPreferences } from '@/types';
+import { CANONICAL_COMPETITIONS_CATALOG } from '@/lib/data/competitionSearch';
 
 // Support both server-side runtime env vars and NEXT_PUBLIC client vars
 const supabaseUrl = 
@@ -348,7 +348,18 @@ class LocalSupabaseQueryBuilder {
       }
 
       const stmt = this.db.prepare(sql);
-      const rows = stmt.all(...params) as any[];
+      const rawRows = stmt.all(...params) as any[];
+      const rows = this.table === 'competitions'
+        ? rawRows.map((r) => {
+            if (!r || typeof r.aliases !== 'string') return r;
+            try {
+              const parsed = JSON.parse(r.aliases);
+              return { ...r, aliases: Array.isArray(parsed) ? parsed : [] };
+            } catch {
+              return { ...r, aliases: [] };
+            }
+          })
+        : rawRows;
 
       const finalCount = exactCount !== null ? exactCount : rows.length;
       return Promise.resolve({ data: rows, count: finalCount, error: null }).then(resolve, reject);
@@ -401,6 +412,23 @@ export function getLocalDatabase(): any {
     if (!state.schemaInitialized) {
       // Initialize Schema
       db.exec(`
+        CREATE TABLE IF NOT EXISTS competitions (
+          id TEXT PRIMARY KEY,
+          code TEXT UNIQUE NOT NULL,
+          name TEXT NOT NULL,
+          country TEXT NOT NULL,
+          sport TEXT NOT NULL DEFAULT 'football',
+          aliases TEXT NOT NULL DEFAULT '[]',
+          sort_order INTEGER NOT NULL DEFAULT 100,
+          emblem_url TEXT,
+          tier INTEGER NOT NULL DEFAULT 1,
+          avg_goals_per_game REAL DEFAULT 2.75,
+          avg_corners_per_game REAL DEFAULT 10.20,
+          avg_cards_per_game REAL DEFAULT 4.10,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS teams (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
@@ -648,6 +676,15 @@ export function getLocalDatabase(): any {
           model_version TEXT NOT NULL,
           recorded_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS profiles (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE,
+          display_name TEXT,
+          role TEXT NOT NULL DEFAULT 'user',
+          tier TEXT NOT NULL DEFAULT 'free',
+          tier_expires_at TEXT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
       `);
 
       // Ensure columns exist on older tables
@@ -678,6 +715,60 @@ export function getLocalDatabase(): any {
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_provider_call_logs_ts ON provider_call_logs(timestamp DESC);'); } catch (_) {}
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_matches_home_kickoff ON matches(home_team_id, kickoff_time DESC);'); } catch (_) {}
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_matches_away_kickoff ON matches(away_team_id, kickoff_time DESC);'); } catch (_) {}
+      try { db.exec("ALTER TABLE competitions ADD COLUMN sport TEXT NOT NULL DEFAULT 'football';"); } catch (_) {}
+      try { db.exec("ALTER TABLE competitions ADD COLUMN aliases TEXT NOT NULL DEFAULT '[]';"); } catch (_) {}
+      try { db.exec('ALTER TABLE competitions ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 100;'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_competitions_sport_sort ON competitions(sport, sort_order, name);'); } catch (_) {}
+      try {
+        const upsertComp = db.prepare(`
+          INSERT INTO competitions (
+            id, code, name, country, sport, aliases, sort_order, emblem_url, tier,
+            avg_goals_per_game, avg_corners_per_game, avg_cards_per_game, is_active, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            code = excluded.code,
+            name = excluded.name,
+            country = excluded.country,
+            sport = excluded.sport,
+            aliases = excluded.aliases,
+            sort_order = excluded.sort_order,
+            emblem_url = excluded.emblem_url,
+            tier = excluded.tier,
+            avg_goals_per_game = excluded.avg_goals_per_game,
+            avg_corners_per_game = excluded.avg_corners_per_game,
+            avg_cards_per_game = excluded.avg_cards_per_game,
+            is_active = excluded.is_active,
+            updated_at = excluded.updated_at
+        `);
+        const nowIso = new Date().toISOString();
+        db.exec('BEGIN');
+        try {
+          for (const c of Object.values(CANONICAL_COMPETITIONS_CATALOG)) {
+            upsertComp.run(
+              c.id,
+              c.code,
+              c.name,
+              c.country,
+              c.sport || 'football',
+              JSON.stringify(c.aliases || []),
+              c.sortOrder ?? 100,
+              c.emblemUrl || '',
+              c.tier ?? 1,
+              c.avgGoalsPerGame ?? 0,
+              c.avgCornersPerGame ?? 0,
+              c.avgCardsPerGame ?? 0,
+              c.isActive ? 1 : 0,
+              nowIso
+            );
+          }
+          db.exec('COMMIT');
+        } catch (seedTxErr) {
+          try { db.exec('ROLLBACK'); } catch (_) {}
+          throw seedTxErr;
+        }
+      } catch (compSeedErr: any) {
+        console.warn('[LocalSupabase] Competition seed warning:', compSeedErr?.message || compSeedErr);
+      }
       state.schemaInitialized = true;
     }
 
@@ -1068,110 +1159,12 @@ export const supabase = isRemoteSupabase
   ? createMisconfiguredProdClient(persistenceBackendInfo().message)
   : createLocalSupabaseClient();
 
-// Local persistent state keys for demonstration mode
-const DEMO_USER_KEY = 'matchmind_demo_user';
-const DEMO_PREFS_KEY = 'matchmind_demo_prefs';
-const DEMO_SAVED_KEY = 'matchmind_demo_saved_fixtures';
-
-export const DEFAULT_DEMO_USER: UserProfile = {
-  id: 'usr_demo_7890',
-  email: 'analyst@calibrall.app',
-  fullName: 'Marcus Vance (Senior Quant)',
-  role: 'admin',
-  subscriptionTier: 'pro',
-  subscriptionStatus: 'active',
-  createdAt: '2025-01-10T10:00:00Z',
-};
-
-export const DEFAULT_DEMO_PREFERENCES: UserPreferences = {
-  timezone: 'UTC',
-  preferredCompetitions: ['BSA', 'PL', 'PD', 'SA', 'BL1', 'FL1'],
-  favoriteTeams: ['team_man_city', 'team_arsenal', 'team_real_madrid'],
-  preferredMarkets: ['total_goals', 'btts', 'total_corners', 'match_result'],
-  preferredOptionTypes: [
-    'win',
-    'draw',
-    'double_chance',
-    'over_under_goals',
-    'both_teams_to_score',
-    'corners',
-    'bookings',
-    'highest_scoring_half',
-    'first_half_goals',
-    'second_half_result'
-  ],
-  minProbabilityThreshold: 0.58,
-  minEdgeThreshold: 0.035,
-  emailNotificationsEnabled: true,
-};
-
-// Client-side authentication helpers with demo state synchronization
-export function getStoredUser(): UserProfile {
-  if (typeof window === 'undefined') return DEFAULT_DEMO_USER;
-  try {
-    const raw = localStorage.getItem(DEMO_USER_KEY);
-    return raw ? JSON.parse(raw) : DEFAULT_DEMO_USER;
-  } catch {
-    return DEFAULT_DEMO_USER;
-  }
-}
-
-export function setStoredUser(user: UserProfile) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(DEMO_USER_KEY, JSON.stringify(user));
-    document.cookie = `calibrall_tier=${encodeURIComponent(user.subscriptionTier || 'free')}; path=/; max-age=31536000; samesite=lax`;
-  } catch (e) {
-    console.error('Failed to store user profile', e);
-  }
-}
-
-export function getStoredPreferences(): UserPreferences {
-  if (typeof window === 'undefined') return DEFAULT_DEMO_PREFERENCES;
-  try {
-    const raw = localStorage.getItem(DEMO_PREFS_KEY);
-    return raw ? JSON.parse(raw) : DEFAULT_DEMO_PREFERENCES;
-  } catch {
-    return DEFAULT_DEMO_PREFERENCES;
-  }
-}
-
-export function setStoredPreferences(prefs: UserPreferences) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(DEMO_PREFS_KEY, JSON.stringify(prefs));
-  } catch (e) {
-    console.error('Failed to store preferences', e);
-  }
-}
-
-export function getStoredSavedFixtures(): string[] {
-  if (typeof window === 'undefined') return ['fix_ars_liv', 'fix_bar_rma'];
-  try {
-    const raw = localStorage.getItem(DEMO_SAVED_KEY);
-    return raw ? JSON.parse(raw) : ['fix_ars_liv', 'fix_bar_rma'];
-  } catch {
-    return ['fix_ars_liv', 'fix_bar_rma'];
-  }
-}
-
-export function toggleStoredSavedFixture(fixtureId: string): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    const existing = getStoredSavedFixtures();
-    let updated: string[];
-    let isSaved = false;
-    if (existing.includes(fixtureId)) {
-      updated = existing.filter(id => id !== fixtureId);
-      isSaved = false;
-    } else {
-      updated = [...existing, fixtureId];
-      isSaved = true;
-    }
-    localStorage.setItem(DEMO_SAVED_KEY, JSON.stringify(updated));
-    return isSaved;
-  } catch (e) {
-    console.error('Failed to toggle saved fixture', e);
-    return false;
-  }
-}
+export {
+  DEFAULT_USER_PREFERENCES as DEFAULT_DEMO_PREFERENCES,
+  getStoredPreferences,
+  setStoredPreferences,
+  getStoredSavedFixtures,
+  toggleStoredSavedFixture,
+  clearStoredSavedFixtures,
+  clearAllClientUserCaches,
+} from '@/lib/storage/userStorage';

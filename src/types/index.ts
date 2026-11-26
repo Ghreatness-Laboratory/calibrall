@@ -284,6 +284,9 @@ export interface Competition {
   code: string;
   name: string;
   country: string;
+  sport?: Sport;
+  aliases?: string[];
+  sortOrder?: number;
   emblemUrl: string;
   tier: number;
   avgGoalsPerGame: number;

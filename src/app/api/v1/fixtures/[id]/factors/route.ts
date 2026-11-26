@@ -2,14 +2,20 @@ import { NextResponse } from 'next/server';
 import { getFootballDataProvider } from '@/lib/data/provider';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
 import { STATE_TAG_REGISTRY, FACTOR_DEFINITIONS } from '@/lib/prediction/contextFactors';
+import { requireApiUser } from '@/lib/supabase/serverAuth';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 120;
+export const revalidate = 0;
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const auth = await requireApiUser(request);
+  if (!auth.authorized) {
+    return auth.errorResponse;
+  }
+
   const provider = getFootballDataProvider();
   const fixture = await provider.getFixtureById(params.id);
 

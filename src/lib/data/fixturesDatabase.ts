@@ -21,8 +21,10 @@ import {
 } from './canonicalTeams';
 import {
   getCanonicalCompetition,
+  isBasketballCompetitionId,
   isCanonicalCompetitionId,
   logCompetitionIntegrityError,
+  resolveAndVerifyFixtureCompetition,
 } from './canonicalCompetitions';
 import { matchesDayFilter, DayFilterType } from '@/lib/utils/dateWindow';
 import { cleanDisplayText } from '@/lib/utils/formatText';
@@ -69,28 +71,18 @@ function inferExternalProviderFromSource(source?: string | null): ExternalTeamPr
  * Rule 1: A fixture with no canonical competition_id is logged as an error and never shown under a fallback.
  */
 export function mapDbRowToFixture(row: any): Fixture | null {
-  const rawCompId = row.competition_id;
-
-  if (!isCanonicalCompetitionId(rawCompId)) {
+  const verified = resolveAndVerifyFixtureCompetition(row);
+  if ('unmapped' in verified) {
     logCompetitionIntegrityError(
-      String(row.id || row.provider_id || 'unknown'),
-      rawCompId,
-      row.source || 'db:fixtures'
+      verified.unmapped.id,
+      verified.unmapped.rawCompetitionId,
+      verified.unmapped.source
     );
     return null;
   }
 
-  const compId = rawCompId.trim().toLowerCase();
-  const comp = getCanonicalCompetition(compId);
-
-  if (!comp) {
-    logCompetitionIntegrityError(
-      String(row.id || row.provider_id || 'unknown'),
-      compId,
-      row.source || 'db:fixtures'
-    );
-    return null;
-  }
+  const compId = verified.competitionId;
+  const comp = verified.competition;
 
   const payload = safeParsePayloadJson(row.payload_json);
 
@@ -603,6 +595,31 @@ export async function syncNBAFixturesToDatabase(
  * Rule 1: Every fixture has a canonical competition_id. Any without is logged as an error and never shown.
  * Rule 3: Filter by competition_id only, and combine it with the day filter.
  */
+/**
+ * Parses single or comma-separated competition_id filters strictly against canonical IDs.
+ * Returns null for "ALL" / unfiltered, or [] if any token is invalid (fail-closed).
+ */
+export function parseCompetitionFilterIds(rawCompetitionId?: string): string[] | null {
+  if (!rawCompetitionId || rawCompetitionId.trim().toUpperCase() === 'ALL') return null;
+  const tokens = rawCompetitionId
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  if (tokens.length === 0 || tokens.includes('all')) return null;
+
+  const valid: string[] = [];
+  for (const token of tokens) {
+    if (!isCanonicalCompetitionId(token)) {
+      logCompetitionIntegrityError('query_filter', token, 'parseCompetitionFilterIds');
+      return [];
+    }
+    const canon = getCanonicalCompetition(token);
+    if (!canon) return [];
+    valid.push(canon.id);
+  }
+  return Array.from(new Set(valid));
+}
+
 export async function getFixturesFromDatabase(options?: {
   competitionId?: string;
   status?: string;
@@ -612,15 +629,9 @@ export async function getFixturesFromDatabase(options?: {
   if (!isSupabaseConfigured || !supabase) return [];
 
   try {
-    let filterCompId: string | null = null;
-    // Rule 3: Filter by competition_id ONLY
-    if (options?.competitionId && options.competitionId !== 'ALL') {
-      const rawCompId = options.competitionId.trim();
-      if (!isCanonicalCompetitionId(rawCompId)) {
-        logCompetitionIntegrityError('query_filter', rawCompId, 'getFixturesFromDatabase');
-        return [];
-      }
-      filterCompId = rawCompId.toLowerCase();
+    const filterCompIds = parseCompetitionFilterIds(options?.competitionId);
+    if (filterCompIds !== null && filterCompIds.length === 0) {
+      return [];
     }
 
     const { data: rows, error } = await fetchAllRows((from, to) => {
@@ -631,8 +642,10 @@ export async function getFixturesFromDatabase(options?: {
         .order('id', { ascending: true })
         .range(from, to);
 
-      if (filterCompId) {
-        query = query.eq('competition_id', filterCompId);
+      if (filterCompIds && filterCompIds.length === 1) {
+        query = query.eq('competition_id', filterCompIds[0]);
+      } else if (filterCompIds && filterCompIds.length > 1) {
+        query = query.in('competition_id', filterCompIds);
       }
 
       if (options?.status && options.status !== 'ALL') {
@@ -650,15 +663,15 @@ export async function getFixturesFromDatabase(options?: {
     const result: Fixture[] = [];
 
     for (const row of rows) {
-      // Map row and validate canonical competition_id (Rule 1)
+      // Map row and validate canonical competition_id + code alignment (Rule 1)
       const fixture = mapDbRowToFixture(row);
       if (!fixture) continue;
 
-      // Filter by sport
-      if (options?.sport === 'football' && fixture.competitionId === 'comp_nba') continue;
-      if (options?.sport === 'basketball' && fixture.competitionId !== 'comp_nba') continue;
+      const isBb = isBasketballCompetitionId(fixture.competitionId) || fixture.sport === 'basketball';
+      if (options?.sport === 'football' && isBb) continue;
+      if (options?.sport === 'basketball' && !isBb) continue;
 
-      // Rule 3: Combine competition_id filter with day filter
+      // Combine competition_id filter with day filter
       if (options?.day && options.day !== 'ALL') {
         if (!matchesDayFilter(fixture.kickoffTime, options.day)) {
           continue;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFootballDataProvider } from '@/lib/data/provider';
 import { getFixtureLineupState } from '@/lib/data/lineupsService';
 import { forwardPickLedger } from '@/lib/prediction/forwardPickLedger';
+import { requireApiUser } from '@/lib/supabase/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireApiUser(request);
+    if (!auth.authorized) {
+      return auth.errorResponse;
+    }
+
     const fixtureId = params.id;
     if (!fixtureId) {
       return NextResponse.json({ error: 'Fixture ID is required' }, { status: 400 });

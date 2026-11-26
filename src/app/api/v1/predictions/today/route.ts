@@ -4,14 +4,19 @@ import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/s
 import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
 import { persistOrLoadImmutableFootballExplanation } from '@/lib/prediction/footballPickPersistence';
 import { getBasketballFixturesAndEvaluations } from '@/lib/basketball/readService';
-import { resolveRequestTier, redactExplanationForTier } from '@/lib/auth/tierAccess';
+import { resolveTierFromSession, redactExplanationForTier } from '@/lib/auth/tierAccess';
+import { requireApiUser } from '@/lib/supabase/serverAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  const tier = resolveRequestTier(request);
+  const auth = await requireApiUser(request);
+  if (!auth.authorized) {
+    return auth.errorResponse;
+  }
+  const tier = resolveTierFromSession(auth.session);
   const { searchParams } = new URL(request.url);
   const sport = searchParams.get('sport')?.toLowerCase() || 'football';
 

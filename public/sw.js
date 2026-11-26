@@ -2,7 +2,7 @@
 // Version: 1.0.5
 // Brand: Every call, on record.
 
-const CACHE_VERSION = 'calibrall-v1.0.5';
+const CACHE_VERSION = 'calibrall-v1.0.6';
 const PRECACHE_NAME = `calibrall-precache-${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `calibrall-static-${CACHE_VERSION}`;
 const DATA_CACHE_NAME = `calibrall-data-${CACHE_VERSION}`;
@@ -84,10 +84,18 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. User-controlled update: message listener for skipWaiting
+// 3. User-controlled update & logout cache purge
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'CLEAR_USER_CACHES') {
+    event.waitUntil(
+      Promise.all([
+        caches.delete(DATA_CACHE_NAME),
+        caches.delete(STATIC_CACHE_NAME),
+      ])
+    );
   }
 });
 
@@ -127,11 +135,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Never cache auth endpoints, revalidate endpoint, payment flows, or mutations
+  // Never cache auth endpoints, account endpoints, revalidate endpoint, payment flows, or mutations
   if (
     url.pathname.includes('/auth') ||
     url.pathname.includes('/api/auth') ||
+    url.pathname.includes('/api/account') ||
+    url.pathname.includes('/api/admin') ||
     url.pathname.includes('/api/revalidate') ||
+    url.pathname.includes('/login') ||
+    url.pathname.includes('/signup') ||
+    url.pathname.includes('/forgot-password') ||
+    url.pathname.includes('/reset-password') ||
     url.pathname.includes('/payment') ||
     url.pathname.includes('/stripe') ||
     url.hostname.includes('supabase.co')
@@ -241,6 +255,11 @@ self.addEventListener('fetch', (event) => {
           const networkResponse = await fetch(request, { signal: controller.signal });
           clearTimeout(timeoutId);
 
+          if (networkResponse && (networkResponse.status === 401 || networkResponse.status === 403)) {
+            await caches.delete(DATA_CACHE_NAME).catch(() => {});
+            return networkResponse;
+          }
+
           if (networkResponse && networkResponse.status === 200) {
             const cache = await caches.open(DATA_CACHE_NAME);
             cache.put(request, networkResponse.clone());
@@ -273,23 +292,24 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Navigation requests (HTML pages)
-  // Policy: Network-first with fallback to cached page, then /offline
+  // Policy: Network-first; only cache public non-personalized routes so signed-in pages never bleed across users.
   if (request.mode === 'navigate') {
+    const publicCacheable = ['/', '/about', '/terms', '/privacy', '/offline'].includes(url.pathname);
     event.respondWith(
       (async () => {
         try {
           const networkResponse = await fetch(request);
-          if (networkResponse && networkResponse.status === 200) {
+          if (publicCacheable && networkResponse && networkResponse.status === 200 && !networkResponse.redirected) {
             const cache = await caches.open(STATIC_CACHE_NAME);
             cache.put(request, networkResponse.clone());
-            return networkResponse;
           }
           return networkResponse;
         } catch (err) {
-          // If network failed, check cache for the navigated page
-          const cachedPage = await caches.match(request);
-          if (cachedPage) {
-            return cachedPage;
+          if (publicCacheable) {
+            const cachedPage = await caches.match(request);
+            if (cachedPage) {
+              return cachedPage;
+            }
           }
           const isBrowserOffline = typeof self.navigator !== 'undefined' && self.navigator.onLine === false;
           if (isBrowserOffline) {

@@ -56,20 +56,8 @@ export interface AdminOverrideAuditLog {
   rationale: string;
 }
 
-// In-memory or localStorage audit log store
-const ADMIN_AUDIT_LOGS: AdminOverrideAuditLog[] = [
-  {
-    id: 'ovr_9102',
-    timestamp: '2026-10-22T21:45:00Z',
-    adminEmail: 'analyst@calibrall.app',
-    fixtureId: 'fix_pl_ars_liv',
-    marketCode: 'TOTAL_CORNERS_O95',
-    selection: 'Over 9.5 Corners',
-    previousStatus: 'PENDING',
-    newStatus: 'WON',
-    rationale: 'Official Premier League post-match corner audit credited 10th corner at 94th minute.',
-  },
-];
+// In-memory audit log store (starts empty; populated only by real overrides)
+const ADMIN_AUDIT_LOGS: AdminOverrideAuditLog[] = [];
 
 /**
  * Extracts verified statistics summary from a completed fixture

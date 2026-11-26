@@ -11,6 +11,8 @@ import SWUpdateToast from '@/components/pwa/SWUpdateToast';
 import OfflineBanner from '@/components/pwa/OfflineBanner';
 import TopSportBar from '@/components/TopSportBar';
 import { SportProvider } from '@/lib/context/SportContext';
+import { AuthProvider, type AuthUserSummary } from '@/lib/context/AuthContext';
+import { getServerAuthSession, getServerSupabaseConfig } from '@/lib/supabase/serverAuth';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -39,8 +41,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Calibrall | Football & NBA Basketball Statistical Projection Platform',
-  description: 'Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession efficiency projections, and calibrated multi market analytics.',
+  title: 'Calibrall | Every call, on record.',
+  description:
+    'Free probabilistic football and basketball predictions where every pick is timestamped before kickoff and scored after full time.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
@@ -58,17 +61,35 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: 'Calibrall | Football & NBA Basketball Statistical Projection Platform',
-    description: 'Football & NBA Basketball Statistical Projection Platform. Bivariate Poisson models, exact NBA possession efficiency projections, and calibrated multi market analytics.',
+    title: 'Calibrall | Every call, on record.',
+    description:
+      'Free probabilistic football and basketball predictions where every pick is timestamped before kickoff and scored after full time.',
     type: 'website',
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getServerAuthSession();
+  const { isAuthConfigured } = getServerSupabaseConfig();
+
+  const initialUser: AuthUserSummary | null = session
+    ? {
+        id: session.user.id,
+        email: session.user.email,
+        displayName: session.profile.displayName,
+        role: session.profile.role,
+        tier: session.effectiveTier,
+        tierExpiresAt: session.profile.tierExpiresAt,
+        isExpired: session.isExpired,
+        isAdmin: session.isAdmin,
+        createdAt: session.profile.createdAt,
+      }
+    : null;
+
   return (
     <html lang="en" className={`${dmSans.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
@@ -85,21 +106,26 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-[100dvh] bg-[var(--bg)] text-[var(--text)] flex flex-col antialiased selection:bg-[var(--accent-fill)] selection:text-[#0A0E0D]">
-        <InstallPromptProvider>
-          <SportProvider>
-            <Navbar />
-            <OfflineBanner />
-            <main className="flex-1 max-w-[430px] md:max-w-4xl lg:max-w-7xl w-full mx-auto px-4 pt-3 pb-[calc(78px+env(safe-area-inset-bottom,0px))] md:pb-8 min-w-0">
-              <TopSportBar />
-              {children}
-            </main>
-            <Footer />
-            <BottomNav />
-            <MobileInstallBanner />
-            <IOSInstallModal />
-            <SWUpdateToast />
-          </SportProvider>
-        </InstallPromptProvider>
+        <AuthProvider
+          initialUser={initialUser}
+          isSupabaseAuthConfigured={isAuthConfigured}
+        >
+          <InstallPromptProvider>
+            <SportProvider>
+              <Navbar />
+              <OfflineBanner />
+              <main className="flex-1 max-w-[430px] md:max-w-4xl lg:max-w-7xl w-full mx-auto px-4 pt-[calc(53px+env(safe-area-inset-top,0px)+14px)] pb-[calc(78px+env(safe-area-inset-bottom,0px))] md:pb-8 min-w-0">
+                <TopSportBar />
+                {children}
+              </main>
+              <Footer />
+              <BottomNav />
+              <MobileInstallBanner />
+              <IOSInstallModal />
+              <SWUpdateToast />
+            </SportProvider>
+          </InstallPromptProvider>
+        </AuthProvider>
       </body>
     </html>
   );

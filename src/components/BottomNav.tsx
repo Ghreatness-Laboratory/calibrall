@@ -3,10 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Calendar, BarChart2, Award, User } from 'lucide-react';
+import { Calendar, BarChart2, Award, Bookmark, User } from 'lucide-react';
+import { useAuth } from '@/lib/context/AuthContext';
+import { isPublicPagePath } from '@/lib/auth/routeAccess';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { isAuthenticated } = useAuth();
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   useEffect(() => {
@@ -35,14 +38,15 @@ export default function BottomNav() {
   }, []);
 
   if (isKeyboardOpen) return null;
+  if (!isAuthenticated || isPublicPagePath(pathname)) return null;
 
-  const isHomeActive = pathname === '/';
-  const isFixturesActive = pathname.startsWith('/matches');
+  const isFixturesActive = pathname.startsWith('/fixtures') || pathname.startsWith('/matches');
   const isAnalysisActive =
     pathname.startsWith('/predictions') ||
-    pathname.startsWith('/markets') ||
-    pathname.startsWith('/saved');
-  const isRecordActive = pathname.startsWith('/performance');
+    pathname.startsWith('/picks') ||
+    pathname.startsWith('/markets');
+  const isRecordActive = pathname.startsWith('/performance') || pathname.startsWith('/record');
+  const isSavedActive = pathname.startsWith('/saved');
   const isAccountActive =
     pathname.startsWith('/settings') ||
     pathname.startsWith('/pricing') ||
@@ -52,16 +56,9 @@ export default function BottomNav() {
 
   const tabs = [
     {
-      id: 'home',
-      label: 'Home',
-      href: '/',
-      icon: Home,
-      isActive: isHomeActive,
-    },
-    {
       id: 'fixtures',
       label: 'Fixtures',
-      href: '/matches',
+      href: '/fixtures',
       icon: Calendar,
       isActive: isFixturesActive,
     },
@@ -78,6 +75,13 @@ export default function BottomNav() {
       href: '/performance',
       icon: Award,
       isActive: isRecordActive,
+    },
+    {
+      id: 'saved',
+      label: 'Saved',
+      href: '/saved',
+      icon: Bookmark,
+      isActive: isSavedActive,
     },
     {
       id: 'account',

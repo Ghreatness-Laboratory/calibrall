@@ -33,7 +33,6 @@ import {
   OCTOBER_18_RETROSPECTIVE_DISCLAIMER,
 } from '@/lib/data/october18CaseStudy';
 import { forwardPickLedger } from '@/lib/prediction/forwardPickLedger';
-import { getStoredUser } from '@/lib/supabase/client';
 import DataStatusDiagnostics from '@/components/DataStatusDiagnostics';
 
 type MainSectionTab =
@@ -80,12 +79,8 @@ export default function PerformancePage() {
     let active = true;
     setBbLoading(true);
     setBbError(null);
-    const userTier = getStoredUser()?.subscriptionTier || 'free';
     fetch('/api/v1/performance/summary?sport=basketball', {
       cache: 'no-store',
-      headers: {
-        'x-calibrall-tier': userTier,
-      },
     })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

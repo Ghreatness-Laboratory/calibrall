@@ -4,11 +4,17 @@ import { FAMILY_VALIDATION_REGISTRY } from '@/lib/prediction/marketGating';
 import { generateMissAnalysisReport, SettledPredictionRecord } from '@/lib/prediction/missAnalysis';
 import { getTeamStyle } from '@/lib/prediction/situationalContext';
 import { matchesStore } from '@/lib/data/matchesStore';
+import { requireApiUser } from '@/lib/supabase/serverAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await requireApiUser(request);
+  if (!auth.authorized) {
+    return auth.errorResponse;
+  }
+
   const report = marketMonitor.getReport(100, 0.40);
 
   // Generate real match settled records from Supabase/matchesStore

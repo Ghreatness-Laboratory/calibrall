@@ -4,22 +4,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = 'https://calibrall.vercel.app';
   const routes = [
     '',
-    '/creators',
-    '/dashboard',
-    '/matches',
-    '/predictions',
-    '/markets',
-    '/performance',
-    '/pricing',
-    '/methodology',
-    '/responsible-use',
-    '/saved',
+    '/about',
+    '/terms',
+    '/privacy',
+    '/login',
+    '/signup',
   ];
 
   return routes.map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date(),
-    changeFrequency: (route === '' || route === '/matches' || route === '/predictions' ? 'daily' : 'weekly') as MetadataRoute.Sitemap[number]['changeFrequency'],
-    priority: route === '' ? 1.0 : route === '/creators' ? 0.8 : 0.7,
+    changeFrequency: (route === '' ? 'daily' : 'monthly') as MetadataRoute.Sitemap[number]['changeFrequency'],
+    priority: route === '' ? 1.0 : 0.6,
   }));
 }

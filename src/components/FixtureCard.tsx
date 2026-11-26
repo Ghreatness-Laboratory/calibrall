@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Fixture, MarketPrediction } from '@/types';
 import { Bookmark, ChevronRight, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
-import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
+import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/storage/userStorage';
 import TeamCrest from '@/components/TeamCrest';
 import LineupChip from '@/components/LineupChip';
 import { getFixtureLineupState } from '@/lib/data/lineupsService';

@@ -35,6 +35,7 @@ import {
   getFixtureFromDatabaseById,
   syncFootballFixturesToDatabase,
   matchesDayFilter,
+  parseCompetitionFilterIds,
 } from './fixturesDatabase';
 import { validateFixtureIntegrity, isPlaceholderTeamName } from './fixtureIntegrity';
 import {
@@ -885,14 +886,14 @@ export class LiveFootballDataProvider implements FootballDataProvider {
 
   private applyLiveFilters(fixtures: Fixture[], params?: { competitionId?: string; status?: string; day?: string }): Fixture[] {
     let filtered = fixtures;
-    // Rule 3: Filter by competition_id ONLY
-    if (params?.competitionId && params.competitionId !== 'ALL') {
-      const targetCompId = params.competitionId.trim().toLowerCase();
-      if (!isCanonicalCompetitionId(targetCompId)) {
-        logCompetitionIntegrityError('applyLiveFilters', params.competitionId, 'provider:filter');
+    // Rule 3: Filter by canonical competition_id(s) ONLY
+    const filterIds = parseCompetitionFilterIds(params?.competitionId);
+    if (filterIds !== null) {
+      if (filterIds.length === 0) {
         return [];
       }
-      filtered = filtered.filter(f => (f.competitionId || '').toLowerCase() === targetCompId);
+      const allowed = new Set(filterIds);
+      filtered = filtered.filter((f) => allowed.has((f.competitionId || '').toLowerCase()));
     }
     if (params?.status && params.status !== 'ALL') {
       filtered = filtered.filter(f => f.status === params.status);
@@ -1290,9 +1291,13 @@ export class LiveFootballDataProvider implements FootballDataProvider {
   async getLiveFixtures(params?: { competitionId?: string; status?: string; day?: string }): Promise<LiveFixturesResult> {
     checkAndLogStartupEnv();
 
-    const normCompId = params?.competitionId && params.competitionId !== 'ALL'
-      ? params.competitionId.trim().toLowerCase()
-      : 'ALL';
+    const filterIds = parseCompetitionFilterIds(params?.competitionId);
+    const normCompId =
+      filterIds === null
+        ? 'ALL'
+        : filterIds.length === 0
+        ? 'INVALID'
+        : [...filterIds].sort().join(',');
     const normStatus = params?.status && params.status !== 'ALL' ? params.status.trim() : 'ALL';
     const normDay = params?.day && params.day !== 'ALL' ? params.day.trim().toLowerCase() : 'ALL';
     const cacheKey = `live_fixtures:football:${normCompId}:${normStatus}:${normDay}`;
@@ -1311,9 +1316,9 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       const { dateFrom, dateTo } = computeRequestDateWindow(14);
       let selectedCanonicalComp: Competition | null = null;
 
-      if (params?.competitionId && params.competitionId !== 'ALL') {
-        if (!isCanonicalCompetitionId(params.competitionId)) {
-          logCompetitionIntegrityError('api_filter', params.competitionId, 'getLiveFixtures');
+      if (filterIds !== null) {
+        if (filterIds.length === 0) {
+          logCompetitionIntegrityError('api_filter', params?.competitionId, 'getLiveFixtures');
           const freshness = await getStoredSportFreshness('football');
           return {
             fixtures: [],
@@ -1328,7 +1333,9 @@ export class LiveFootballDataProvider implements FootballDataProvider {
             dateRange: { dateFrom, dateTo },
           };
         }
-        selectedCanonicalComp = getCanonicalCompetition(params.competitionId);
+        if (filterIds.length === 1) {
+          selectedCanonicalComp = getCanonicalCompetition(filterIds[0]);
+        }
       }
 
       const compCoverage = selectedCanonicalComp

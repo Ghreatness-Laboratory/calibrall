@@ -39,7 +39,10 @@ export const BASKETBALL_COMPETITIONS: Record<BasketballLeague, Competition> = {
     code: 'NBA',
     name: 'National Basketball Association',
     country: 'USA',
-    emblemUrl: '',
+    sport: 'basketball',
+    aliases: ['nba', 'usa basketball', 'pro basketball', 'us'],
+    sortOrder: 10,
+    emblemUrl: 'https://a.espncdn.com/i/teamlogos/leagues/500/nba.png',
     tier: 1,
     avgGoalsPerGame: 226.4,
     avgCornersPerGame: 0,
@@ -53,6 +56,9 @@ export const BASKETBALL_COMPETITIONS: Record<BasketballLeague, Competition> = {
     code: 'NCAAB',
     name: 'NCAA Men Division I',
     country: 'USA',
+    sport: 'basketball',
+    aliases: ['ncaab', 'ncaa', 'march madness', 'college basketball', 'ncaa men'],
+    sortOrder: 20,
     emblemUrl: '',
     tier: 1,
     avgGoalsPerGame: 149.8,
@@ -67,6 +73,9 @@ export const BASKETBALL_COMPETITIONS: Record<BasketballLeague, Competition> = {
     code: 'EUROLEAGUE',
     name: 'EuroLeague',
     country: 'Europe',
+    sport: 'basketball',
+    aliases: ['euroleague', 'euro league', 'european basketball', 'el'],
+    sortOrder: 30,
     emblemUrl: '',
     tier: 1,
     avgGoalsPerGame: 172.8,
@@ -550,13 +559,22 @@ export async function bustBasketballSlateCache(): Promise<void> {
   await serverCache.bust(SLATE_CACHE_KEY);
 }
 
-function normalizeLeagueFilter(raw?: string): BasketballLeague | 'ALL' {
-  if (!raw || raw === 'ALL') return 'ALL';
-  const u = raw.trim().toUpperCase();
-  if (u === 'NBA' || u === 'COMP_NBA') return 'NBA';
-  if (u === 'NCAAB' || u === 'COMP_NCAAB') return 'NCAAB';
-  if (u === 'EUROLEAGUE' || u === 'COMP_EUROLEAGUE') return 'EUROLEAGUE';
-  return 'ALL';
+function normalizeLeagueFilterList(raw?: string): BasketballLeague[] | null {
+  if (!raw || raw.trim().toUpperCase() === 'ALL') return null;
+  const tokens = raw
+    .split(',')
+    .map((t) => t.trim().toUpperCase())
+    .filter(Boolean);
+  if (tokens.length === 0 || tokens.includes('ALL')) return null;
+
+  const selected: BasketballLeague[] = [];
+  for (const u of tokens) {
+    if (u === 'NBA' || u === 'COMP_NBA') selected.push('NBA');
+    else if (u === 'NCAAB' || u === 'COMP_NCAAB') selected.push('NCAAB');
+    else if (u === 'EUROLEAGUE' || u === 'COMP_EUROLEAGUE') selected.push('EUROLEAGUE');
+    else return []; // Strictly reject invalid/non-basketball competition filter instead of falling back
+  }
+  return Array.from(new Set(selected));
 }
 
 export async function getBasketballFixturesAndEvaluations(options?: {
@@ -578,12 +596,20 @@ export async function getBasketballFixturesAndEvaluations(options?: {
   season: string;
 }> {
   const slate = await buildEvaluatedBasketballSlate(false);
-  const leagueFilter = normalizeLeagueFilter(options?.competitionId || options?.league);
+  const leagueFilterList = normalizeLeagueFilterList(options?.competitionId || options?.league);
 
   let filtered = slate.fixtures;
 
-  if (leagueFilter !== 'ALL') {
-    filtered = filtered.filter((f) => f.basketballStats?.league === leagueFilter || f.competition.code === leagueFilter);
+  if (leagueFilterList !== null) {
+    if (leagueFilterList.length === 0) {
+      filtered = [];
+    } else {
+      const allowed = new Set<BasketballLeague>(leagueFilterList);
+      filtered = filtered.filter((f) => {
+        const lg = (f.basketballStats?.league || f.competition.code) as BasketballLeague;
+        return allowed.has(lg);
+      });
+    }
   }
 
   if (options?.day && options.day !== 'ALL') {
@@ -722,30 +748,36 @@ export async function getBasketballFixtureByIdFromDb(gameId: string): Promise<{
 
 export async function getBasketballCompetitionsSummary(day?: string) {
   const slate = await buildEvaluatedBasketballSlate(false);
-  const list = (['NBA', 'NCAAB', 'EUROLEAGUE'] as BasketballLeague[]).map((league) => {
-    const comp = BASKETBALL_COMPETITIONS[league];
-    const windowFixtures = slate.fixtures.filter((f) => {
-      if ((f.basketballStats?.league || f.competition.code) !== league) return false;
-      if (day && day !== 'ALL') return matchesDayFilter(f.kickoffTime, day);
-      return true;
-    });
-    return {
-      ...comp,
-      name: cleanDisplayText(comp.name),
-      fixtureCount: windowFixtures.length,
-      storedMatchCount: slate.leagueCounts[league]?.totalStored || windowFixtures.length,
-      hasFreeFixturesSource: true,
-      freeFixturesProvider: comp.freeFixturesProvider || 'Free Public API',
-    };
-  });
+  const list = (['NBA', 'NCAAB', 'EUROLEAGUE'] as BasketballLeague[])
+    .map((league) => {
+      const comp = BASKETBALL_COMPETITIONS[league];
+      const windowFixtures = slate.fixtures.filter((f) => {
+        if ((f.basketballStats?.league || f.competition.code) !== league) return false;
+        if (day && day !== 'ALL') return matchesDayFilter(f.kickoffTime, day);
+        return true;
+      });
+      return {
+        ...comp,
+        sport: 'basketball' as const,
+        aliases: comp.aliases || [],
+        sortOrder: comp.sortOrder ?? 100,
+        name: cleanDisplayText(comp.name),
+        fixtureCount: windowFixtures.length,
+        storedMatchCount: slate.leagueCounts[league]?.totalStored || windowFixtures.length,
+        hasFreeFixturesSource: true,
+        freeFixturesProvider: comp.freeFixturesProvider || 'Free Public API',
+      };
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
   return {
     competitions: list,
     groupedByCountry: [
-      { country: 'Europe', competitions: list.filter((c) => c.country === 'Europe') },
       { country: 'USA', competitions: list.filter((c) => c.country === 'USA') },
+      { country: 'Europe', competitions: list.filter((c) => c.country === 'Europe') },
     ].filter((g) => g.competitions.length > 0),
     total: list.length,
     totalFixtures: list.reduce((s, c) => s + c.fixtureCount, 0),
+    unmappedFixtures: [] as Array<never>,
   };
 }

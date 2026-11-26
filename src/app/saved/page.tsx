@@ -8,7 +8,7 @@ import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/predi
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import { useSport } from '@/lib/context/SportContext';
-import { getStoredSavedFixtures } from '@/lib/supabase/client';
+import { getStoredSavedFixtures, clearStoredSavedFixtures } from '@/lib/storage/userStorage';
 import { Bookmark, ArrowRight, Trash2 } from 'lucide-react';
 
 export default function SavedMatchesPage() {
@@ -48,10 +48,8 @@ export default function SavedMatchesPage() {
   }, [fixtures, savedIds, sport]);
 
   const handleClearAll = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('matchmind_demo_saved_fixtures', JSON.stringify([]));
-      setSavedIds([]);
-    }
+    clearStoredSavedFixtures();
+    setSavedIds([]);
   };
 
   return (

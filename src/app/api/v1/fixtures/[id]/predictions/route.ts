@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getEvaluatedFixture } from '@/lib/data/provider';
-import { resolveRequestTier, redactExplanationForTier } from '@/lib/auth/tierAccess';
+import { resolveTierFromSession, redactExplanationForTier } from '@/lib/auth/tierAccess';
+import { requireApiUser } from '@/lib/supabase/serverAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -9,7 +10,11 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const tier = resolveRequestTier(request);
+  const auth = await requireApiUser(request);
+  if (!auth.authorized) {
+    return auth.errorResponse;
+  }
+  const tier = resolveTierFromSession(auth.session);
   const result = await getEvaluatedFixture(params.id);
 
   if (!result) {

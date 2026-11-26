@@ -21,7 +21,7 @@ import {
   Sparkles,
   ArrowUpRight,
 } from 'lucide-react';
-import { toggleStoredSavedFixture, getStoredSavedFixtures, getStoredUser } from '@/lib/supabase/client';
+import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/storage/userStorage';
 import { Fixture, MarketPrediction, WrittenMatchExplanation } from '@/types';
 import { formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import type { BasketballGameEvaluation, BasketballPickCandidate } from '@/lib/basketball/picker';
@@ -102,14 +102,10 @@ export default function MatchAnalysisPage() {
       try {
         setIsLoading(true);
         const isBb = id?.startsWith('bbg_') || id?.startsWith('nba_');
-        const userTier = getStoredUser()?.subscriptionTier || 'free';
         const res = await fetch(
           `/api/v1/fixtures?sport=${isBb ? 'basketball' : 'football'}&id=${encodeURIComponent(id)}`,
           {
             cache: 'no-store',
-            headers: {
-              'x-calibrall-tier': userTier,
-            },
           }
         );
         if (!res.ok) {
@@ -309,35 +305,37 @@ export default function MatchAnalysisPage() {
 
   const StickyDetailTopBar = (
     <div
-      className="sticky top-0 z-40 -mx-4 px-4 h-[52px] bg-[var(--bg)]/85 backdrop-blur-xl border-b border-[var(--line)] flex items-center justify-between"
+      className="fixed top-0 left-0 right-0 z-40 md:hidden px-4 bg-[var(--bg)]/95 backdrop-blur-xl border-b border-[var(--line)]"
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
-      <Link
-        href="/matches"
-        className="min-h-[44px] min-w-[44px] -ml-2 px-2 inline-flex items-center gap-1.5 text-[13px] text-[var(--text)] hover:text-[var(--accent)] transition-colors touch-press font-medium rounded-[10px]"
-        aria-label="Back to fixtures"
-      >
-        <ChevronLeft className="w-5 h-5" strokeWidth={2.2} />
-        <span>Fixtures</span>
-      </Link>
-
-      <button
-        onClick={handleToggleBookmark}
-        type="button"
-        className="min-w-[44px] min-h-[44px] -mr-1 flex items-center justify-center touch-press"
-        title={isSaved ? 'Remove bookmark' : 'Bookmark fixture'}
-        aria-label={isSaved ? 'Remove bookmark' : 'Bookmark fixture'}
-      >
-        <span
-          className={`w-[36px] h-[36px] rounded-[10px] border flex items-center justify-center transition-colors ${
-            isSaved
-              ? 'bg-[var(--medium-soft)] border-[var(--medium)]/40 text-[var(--medium)]'
-              : 'bg-[var(--surface)] border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text)]'
-          }`}
+      <div className="h-[52px] flex items-center justify-between">
+        <Link
+          href="/matches"
+          className="min-h-[44px] min-w-[44px] -ml-2 px-2 inline-flex items-center gap-1.5 text-[13px] text-[var(--text)] hover:text-[var(--accent)] transition-colors touch-press font-medium rounded-[10px]"
+          aria-label="Back to fixtures"
         >
-          <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-[var(--medium)]' : ''}`} strokeWidth={2} />
-        </span>
-      </button>
+          <ChevronLeft className="w-5 h-5" strokeWidth={2.2} />
+          <span>Fixtures</span>
+        </Link>
+
+        <button
+          onClick={handleToggleBookmark}
+          type="button"
+          className="min-w-[44px] min-h-[44px] -mr-1 flex items-center justify-center touch-press"
+          title={isSaved ? 'Remove bookmark' : 'Bookmark fixture'}
+          aria-label={isSaved ? 'Remove bookmark' : 'Bookmark fixture'}
+        >
+          <span
+            className={`w-[36px] h-[36px] rounded-[10px] border flex items-center justify-center transition-colors ${
+              isSaved
+                ? 'bg-[var(--medium-soft)] border-[var(--medium)]/40 text-[var(--medium)]'
+                : 'bg-[var(--surface)] border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text)]'
+            }`}
+          >
+            <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-[var(--medium)]' : ''}`} strokeWidth={2} />
+          </span>
+        </button>
+      </div>
     </div>
   );
 

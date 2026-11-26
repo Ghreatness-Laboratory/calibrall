@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Fixture } from '@/types';
 import { Bookmark, ChevronRight } from 'lucide-react';
-import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
+import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/storage/userStorage';
 import TeamCrest from '../TeamCrest';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import type { BasketballGameEvaluation, BasketballPickCandidate } from '@/lib/basketball/picker';

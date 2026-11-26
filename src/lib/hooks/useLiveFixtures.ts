@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Fixture, Sport } from '@/types';
 import type { BasketballGameEvaluation } from '@/lib/basketball/picker';
-import { getStoredUser } from '@/lib/supabase/client';
 
 export interface SkippedLeagueDiagnostic {
   leagueCode: string;
@@ -47,7 +46,20 @@ interface SavedFixturesPayload {
 
 const SAVED_FIXTURES_PREFIX = 'calibrall_saved_fixtures_v1:';
 
-function getSavedFixturesKey(sport: Sport, competitionId?: string, status?: string, day?: string): string {
+function normalizeCompParam(competitionId?: string | string[]): string {
+  if (!competitionId) return 'ALL';
+  const rawList = Array.isArray(competitionId) ? competitionId : competitionId.split(',');
+  const cleaned = Array.from(
+    new Set(
+      rawList
+        .map((c) => c.trim())
+        .filter((c) => c && c.toUpperCase() !== 'ALL')
+    )
+  ).sort();
+  return cleaned.length > 0 ? cleaned.join(',') : 'ALL';
+}
+
+function getSavedFixturesKey(sport: Sport | 'all', competitionId?: string, status?: string, day?: string): string {
   return `${SAVED_FIXTURES_PREFIX}${sport}:${competitionId || 'ALL'}:${status || 'ALL'}:${day || 'ALL'}`;
 }
 
@@ -125,11 +137,12 @@ function formatServerFailureReason(status: number, parsedJson: any, fallbackText
 }
 
 export function useLiveFixtures(
-  competitionId?: string,
+  competitionId?: string | string[],
   status?: string,
-  sport: Sport = 'football',
+  sport: Sport | 'all' = 'football',
   day?: string
 ): LiveFixturesHookResult {
+  const normalizedCompId = normalizeCompParam(competitionId);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [liveDataAvailable, setLiveDataAvailable] = useState(false);
@@ -198,25 +211,21 @@ export function useLiveFixtures(
   );
 
   const load = useCallback(async () => {
-    const storageKey = getSavedFixturesKey(sport, competitionId, status, day);
+    const storageKey = getSavedFixturesKey(sport, normalizedCompId, status, day);
     const browserOfflineNow = typeof navigator !== 'undefined' && navigator.onLine === false;
 
     try {
       setIsLoading(true);
       const query = new URLSearchParams();
       query.set('sport', sport);
-      if (competitionId && competitionId !== 'ALL') {
-        query.set('competition_id', competitionId);
+      if (normalizedCompId && normalizedCompId !== 'ALL') {
+        query.set('competition_id', normalizedCompId);
       }
       if (status && status !== 'ALL') query.set('status', status);
       if (day && day !== 'ALL') query.set('day', day);
 
-      const userTier = getStoredUser()?.subscriptionTier || 'free';
       const res = await fetch(`/api/v1/fixtures?${query.toString()}`, {
         cache: 'no-store',
-        headers: {
-          'x-calibrall-tier': userTier,
-        },
       });
 
       const text = await res.text();
@@ -225,6 +234,21 @@ export function useLiveFixtures(
         json = text ? JSON.parse(text) : null;
       } catch {
         json = null;
+      }
+
+      if (res.status === 401 || res.status === 403) {
+        try {
+          window.localStorage.removeItem(storageKey);
+        } catch {}
+        fixturesRef.current = [];
+        evaluationsRef.current = {};
+        setFixtures([]);
+        setEvaluations({});
+        setLiveDataAvailable(false);
+        setIsSavedCopy(false);
+        setServerStatus(res.status);
+        setError('Authentication required.');
+        return;
       }
 
       if (!res.ok) {
@@ -316,10 +340,10 @@ export function useLiveFixtures(
     } finally {
       setIsLoading(false);
     }
-  }, [competitionId, status, sport, day, applySavedFallback]);
+  }, [normalizedCompId, status, sport, day, applySavedFallback]);
 
   useEffect(() => {
-    const storageKey = getSavedFixturesKey(sport, competitionId, status, day);
+    const storageKey = getSavedFixturesKey(sport, normalizedCompId, status, day);
     const stored = readSavedFixturesFromStorage(storageKey);
     if (stored) {
       fixturesRef.current = stored.fixtures;
@@ -338,7 +362,7 @@ export function useLiveFixtures(
     // Poll DB-backed API every 120 seconds (0 external provider calls per visitor)
     const timer = setInterval(load, 120000);
     return () => clearInterval(timer);
-  }, [competitionId, status, sport, day, load]);
+  }, [normalizedCompId, status, sport, day, load]);
 
   return {
     fixtures,

@@ -11,15 +11,14 @@ import {
   BarChart3,
   ShieldCheck
 } from 'lucide-react';
-import { getStoredUser } from '@/lib/supabase/client';
-import { UserProfile } from '@/types';
+import { useAuth } from '@/lib/context/AuthContext';
 import { MonitoringReport } from '@/lib/prediction/marketMonitor';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import { isDixonColesV25Active, setDixonColesV25Active } from '@/lib/prediction/v25/featureFlags';
 import { getAdminAuditLogs, recordAdminOverride, AdminOverrideAuditLog } from '@/lib/prediction/settlementEngine';
 
 export default function AdminPage() {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const { user } = useAuth();
   const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'SUCCESS'>('IDLE');
   const [lastSync, setLastSync] = useState<string>('Just now');
   const [unpublishedModels, setUnpublishedModels] = useState<string[]>([]);
@@ -60,7 +59,6 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    setUser(getStoredUser());
     fetchMonitoring();
     setV25Active(isDixonColesV25Active());
     setAuditLogs(getAdminAuditLogs());
@@ -78,7 +76,7 @@ export default function AdminPage() {
       setOverrideMessage('A verifiable rationale is required for audit compliance.');
       return;
     }
-    const adminEmail = user?.email || 'analyst@calibrall.app';
+    const adminEmail = user?.email || 'admin';
     const newLog = recordAdminOverride(
       adminEmail,
       overrideFixtureId,
