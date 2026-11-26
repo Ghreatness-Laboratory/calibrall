@@ -580,7 +580,53 @@ export function getOptionTypeLabel(type: SupportedOptionType | string): string {
   }
 }
 
-import { RiskTier } from '@/types';
+import { RiskTier, MarketPrediction } from '@/types';
+
+export interface ConfidenceTierGroups {
+  high: MarketPrediction[];
+  medium: MarketPrediction[];
+  low: MarketPrediction[];
+  total: number;
+}
+
+/**
+ * Single source of truth for grouping predictions into the 3 displayed confidence tiers
+ * (High, Medium, Low / Speculative) so summary cards and collapsible sections always match.
+ */
+export function groupPredictionsByConfidenceTier(predictions: MarketPrediction[]): ConfidenceTierGroups {
+  const high: MarketPrediction[] = [];
+  const medium: MarketPrediction[] = [];
+  const low: MarketPrediction[] = [];
+
+  for (const p of predictions) {
+    const isInsufficient =
+      p.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY' &&
+      (p.evidenceTier?.includes('Insufficient Data') ||
+        p.explanation?.dataLimitations?.some((d) => d.includes('Insufficient')));
+
+    const tier = (p.confidenceTier || p.riskTier || '').toUpperCase();
+
+    if (isInsufficient) {
+      low.push(p);
+    } else if (tier === 'HIGH' || tier === 'SAFE') {
+      high.push(p);
+    } else if (tier === 'MEDIUM' || tier === 'MODERATE') {
+      medium.push(p);
+    } else {
+      low.push(p);
+    }
+  }
+
+  const byProbDesc = (a: MarketPrediction, b: MarketPrediction) =>
+    (b.calibratedProbability ?? b.modelProbability) - (a.calibratedProbability ?? a.modelProbability);
+
+  return {
+    high: high.sort(byProbDesc),
+    medium: medium.sort(byProbDesc),
+    low: low.sort(byProbDesc),
+    total: predictions.length,
+  };
+}
 
 export function getRiskTierBadge(tier?: RiskTier | string): { label: string; badgeClass: string } {
   const normalized = (tier || '').toUpperCase();
@@ -588,26 +634,26 @@ export function getRiskTierBadge(tier?: RiskTier | string): { label: string; bad
     case 'HIGH':
     case 'SAFE':
       return {
-        label: 'HIGH',
-        badgeClass: 'bg-[#b8e63a]/15 text-[#b8e63a] border border-[#b8e63a]/30',
+        label: 'High',
+        badgeClass: 'bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30',
       };
     case 'MEDIUM':
     case 'MODERATE':
       return {
-        label: 'MEDIUM',
-        badgeClass: 'bg-[#e3b341]/15 text-[#e3b341] border border-[#e3b341]/30',
+        label: 'Medium',
+        badgeClass: 'bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30',
       };
     case 'LOW':
     case 'RISKY':
     case 'LONGSHOT':
       return {
-        label: 'LOW',
-        badgeClass: 'bg-orange-500/15 text-orange-400 border border-orange-500/30',
+        label: 'Low',
+        badgeClass: 'bg-[var(--muted-soft)] text-[var(--muted)] border border-[var(--line)]',
       };
     default:
       return {
-        label: 'ANALYSIS',
-        badgeClass: 'bg-white/10 text-[#8fa69a] border border-white/15',
+        label: 'Analysis',
+        badgeClass: 'bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)]',
       };
   }
 }
@@ -697,15 +743,15 @@ export function formatSelectionName(name: string): string {
  */
 export function formatExpectedValue(ev?: number | null): { text: string; colorClass: string } {
   if (ev === undefined || ev === null || isNaN(ev)) {
-    return { text: '—', colorClass: 'text-[#8fa69a]' };
+    return { text: '—', colorClass: 'text-[var(--text-2)]' };
   }
   const pct = ev * 100;
   if (pct > 0.05) {
-    return { text: `+${pct.toFixed(1)}%`, colorClass: 'text-[#b8e63a]' };
+    return { text: `+${pct.toFixed(1)}%`, colorClass: 'text-[var(--accent)]' };
   } else if (pct < -0.05) {
-    return { text: `−${Math.abs(pct).toFixed(1)}%`, colorClass: 'text-[#e06a5f]' };
+    return { text: `−${Math.abs(pct).toFixed(1)}%`, colorClass: 'text-[var(--danger)]' };
   } else {
-    return { text: `${pct.toFixed(1)}%`, colorClass: 'text-[#8fa69a]' };
+    return { text: `${pct.toFixed(1)}%`, colorClass: 'text-[var(--text-2)]' };
   }
 }
 

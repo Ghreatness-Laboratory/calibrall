@@ -17,59 +17,59 @@ export default function LineupChip({ lineupState, className = '', isPastKickoff 
   if (!isTeamNewsEnabled()) {
     return (
       <span
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[9.5px] font-mono bg-[#151E19] text-[#8B9890] border border-white/[0.07] ${className}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)] ${className}`}
       >
-        <span>Team news: not included</span>
+        <span>Team news pending</span>
       </span>
     );
   }
 
   const { status, expectedReleaseTimeFormatted, isWithin30MinsOfKickoff, anyKeyPlayerOut, firstKeyPlayerOutName } = lineupState;
 
-  // 1. Key player out on confirmed lineup: Amber/Red with AlertTriangle icon + explicit name text (never colour alone)
+  // 1. Key player out on confirmed lineup
   if (status === 'confirmed' && anyKeyPlayerOut && firstKeyPlayerOutName) {
     return (
       <span
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 ${className}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--danger-soft)] text-[var(--danger)] border border-[var(--danger)]/30 ${className}`}
         title={`Key player out: ${firstKeyPlayerOutName}`}
       >
-        <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" strokeWidth={2.2} />
+        <AlertTriangle className="w-3 h-3 shrink-0" strokeWidth={2.2} />
         <span className="truncate max-w-[170px]">Key player out: {cleanDisplayText(firstKeyPlayerOutName)}</span>
       </span>
     );
   }
 
-  // 2. Confirmed lineups without key absences: Green with CheckCircle2 icon + text
+  // 2. Confirmed lineups without key absences
   if (status === 'confirmed') {
     return (
       <span
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-semibold bg-[#B6E63B]/[0.15] text-[#B6E63B] border border-[#B6E63B]/30 ${className}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30 ${className}`}
       >
-        <CheckCircle2 className="w-3 h-3 text-[#B6E63B] shrink-0" strokeWidth={2.2} />
+        <CheckCircle2 className="w-3 h-3 shrink-0" strokeWidth={2.2} />
         <span>XI confirmed</span>
       </span>
     );
   }
 
-  // 3. Past kickoff or unreleased late: Remove "Lineups pending" and display "Lineups not released"
+  // 3. Past kickoff or unreleased late
   if (isPastKickoff || status === 'unreleased_late' || isWithin30MinsOfKickoff) {
     return (
       <span
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/25 ${className}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30 ${className}`}
       >
-        <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" strokeWidth={2} />
-        <span>Lineups not released</span>
+        <AlertCircle className="w-3 h-3 shrink-0" strokeWidth={2} />
+        <span>Team news pending</span>
       </span>
     );
   }
 
-  // 4. Standard pending (Strictly pre-kickoff): Grey with Clock icon and expected release time (~T-60)
+  // 4. Standard pending
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-normal bg-[#151E19] text-[#8B9890] border border-white/[0.07] ${className}`}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-normal bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)] ${className}`}
     >
-      <Clock className="w-3 h-3 text-[#5E6A63] shrink-0" strokeWidth={1.8} />
-      <span>Lineups pending · expected ~{expectedReleaseTimeFormatted.replace(' WAT', '')}</span>
+      <Clock className="w-3 h-3 text-[var(--text-3)] shrink-0" strokeWidth={1.8} />
+      <span>Team news pending · ~{expectedReleaseTimeFormatted.replace(' WAT', '')}</span>
     </span>
   );
 }

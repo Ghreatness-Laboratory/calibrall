@@ -523,7 +523,7 @@ export class DixonColesV25Evaluator {
           announced: features.discipline.refereeAnnounced,
           name: features.discipline.refereeAnnounced ? cleanDisplayText(features.discipline.refereeName) : undefined,
           shrunkCardsPerMatch: features.discipline.refereeAnnounced ? Number(features.discipline.refereeCardsPerMatch.toFixed(2)) : undefined,
-          leagueBaseline: Number(features.discipline.refereeLeagueBaseline.toFixed(2)),
+          leagueBaseline: features.discipline.refereeLeagueBaseline > 0 ? Number(features.discipline.refereeLeagueBaseline.toFixed(2)) : undefined,
           explanation: cleanDisplayText(features.discipline.refereeExplanation),
         },
         h2h: {
@@ -724,20 +724,45 @@ export class DixonColesV25Evaluator {
       }
 
       const wProbPct = ((winner.calibratedProbability ?? winner.modelProbability) * 100).toFixed(1);
-      const stricterNote = nextStricter
-        ? `; next stricter line ${nextStricter.selection} fell below 70.0% (${((nextStricter.calibratedProbability ?? nextStricter.modelProbability) * 100).toFixed(1)}%)`
-        : ' (strictest line on ladder)';
+      let stricterNote = ' (strictest line on ladder)';
+      if (nextStricter) {
+        const nsProb = nextStricter.calibratedProbability ?? nextStricter.modelProbability;
+        const nsProbPct = (nsProb * 100).toFixed(1);
+        if (nsProb < PICK_CONFIDENCE_THRESHOLD) {
+          stricterNote = `; next stricter line ${nextStricter.selection} fell below 70.0% (${nsProbPct}%)`;
+        } else {
+          let rejectReason = 'did not clear qualification rules';
+          if (!nextStricter.isValidated) {
+            rejectReason = 'failed walk forward validation gate';
+          } else if (nextStricter.sanityTripwire) {
+            rejectReason = 'triggered sanity check';
+          } else if (nextStricter.optionType === 'asian_handicap' && (nextStricter.handicapLine ?? 0) >= 1.5) {
+            rejectReason = 'exceeded handicap cushion limit';
+          } else if (nextStricter.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY') {
+            rejectReason = 'exceeded uncertainty cap';
+          } else if (nextStricter.marketOdds && nextStricter.marketOdds > 1.0 && (nextStricter.expectedValue ?? 0) <= 0) {
+            rejectReason = `had non positive EV (${((nextStricter.expectedValue ?? 0) * 100).toFixed(1)}%)`;
+          } else if (nextStricter.marketOdds && nextStricter.marketOdds > 1.0 && (nextStricter.skillVsDeviggedMarket ?? 0) <= 0) {
+            rejectReason = 'trailed devigged market price';
+          } else if ((nextStricter.edgeOverBaseline ?? 0) <= 0.010) {
+            rejectReason = `lacked +1.0% edge over baseline (+${((nextStricter.edgeOverBaseline ?? 0) * 100).toFixed(1)}%)`;
+          } else if (nextStricter.isGenericPick) {
+            rejectReason = 'was excluded as a generic line';
+          }
+          stricterNote = `; next stricter line ${nextStricter.selection} (${nsProbPct}%) ${rejectReason}`;
+        }
+      }
       const oddsNote = winner.marketOdds && winner.expectedValue !== null && winner.expectedValue !== undefined
         ? ` Priced @${winner.marketOdds.toFixed(2)} vs ${((winner.deviggedMarketProb ?? 0) * 100).toFixed(1)}% devigged prob (EV +${(winner.expectedValue * 100).toFixed(1)}%).`
-        : ' No bookmaker odds stored on this line so no EV calculated.';
+        : ' Probability analysis only (no odds stored).';
       const text = cleanDisplayText(
-        `Highest line clearing 70.0% confidence (${wProbPct}%)${stricterNote}; easier lines omitted.${oddsNote}`
+        `Highest line clearing 70.0% (${wProbPct}%)${stricterNote}.${oddsNote}`
       );
       if (winner.evidence) {
         winner.evidence.whyLineChosen = text;
       }
       winner.plainEnglishReason = winner.plainEnglishReason
-        ? cleanDisplayText(`${winner.plainEnglishReason} ${text}`)
+        ? cleanDisplayText(`${winner.plainEnglishReason} Highest line clearing 70.0% (${wProbPct}%)${stricterNote}.`)
         : text;
     }
 

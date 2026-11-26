@@ -1216,7 +1216,9 @@ export function evaluateFixtureMarkets(
     const meta = SUPPORTED_OPTIONS_CATALOGUE.bookings;
     const refBasisText = context.refereeAnnounced && context.referee
       ? `Appointed referee ${context.referee} shrunk toward league baseline (${effectiveCards.toFixed(2)} exp cards)`
-      : `No referee announced; using league baseline (${(context.refereeLeagueBaseline ?? effectiveCards).toFixed(2)} cards per fixture)`;
+      : (context.refereeLeagueBaseline ?? effectiveCards) > 0
+        ? `No referee announced; using league baseline (${(context.refereeLeagueBaseline ?? effectiveCards).toFixed(2)} cards per fixture)`
+        : 'Referee unannounced';
 
     [2.5, 3.5, 4.5, 5.5].forEach(line => {
       if (cardDist.total[line]) {

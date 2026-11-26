@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Building2 } from 'lucide-react';
+import { Building2, ChevronRight } from 'lucide-react';
 import { creators, getSocialUrl } from '@/content/creators';
 import SocialIcon from '@/components/creators/SocialIcon';
 
@@ -29,75 +29,67 @@ export default function HomeCreatorsTeaser() {
 
   return (
     <section className="pt-1">
-      <div className="bg-[#0F1814] border border-[#1B2A23] rounded-[16px] p-[14px] space-y-3">
-        {/* Row 1: 38px tile, "Built by" 12px muted over "Ghreatness Labs" 15px/600, "Est. 2024" mono pill on right */}
+      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             {creators.company.logo ? (
-              <div className="w-[38px] h-[38px] min-w-[38px] min-h-[38px] rounded-[10px] overflow-hidden border border-[#1B2A23] bg-[#142019] flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-[12px] overflow-hidden border border-[var(--line)] bg-[var(--surface-2)] flex items-center justify-center shrink-0">
                 <Image
                   src={creators.company.logo}
                   alt={creators.company.name}
-                  width={38}
-                  height={38}
+                  width={40}
+                  height={40}
                   className="w-full h-full object-contain"
                   loading="lazy"
+                  referrerPolicy="no-referrer"
                 />
               </div>
             ) : (
-              <div className="w-[38px] h-[38px] min-w-[38px] min-h-[38px] rounded-[10px] border border-[#1B2A23] bg-[#142019] flex items-center justify-center text-[#B8E63A] shrink-0">
-                <Building2 className="w-[18px] h-[18px]" strokeWidth={1.7} />
+              <div className="w-10 h-10 rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] flex items-center justify-center text-[var(--accent)] shrink-0">
+                <Building2 className="w-5 h-5" strokeWidth={1.7} />
               </div>
             )}
             <div className="min-w-0">
-              <span className="text-[12px] font-[400] text-[#8B9B93] block leading-tight">
+              <span className="text-[11.5px] text-[var(--text-2)] block leading-tight">
                 Built by
               </span>
-              <h3 className="text-[15px] font-[600] text-[#E9EFEB] leading-tight truncate mt-0.5">
+              <h3 className="font-display text-[15px] font-semibold text-[var(--text)] leading-tight truncate mt-0.5">
                 {creators.company.name}
               </h3>
             </div>
           </div>
 
-          <div className="border border-[#1B2A23] px-2.5 py-0.5 rounded-full font-mono text-[11px] text-[#8B9B93] bg-[#0A0F0D] shrink-0 whitespace-nowrap">
+          <div className="border border-[var(--line)] px-2.5 py-1 rounded-full text-[11px] text-[var(--text-2)] bg-[var(--surface-2)] shrink-0 whitespace-nowrap tabular-nums">
             Est. 2024
           </div>
         </div>
 
-        {/* Accent tagline at 13.5px */}
-        <p className="text-[13.5px] font-[600] text-[#B8E63A] leading-tight">
+        <p className="text-[13px] font-semibold text-[var(--accent)] leading-tight">
           One platform. Multiple ventures. Infinite possibilities.
         </p>
 
-        {/* 12.5px muted description */}
-        <p className="text-[12.5px] font-[400] text-[#8B9B93] leading-[1.55]">
+        <p className="text-[12.5px] text-[var(--text-2)] leading-[1.5]">
           A technology holding group and IT solutions provider simplifying digital transformation for startups, small businesses and companies.
         </p>
 
-        {/* Small chips: fully rounded */}
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
           {teaserChips.map((chip) => (
             <span
               key={chip}
-              className="border border-[#1B2A23] px-2.5 py-0.5 rounded-full text-[11px] font-[500] text-[#8B9B93] bg-[#0A0F0D]"
+              className="border border-[var(--line)] px-2.5 py-0.5 rounded-full text-[11px] font-medium text-[var(--text-2)] bg-[var(--surface-2)]"
             >
               {chip}
             </span>
           ))}
         </div>
 
-        {/* One line in 12.5px with "and more" link */}
-        <p className="text-[12.5px] font-[400] text-[#8B9B93] leading-normal pt-0.5">
+        <p className="text-[12.5px] text-[var(--text-2)] leading-normal pt-0.5">
           Also from us: Calibrall, Gbedu Games, FragNaija{' '}
-          <Link
-            href="/creators#more-from-us"
-            className="text-[#B8E63A] font-[500] hover:underline"
-          >
+          <Link href="/creators#more-from-us" className="text-[var(--accent)] font-medium hover:underline">
             and more
           </Link>
         </p>
 
-        {/* 5-icon social row: 40px icon buttons */}
         {availableSocials.length > 0 && (
           <div className="flex items-center gap-2 pt-0.5 flex-wrap">
             {availableSocials.map((platform) => (
@@ -107,7 +99,7 @@ export default function HomeCreatorsTeaser() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`Ghreatness Labs on ${platform.name}`}
-                className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-[10px] border border-[#1B2A23] bg-[#142019] hover:bg-[#1B2A23] text-[#8B9B93] hover:text-[#E9EFEB] flex items-center justify-center transition-colors touch-press focus-visible:outline-2 focus-visible:outline-[#B8E63A]"
+                className="w-[44px] h-[44px] rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] hover:border-[var(--border-strong)] text-[var(--text-2)] hover:text-[var(--text)] flex items-center justify-center transition-colors touch-press"
               >
                 <SocialIcon platform={platform.key} size={18} />
               </a>
@@ -115,14 +107,13 @@ export default function HomeCreatorsTeaser() {
           </div>
         )}
 
-        {/* Full-width 42px accent button: "Meet the creators ›" */}
         <div className="pt-1">
           <Link
             href="/creators"
-            className="w-full h-[42px] px-4 rounded-[12px] bg-[#B8E63A] hover:bg-[#c8ee47] text-[#0A0F0D] font-[600] text-[13px] flex items-center justify-center gap-1.5 transition-colors touch-press focus-visible:outline-2 focus-visible:outline-[#B8E63A]"
+            className="w-full min-h-[44px] px-4 rounded-[12px] bg-[var(--accent-fill)] hover:opacity-95 text-[var(--accent-ink)] font-bold text-[13px] flex items-center justify-center gap-1.5 transition-all touch-press"
           >
             <span>Meet the creators</span>
-            <span className="text-[15px] font-bold leading-none">›</span>
+            <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
           </Link>
         </div>
       </div>

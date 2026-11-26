@@ -45,12 +45,16 @@ export class WhyPanelGenerator {
     } else if (isCards) {
       if (features.discipline.refereeAnnounced) {
         factorsFor.push(
-          `Appointed referee ${features.discipline.refereeName} averages ${features.discipline.refereeCardsPerMatch.toFixed(2)} cards per fixture (shrunk toward ${features.discipline.refereeLeagueBaseline.toFixed(2)} league baseline)`
+          features.discipline.refereeLeagueBaseline > 0
+            ? `Appointed referee ${features.discipline.refereeName} averages ${features.discipline.refereeCardsPerMatch.toFixed(2)} cards per fixture (shrunk toward ${features.discipline.refereeLeagueBaseline.toFixed(2)} league baseline)`
+            : `Appointed referee ${features.discipline.refereeName} averages ${features.discipline.refereeCardsPerMatch.toFixed(2)} cards per fixture`
         );
-      } else {
+      } else if (features.discipline.refereeLeagueBaseline > 0) {
         factorsFor.push(
           `Referee unannounced; using league baseline of ${features.discipline.refereeLeagueBaseline.toFixed(2)} cards per fixture`
         );
+      } else {
+        factorsFor.push('Referee unannounced');
       }
       if (features.isDerby) {
         factorsFor.push(`High intensity derby rivalry elevates duel friction and disciplinary bookings`);

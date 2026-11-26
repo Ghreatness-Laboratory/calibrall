@@ -9,13 +9,13 @@ export default function SportSwitcher() {
   const { sport, setSport } = useSport();
 
   const sports = [
-    { 
-      id: 'football' as Sport, 
+    {
+      id: 'football' as Sport,
       label: 'Football',
       icon: Trophy,
     },
-    { 
-      id: 'basketball' as Sport, 
+    {
+      id: 'basketball' as Sport,
       label: 'Basketball',
       icon: Dribbble,
     },
@@ -23,7 +23,7 @@ export default function SportSwitcher() {
 
   return (
     <div className="w-full">
-      <div className="h-[40px] bg-[#101613] border border-[#1F2A24] p-[3px] rounded-full flex items-center gap-1 w-full">
+      <div className="h-[44px] bg-[var(--surface)] border border-[var(--line)] p-[3px] rounded-full flex items-center gap-1 w-full">
         {sports.map((item) => {
           const isActive = sport === item.id;
           const Icon = item.icon;
@@ -34,8 +34,8 @@ export default function SportSwitcher() {
               type="button"
               className={`flex-1 h-full rounded-full flex items-center justify-center gap-1.5 text-[12.5px] transition-all touch-manipulation select-none whitespace-nowrap touch-press ${
                 isActive
-                  ? 'bg-[#B8E636] text-[#0A0E0C] font-[650]'
-                  : 'text-[#8B9892] font-medium hover:text-[#E9EFEB]'
+                  ? 'bg-[var(--accent-fill)] text-[#0A0E0D] font-semibold'
+                  : 'text-[var(--text-2)] font-medium hover:text-[var(--text)]'
               }`}
               aria-pressed={isActive}
             >

@@ -1,27 +1,38 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg: #0A0E0C;
-  --surface-1: #101613;
-  --surface-2: #151D19;
-  --surface: #101613;
-  --raised: #151D19;
-  --border: #1F2A24;
-  --border-strong: #2A3830;
-  --text: #E9EFEB;
-  --muted: #8B9892;
-  --dim: #5E6B65;
-  --subtle: #5E6B65;
-  --accent: #B8E636;
-  --accent-ink: #0A0E0C;
-  --accent-soft: rgba(184, 230, 54, 0.12);
-  --warn: #E8B04A;
-  --warn-soft: rgba(232, 176, 74, 0.12);
-  --caution: #E8B04A;
+  --bg: #0A0E0D;
+  --surface: #101614;
+  --surface-1: #101614;
+  --surface-2: #151C19;
+  --raised: #151C19;
+  --line: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  --text: #EEF2F0;
+  --text-2: #9AA7A1;
+  --text-3: #6B7873;
+  --muted: #7E8A94;
+  --dim: #6B7873;
+  --subtle: #6B7873;
+
+  --accent: #A6E04A;
+  --accent-fill: #A6E04A;
+  --accent-ink: #0A0E0D;
+  --accent-soft: rgba(166, 224, 74, 0.12);
+
+  --medium: #E8B65B;
+  --medium-soft: rgba(232, 182, 91, 0.14);
+  --warn: #E8B65B;
+  --warn-soft: rgba(232, 182, 91, 0.14);
+  --caution: #E8B65B;
+
+  --muted-soft: rgba(126, 138, 148, 0.14);
+  --danger: #E5684F;
+  --danger-soft: rgba(229, 104, 79, 0.14);
   --loss: #E5684F;
   --info: #5EB6E8;
 
@@ -29,12 +40,54 @@
   --foreground: var(--text);
 }
 
-/* Standard document scrolling */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #F4F6F5;
+    --surface: #FFFFFF;
+    --surface-1: #FFFFFF;
+    --surface-2: #ECEFED;
+    --raised: #ECEFED;
+    --line: rgba(10, 14, 13, 0.08);
+    --border: rgba(10, 14, 13, 0.08);
+    --border-strong: rgba(10, 14, 13, 0.16);
+
+    --text: #101614;
+    --text-2: #495650;
+    --text-3: #6B7873;
+    --muted: #626E78;
+    --dim: #6B7873;
+    --subtle: #6B7873;
+
+    --accent: #4D880B;
+    --accent-fill: #A6E04A;
+    --accent-ink: #0A0E0D;
+    --accent-soft: rgba(77, 136, 11, 0.11);
+
+    --medium: #A87010;
+    --medium-soft: rgba(168, 112, 16, 0.12);
+    --warn: #A87010;
+    --warn-soft: rgba(168, 112, 16, 0.12);
+    --caution: #A87010;
+
+    --muted-soft: rgba(98, 110, 120, 0.12);
+    --danger: #C73E26;
+    --danger-soft: rgba(199, 62, 38, 0.12);
+    --loss: #C73E26;
+    --info: #1E76A8;
+
+    --background: var(--bg);
+    --foreground: var(--text);
+  }
+}
+
+/* Standard document scrolling with native bounce containment */
 html {
   min-height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   background-color: var(--bg);
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
 }
 
 /* GLOBAL TEXT RULE: Disable automatic browser hyphenation everywhere */
@@ -49,12 +102,13 @@ html {
 body {
   min-height: 100dvh;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   background-color: var(--bg);
   color: var(--text);
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-weight: 400;
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
@@ -63,7 +117,11 @@ body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
 }
 
-/* Minimal native-like scrollbars */
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-dm-sans), var(--font-inter), system-ui, sans-serif;
+}
+
+/* Minimal scrollbars */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -72,7 +130,7 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--line);
   border-radius: 4px;
 }
 
@@ -85,24 +143,19 @@ body {
   scrollbar-width: none;
 }
 
-/* Tabular numbers for clean numeric alignment (using Inter, not monospace) */
+/* Tabular numbers for aligned figures */
 .tabular-nums, table, [data-tabular] {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
 
-/* Eyebrow label utility */
-.eyebrow {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--dim);
-}
-
-/* Focus ring: 2px, lime at 40 percent opacity */
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 2px solid rgba(184, 230, 54, 0.4);
+/* Accessible focus rings */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -116,30 +169,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   }
 }
 
-/* Native mobile tap transitions */
+/* Native mobile tap transitions (150ms) */
 button, [role="button"] {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Tactile touch pressed state for native mobile feel (150ms ease, scale 0.98) */
 .touch-press {
-  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1), opacity 150ms ease, background-color 150ms ease;
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1), opacity 150ms ease, background-color 150ms ease, border-color 150ms ease;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
 .touch-press:active {
   transform: scale(0.98);
+  opacity: 0.92;
 }
 
 /* Monochrome Mode */
 html.monochrome {
   filter: grayscale(100%) contrast(105%);
-}
-
-html.monochrome body {
-  background-color: #080808;
-  color: #f3f3f3;
 }
 
 html.monochrome img {

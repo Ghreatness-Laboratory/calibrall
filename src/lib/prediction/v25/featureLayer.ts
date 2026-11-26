@@ -719,9 +719,14 @@ export class FeatureLayerEngine {
       ? refProfile.refereeName
       : 'League baseline (no referee announced)';
 
+    const hasPositiveBaseline = refereeLeagueBaseline > 0;
     const refereeExplanation = refereeAnnounced && refProfile.refereeName
-      ? `Appointed referee ${refProfile.refereeName} (${refereeSampleSize} matches) shrunk toward league baseline (${refereeLeagueBaseline.toFixed(2)}) yields ${refereeShrunkRate.toFixed(2)} cards per fixture.`
-      : `No referee announced; using league baseline of ${refereeLeagueBaseline.toFixed(2)} cards per fixture.`;
+      ? hasPositiveBaseline
+        ? `Appointed referee ${refProfile.refereeName} (${refereeSampleSize} matches) shrunk toward league baseline (${refereeLeagueBaseline.toFixed(2)}) yields ${refereeShrunkRate.toFixed(2)} cards per fixture.`
+        : `Appointed referee ${refProfile.refereeName} (${refereeSampleSize} matches) averages ${refereeShrunkRate.toFixed(2)} cards per fixture.`
+      : hasPositiveBaseline
+      ? `No referee announced; using league baseline of ${refereeLeagueBaseline.toFixed(2)} cards per fixture.`
+      : 'Referee unannounced.';
 
     return {
       refereeName,

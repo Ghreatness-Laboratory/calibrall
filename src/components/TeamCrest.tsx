@@ -7,7 +7,7 @@ interface TeamCrestProps {
   crestUrl?: string | null;
   teamName: string;
   canonicalTeamId?: string;
-  size?: number; // size in px, defaults to 28
+  size?: number;
   className?: string;
 }
 
@@ -23,25 +23,23 @@ export function getTeamInitials(name: string): string {
   return cleaned.slice(0, 3).toUpperCase();
 }
 
-// Deterministic subtle badge color based on name for crisp native look
 function getBadgeBg(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
   const colors = [
-    '#253346', // slate blue
-    '#3D242B', // burgundy / red
-    '#1B3838', // teal
-    '#3B3120', // amber
-    '#2E2741', // violet
-    '#1B2E3E', // ocean
+    '#253346',
+    '#3D242B',
+    '#1B3838',
+    '#3B3120',
+    '#2E2741',
+    '#1B2E3E',
   ];
   return colors[Math.abs(hash) % colors.length];
 }
 
 export default function TeamCrest({
-  crestUrl,
   teamName,
   canonicalTeamId,
   size = 28,
@@ -49,15 +47,12 @@ export default function TeamCrest({
 }: TeamCrestProps) {
   const [hasError, setHasError] = useState(false);
 
-  // Look up crest in team_crests table by canonical team id
   const effectiveCrestUrl = useMemo(() => {
     const targetId = canonicalTeamId || teamName;
     const record = lookupTeamCrest(targetId);
     if (record) {
-      // Strict requirement: No verified crest = initials badge (null)
       return record.verified && record.crestUrl ? record.crestUrl : null;
     }
-    // No verified record found in team_crests table -> initials badge
     return null;
   }, [canonicalTeamId, teamName]);
 
@@ -70,7 +65,6 @@ export default function TeamCrest({
     maxHeight: `${size}px`,
   };
 
-  // If unverified, no URL is provided, or image fails to load, display circular badge with team initials
   if (!effectiveCrestUrl || hasError) {
     const initials = getTeamInitials(teamName);
     return (
@@ -79,7 +73,7 @@ export default function TeamCrest({
           ...styleDimension,
           backgroundColor: getBadgeBg(teamName),
         }}
-        className={`shrink-0 rounded-full border border-[#232C3A] flex items-center justify-center text-[10px] font-bold text-[#EDF1F6] select-none tracking-tight ${className}`}
+        className={`shrink-0 rounded-full border border-[var(--line)] flex items-center justify-center text-[10.5px] font-bold text-[#EEF2F0] select-none tracking-tight ${className}`}
         title={`${teamName} crest`}
         aria-label={`${teamName} crest fallback`}
       >
@@ -91,7 +85,7 @@ export default function TeamCrest({
   return (
     <div
       style={styleDimension}
-      className={`shrink-0 rounded-full flex items-center justify-center overflow-hidden bg-[#1A222E] border border-[#232C3A] ${className}`}
+      className={`shrink-0 rounded-full flex items-center justify-center overflow-hidden bg-[var(--surface-2)] border border-[var(--line)] ${className}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

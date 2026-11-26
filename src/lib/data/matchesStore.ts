@@ -1884,6 +1884,7 @@ class MatchesStore {
     const hasRefereeDataInLeague = Boolean(compCfg?.capabilities.hasReferee);
     const leagueBaseline = Number((compCfg?.cards?.avgTotalCards ?? 4.05).toFixed(3));
 
+    const hasPositiveBaseline = leagueBaseline > 0;
     const cleanRef = (refereeName || '').trim();
     if (!hasRefereeDataInLeague || !cleanRef) {
       return {
@@ -1896,8 +1897,12 @@ class MatchesStore {
         leagueBaseline,
         shrinkageK,
         explanation: !hasRefereeDataInLeague
-          ? `Referee column unavailable for ${competitionCode}; using league baseline (${leagueBaseline.toFixed(2)} cards/match).`
-          : `No referee announced yet; using league baseline (${leagueBaseline.toFixed(2)} cards/match).`,
+          ? hasPositiveBaseline
+            ? `Referee column unavailable for ${competitionCode}; using league baseline (${leagueBaseline.toFixed(2)} cards/match).`
+            : `Referee column unavailable for ${competitionCode}.`
+          : hasPositiveBaseline
+          ? `No referee announced yet; using league baseline (${leagueBaseline.toFixed(2)} cards/match).`
+          : 'Referee unannounced.',
       };
     }
 
@@ -1940,7 +1945,9 @@ class MatchesStore {
         shrunkRate: leagueBaseline,
         leagueBaseline,
         shrinkageK,
-        explanation: `Appointed referee ${cleanRef} has 0 stored matches; shrunk to league baseline (${leagueBaseline.toFixed(2)} cards/match).`,
+        explanation: hasPositiveBaseline
+          ? `Appointed referee ${cleanRef} has 0 stored matches; shrunk to league baseline (${leagueBaseline.toFixed(2)} cards/match).`
+          : `Appointed referee ${cleanRef} has 0 stored matches.`,
       };
     }
 
@@ -1956,7 +1963,9 @@ class MatchesStore {
       shrunkRate,
       leagueBaseline,
       shrinkageK,
-      explanation: `Appointed referee ${cleanRef}: ${rawAvgCards.toFixed(2)} raw cards/match across ${sampleSize} matches, shrunk (K=${shrinkageK}) to ${shrunkRate.toFixed(2)} vs ${leagueBaseline.toFixed(2)} league baseline.`,
+      explanation: hasPositiveBaseline
+        ? `Appointed referee ${cleanRef}: ${rawAvgCards.toFixed(2)} raw cards/match across ${sampleSize} matches, shrunk (K=${shrinkageK}) to ${shrunkRate.toFixed(2)} vs ${leagueBaseline.toFixed(2)} league baseline.`
+        : `Appointed referee ${cleanRef}: ${rawAvgCards.toFixed(2)} raw cards/match across ${sampleSize} matches.`,
     };
   }
 

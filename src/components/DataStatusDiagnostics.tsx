@@ -144,35 +144,34 @@ export default function DataStatusDiagnostics() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [teamSearchQuery, setTeamSearchQuery] = useState<string>('');
 
-  // Comprehensive backfill call list for all supported leagues & extra leagues
   const exampleCalls = [
-    { league: 'ELC', season: '2627', desc: 'Championship 2026-27 (Current In-Play) · Has Corners & Cards' },
-    { league: 'ELC', season: '2526', desc: 'Championship 2025-26 · Has Corners & Cards' },
-    { league: 'PL', season: '2627', desc: 'Premier League 2026-27 (Current In-Play) · Has Corners & Cards' },
-    { league: 'PL', season: '2526', desc: 'Premier League 2025-26 · Has Corners & Cards' },
-    { league: 'PD', season: '2627', desc: 'La Liga 2026-27 (Current In-Play) · Has Corners & Cards' },
-    { league: 'PD', season: '2526', desc: 'La Liga 2025-26 · Has Corners & Cards' },
-    { league: 'BL1', season: '2627', desc: 'Bundesliga 2026-27 (Current In-Play) · Has Corners & Cards' },
-    { league: 'BL1', season: '2526', desc: 'Bundesliga 2025-26 · Has Corners & Cards' },
-    { league: 'SA', season: '2627', desc: 'Serie A 2026-27 (Current In-Play) · Has Corners & Cards' },
-    { league: 'SA', season: '2526', desc: 'Serie A 2025-26 · Has Corners & Cards' },
-    { league: 'FL1', season: '2627', desc: 'Ligue 1 2026-27 (Current In-Play) · Has Corners & Cards' },
-    { league: 'FL1', season: '2526', desc: 'Ligue 1 2025-26 · Has Corners & Cards' },
-    { league: 'DED', season: '2627', desc: 'Eredivisie 2026-27 (Current In-Play) · Has Corners & Cards' },
-    { league: 'DED', season: '2526', desc: 'Eredivisie 2025-26 · Has Corners & Cards' },
-    { league: 'P1', season: '2627', desc: 'Portugal Primeira Liga 2026-27 (Current In-Play) · Has Corners & Cards' },
-    { league: 'P1', season: '2526', desc: 'Portugal Primeira Liga 2025-26 · Has Corners & Cards' },
-    { league: 'T1', season: '2627', desc: 'Turkey Süper Lig 2026-27 (Current In-Play) · Has Corners & Cards' },
-    { league: 'T1', season: '2526', desc: 'Turkey Süper Lig 2025-26 · Has Corners & Cards' },
-    { league: 'SC0', season: '2627', desc: 'Scotland Premiership 2026-27 (Current In-Play) · Has Corners & Cards' },
-    { league: 'SC0', season: '2526', desc: 'Scotland Premiership 2025-26 · Has Corners & Cards' },
-    { league: 'DNK', season: '2026', desc: 'Denmark Superliga (Extra League /new/DNK.csv) · No Corners/Cards' },
-    { league: 'NOR', season: '2026', desc: 'Norway Eliteserien (Extra League /new/NOR.csv) · No Corners/Cards' },
-    { league: 'FIN', season: '2026', desc: 'Finland Veikkausliiga (Extra League /new/FIN.csv) · No Corners/Cards' },
-    { league: 'JPN', season: '2026', desc: 'Japan J1 League (Extra League /new/JPN.csv) · No Corners/Cards' },
-    { league: 'ARG', season: '2026', desc: 'Argentina Liga Profesional (Extra League /new/ARG.csv) · No Corners/Cards' },
-    { league: 'BSA', season: '2026', desc: 'Brazil Série A 2026 (Extra League /new/BRA.csv) · No Corners/Cards' },
-    { league: 'BSA', season: '2025', desc: 'Brazil Série A 2025 (Extra League /new/BRA.csv) · No Corners/Cards' },
+    { league: 'ELC', season: '2627', desc: 'Championship 2026-27 (Current in-play) · Corners & cards' },
+    { league: 'ELC', season: '2526', desc: 'Championship 2025-26 · Corners & cards' },
+    { league: 'PL', season: '2627', desc: 'Premier League 2026-27 (Current in-play) · Corners & cards' },
+    { league: 'PL', season: '2526', desc: 'Premier League 2025-26 · Corners & cards' },
+    { league: 'PD', season: '2627', desc: 'La Liga 2026-27 (Current in-play) · Corners & cards' },
+    { league: 'PD', season: '2526', desc: 'La Liga 2025-26 · Corners & cards' },
+    { league: 'BL1', season: '2627', desc: 'Bundesliga 2026-27 (Current in-play) · Corners & cards' },
+    { league: 'BL1', season: '2526', desc: 'Bundesliga 2025-26 · Corners & cards' },
+    { league: 'SA', season: '2627', desc: 'Serie A 2026-27 (Current in-play) · Corners & cards' },
+    { league: 'SA', season: '2526', desc: 'Serie A 2025-26 · Corners & cards' },
+    { league: 'FL1', season: '2627', desc: 'Ligue 1 2026-27 (Current in-play) · Corners & cards' },
+    { league: 'FL1', season: '2526', desc: 'Ligue 1 2025-26 · Corners & cards' },
+    { league: 'DED', season: '2627', desc: 'Eredivisie 2026-27 (Current in-play) · Corners & cards' },
+    { league: 'DED', season: '2526', desc: 'Eredivisie 2025-26 · Corners & cards' },
+    { league: 'P1', season: '2627', desc: 'Primeira Liga 2026-27 (Current in-play) · Corners & cards' },
+    { league: 'P1', season: '2526', desc: 'Primeira Liga 2025-26 · Corners & cards' },
+    { league: 'T1', season: '2627', desc: 'Turkey Süper Lig 2026-27 (Current in-play) · Corners & cards' },
+    { league: 'T1', season: '2526', desc: 'Turkey Süper Lig 2025-26 · Corners & cards' },
+    { league: 'SC0', season: '2627', desc: 'Scotland Premiership 2026-27 (Current in-play) · Corners & cards' },
+    { league: 'SC0', season: '2526', desc: 'Scotland Premiership 2025-26 · Corners & cards' },
+    { league: 'DNK', season: '2026', desc: 'Denmark Superliga · Goals only' },
+    { league: 'NOR', season: '2026', desc: 'Norway Eliteserien · Goals only' },
+    { league: 'FIN', season: '2026', desc: 'Finland Veikkausliiga · Goals only' },
+    { league: 'JPN', season: '2026', desc: 'Japan J1 League · Goals only' },
+    { league: 'ARG', season: '2026', desc: 'Argentina Liga Profesional · Goals only' },
+    { league: 'BSA', season: '2026', desc: 'Brazil Série A 2026 · Goals only' },
+    { league: 'BSA', season: '2025', desc: 'Brazil Série A 2025 · Goals only' },
   ];
 
   const fetchPublicHealthFallback = async (reasonMsg: string) => {
@@ -220,14 +219,14 @@ export default function DataStatusDiagnostics() {
 
       if (res.status === 503) {
         await fetchPublicHealthFallback(
-          'ADMIN_SECRET is not configured — displaying public database coverage summary.'
+          'ADMIN_SECRET is not configured. Displaying public database coverage summary.'
         );
         return;
       }
 
       if (res.status === 401) {
         await fetchPublicHealthFallback(
-          'Admin diagnostics locked (enter x-admin-secret to unlock full per-team logs) — displaying public database coverage.'
+          'Admin diagnostics locked. Displaying public database coverage summary.'
         );
         return;
       }
@@ -277,15 +276,15 @@ export default function DataStatusDiagnostics() {
   };
 
   return (
-    <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
+    <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3.5">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 border-b border-white/[0.07] pb-2.5">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--line)] pb-3">
         <div>
-          <div className="text-[13.5px] font-semibold text-[#ECF1EE] flex items-center gap-2">
-            <Database className="w-4 h-4 text-[#B6E63B]" />
-            <span>Database Status & Historical Sample Coverage</span>
+          <div className="font-display text-[14px] font-semibold text-[var(--text)] flex items-center gap-2">
+            <Database className="w-4 h-4 text-[var(--accent)]" />
+            <span>Database status &amp; historical coverage</span>
           </div>
-          <p className="text-[11.5px] text-[#8B9890] mt-0.5">
+          <p className="text-[12px] text-[var(--text-2)] mt-0.5">
             Diagnostic verification joining the teams table and multi-season ingestion pipeline.
           </p>
         </div>
@@ -293,49 +292,58 @@ export default function DataStatusDiagnostics() {
           onClick={() => fetchDataStatus()}
           disabled={loading}
           type="button"
-          className="p-1.5 rounded-[8px] bg-[#151E19] border border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE] transition-colors disabled:opacity-50"
-          title="Refresh Data Status"
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text)] transition-colors disabled:opacity-50 touch-press"
+          title="Refresh data status"
+          aria-label="Refresh data status"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className="w-4 h-4" />
         </button>
       </div>
 
       {/* Admin Secret Bar */}
-      <form onSubmit={handleSaveSecret} className="flex items-center gap-2 bg-[#151E19] p-2 rounded-[10px] border border-white/[0.07]">
-        <Key className="w-4 h-4 text-[#B6E63B] shrink-0" />
+      <form
+        onSubmit={handleSaveSecret}
+        className="flex items-center gap-2 bg-[var(--surface-2)] p-1.5 pl-3 rounded-[12px] border border-[var(--line)]"
+      >
+        <Key className="w-4 h-4 text-[var(--accent)] shrink-0" />
         <input
           type="password"
-          placeholder="Enter x-admin-secret (>= 32 chars)..."
+          placeholder="Enter x-admin-secret..."
           value={adminSecretInput}
           onChange={(e) => setAdminSecretInput(e.target.value)}
-          className="bg-transparent text-[11.5px] font-mono text-[#ECF1EE] placeholder-[#5E6A63] flex-1 outline-none min-w-0"
+          className="bg-transparent text-[12px] font-mono text-[var(--text)] placeholder-[var(--text-3)] flex-1 outline-none min-w-0 min-h-[40px]"
         />
         <button
           type="submit"
           disabled={loading || adminSecretInput.length < 5}
-          className="px-2.5 py-1 rounded-[6px] bg-[#B6E63B] text-[#0A0F0D] text-[11px] font-semibold hover:bg-[#c8ee47] disabled:opacity-50 shrink-0"
+          className="min-h-[40px] px-3.5 rounded-[10px] bg-[var(--accent-fill)] text-[var(--accent-ink)] text-[11.5px] font-semibold hover:opacity-90 disabled:opacity-50 shrink-0 touch-press"
         >
-          {loading ? 'Checking...' : isSecretSaved ? 'Update Key' : 'Authorize'}
+          {loading ? 'Checking...' : isSecretSaved ? 'Update key' : 'Authorize'}
         </button>
       </form>
 
       {loading && !data && (
-        <div className="py-6 text-center text-[12px] text-[#8B9890] flex items-center justify-center gap-2">
-          <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#B6E63B]" />
-          <span>Querying database status...</span>
+        <div className="space-y-2.5 animate-pulse py-2">
+          <div className="h-10 bg-[var(--surface-2)] rounded-[12px]" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="h-16 bg-[var(--surface-2)] rounded-[12px]" />
+            <div className="h-16 bg-[var(--surface-2)] rounded-[12px]" />
+            <div className="h-16 bg-[var(--surface-2)] rounded-[12px]" />
+            <div className="h-16 bg-[var(--surface-2)] rounded-[12px]" />
+          </div>
         </div>
       )}
 
       {publicNote && (
-        <div className="p-2.5 bg-[#151E19] border border-white/[0.08] rounded-[10px] text-[11.5px] text-[#8B9890]">
-          <span className="font-semibold text-[#ECF1EE]">Public Coverage Mode: </span>
+        <div className="p-3 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] text-[12px] text-[var(--text-2)]">
+          <span className="font-semibold text-[var(--text)]">Public coverage mode: </span>
           {publicNote}
         </div>
       )}
 
       {error && (
-        <div className="p-3 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] text-[12px] text-[#E2AE45]">
-          <span className="font-semibold text-[#ECF1EE]">Admin Status: </span>
+        <div className="p-3 bg-[var(--medium-soft)] border border-[var(--medium)]/30 rounded-[12px] text-[12px] text-[var(--medium)]">
+          <span className="font-semibold text-[var(--text)]">Status: </span>
           {error}
         </div>
       )}
@@ -343,75 +351,69 @@ export default function DataStatusDiagnostics() {
       {data && (
         <div className="space-y-3">
           {/* Active Store Indicator */}
-          <div className="flex items-center justify-between px-3 py-1.5 rounded-[8px] bg-[#151E19] border border-white/[0.07] text-[11px] font-mono">
-            <span className="text-[#8B9890]">Active Store Source:</span>
-            <span className={`font-semibold px-2 py-0.5 rounded ${
-              data.storeUsed === 'supabase'
-                ? 'bg-[#B6E63B]/10 text-[#B6E63B] border border-[#B6E63B]/30'
-                : data.storeUsed === 'local-sqlite'
-                ? 'bg-[#B6E63B]/10 text-[#B6E63B] border border-[#B6E63B]/30'
-                : 'bg-[#E2AE45]/10 text-[#E2AE45] border border-[#E2AE45]/30'
-            }`}>
+          <div className="flex items-center justify-between px-3 py-2 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] text-[11.5px]">
+            <span className="text-[var(--text-2)]">Active store source</span>
+            <span
+              className={`font-semibold px-2.5 py-0.5 rounded-full border text-[10.5px] ${
+                data.storeUsed === 'supabase' || data.storeUsed === 'local-sqlite'
+                  ? 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30'
+                  : 'bg-[var(--medium-soft)] text-[var(--medium)] border-[var(--medium)]/30'
+              }`}
+            >
               {data.storeUsed === 'supabase'
-                ? 'Supabase Production Database'
+                ? 'Supabase production'
                 : data.storeUsed === 'local-sqlite'
-                ? 'Local SQLite Store'
-                : 'In-Memory Sandbox Store'}
+                ? 'Local SQLite store'
+                : 'In-memory sandbox'}
             </span>
           </div>
 
-          {/* Headline summary pills */}
+          {/* Headline summary tiles */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div className="bg-[#151E19] rounded-[10px] p-2.5 border border-white/[0.07]">
-              <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-[#8B9890] block">
-                Total Matches
-              </span>
-              <span className="text-[17px] font-bold font-mono text-[#B6E63B] tabular-nums">
-                {data.totalMatches}
+            <div className="bg-[var(--surface-2)] rounded-[12px] p-3 border border-[var(--line)]">
+              <span className="text-[10.5px] text-[var(--text-2)] block">Total matches</span>
+              <span className="font-display text-[18px] font-bold text-[var(--accent)] tabular-nums mt-0.5 block">
+                {data.totalMatches.toLocaleString()}
               </span>
             </div>
 
-            <div className="bg-[#151E19] rounded-[10px] p-2.5 border border-white/[0.07]">
-              <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-[#8B9890] block">
-                Earliest Date
-              </span>
-              <span className="text-[12px] font-mono text-[#ECF1EE] truncate block mt-0.5">
-                {data.earliestDate ? cleanDisplayText(data.earliestDate.substring(0, 10)) : 'N/A'}
+            <div className="bg-[var(--surface-2)] rounded-[12px] p-3 border border-[var(--line)]">
+              <span className="text-[10.5px] text-[var(--text-2)] block">Earliest date</span>
+              <span className="text-[12.5px] font-medium text-[var(--text)] truncate block mt-1 tabular-nums">
+                {data.earliestDate ? cleanDisplayText(data.earliestDate.substring(0, 10)) : '—'}
               </span>
             </div>
 
-            <div className="bg-[#151E19] rounded-[10px] p-2.5 border border-white/[0.07]">
-              <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-[#8B9890] block">
-                Latest Date
-              </span>
-              <span className="text-[12px] font-mono text-[#ECF1EE] truncate block mt-0.5">
-                {data.latestDate ? cleanDisplayText(data.latestDate.substring(0, 10)) : 'N/A'}
+            <div className="bg-[var(--surface-2)] rounded-[12px] p-3 border border-[var(--line)]">
+              <span className="text-[10.5px] text-[var(--text-2)] block">Latest date</span>
+              <span className="text-[12.5px] font-medium text-[var(--text)] truncate block mt-1 tabular-nums">
+                {data.latestDate ? cleanDisplayText(data.latestDate.substring(0, 10)) : '—'}
               </span>
             </div>
 
-            <div className="bg-[#151E19] rounded-[10px] p-2.5 border border-white/[0.07]">
-              <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-[#8B9890] block">
-                Unmatched Names
-              </span>
-              <span className="text-[17px] font-bold font-mono text-[#ECF1EE] tabular-nums">
+            <div className="bg-[var(--surface-2)] rounded-[12px] p-3 border border-[var(--line)]">
+              <span className="text-[10.5px] text-[var(--text-2)] block">Unmatched names</span>
+              <span className="font-display text-[18px] font-bold text-[var(--text)] tabular-nums mt-0.5 block">
                 {data.unmatchedNamesCount ?? 0}
               </span>
             </div>
           </div>
 
-          {/* Unmatched Names Box if any */}
           {data.unmatchedNames && data.unmatchedNames.length > 0 && (
-            <div className="p-3 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] space-y-1.5">
-              <span className="text-[11.5px] font-semibold text-[#E2AE45] flex items-center gap-1.5">
+            <div className="p-3 bg-[var(--medium-soft)] border border-[var(--medium)]/30 rounded-[12px] space-y-1.5">
+              <span className="text-[12px] font-semibold text-[var(--medium)] flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                <span>Unmatched Team Names ({data.unmatchedNames.length})</span>
+                <span>Unmatched team names ({data.unmatchedNames.length})</span>
               </span>
-              <p className="text-[11px] text-[#8B9890]">
-                The following raw CSV names had no match in team_aliases and were skipped (never auto-slugified):
+              <p className="text-[11.5px] text-[var(--text-2)]">
+                Raw CSV names without an alias match were skipped:
               </p>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {data.unmatchedNames.map((name, i) => (
-                  <span key={i} className="text-[10.5px] font-mono px-2 py-0.5 rounded bg-black/40 border border-[#E2AE45]/40 text-[#ECF1EE]">
+                  <span
+                    key={i}
+                    className="text-[10.5px] px-2.5 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--medium)]/40 text-[var(--text)]"
+                  >
                     {name}
                   </span>
                 ))}
@@ -419,30 +421,29 @@ export default function DataStatusDiagnostics() {
             </div>
           )}
 
-          {/* Priority-Tiered Provider Skipped Leagues Diagnostics */}
           {data.skippedLeagues && data.skippedLeagues.length > 0 && (
-            <div className="p-3 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] space-y-2">
+            <div className="p-3 bg-[var(--medium-soft)] border border-[var(--medium)]/30 rounded-[12px] space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11.5px] font-semibold text-[#E2AE45] flex items-center gap-1.5">
+                <span className="text-[12px] font-semibold text-[var(--medium)] flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>Leagues Skipped by Quota Budget ({data.skippedLeagues.length})</span>
+                  <span>Skipped leagues ({data.skippedLeagues.length})</span>
                 </span>
-                <span className="text-[10px] font-mono text-[#E2AE45]">Tier 1 prioritised</span>
+                <span className="text-[10.5px] text-[var(--medium)]">Tier 1 prioritized</span>
               </div>
-              <div className="border border-white/[0.07] bg-[#151E19] rounded-[8px] overflow-hidden text-[10.5px] font-mono">
-                <div className="grid grid-cols-5 px-2.5 py-1 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
+              <div className="border border-[var(--line)] bg-[var(--surface)] rounded-[12px] overflow-hidden text-[11px]">
+                <div className="grid grid-cols-5 px-3 py-1.5 bg-[var(--surface-2)] text-[var(--text-3)] border-b border-[var(--line)] font-semibold">
                   <span>League</span>
                   <span>Tier</span>
                   <span>Provider</span>
                   <span className="col-span-2">Reason</span>
                 </div>
-                <div className="divide-y divide-white/[0.04] max-h-36 overflow-y-auto">
+                <div className="divide-y divide-[var(--line)] max-h-36 overflow-y-auto">
                   {data.skippedLeagues.map((sk, idx) => (
-                    <div key={`${sk.provider}_${sk.leagueCode}_${idx}`} className="grid grid-cols-5 px-2.5 py-1 text-[#8B9890]">
-                      <span className="font-semibold text-[#ECF1EE] truncate">{sk.leagueCode}</span>
+                    <div key={`${sk.provider}_${sk.leagueCode}_${idx}`} className="grid grid-cols-5 px-3 py-1.5 text-[var(--text-2)]">
+                      <span className="font-semibold text-[var(--text)] truncate">{sk.leagueCode}</span>
                       <span>T{sk.tier}</span>
                       <span className="truncate">{sk.provider}</span>
-                      <span className="col-span-2 truncate text-[#E2AE45]">{sk.reason}</span>
+                      <span className="col-span-2 truncate text-[var(--medium)]">{sk.reason}</span>
                     </div>
                   ))}
                 </div>
@@ -450,69 +451,64 @@ export default function DataStatusDiagnostics() {
             </div>
           )}
 
-          {/* Unresolved Teams Log */}
           {data.unresolvedTeams && data.unresolvedTeams.length > 0 ? (
-            <div className="p-3 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] space-y-2">
+            <div className="p-3 bg-[var(--medium-soft)] border border-[var(--medium)]/30 rounded-[12px] space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11.5px] font-semibold text-[#E2AE45] flex items-center gap-1.5">
+                <span className="text-[12px] font-semibold text-[var(--medium)] flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>Unresolved Teams Log ({data.unresolvedTeams.length})</span>
+                  <span>Unresolved teams ({data.unresolvedTeams.length})</span>
                 </span>
-                <span className="text-[10px] font-mono text-[#E2AE45]">Exact aliases needed</span>
+                <span className="text-[10.5px] text-[var(--medium)]">Exact aliases needed</span>
               </div>
-              <p className="text-[11px] text-[#8B9890]">
-                Source names that failed canonical resolution. Logged with exact provider and observation counts:
-              </p>
-              <div className="border border-white/[0.07] bg-[#151E19] rounded-[8px] overflow-hidden text-[10.5px] font-mono">
-                <div className="grid grid-cols-4 px-2.5 py-1 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
-                  <span className="col-span-2">Source Name</span>
+              <div className="border border-[var(--line)] bg-[var(--surface)] rounded-[12px] overflow-hidden text-[11px]">
+                <div className="grid grid-cols-4 px-3 py-1.5 bg-[var(--surface-2)] text-[var(--text-3)] border-b border-[var(--line)] font-semibold">
+                  <span className="col-span-2">Source name</span>
                   <span>Provider</span>
                   <span className="text-right">Attempts</span>
                 </div>
-                <div className="divide-y divide-white/[0.04] max-h-36 overflow-y-auto">
+                <div className="divide-y divide-[var(--line)] max-h-36 overflow-y-auto">
                   {data.unresolvedTeams.map((entry, i) => (
-                    <div key={i} className="grid grid-cols-4 px-2.5 py-1 text-[#8B9890] hover:text-[#ECF1EE]">
-                      <span className="col-span-2 font-semibold text-[#ECF1EE] truncate">{entry.sourceName}</span>
-                      <span className="text-[#5E6A63] truncate">{entry.sourceProvider}</span>
-                      <span className="text-right text-[#E2AE45] font-bold tabular-nums">{entry.count}</span>
+                    <div key={i} className="grid grid-cols-4 px-3 py-1.5 text-[var(--text-2)]">
+                      <span className="col-span-2 font-semibold text-[var(--text)] truncate">{entry.sourceName}</span>
+                      <span className="text-[var(--text-3)] truncate">{entry.sourceProvider}</span>
+                      <span className="text-right text-[var(--medium)] font-bold tabular-nums">{entry.count}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="p-2.5 rounded-[10px] bg-[#151E19] border border-white/[0.07] text-[11.5px] text-[#B6E63B] flex items-center justify-between gap-2">
+            <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] text-[11.5px] text-[var(--accent)] flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>Unresolved Teams Log: 0 unresolved source names (all clubs resolved via exact aliases).</span>
+                <span>All source clubs resolved via canonical aliases.</span>
               </span>
-              <span className="text-[10px] font-mono text-[#5E6A63]">unresolved_teams</span>
+              <span className="text-[10.5px] text-[var(--text-3)]">0 unresolved</span>
             </div>
           )}
 
-          {/* Matches Per League & Season Table */}
           {data.matchesPerLeagueAndSeason.length > 0 && (
             <div className="space-y-1.5">
-              <div className="text-[11.5px] font-semibold text-[#ECF1EE] flex items-center justify-between">
-                <span>Matches by League & Season</span>
-                <span className="text-[10px] font-mono text-[#5E6A63]">
-                  {data.matchesPerLeagueAndSeason.length} active pipelines
+              <div className="text-[12px] font-semibold text-[var(--text)] flex items-center justify-between">
+                <span>Matches by league &amp; season</span>
+                <span className="text-[10.5px] text-[var(--text-3)]">
+                  {data.matchesPerLeagueAndSeason.length} pipelines
                 </span>
               </div>
-              <div className="border border-white/[0.07] bg-[#151E19] rounded-[10px] overflow-hidden text-[11px] font-mono">
-                <div className="grid grid-cols-4 px-3 py-1.5 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
+              <div className="border border-[var(--line)] bg-[var(--surface-2)] rounded-[12px] overflow-hidden text-[11px]">
+                <div className="grid grid-cols-4 px-3 py-1.5 bg-[var(--surface)] text-[var(--text-3)] border-b border-[var(--line)] font-semibold">
                   <span>League</span>
                   <span>Season</span>
                   <span className="text-right">Matches</span>
-                  <span className="text-right">Coverage Span</span>
+                  <span className="text-right">Span</span>
                 </div>
-                <div className="divide-y divide-white/[0.04] max-h-48 overflow-y-auto">
+                <div className="divide-y divide-[var(--line)] max-h-48 overflow-y-auto">
                   {data.matchesPerLeagueAndSeason.map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-4 px-3 py-1.5 text-[#8B9890] hover:text-[#ECF1EE]">
-                      <span className="font-semibold text-[#ECF1EE]">{row.league}</span>
+                    <div key={idx} className="grid grid-cols-4 px-3 py-1.5 text-[var(--text-2)]">
+                      <span className="font-semibold text-[var(--text)]">{row.league}</span>
                       <span>{row.season}</span>
-                      <span className="text-right text-[#B6E63B] font-bold tabular-nums">{row.count}</span>
-                      <span className="text-right text-[#5E6A63] truncate">
+                      <span className="text-right text-[var(--accent)] font-bold tabular-nums">{row.count}</span>
+                      <span className="text-right text-[var(--text-3)] truncate tabular-nums">
                         {row.earliestDate.substring(0, 10)} to {row.latestDate.substring(0, 10)}
                       </span>
                     </div>
@@ -522,126 +518,130 @@ export default function DataStatusDiagnostics() {
             </div>
           )}
 
-          {/* Latest Stored Match Date Per League */}
           {data.leagueLatestDates && data.leagueLatestDates.length > 0 && (
             <div className="space-y-1.5 pt-1">
-              <div className="text-[11.5px] font-semibold text-[#ECF1EE] flex items-center justify-between">
+              <div className="text-[12px] font-semibold text-[var(--text)] flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-[#B6E63B]" />
-                  <span>Latest Stored Match Date Per League</span>
+                  <Database className="w-3.5 h-3.5 text-[var(--accent)]" />
+                  <span>Latest stored match per league</span>
                 </span>
-                <span className="text-[10px] font-mono text-[#5E6A63]">
-                  {data.leagueLatestDates.filter(l => !l.isStale).length} / {data.leagueLatestDates.length} current
+                <span className="text-[10.5px] text-[var(--text-3)]">
+                  {data.leagueLatestDates.filter((l) => !l.isStale).length} / {data.leagueLatestDates.length} current
                 </span>
               </div>
-              <div className="border border-white/[0.07] bg-[#151E19] rounded-[10px] overflow-hidden text-[11px] font-mono">
-                <div className="grid grid-cols-7 px-3 py-1.5 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
-                  <span className="col-span-2">League</span>
-                  <span className="text-right">Stored Matches</span>
-                  <span className="text-right">Latest Loaded Date</span>
-                  <span className="col-span-2 text-center">Recorded Features</span>
-                  <span className="text-right">Staleness Status</span>
-                </div>
-                <div className="divide-y divide-white/[0.04] max-h-72 overflow-y-auto">
-                  {data.leagueLatestDates.map((l) => (
-                    <div key={l.league} className="grid grid-cols-7 px-3 py-1.5 text-[#8B9890] hover:text-[#ECF1EE] items-center gap-1">
-                      <div className="col-span-2 truncate pr-2">
-                        <span className="font-semibold text-[#ECF1EE]">{l.league}</span>
-                        <span className="text-[#5E6A63] ml-1.5 text-[10px] truncate">{l.leagueName}</span>
+              <div className="border border-[var(--line)] bg-[var(--surface-2)] rounded-[12px] overflow-x-auto text-[11px]">
+                <div className="min-w-[540px]">
+                  <div className="grid grid-cols-7 px-3 py-1.5 bg-[var(--surface)] text-[var(--text-3)] border-b border-[var(--line)] font-semibold">
+                    <span className="col-span-2">League</span>
+                    <span className="text-right">Matches</span>
+                    <span className="text-right">Latest</span>
+                    <span className="col-span-2 text-center">Features</span>
+                    <span className="text-right">Status</span>
+                  </div>
+                  <div className="divide-y divide-[var(--line)] max-h-72 overflow-y-auto">
+                    {data.leagueLatestDates.map((l) => (
+                      <div key={l.league} className="grid grid-cols-7 px-3 py-2 text-[var(--text-2)] items-center gap-1">
+                        <div className="col-span-2 truncate pr-2">
+                          <span className="font-semibold text-[var(--text)]">{l.league}</span>
+                          <span className="text-[var(--text-3)] ml-1.5 text-[10.5px] truncate">{l.leagueName}</span>
+                        </div>
+                        <span className="text-right font-bold tabular-nums text-[var(--accent)]">{l.count}</span>
+                        <span className="text-right text-[var(--text)] truncate tabular-nums">
+                          {l.latestDate ? l.latestDate.substring(0, 10) : 'None'}
+                        </span>
+                        <div className="col-span-2 flex flex-wrap justify-center gap-1 text-[10.5px]">
+                          {[
+                            { key: 'Cards', ok: Boolean(l.features?.cards) },
+                            { key: 'Corners', ok: Boolean(l.features?.corners) },
+                            { key: 'HT', ok: Boolean(l.features?.halfTimeGoals) },
+                            { key: 'Ref', ok: Boolean(l.features?.referee) },
+                            { key: 'AH', ok: Boolean(l.features?.asianHandicapPrices) },
+                          ].map((tag) => (
+                            <span
+                              key={tag.key}
+                              className={`px-1.5 py-0.5 rounded border ${
+                                tag.ok
+                                  ? 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30'
+                                  : 'bg-[var(--surface)] text-[var(--text-3)] border-[var(--line)]'
+                              }`}
+                            >
+                              {tag.key}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="text-right">
+                          {l.isStale ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--danger-soft)] text-[var(--danger)] border border-[var(--danger)]/30">
+                              {l.daysAgo !== null ? `Stale (${l.daysAgo}d)` : 'No data'}
+                            </span>
+                          ) : l.isStale7d ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30">
+                              {`>7d (${l.daysAgo}d)`}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30">
+                              Active ({l.daysAgo}d)
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-right font-bold tabular-nums text-[#B6E63B]">{l.count}</span>
-                      <span className="text-right text-[#ECF1EE] truncate">
-                        {l.latestDate ? l.latestDate.substring(0, 10) : 'None'}
-                      </span>
-                      <div className="col-span-2 flex flex-wrap justify-center gap-1 text-[9px]">
-                        {[
-                          { key: 'Cards', ok: Boolean(l.features?.cards) },
-                          { key: 'Corners', ok: Boolean(l.features?.corners) },
-                          { key: 'HT', ok: Boolean(l.features?.halfTimeGoals) },
-                          { key: 'Ref', ok: Boolean(l.features?.referee) },
-                          { key: 'AH', ok: Boolean(l.features?.asianHandicapPrices) },
-                        ].map((tag) => (
-                          <span
-                            key={tag.key}
-                            className={`px-1 py-0.5 rounded border ${
-                              tag.ok
-                                ? 'bg-[#B6E63B]/10 text-[#B6E63B] border-[#B6E63B]/30'
-                                : 'bg-black/30 text-[#5E6A63] border-white/[0.05]'
-                            }`}
-                          >
-                            {tag.key}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="text-right">
-                        {l.isStale ? (
-                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">
-                            {l.daysAgo !== null ? `Stale (${l.daysAgo}d ago)` : 'No Data'}
-                          </span>
-                        ) : l.isStale7d ? (
-                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-[#E2AE45]/15 text-[#E2AE45] border border-[#E2AE45]/30">
-                            {`>7d (${l.daysAgo}d ago)`}
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-[#B6E63B]/10 text-[#B6E63B] border border-[#B6E63B]/30">
-                            Active ({l.daysAgo}d ago)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Latest Stored Match Date Per Club */}
           {data.teamLatestDates && data.teamLatestDates.length > 0 && (
             <div className="space-y-1.5 pt-1">
-              <div className="text-[11.5px] font-semibold text-[#ECF1EE] flex items-center justify-between">
+              <div className="text-[12px] font-semibold text-[var(--text)] flex flex-wrap items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#B6E63B]" />
-                  <span>Latest Stored Match Date Per Club ({data.teamLatestDates.length} registered)</span>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent)]" />
+                  <span>Latest match per club ({data.teamLatestDates.length})</span>
                 </span>
                 <input
                   type="text"
-                  placeholder="Filter club name / league..."
+                  placeholder="Filter club or league..."
                   value={teamSearchQuery}
                   onChange={(e) => setTeamSearchQuery(e.target.value)}
-                  className="bg-black/40 border border-white/[0.08] rounded px-2 py-0.5 text-[10.5px] font-mono text-[#ECF1EE] placeholder-[#5E6A63] outline-none w-44"
+                  className="min-h-[44px] bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] px-3 text-[12px] text-[var(--text)] placeholder-[var(--text-3)] outline-none w-full sm:w-48"
                 />
               </div>
-              <div className="border border-white/[0.07] bg-[#151E19] rounded-[10px] overflow-hidden text-[11px] font-mono">
-                <div className="grid grid-cols-5 px-3 py-1.5 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
-                  <span className="col-span-2">Club Name</span>
-                  <span className="text-right">Stored Matches</span>
-                  <span className="text-right">Latest Match</span>
-                  <span className="text-right">Staleness Status</span>
+              <div className="border border-[var(--line)] bg-[var(--surface-2)] rounded-[12px] overflow-hidden text-[11px]">
+                <div className="grid grid-cols-5 px-3 py-1.5 bg-[var(--surface)] text-[var(--text-3)] border-b border-[var(--line)] font-semibold">
+                  <span className="col-span-2">Club</span>
+                  <span className="text-right">Matches</span>
+                  <span className="text-right">Latest</span>
+                  <span className="text-right">Status</span>
                 </div>
-                <div className="divide-y divide-white/[0.04] max-h-56 overflow-y-auto">
+                <div className="divide-y divide-[var(--line)] max-h-56 overflow-y-auto">
                   {data.teamLatestDates
                     .filter((t) => {
                       if (!teamSearchQuery.trim()) return true;
                       const q = teamSearchQuery.toLowerCase().trim();
-                      return t.name.toLowerCase().includes(q) || t.shortName.toLowerCase().includes(q) || t.competitionCode.toLowerCase().includes(q);
+                      return (
+                        t.name.toLowerCase().includes(q) ||
+                        t.shortName.toLowerCase().includes(q) ||
+                        t.competitionCode.toLowerCase().includes(q)
+                      );
                     })
                     .map((t) => (
-                      <div key={t.teamId} className="grid grid-cols-5 px-3 py-1.5 text-[#8B9890] hover:text-[#ECF1EE] items-center">
+                      <div key={t.teamId} className="grid grid-cols-5 px-3 py-2 text-[var(--text-2)] items-center">
                         <div className="col-span-2 truncate pr-2">
-                          <span className="font-semibold text-[#ECF1EE]">{t.shortName}</span>
-                          <span className="text-[#5E6A63] ml-1.5 text-[10px]">({t.competitionCode})</span>
+                          <span className="font-semibold text-[var(--text)]">{t.shortName}</span>
+                          <span className="text-[var(--text-3)] ml-1.5 text-[10.5px]">({t.competitionCode})</span>
                         </div>
-                        <span className="text-right font-bold tabular-nums text-[#B6E63B]">{t.matchCount}</span>
-                        <span className="text-right text-[#ECF1EE] truncate">
+                        <span className="text-right font-bold tabular-nums text-[var(--accent)]">{t.matchCount}</span>
+                        <span className="text-right text-[var(--text)] truncate tabular-nums">
                           {t.latestDate ? t.latestDate.substring(0, 10) : 'None'}
                         </span>
                         <div className="text-right">
                           {t.isStale ? (
-                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">
-                              {t.daysAgo !== null ? `Stale (${t.daysAgo}d)` : 'Needs Backfill'}
+                            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--danger-soft)] text-[var(--danger)] border border-[var(--danger)]/30">
+                              {t.daysAgo !== null ? `Stale (${t.daysAgo}d)` : 'Backfill'}
                             </span>
                           ) : (
-                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-[#B6E63B]/10 text-[#B6E63B] border border-[#B6E63B]/30">
+                            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30">
                               Active ({t.daysAgo}d)
                             </span>
                           )}
@@ -653,37 +653,37 @@ export default function DataStatusDiagnostics() {
             </div>
           )}
 
-          {/* Under-Sampled Teams (< 10 matches) by joining teams table */}
+          {/* Under-Sampled Teams */}
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-between">
-              <span className="text-[11.5px] font-semibold text-[#ECF1EE] flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 text-[#E2AE45]" />
-                <span>Under-Sampled Clubs (&lt; 10 matches) Joined from Teams Table</span>
+              <span className="text-[12px] font-semibold text-[var(--text)] flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-[var(--medium)]" />
+                <span>Under-sampled clubs (&lt; 10 matches)</span>
               </span>
-              <span className="text-[10px] font-mono text-[#E2AE45]">
-                {data.teamsWithFewerThan10Matches.length} clubs flagged
+              <span className="text-[10.5px] text-[var(--medium)]">
+                {data.teamsWithFewerThan10Matches.length} flagged
               </span>
             </div>
 
             {data.teamsWithFewerThan10Matches.length === 0 ? (
-              <div className="p-2.5 rounded-[10px] bg-[#151E19] border border-white/[0.07] text-[11.5px] text-[#B6E63B] flex items-center gap-2">
+              <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] text-[12px] text-[var(--accent)] flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>All registered clubs in teams table have verified sample coverage (&ge; 10 matches).</span>
+                <span>All registered clubs have verified sample coverage (&ge; 10 matches).</span>
               </div>
             ) : (
-              <div className="border border-[#E2AE45]/20 bg-[#151E19] rounded-[10px] p-2.5 space-y-2">
-                <p className="text-[11px] text-[#8B9890] leading-tight">
-                  Clubs with insufficient history in the joined teams table require historical match backfill:
+              <div className="border border-[var(--medium)]/30 bg-[var(--surface-2)] rounded-[12px] p-3 space-y-2">
+                <p className="text-[11.5px] text-[var(--text-2)]">
+                  Clubs with insufficient history require historical backfill:
                 </p>
-                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pt-1">
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
                   {data.teamsWithFewerThan10Matches.map((t) => (
                     <span
                       key={t.teamId}
-                      className="inline-flex items-center gap-1.5 text-[10.5px] font-mono px-2 py-0.5 rounded-[6px] bg-black/30 border border-white/[0.08] text-[#ECF1EE]"
+                      className="inline-flex items-center gap-1.5 text-[10.5px] px-2.5 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--line)] text-[var(--text)]"
                     >
-                      <span className="font-semibold text-[#E2AE45]">{t.shortName}</span>
-                      <span className="text-[#5E6A63]">({t.competitionCode})</span>
-                      <span className="text-[#B6E63B] font-bold">{t.matchCount} m</span>
+                      <span className="font-semibold text-[var(--medium)]">{t.shortName}</span>
+                      <span className="text-[var(--text-3)]">({t.competitionCode})</span>
+                      <span className="text-[var(--accent)] font-bold">{t.matchCount}m</span>
                     </span>
                   ))}
                 </div>
@@ -693,31 +693,29 @@ export default function DataStatusDiagnostics() {
 
           {/* Basketball Historical Coverage Panel */}
           {data.basketball && (
-            <div className="space-y-2.5 pt-2 border-t border-white/[0.07]">
+            <div className="space-y-2.5 pt-3 border-t border-[var(--line)]">
               <div className="flex items-center justify-between">
-                <span className="text-[12px] font-semibold text-[#ECF1EE] flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-[#B6E63B]" />
-                  <span>Basketball Coverage (NBA, NCAAB D1, EuroLeague)</span>
+                <span className="text-[12.5px] font-semibold text-[var(--text)] flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-[var(--accent)]" />
+                  <span>Basketball coverage</span>
                 </span>
-                <span className="text-[10px] font-mono text-[#8B9890]">
-                  {data.basketball.totalGames.toLocaleString()} games · Latest {data.basketball.latestDate || 'None'}
+                <span className="text-[10.5px] text-[var(--text-2)] tabular-nums">
+                  {data.basketball.totalGames.toLocaleString()} games · Latest {data.basketball.latestDate || '—'}
                 </span>
               </div>
 
               {data.basketball.leagueSummary.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {data.basketball.leagueSummary.map((ls) => (
-                    <div key={ls.league} className="bg-[#151E19] rounded-[10px] p-2.5 border border-white/[0.07] space-y-1">
+                    <div key={ls.league} className="bg-[var(--surface-2)] rounded-[12px] p-3 border border-[var(--line)] space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono font-semibold text-[#B6E63B]">{ls.league}</span>
-                        <span className="text-[10px] font-mono text-[#8B9890]">
-                          Half scores: {ls.halfScoresPct}%
-                        </span>
+                        <span className="text-[11.5px] font-semibold text-[var(--accent)]">{ls.league}</span>
+                        <span className="text-[10.5px] text-[var(--text-2)]">Half scores: {ls.halfScoresPct}%</span>
                       </div>
-                      <div className="text-[16px] font-bold font-mono text-[#ECF1EE] tabular-nums">
+                      <div className="font-display text-[16px] font-bold text-[var(--text)] tabular-nums">
                         {ls.count.toLocaleString()} games
                       </div>
-                      <div className="text-[10px] font-mono text-[#8B9890]">
+                      <div className="text-[10.5px] text-[var(--text-2)]">
                         Latest: {ls.latestDate || 'Needs history'}
                       </div>
                     </div>
@@ -726,26 +724,26 @@ export default function DataStatusDiagnostics() {
               )}
 
               {data.basketball.gamesPerLeagueAndSeason.length === 0 ? (
-                <div className="p-2.5 rounded-[10px] bg-[#151E19] border border-white/[0.07] text-[11.5px] text-[#8B9890]">
-                  Needs history: no basketball seasons ingested yet.
+                <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] text-[12px] text-[var(--text-2)]">
+                  No basketball seasons ingested yet.
                 </div>
               ) : (
-                <div className="border border-white/[0.07] bg-[#151E19] rounded-[10px] overflow-hidden text-[11px] font-mono">
-                  <div className="grid grid-cols-5 px-3 py-1.5 bg-black/20 text-[#5E6A63] border-b border-white/[0.05] font-semibold">
+                <div className="border border-[var(--line)] bg-[var(--surface-2)] rounded-[12px] overflow-hidden text-[11px]">
+                  <div className="grid grid-cols-5 px-3 py-1.5 bg-[var(--surface)] text-[var(--text-3)] border-b border-[var(--line)] font-semibold">
                     <span>League</span>
                     <span>Season</span>
                     <span className="text-right">Games</span>
-                    <span className="text-right">Half Scores %</span>
-                    <span className="text-right">Latest Date</span>
+                    <span className="text-right">Half %</span>
+                    <span className="text-right">Latest</span>
                   </div>
-                  <div className="divide-y divide-white/[0.04] max-h-56 overflow-y-auto">
+                  <div className="divide-y divide-[var(--line)] max-h-56 overflow-y-auto">
                     {data.basketball.gamesPerLeagueAndSeason.map((row) => (
-                      <div key={`${row.league}-${row.season}`} className="grid grid-cols-5 px-3 py-1.5 text-[#8B9890] hover:text-[#ECF1EE]">
-                        <span className="font-semibold text-[#ECF1EE]">{row.league}</span>
+                      <div key={`${row.league}-${row.season}`} className="grid grid-cols-5 px-3 py-1.5 text-[var(--text-2)]">
+                        <span className="font-semibold text-[var(--text)]">{row.league}</span>
                         <span>{row.season}</span>
-                        <span className="text-right text-[#B6E63B] font-bold tabular-nums">{row.count}</span>
-                        <span className="text-right text-[#ECF1EE] tabular-nums">{row.halfScoresPct}%</span>
-                        <span className="text-right text-[#5E6A63]">{row.latestDate || 'None'}</span>
+                        <span className="text-right text-[var(--accent)] font-bold tabular-nums">{row.count}</span>
+                        <span className="text-right text-[var(--text)] tabular-nums">{row.halfScoresPct}%</span>
+                        <span className="text-right text-[var(--text-3)] tabular-nums">{row.latestDate || '—'}</span>
                       </div>
                     ))}
                   </div>
@@ -753,23 +751,25 @@ export default function DataStatusDiagnostics() {
               )}
 
               {data.basketball.unresolvedTeams.length > 0 ? (
-                <div className="p-2.5 bg-[#E2AE45]/[0.08] border border-[#E2AE45]/30 rounded-[10px] space-y-1.5">
-                  <span className="text-[11px] font-semibold text-[#E2AE45] flex items-center gap-1.5">
+                <div className="p-3 bg-[var(--medium-soft)] border border-[var(--medium)]/30 rounded-[12px] space-y-1.5">
+                  <span className="text-[11.5px] font-semibold text-[var(--medium)] flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5" />
-                    <span>Unresolved Basketball Teams ({data.basketball.unresolvedTeams.length})</span>
+                    <span>Unresolved basketball teams ({data.basketball.unresolvedTeams.length})</span>
                   </span>
-                  <div className="divide-y divide-white/[0.05] max-h-28 overflow-y-auto text-[10.5px] font-mono">
+                  <div className="divide-y divide-[var(--line)] max-h-28 overflow-y-auto text-[11px]">
                     {data.basketball.unresolvedTeams.map((u, i) => (
                       <div key={i} className="py-1 flex items-center justify-between gap-2">
-                        <span className="text-[#ECF1EE] truncate">{u.sourceName}</span>
-                        <span className="text-[#8B9890] shrink-0">{u.sourceProvider} ({u.count}x)</span>
+                        <span className="text-[var(--text)] truncate">{u.sourceName}</span>
+                        <span className="text-[var(--text-2)] shrink-0">
+                          {u.sourceProvider} ({u.count}x)
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : (
-                <div className="p-2 rounded-[10px] bg-[#151E19] border border-white/[0.07] text-[11px] text-[#B6E636] flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <div className="p-2.5 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] text-[11.5px] text-[var(--accent)] flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <span>Unresolved basketball teams: 0</span>
                 </div>
               )}
@@ -778,14 +778,14 @@ export default function DataStatusDiagnostics() {
         </div>
       )}
 
-      {/* Call List Section */}
-      <div className="space-y-2 pt-2 border-t border-white/[0.07]">
-        <div className="flex items-center justify-between">
-          <span className="text-[12px] font-semibold text-[#ECF1EE] flex items-center gap-1.5">
-            <Terminal className="w-3.5 h-3.5 text-[#B6E63B]" />
-            <span>Authorized Backfill Call List (Seasons 2526, 2627, BSA 2025/2026, 1920 Dropped)</span>
+      {/* Backfill Reference Calls */}
+      <div className="space-y-2 pt-3 border-t border-[var(--line)]">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[12.5px] font-semibold text-[var(--text)] flex items-center gap-1.5">
+            <Terminal className="w-3.5 h-3.5 text-[var(--accent)]" />
+            <span>Backfill API endpoints</span>
           </span>
-          <span className="text-[10px] font-mono text-[#5E6A63]">Header: x-admin-secret</span>
+          <span className="text-[10.5px] text-[var(--text-3)]">x-admin-secret</span>
         </div>
 
         <div className="space-y-1.5 max-h-52 overflow-y-auto">
@@ -794,18 +794,22 @@ export default function DataStatusDiagnostics() {
             const isCopied = copiedIndex === idx;
 
             return (
-              <div key={idx} className="p-2 bg-[#151E19] rounded-[8px] border border-white/[0.05] flex items-center justify-between gap-2 text-[11px] font-mono">
+              <div
+                key={idx}
+                className="p-2.5 bg-[var(--surface-2)] rounded-[12px] border border-[var(--line)] flex items-center justify-between gap-2 text-[11.5px]"
+              >
                 <div className="min-w-0">
-                  <div className="text-[#ECF1EE] font-semibold">{c.desc}</div>
-                  <div className="text-[#8B9890] truncate text-[10px] mt-0.5">{curlCmd}</div>
+                  <div className="text-[var(--text)] font-medium">{c.desc}</div>
+                  <div className="text-[var(--text-3)] font-mono truncate text-[10.5px] mt-0.5">{curlCmd}</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleCopyCommand(curlCmd, idx)}
-                  className="p-1 rounded bg-black/40 hover:bg-black/60 text-[#8B9890] hover:text-[#ECF1EE] shrink-0"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-[10px] bg-[var(--surface)] border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text)] shrink-0 touch-press"
                   title="Copy curl command"
+                  aria-label="Copy curl command"
                 >
-                  {isCopied ? <Check className="w-3.5 h-3.5 text-[#B6E63B]" /> : <Copy className="w-3.5 h-3.5" />}
+                  {isCopied ? <Check className="w-4 h-4 text-[var(--accent)]" /> : <Copy className="w-4 h-4" />}
                 </button>
               </div>
             );

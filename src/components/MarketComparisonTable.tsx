@@ -1,27 +1,23 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { MarketPrediction, RiskTier } from '@/types';
-import { 
-  ArrowUpDown, 
-  Clock, 
-  ChevronRight, 
-  ChevronDown, 
-  Sliders, 
-  ShieldCheck, 
-  AlertTriangle,
-  Layers,
+import { MarketPrediction } from '@/types';
+import {
+  ArrowUpDown,
+  Clock,
+  ChevronRight,
+  ChevronDown,
   Scale,
   Gauge,
-  Info
+  AlertTriangle,
+  Info,
 } from 'lucide-react';
-import { 
-  formatSelectionName, 
-  getOptionTypeLabel, 
-  getPeriodLabel, 
-  formatExpectedValue, 
+import {
+  getOptionTypeLabel,
+  getPeriodLabel,
+  formatExpectedValue,
   formatOdds,
-  getRiskTierBadge
+  groupPredictionsByConfidenceTier,
 } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 
@@ -46,10 +42,13 @@ export default function MarketComparisonTable({
   const [marketFilter, setMarketFilter] = useState<string>('ALL');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [openTiers, setOpenTiers] = useState<Record<'high' | 'medium' | 'low', boolean>>({
+    high: true,
+    medium: true,
+    low: true,
+  });
 
-  // Handicap interactive state
   const [handicapMode, setHandicapMode] = useState<'asian' | 'european'>('asian');
-  const [selectedHandicapLine, setSelectedHandicapLine] = useState<number>(0.5);
 
   const handleRowClick = (pred: MarketPrediction) => {
     if (onSelectPrediction) {
@@ -58,82 +57,84 @@ export default function MarketComparisonTable({
     setExpandedId((prev) => (prev === pred.id ? null : pred.id));
   };
 
-  // Group by risk tier
-  const tierGroups = useMemo(() => {
-    const safe: MarketPrediction[] = [];
-    const moderate: MarketPrediction[] = [];
-    const risky: MarketPrediction[] = [];
-    const longshot: MarketPrediction[] = [];
-    const insufficientData: MarketPrediction[] = [];
+  const toggleTierSection = (tier: 'high' | 'medium' | 'low') => {
+    setOpenTiers((prev) => ({ ...prev, [tier]: !prev[tier] }));
+  };
 
-    predictions.forEach(p => {
-      if (p.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY' && (p.evidenceTier?.includes('Insufficient Data') || p.explanation?.dataLimitations?.some(d => d.includes('Insufficient')))) {
-        insufficientData.push(p);
-      } else if (p.confidenceTier === 'HIGH' || p.riskTier === 'HIGH' || p.riskTier === 'SAFE') {
-        safe.push(p);
-      } else if (p.confidenceTier === 'MEDIUM' || p.riskTier === 'MEDIUM' || p.riskTier === 'MODERATE') {
-        moderate.push(p);
-      } else if (p.confidenceTier === 'LOW' || p.riskTier === 'LOW' || p.riskTier === 'RISKY') {
-        risky.push(p);
-      } else {
-        longshot.push(p);
-      }
-    });
+  // Single source of truth used by BOTH the summary card + stacked bar AND the collapsible tier sections
+  const tierGroups = useMemo(
+    () => groupPredictionsByConfidenceTier(predictions),
+    [predictions]
+  );
 
-    return {
-      safe: safe.sort((a, b) => (b.calibratedProbability ?? b.modelProbability) - (a.calibratedProbability ?? a.modelProbability)),
-      moderate: moderate.sort((a, b) => (b.calibratedProbability ?? b.modelProbability) - (a.calibratedProbability ?? a.modelProbability)),
-      risky: risky.sort((a, b) => (b.calibratedProbability ?? b.modelProbability) - (a.calibratedProbability ?? a.modelProbability)),
-      longshot: longshot.sort((a, b) => (b.edge ?? 0) - (a.edge ?? 0)),
-      insufficientData
-    };
-  }, [predictions]);
+  const totalCount = tierGroups.total || 1;
+  const highPct = (tierGroups.high.length / totalCount) * 100;
+  const medPct = (tierGroups.medium.length / totalCount) * 100;
+  const lowPct = (tierGroups.low.length / totalCount) * 100;
 
-  // Handicap lines analysis
-  const handicapPredictions = useMemo(() => {
-    return predictions.filter(p => p.marketCategory === 'handicap' || p.optionType === 'asian_handicap' || p.optionType === 'european_handicap');
-  }, [predictions]);
+  const handicapPredictions = useMemo(
+    () =>
+      predictions.filter(
+        (p) =>
+          p.marketCategory === 'handicap' ||
+          p.optionType === 'asian_handicap' ||
+          p.optionType === 'european_handicap'
+      ),
+    [predictions]
+  );
 
-  // Safest handicap line per team
   const safestHomeHandicap = useMemo(() => {
-    const homeLines = handicapPredictions.filter(p => p.handicapType === 'asian' && p.selection.includes(homeTeamName));
+    const homeLines = handicapPredictions.filter(
+      (p) => p.handicapType === 'asian' && p.selection.includes(homeTeamName)
+    );
     return homeLines.sort((a, b) => b.modelProbability - a.modelProbability)[0];
   }, [handicapPredictions, homeTeamName]);
 
   const safestAwayHandicap = useMemo(() => {
-    const awayLines = handicapPredictions.filter(p => p.handicapType === 'asian' && p.selection.includes(awayTeamName));
+    const awayLines = handicapPredictions.filter(
+      (p) => p.handicapType === 'asian' && p.selection.includes(awayTeamName)
+    );
     return awayLines.sort((a, b) => b.modelProbability - a.modelProbability)[0];
   }, [handicapPredictions, awayTeamName]);
 
-  // Goal bounds analysis (bands)
-  const goalBoundsPredictions = useMemo(() => {
-    return predictions.filter(p => p.marketCategory === 'goal_bounds');
-  }, [predictions]);
+  const goalBoundsPredictions = useMemo(
+    () => predictions.filter((p) => p.marketCategory === 'goal_bounds'),
+    [predictions]
+  );
 
-  const mostLikelyGoalBand = useMemo(() => {
-    return goalBoundsPredictions
-      .filter(p => p.selection.includes('Exact') || p.selection.includes('goals') || p.selection.includes('to'))
-      .sort((a, b) => b.modelProbability - a.modelProbability)[0];
-  }, [goalBoundsPredictions]);
+  const mostLikelyGoalBand = useMemo(
+    () =>
+      goalBoundsPredictions
+        .filter((p) => p.selection.includes('Exact') || p.selection.includes('goals') || p.selection.includes('to'))
+        .sort((a, b) => b.modelProbability - a.modelProbability)[0],
+    [goalBoundsPredictions]
+  );
 
-  const safestWideBand = useMemo(() => {
-    return goalBoundsPredictions
-      .filter(p => p.selection.includes('2 to 4') || p.selection.includes('1 to 3') || p.selection.includes('2 to 5') || p.selection.includes('Wide'))
-      .sort((a, b) => b.modelProbability - a.modelProbability)[0];
-  }, [goalBoundsPredictions]);
+  const safestWideBand = useMemo(
+    () =>
+      goalBoundsPredictions
+        .filter(
+          (p) =>
+            p.selection.includes('2 to 4') ||
+            p.selection.includes('1 to 3') ||
+            p.selection.includes('2 to 5') ||
+            p.selection.includes('Wide')
+        )
+        .sort((a, b) => b.modelProbability - a.modelProbability)[0],
+    [goalBoundsPredictions]
+  );
 
-  // Halves predictions
-  const halfPredictions = useMemo(() => {
-    return predictions.filter(p => p.marketCategory === 'half_time');
-  }, [predictions]);
+  const halfPredictions = useMemo(
+    () => predictions.filter((p) => p.marketCategory === 'half_time'),
+    [predictions]
+  );
 
   const hasHalfData = halfPredictions.length > 0;
 
-  // Filtered list for "ALL_LINES" mode
   const filteredList = useMemo(() => {
     let list = [...predictions];
     if (marketFilter !== 'ALL') {
-      list = list.filter(p => p.marketCategory === marketFilter || p.optionType === marketFilter);
+      list = list.filter((p) => p.marketCategory === marketFilter || p.optionType === marketFilter);
     }
     return list.sort((a, b) => {
       const pA = a.calibratedProbability ?? a.modelProbability;
@@ -145,176 +146,160 @@ export default function MarketComparisonTable({
   const renderPredictionRow = (pred: MarketPrediction) => {
     const isSelected = selectedPredictionId === pred.id;
     const isExpanded = expandedId === pred.id;
-    const isAbstained = pred.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY';
     const probPct = (pred.calibratedProbability ?? pred.modelProbability) * 100;
-    const oddsFormatted = pred.marketOdds ? formatOdds(pred.marketOdds) : 'N/A';
+    const oddsFormatted = pred.marketOdds ? formatOdds(pred.marketOdds) : '—';
     const evFormatted = formatExpectedValue(pred.expectedValue);
-    const riskBadge = getRiskTierBadge(pred.riskTier);
+
+    const tier = (pred.confidenceTier || pred.riskTier || '').toUpperCase();
+    const barColor =
+      tier === 'HIGH' || tier === 'SAFE'
+        ? 'bg-[var(--accent-fill)]'
+        : tier === 'MEDIUM' || tier === 'MODERATE'
+        ? 'bg-[var(--medium)]'
+        : 'bg-[var(--muted)]';
+
+    const refSummary = (() => {
+      const ref = pred.evidence?.referee;
+      if (!ref) return null;
+      if (!ref.leagueBaseline || ref.leagueBaseline <= 0) {
+        return ref.announced && ref.name ? `Referee ${ref.name}` : 'Referee unannounced';
+      }
+      return cleanDisplayText(ref.explanation);
+    })();
 
     return (
-      <div 
-        key={pred.id} 
-        className={`transition-colors border-b border-white/[0.05] ${
-          isSelected ? 'bg-[rgba(182,230,59,0.08)]' : 'hover:bg-white/[0.02]'
+      <div
+        key={pred.id}
+        className={`transition-colors border-b border-[var(--line)] last:border-b-0 ${
+          isSelected ? 'bg-[var(--accent-soft)]' : ''
         }`}
       >
-        <div 
+        <button
+          type="button"
           onClick={() => handleRowClick(pred)}
-          className="p-3 flex items-center justify-between cursor-pointer select-none text-[12px] gap-2 touch-press"
+          aria-expanded={isExpanded}
+          className="w-full min-h-[52px] px-3.5 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-2)]/70 transition-colors touch-press"
         >
-          {/* Main selection column */}
-          <div className="flex-1 min-w-0 pr-2">
-            <div className="flex items-center gap-2">
-              <span className={`font-semibold truncate text-[13px] ${isSelected ? 'text-[#B6E63B]' : 'text-[#ECF1EE]'}`}>
+          {/* Left: Market name & subtext */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`font-display font-semibold truncate text-[13.5px] leading-snug ${
+                  isSelected ? 'text-[var(--accent)]' : 'text-[var(--text)]'
+                }`}
+              >
                 {cleanDisplayText(pred.selection)}
               </span>
               {pred.handicapLine !== undefined && (
-                <span className="text-[10px] font-mono px-1.5 py-0.2 bg-[#151E19] text-[#8B9890] rounded border border-white/[0.07]">
+                <span className="text-[10.5px] px-1.5 py-0.5 bg-[var(--surface-2)] text-[var(--text-2)] rounded-full border border-[var(--line)] tabular-nums shrink-0">
                   {cleanDisplayText(pred.handicapLine > 0 ? `+${pred.handicapLine}` : `${pred.handicapLine}`)}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-2 text-[10.5px] text-[#8B9890] mt-0.5">
+            <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-2)] mt-0.5 truncate">
               <span>{cleanDisplayText(getOptionTypeLabel(pred.optionType))}</span>
               <span>·</span>
-              <span className="font-mono">{cleanDisplayText(getPeriodLabel(pred.period))}</span>
-              {pred.riskTier && (
-                <>
-                  <span>·</span>
-                  <span className={`px-1.5 py-0.2 rounded-full font-mono text-[9px] ${riskBadge.badgeClass}`}>
-                    {cleanDisplayText(riskBadge.label)}
-                  </span>
-                </>
-              )}
-              {pred.settlementStatus && pred.settlementStatus !== 'PENDING' && (
-                <>
-                  <span>·</span>
-                  <span className={`px-1.5 py-0.2 rounded-full font-mono text-[9px] font-bold ${
-                    pred.settlementStatus === 'WON' ? 'bg-[#B6E63B]/20 text-[#B6E63B] border border-[#B6E63B]/30' :
-                    pred.settlementStatus === 'LOST' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                    pred.settlementStatus === 'PUSH' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                    'bg-zinc-500/20 text-zinc-400 border border-zinc-500/30'
-                  }`}>
-                    {pred.settlementStatus}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Prob & Odds cell */}
-          <div className="text-right whitespace-nowrap pl-2 flex flex-col items-end">
-            <span className="font-mono text-[13px] text-[#ECF1EE] tabular-nums font-semibold leading-tight">
-              {probPct.toFixed(1)}%
-            </span>
-            <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#8B9890]">
-              {pred.sanityTripwire && (
-                <span className="px-1 py-0.2 rounded text-[9px] bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                  Check data
-                </span>
-              )}
+              <span>{cleanDisplayText(getPeriodLabel(pred.period))}</span>
               {pred.marketOdds && pred.marketOdds > 1.0 ? (
                 <>
-                  <span className="tabular-nums text-[#ECF1EE]">@{oddsFormatted}</span>
-                  {pred.expectedValue !== null && pred.expectedValue !== undefined && (
-                    <span className={`tabular-nums ${evFormatted.colorClass}`}>
-                      {cleanDisplayText(evFormatted.text)}
-                    </span>
-                  )}
+                  <span>·</span>
+                  <span className="tabular-nums text-[var(--text)]">@{oddsFormatted}</span>
                 </>
               ) : (
                 <>
-                  <span className="text-[9px] text-[#5E6A63]">No odds</span>
                   <span>·</span>
-                  <span className="text-[#8B9890] tabular-nums">Analysis only</span>
+                  <span>Probability only</span>
                 </>
               )}
             </div>
           </div>
 
-          {/* Chevron */}
-          <div className="w-4 h-4 flex items-center justify-center text-[#8B9890] shrink-0">
-            {isExpanded ? (
-              <ChevronDown className="w-3.5 h-3.5 text-[#ECF1EE]" />
-            ) : (
-              <ChevronRight className="w-3.5 h-3.5" />
-            )}
+          {/* Right: Right-aligned probability + mini bar + chevron */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex flex-col items-end gap-1">
+              <span className="font-display text-[14px] font-bold text-[var(--text)] tabular-nums leading-none">
+                {probPct.toFixed(1)}%
+              </span>
+              <div className="w-14 h-1 rounded-full bg-[var(--surface-2)] overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${barColor}`}
+                  style={{ width: `${Math.min(100, Math.max(0, probPct))}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="w-5 h-5 flex items-center justify-center text-[var(--text-2)] shrink-0">
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4 text-[var(--text)]" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </div>
           </div>
-        </div>
+        </button>
 
         {/* Expanded detail */}
         {isExpanded && (
-          <div className="px-3.5 pb-3.5 pt-1 bg-[#151E19]/60 border-t border-white/[0.05] text-[12px] space-y-2">
+          <div className="px-3.5 pb-3.5 pt-2 bg-[var(--surface-2)]/70 border-t border-[var(--line)] text-[12px] space-y-2">
             {pred.settlementStatus && pred.settlementStatus !== 'PENDING' && (
-              <div className="p-2.5 rounded-[8px] bg-[#101713] border border-white/[0.07] text-[11px] flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[#8B9890] font-mono text-[10px] uppercase">Settlement Outcome:</span>
-                <span className={`font-mono font-semibold ${
-                  pred.settlementStatus === 'WON' ? 'text-[#B6E63B]' :
-                  pred.settlementStatus === 'LOST' ? 'text-rose-400' :
-                  pred.settlementStatus === 'PUSH' ? 'text-amber-300' : 'text-[#8B9890]'
-                }`}>
+              <div className="p-2.5 rounded-[10px] bg-[var(--surface)] border border-[var(--line)] text-[11.5px] flex items-center justify-between gap-2">
+                <span className="text-[var(--text-2)]">Settlement outcome</span>
+                <span
+                  className={`font-semibold ${
+                    pred.settlementStatus === 'WON'
+                      ? 'text-[var(--accent)]'
+                      : pred.settlementStatus === 'LOST'
+                      ? 'text-[var(--danger)]'
+                      : 'text-[var(--medium)]'
+                  }`}
+                >
                   {cleanDisplayText(pred.lineComparisonText || pred.settlementStatus)}
                 </span>
               </div>
             )}
 
-            <div className="text-[11px] text-[#8B9890] leading-relaxed">
-              <span className="text-[#ECF1EE] font-medium">Settlement rule: </span>
+            <div className="text-[12px] text-[var(--text-2)] leading-[1.5]">
+              <span className="text-[var(--text)] font-medium">Settlement rule: </span>
               {cleanDisplayText(pred.settlementRule)}
             </div>
 
             {pred.plainEnglishReason && (
-              <div className="p-2.5 rounded-[8px] bg-[#101713] border border-white/[0.07] text-[11px] text-[#B6E63B]">
-                <span className="text-[#8B9890] block font-mono text-[10px] uppercase tracking-wider">Model Rationale:</span>
+              <div className="p-2.5 rounded-[10px] bg-[var(--surface)] border border-[var(--line)] text-[12px] text-[var(--text)] leading-[1.5]">
+                <span className="text-[var(--accent)] font-semibold block text-[11px] mb-0.5">
+                  Model rationale
+                </span>
                 {cleanDisplayText(pred.plainEnglishReason)}
               </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono pt-1 text-[#8B9890] tabular-nums">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-[var(--text-2)] tabular-nums">
               <div>
                 <span>Odds: </span>
-                <span className="text-[#ECF1EE]">{pred.marketOdds && pred.marketOdds > 1.0 ? oddsFormatted : 'No price'}</span>
-              </div>
-              <div>
-                <span>Market status: </span>
-                <span className="text-[#8B9890]">
-                  {pred.marketOdds && pred.marketOdds > 1.0
-                    ? cleanDisplayText(
-                        `Price active${pred.deviggedMarketProb !== undefined ? ` (Devigged ${(pred.deviggedMarketProb * 100).toFixed(1)}%)` : ''}${pred.expectedValue !== null && pred.expectedValue !== undefined ? ` EV ${evFormatted.text}` : ''}`
-                      )
-                    : 'Probability analysis only (no EV)'}
+                <span className="text-[var(--text)] font-medium">
+                  {pred.marketOdds && pred.marketOdds > 1.0 ? `@${oddsFormatted}` : 'No price'}
                 </span>
               </div>
-              <div>
-                <span>Confidence: </span>
-                <span className="text-[#ECF1EE]">{((pred.confidenceScore ?? 0.75) * 100).toFixed(0)}%</span>
-              </div>
-              {pred.winProb !== undefined && (
+              {pred.marketOdds && pred.marketOdds > 1.0 && pred.expectedValue !== null && pred.expectedValue !== undefined && (
                 <div>
-                  <span>Win/Push/Loss: </span>
-                  <span className="text-[#ECF1EE]">
-                    {(pred.winProb * 100).toFixed(0)}% / {((pred.pushProb ?? 0) * 100).toFixed(0)}% / {((pred.lossProb ?? 0) * 100).toFixed(0)}%
+                  <span>EV: </span>
+                  <span className={`font-semibold ${evFormatted.colorClass}`}>
+                    {cleanDisplayText(evFormatted.text)}
                   </span>
                 </div>
               )}
+              <div>
+                <span>Confidence: </span>
+                <span className="text-[var(--text)] font-medium">
+                  {((pred.confidenceScore ?? 0.75) * 100).toFixed(0)}%
+                </span>
+              </div>
             </div>
 
             {pred.evidence && (
-              <div className="p-2.5 rounded-[8px] bg-[#101713] border border-white/[0.06] text-[10.5px] text-[#8B9890] space-y-1">
-                <div className="text-[#ECF1EE]">{cleanDisplayText(pred.evidence.whyLineChosen)}</div>
-                <div>
-                  {cleanDisplayText(
-                    `Strengths: Home ${pred.evidence.fittedStrengths.homeAttack.toFixed(2)}/${pred.evidence.fittedStrengths.homeDefense.toFixed(2)} (${pred.evidence.fittedStrengths.homeXg.toFixed(2)} xG), Away ${pred.evidence.fittedStrengths.awayAttack.toFixed(2)}/${pred.evidence.fittedStrengths.awayDefense.toFixed(2)} (${pred.evidence.fittedStrengths.awayXg.toFixed(2)} xG) · Samples H${pred.evidence.sampleSizes.homeMatches}/A${pred.evidence.sampleSizes.awayMatches}/WF${pred.evidence.sampleSizes.walkForwardMatches}`
-                  )}
-                </div>
-                <div>
-                  {cleanDisplayText(
-                    `${pred.evidence.referee.explanation} · ${pred.evidence.h2h.summary} · ${
-                      pred.evidence.derby.isDerby ? `Derby: ${pred.evidence.derby.name}` : 'Non derby'
-                    }`
-                  )}
-                </div>
+              <div className="p-2.5 rounded-[10px] bg-[var(--surface)] border border-[var(--line)] text-[11px] text-[var(--text-2)] space-y-1">
+                <div className="text-[var(--text)]">{cleanDisplayText(pred.evidence.whyLineChosen)}</div>
+                {refSummary && <div>{refSummary}</div>}
               </div>
             )}
           </div>
@@ -323,310 +308,391 @@ export default function MarketComparisonTable({
     );
   };
 
+  const tierSections = [
+    {
+      key: 'high' as const,
+      title: 'High confidence',
+      description: 'Narrow variance bounds and high sample depth',
+      dotColor: 'bg-[var(--accent)]',
+      titleColor: 'text-[var(--accent)]',
+      items: tierGroups.high,
+      emptyText: 'No lines met the high confidence criteria for this fixture.',
+    },
+    {
+      key: 'medium' as const,
+      title: 'Medium confidence',
+      description: 'Balanced probability with moderate market spread',
+      dotColor: 'bg-[var(--medium)]',
+      titleColor: 'text-[var(--medium)]',
+      items: tierGroups.medium,
+      emptyText: 'No lines classified in the medium confidence tier.',
+    },
+    {
+      key: 'low' as const,
+      title: 'Low / Speculative',
+      description: 'Higher variance, longshots, or active risk flags',
+      dotColor: 'bg-[var(--muted)]',
+      titleColor: 'text-[var(--text)]',
+      items: tierGroups.low,
+      emptyText: 'No speculative or low confidence lines.',
+    },
+  ];
+
   return (
-    <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] overflow-hidden space-y-0">
-      {/* Header with View Mode Tabs */}
-      <div className="p-3.5 border-b border-white/[0.07] flex flex-wrap items-center justify-between gap-3 bg-[#151E19]/50">
-        <div>
-          <h3 className="text-[14px] font-semibold text-[#ECF1EE] flex items-center gap-2">
-            <span>Market Intel & Candidate Lines ({predictions.length})</span>
+    <div className="space-y-3">
+      {/* Section Header */}
+      <div className="space-y-0.5 px-0.5">
+        <h2 className="font-display text-[18px] font-bold text-[var(--text)] tracking-[-0.015em]">
+          Market intel
+        </h2>
+        <p className="text-[12.5px] text-[var(--text-2)] leading-[1.5]">
+          {predictions.length} calibrated lines evaluated from Dixon Coles and volume models.
+        </p>
+      </div>
+
+      {/* Tier Summary Card: Stacked proportional bar + 3 rows computed from single source of truth */}
+      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-[14px] font-semibold text-[var(--text)]">
+            Confidence tiers
           </h3>
-          <p className="text-[11px] text-[#8B9890] mt-0.5">
-            Dixon Coles bivariate distributions & negative binomial models grouped by risk tier.
-          </p>
+          <span className="text-[11px] text-[var(--text-2)] tabular-nums">
+            {tierGroups.total} total lines
+          </span>
         </div>
 
-        {/* View Mode Switcher */}
-        <div className="flex items-center gap-1 bg-[#101713] p-1 rounded-[11px] border border-white/[0.07] text-[11px]">
-          <button
-            onClick={() => setViewMode('TIER_GROUPED')}
-            type="button"
-            className={`px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press ${
-              viewMode === 'TIER_GROUPED' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
-            }`}
-          >
-            Grouped by Tier
-          </button>
-          <button
-            onClick={() => setViewMode('MARKET_SECTIONS')}
-            type="button"
-            className={`px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press ${
-              viewMode === 'MARKET_SECTIONS' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
-            }`}
-          >
-            Special Markets
-          </button>
-          <button
-            onClick={() => setViewMode('ALL_LINES')}
-            type="button"
-            className={`px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press ${
-              viewMode === 'ALL_LINES' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
-            }`}
-          >
-            All Lines
-          </button>
+        {/* Stacked proportional bar */}
+        <div
+          className="w-full h-2.5 rounded-full bg-[var(--surface-2)] overflow-hidden flex gap-[2px]"
+          role="img"
+          aria-label={`High ${tierGroups.high.length}, Medium ${tierGroups.medium.length}, Low ${tierGroups.low.length} lines`}
+        >
+          {tierGroups.high.length > 0 && (
+            <div
+              className="h-full bg-[var(--accent-fill)] transition-all duration-300"
+              style={{ width: `${highPct}%` }}
+            />
+          )}
+          {tierGroups.medium.length > 0 && (
+            <div
+              className="h-full bg-[var(--medium)] transition-all duration-300"
+              style={{ width: `${medPct}%` }}
+            />
+          )}
+          {tierGroups.low.length > 0 && (
+            <div
+              className="h-full bg-[var(--muted)] transition-all duration-300"
+              style={{ width: `${lowPct}%` }}
+            />
+          )}
+        </div>
+
+        {/* 3 Summary Rows */}
+        <div className="divide-y divide-[var(--line)]">
+          {tierSections.map((sec) => (
+            <div key={sec.key} className="py-2.5 first:pt-1 last:pb-0 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${sec.dotColor}`} />
+                <div className="min-w-0">
+                  <div className="text-[13px] font-semibold text-[var(--text)] leading-tight">
+                    {sec.title}
+                  </div>
+                  <p className="text-[11.5px] text-[var(--text-2)] truncate mt-0.5">
+                    {sec.description}
+                  </p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-full text-[11px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text)] tabular-nums shrink-0 font-semibold">
+                {sec.items.length} {sec.items.length === 1 ? 'line' : 'lines'}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* VIEW MODE 1: GROUPED BY TIER */}
+      {/* Segmented Control (By tier / Special markets / All lines) */}
+      <div
+        className="grid grid-cols-3 gap-1 p-1 rounded-[14px] bg-[var(--surface-2)] border border-[var(--line)]"
+        role="tablist"
+        aria-label="Market view mode"
+      >
+        {(
+          [
+            { id: 'TIER_GROUPED' as const, label: 'By tier' },
+            { id: 'MARKET_SECTIONS' as const, label: 'Special markets' },
+            { id: 'ALL_LINES' as const, label: 'All lines' },
+          ]
+        ).map((seg) => {
+          const active = viewMode === seg.id;
+          return (
+            <button
+              key={seg.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setViewMode(seg.id)}
+              className={`min-h-[44px] px-2 rounded-[10px] text-[12px] font-medium transition-colors touch-press ${
+                active
+                  ? 'bg-[var(--surface)] text-[var(--accent)] font-semibold border border-[var(--line)]'
+                  : 'text-[var(--text-2)] hover:text-[var(--text)]'
+              }`}
+            >
+              {seg.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* VIEW MODE 1: BY TIER (Collapsible sections matching exact counts) */}
       {viewMode === 'TIER_GROUPED' && (
-        <div className="divide-y divide-white/[0.07]">
-          {/* HIGH CONFIDENCE TIER */}
-          <div className="p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#B6E63B]" />
-                <h4 className="text-[12.5px] font-semibold text-[#B6E63B]">
-                  HIGH CONFIDENCE TIERS (≥60% Calibrated Probability & Low Uncertainty)
-                </h4>
-                <span className="text-[10px] font-mono text-[#8B9890] bg-white/[0.05] px-1.5 py-0.5 rounded">
-                  {tierGroups.safe.length} lines
-                </span>
-              </div>
-            </div>
-            {tierGroups.safe.length > 0 ? (
-              <div className="divide-y divide-white/[0.05] border border-white/[0.07] rounded-[11px] overflow-hidden bg-[#151E19]/40">
-                {tierGroups.safe.map(renderPredictionRow)}
-              </div>
-            ) : (
-              <p className="text-[11px] text-[#8B9890] italic px-2 py-1">No candidate lines meet the rigorous High Confidence criteria without risk flags.</p>
-            )}
-          </div>
+        <div className="space-y-3">
+          {tierSections.map((sec) => {
+            const isOpen = openTiers[sec.key];
+            return (
+              <section
+                key={sec.key}
+                className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleTierSection(sec.key)}
+                  aria-expanded={isOpen}
+                  className="w-full min-h-[48px] px-4 py-3 flex items-center justify-between gap-2 text-left hover:bg-[var(--surface-2)]/60 transition-colors touch-press"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${sec.dotColor}`} />
+                    <h4 className={`font-display text-[14px] font-semibold truncate ${sec.titleColor}`}>
+                      {sec.title}
+                    </h4>
+                  </div>
 
-          {/* MEDIUM CONFIDENCE TIER */}
-          <div className="p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#E2AE45]" />
-                <h4 className="text-[12.5px] font-semibold text-[#E2AE45]">
-                  MEDIUM CONFIDENCE TIERS (Balanced Model Probability and Moderate Variance)
-                </h4>
-                <span className="text-[10px] font-mono text-[#8B9890] bg-white/[0.05] px-1.5 py-0.5 rounded">
-                  {tierGroups.moderate.length} lines
-                </span>
-              </div>
-            </div>
-            {tierGroups.moderate.length > 0 ? (
-              <div className="divide-y divide-white/[0.05] border border-white/[0.07] rounded-[11px] overflow-hidden bg-[#151E19]/40">
-                {tierGroups.moderate.map(renderPredictionRow)}
-              </div>
-            ) : (
-              <p className="text-[11px] text-[#8B9890] italic px-2 py-1">No markets in the medium confidence range.</p>
-            )}
-          </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)] tabular-nums font-medium">
+                      {sec.items.length} {sec.items.length === 1 ? 'line' : 'lines'}
+                    </span>
+                    {isOpen ? (
+                      <ChevronDown className="w-4 h-4 text-[var(--text-2)]" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-[var(--text-2)]" />
+                    )}
+                  </div>
+                </button>
 
-          {/* LOW CONFIDENCE TIER */}
-          <div className="p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
-                <h4 className="text-[12.5px] font-semibold text-orange-400">
-                  LOW CONFIDENCE TIERS (Higher Variance or Risk Flags Present)
-                </h4>
-                <span className="text-[10px] font-mono text-[#8B9890] bg-white/[0.05] px-1.5 py-0.5 rounded">
-                  {tierGroups.risky.length} lines
-                </span>
-              </div>
-            </div>
-            {tierGroups.risky.length > 0 ? (
-              <div className="divide-y divide-white/[0.05] border border-white/[0.07] rounded-[11px] overflow-hidden bg-[#151E19]/40">
-                {tierGroups.risky.map(renderPredictionRow)}
-              </div>
-            ) : (
-              <p className="text-[11px] text-[#8B9890] italic px-2 py-1">No markets classified as low confidence tiers.</p>
-            )}
-          </div>
-
-          {/* LONGSHOTS */}
-          {tierGroups.longshot.length > 0 && (
-            <div className="p-3.5 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
-                  <h4 className="text-[12.5px] font-semibold text-purple-300">
-                    LONGSHOTS (&lt;45% Probability)
-                  </h4>
-                  <span className="text-[10px] font-mono text-[#8B9890] bg-white/[0.05] px-1.5 py-0.5 rounded">
-                    {tierGroups.longshot.length} lines
-                  </span>
-                </div>
-              </div>
-              <div className="divide-y divide-white/[0.05] border border-white/[0.07] rounded-[11px] overflow-hidden bg-[#151E19]/40">
-                {tierGroups.longshot.slice(0, 4).map(renderPredictionRow)}
-              </div>
-            </div>
-          )}
-
-          {/* INSUFFICIENT DATA / ABSTAIN SECTION */}
-          {tierGroups.insufficientData.length > 0 && (
-            <div className="p-3.5 space-y-2 bg-[#151E19]/50">
-              <div className="flex items-center gap-2 text-rose-400">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                <h4 className="text-[12px] font-semibold">
-                  INSUFFICIENT DATA (Model Abstains)
-                </h4>
-              </div>
-              <p className="text-[11px] text-[#8B9890]">
-                In accordance with calibration standards, the engine skips fabricating probabilities when corner, card, or half split records lack adequate sample size.
-              </p>
-              <div className="divide-y divide-white/[0.05] border border-white/[0.07] rounded-[11px] overflow-hidden bg-[#101713]/50">
-                {tierGroups.insufficientData.map(renderPredictionRow)}
-              </div>
-            </div>
-          )}
+                {isOpen && (
+                  <div className="border-t border-[var(--line)]">
+                    {sec.items.length > 0 ? (
+                      <div>{sec.items.map(renderPredictionRow)}</div>
+                    ) : (
+                      <div className="px-4 py-4 text-[12px] text-[var(--text-3)] text-center bg-[var(--surface-2)]/30">
+                        {sec.emptyText}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
       )}
 
       {/* VIEW MODE 2: SPECIAL MARKETS */}
       {viewMode === 'MARKET_SECTIONS' && (
-        <div className="p-3.5 space-y-4">
-          {/* 1. HANDICAP SECTION */}
-          <div className="bg-[#151E19] border border-white/[0.07] rounded-[11px] p-3.5 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-2.5">
+        <div className="space-y-3">
+          {/* Handicap section */}
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] pb-2.5">
               <div className="flex items-center gap-2">
-                <Scale className="w-4 h-4 text-[#B6E63B]" />
-                <h4 className="text-[13px] font-semibold text-[#ECF1EE]">Handicap Intel (Asian & European)</h4>
+                <Scale className="w-4 h-4 text-[var(--accent)]" />
+                <h4 className="font-display text-[14px] font-semibold text-[var(--text)]">
+                  Handicap intel
+                </h4>
               </div>
 
-              {/* Handicap Switcher */}
-              <div className="flex items-center gap-1 bg-[#101713] p-1 rounded-[8px] border border-white/[0.07] text-[11px]">
+              <div className="flex items-center gap-1 bg-[var(--surface-2)] p-1 rounded-[12px] border border-[var(--line)]">
                 <button
                   type="button"
                   onClick={() => setHandicapMode('asian')}
-                  className={`px-2 py-0.5 rounded font-medium touch-press ${handicapMode === 'asian' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890]'}`}
+                  className={`min-h-[36px] px-3 rounded-[8px] text-[11.5px] font-medium touch-press ${
+                    handicapMode === 'asian'
+                      ? 'bg-[var(--surface)] text-[var(--accent)] font-semibold'
+                      : 'text-[var(--text-2)]'
+                  }`}
                 >
-                  Asian Handicap
+                  Asian
                 </button>
                 <button
                   type="button"
                   onClick={() => setHandicapMode('european')}
-                  className={`px-2 py-0.5 rounded font-medium touch-press ${handicapMode === 'european' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890]'}`}
+                  className={`min-h-[36px] px-3 rounded-[8px] text-[11.5px] font-medium touch-press ${
+                    handicapMode === 'european'
+                      ? 'bg-[var(--surface)] text-[var(--accent)] font-semibold'
+                      : 'text-[var(--text-2)]'
+                  }`}
                 >
-                  European (3 Way)
+                  European
                 </button>
               </div>
             </div>
 
-            {/* Top Handicap Callouts */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {safestHomeHandicap && (
-                <div className="p-2.5 rounded-[8px] bg-[#101713] border border-white/[0.07] space-y-1">
-                  <div className="text-[10px] uppercase font-mono text-[#8B9890]">Top {cleanDisplayText(homeTeamName)} line</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12.5px] font-medium text-[#ECF1EE]">{cleanDisplayText(safestHomeHandicap.selection)}</span>
-                    <span className="font-mono text-[#B6E63B] font-bold tabular-nums">{(safestHomeHandicap.modelProbability * 100).toFixed(0)}%</span>
+            {(safestHomeHandicap || safestAwayHandicap) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {safestHomeHandicap && (
+                  <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] space-y-1">
+                    <div className="text-[11px] text-[var(--text-2)]">
+                      Top {cleanDisplayText(homeTeamName)} line
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-semibold text-[var(--text)]">
+                        {cleanDisplayText(safestHomeHandicap.selection)}
+                      </span>
+                      <span className="font-display text-[14px] text-[var(--accent)] font-bold tabular-nums">
+                        {(safestHomeHandicap.modelProbability * 100).toFixed(0)}%
+                      </span>
+                    </div>
                   </div>
-                  {safestHomeHandicap.pushProbability !== undefined && (
-                    <div className="text-[10px] text-[#8B9890] tabular-nums">Push returns neutral outcome (Push: {(safestHomeHandicap.pushProbability * 100).toFixed(0)}%)</div>
-                  )}
+                )}
+
+                {safestAwayHandicap && (
+                  <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] space-y-1">
+                    <div className="text-[11px] text-[var(--text-2)]">
+                      Top {cleanDisplayText(awayTeamName)} line
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-semibold text-[var(--text)]">
+                        {cleanDisplayText(safestAwayHandicap.selection)}
+                      </span>
+                      <span className="font-display text-[14px] text-[var(--accent)] font-bold tabular-nums">
+                        {(safestAwayHandicap.modelProbability * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="border border-[var(--line)] rounded-[12px] overflow-hidden">
+              {handicapPredictions.filter((p) => p.handicapType === handicapMode).length > 0 ? (
+                handicapPredictions
+                  .filter((p) => p.handicapType === handicapMode)
+                  .map(renderPredictionRow)
+              ) : (
+                <div className="p-4 text-center text-[12px] text-[var(--text-3)]">
+                  No handicap lines evaluated for this mode.
                 </div>
               )}
-
-              {safestAwayHandicap && (
-                <div className="p-2.5 rounded-[8px] bg-[#101713] border border-white/[0.07] space-y-1">
-                  <div className="text-[10px] uppercase font-mono text-[#8B9890]">Top {cleanDisplayText(awayTeamName)} line</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12.5px] font-medium text-[#ECF1EE]">{cleanDisplayText(safestAwayHandicap.selection)}</span>
-                    <span className="font-mono text-[#B6E63B] font-bold tabular-nums">{(safestAwayHandicap.modelProbability * 100).toFixed(0)}%</span>
-                  </div>
-                  {safestAwayHandicap.pushProbability !== undefined && (
-                    <div className="text-[10px] text-[#8B9890] tabular-nums">Push returns neutral outcome (Push: {(safestAwayHandicap.pushProbability * 100).toFixed(0)}%)</div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Handicap lines list */}
-            <div className="divide-y divide-white/[0.05] border border-white/[0.07] rounded-[8px] overflow-hidden bg-[#101713]/50">
-              {handicapPredictions
-                .filter(p => p.handicapType === handicapMode)
-                .map(renderPredictionRow)}
             </div>
           </div>
 
-          {/* 2. GOAL BOUNDS SECTION */}
-          <div className="bg-[#151E19] border border-white/[0.07] rounded-[11px] p-3.5 space-y-3">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-2.5">
+          {/* Goal bounds */}
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-[var(--line)] pb-2.5">
               <div className="flex items-center gap-2">
-                <Gauge className="w-4 h-4 text-[#B6E63B]" />
-                <h4 className="text-[13px] font-semibold text-[#ECF1EE]">Goal Bounds (Total & Team Goal Ranges)</h4>
+                <Gauge className="w-4 h-4 text-[var(--accent)]" />
+                <h4 className="font-display text-[14px] font-semibold text-[var(--text)]">
+                  Goal bounds
+                </h4>
               </div>
-              <span className="text-[11px] font-mono text-[#8B9890]">Non overlapping bands</span>
+              <span className="text-[11px] text-[var(--text-2)]">Non overlapping bands</span>
             </div>
 
-            {/* Highlights */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {mostLikelyGoalBand && (
-                <div className="p-2.5 rounded-[8px] bg-[#101713] border border-white/[0.07] space-y-1">
-                  <div className="text-[10px] uppercase font-mono text-[#8B9890]">Most Likely Goal Band</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12.5px] font-medium text-[#ECF1EE]">{cleanDisplayText(mostLikelyGoalBand.selection)}</span>
-                    <span className="font-mono text-[#B6E63B] font-bold tabular-nums">{(mostLikelyGoalBand.modelProbability * 100).toFixed(0)}%</span>
+            {(mostLikelyGoalBand || safestWideBand) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {mostLikelyGoalBand && (
+                  <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] space-y-1">
+                    <div className="text-[11px] text-[var(--text-2)]">Most likely band</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-semibold text-[var(--text)]">
+                        {cleanDisplayText(mostLikelyGoalBand.selection)}
+                      </span>
+                      <span className="font-display text-[14px] text-[var(--accent)] font-bold tabular-nums">
+                        {(mostLikelyGoalBand.modelProbability * 100).toFixed(0)}%
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-[#8B9890]">Modal point of bivariate Poisson joint matrix</div>
+                )}
+
+                {safestWideBand && (
+                  <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] space-y-1">
+                    <div className="text-[11px] text-[var(--text-2)]">Wide band cushion</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-semibold text-[var(--text)]">
+                        {cleanDisplayText(safestWideBand.selection)}
+                      </span>
+                      <span className="font-display text-[14px] text-[var(--accent)] font-bold tabular-nums">
+                        {(safestWideBand.modelProbability * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="border border-[var(--line)] rounded-[12px] overflow-hidden">
+              {goalBoundsPredictions.length > 0 ? (
+                goalBoundsPredictions.map(renderPredictionRow)
+              ) : (
+                <div className="p-4 text-center text-[12px] text-[var(--text-3)]">
+                  No goal bound lines evaluated.
                 </div>
               )}
-
-              {safestWideBand && (
-                <div className="p-2.5 rounded-[8px] bg-[#101713] border border-white/[0.07] space-y-1">
-                  <div className="text-[10px] uppercase font-mono text-[#8B9890]">Top Wide Band Cushion</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12.5px] font-medium text-[#ECF1EE]">{cleanDisplayText(safestWideBand.selection)}</span>
-                    <span className="font-mono text-[#B6E63B] font-bold tabular-nums">{(safestWideBand.modelProbability * 100).toFixed(0)}%</span>
-                  </div>
-                  <div className="text-[10px] text-[#8B9890]">Wide range covers bulk of simulated scorelines</div>
-                </div>
-              )}
-            </div>
-
-            {/* Bands table */}
-            <div className="divide-y divide-white/[0.05] border border-white/[0.07] rounded-[8px] overflow-hidden bg-[#101713]/50">
-              {goalBoundsPredictions.map(renderPredictionRow)}
             </div>
           </div>
 
-          {/* 3. HALVES ANALYSIS SECTION */}
-          <div className="bg-[#151E19] border border-white/[0.07] rounded-[11px] p-3.5 space-y-3">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-2.5">
+          {/* Halves analysis */}
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-[var(--line)] pb-2.5">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-[#B6E63B]" />
-                <h4 className="text-[13px] font-semibold text-[#ECF1EE]">Half by Half Breakdown & Highest Scoring Half</h4>
+                <Clock className="w-4 h-4 text-[var(--accent)]" />
+                <h4 className="font-display text-[14px] font-semibold text-[var(--text)]">
+                  Half by half breakdown
+                </h4>
               </div>
-              <span className="text-[11px] font-mono text-[#8B9890]">
-                {hasHalfData ? 'Empirically calibrated (100% sum)' : 'Insufficient split data'}
+              <span className="text-[11px] text-[var(--text-2)]">
+                {hasHalfData ? 'Empirically calibrated' : 'Insufficient split data'}
               </span>
             </div>
 
             {hasHalfData ? (
-              <div className="divide-y divide-white/[0.05] border border-white/[0.07] rounded-[8px] overflow-hidden bg-[#101713]/50">
+              <div className="border border-[var(--line)] rounded-[12px] overflow-hidden">
                 {halfPredictions.map(renderPredictionRow)}
               </div>
             ) : (
-              <div className="p-4 rounded-[8px] bg-[#101713] border border-white/[0.07] text-center text-[12px] text-[#8B9890] space-y-1">
-                <AlertTriangle className="w-4 h-4 text-[#E2AE45] mx-auto" />
-                <p className="font-semibold text-[#ECF1EE]">Insufficient Half Split Data</p>
-                <p>First half and second half goal records for {homeTeamName} and {awayTeamName} not available in stored matches. Engine abstains to prevent fabricated projections.</p>
+              <div className="p-4 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] text-center text-[12px] text-[var(--text-2)] space-y-1">
+                <AlertTriangle className="w-4 h-4 text-[var(--medium)] mx-auto" />
+                <p className="font-semibold text-[var(--text)]">Insufficient half split data</p>
+                <p>
+                  Half level goal records for {homeTeamName} and {awayTeamName} are unavailable. Engine abstains.
+                </p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* VIEW MODE 3: ALL LINES TRADITIONAL TABLE */}
+      {/* VIEW MODE 3: ALL LINES */}
       {viewMode === 'ALL_LINES' && (
-        <div className="space-y-0">
-          {/* Filter Bar for All Lines */}
-          <div className="border-b border-white/[0.07] bg-[#151E19] py-2 px-3.5 flex items-center justify-between gap-3 text-[11px]">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] overflow-hidden">
+          <div className="border-b border-[var(--line)] bg-[var(--surface-2)]/60 py-2 px-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-              {['ALL', 'match_result', 'double_chance', 'handicap', 'total_goals', 'goal_bounds', 'half_time', 'total_corners', 'bookings', 'combos'].map(cat => (
+              {[
+                'ALL',
+                'match_result',
+                'double_chance',
+                'handicap',
+                'total_goals',
+                'goal_bounds',
+                'half_time',
+                'total_corners',
+                'bookings',
+              ].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setMarketFilter(cat)}
                   type="button"
-                  className={`px-2.5 py-1 rounded-[8px] font-medium transition-colors whitespace-nowrap touch-press ${
+                  className={`min-h-[36px] px-3 rounded-full text-[11.5px] font-medium transition-colors whitespace-nowrap touch-press shrink-0 border ${
                     marketFilter === cat
-                      ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold'
-                      : 'bg-[#101713] text-[#8B9890] hover:text-[#ECF1EE] border border-white/[0.07]'
+                      ? 'bg-[var(--accent-soft)] border-[var(--accent)]/40 text-[var(--accent)] font-semibold'
+                      : 'bg-[var(--surface)] text-[var(--text-2)] border-[var(--line)]'
                   }`}
                 >
                   {cat === 'ALL' ? 'All' : cleanDisplayText(cat)}
@@ -637,23 +703,31 @@ export default function MarketComparisonTable({
             <button
               onClick={() => setSortAsc(!sortAsc)}
               type="button"
-              className="flex items-center gap-1 text-[#8B9890] hover:text-[#ECF1EE] shrink-0 font-mono touch-press"
+              className="min-h-[36px] px-2.5 flex items-center gap-1 text-[11.5px] text-[var(--text-2)] hover:text-[var(--text)] shrink-0 touch-press"
             >
               <span>Prob</span>
-              <ArrowUpDown className="w-3 h-3" />
+              <ArrowUpDown className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="divide-y divide-white/[0.05]">
-            {filteredList.map(renderPredictionRow)}
+          <div>
+            {filteredList.length > 0 ? (
+              filteredList.map(renderPredictionRow)
+            ) : (
+              <div className="p-5 text-center text-[12.5px] text-[var(--text-3)]">
+                No markets match this category filter.
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Mandatory Statistical Estimate Disclaimer */}
-      <div className="p-3 bg-[#101713] border-t border-white/[0.07] text-[11px] text-[#8B9890] flex items-center gap-2">
-        <Info className="w-3.5 h-3.5 text-[#8B9890] shrink-0" />
-        <span>Statistical estimate only: model probabilities are derived from Dixon Coles parameters and do not represent guaranteed outcomes.</span>
+      {/* Statistical Estimate Disclaimer */}
+      <div className="p-3 bg-[var(--surface)] border border-[var(--line)] rounded-[14px] text-[11.5px] text-[var(--text-2)] flex items-center gap-2">
+        <Info className="w-4 h-4 text-[var(--text-3)] shrink-0" />
+        <span>
+          Statistical estimates derived from Dixon Coles parameters; outcomes are never guaranteed.
+        </span>
       </div>
     </div>
   );

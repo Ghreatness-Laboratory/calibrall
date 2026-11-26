@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { DM_Sans, Inter } from 'next/font/google';
 import './globals.css';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -11,10 +12,27 @@ import OfflineBanner from '@/components/pwa/OfflineBanner';
 import TopSportBar from '@/components/TopSportBar';
 import { SportProvider } from '@/lib/context/SportContext';
 
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['600', '700'],
+  variable: '--font-dm-sans',
+  display: 'swap',
+});
+
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
 export const dynamic = 'force-dynamic';
 
 export const viewport: Viewport = {
-  themeColor: '#0A0E0C',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F4F6F5' },
+    { media: '(prefers-color-scheme: dark)', color: '#0A0E0D' },
+  ],
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -52,13 +70,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className={`${dmSans.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Calibrall" />
-        <meta name="theme-color" content="#0A0E0C" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.webmanifest" />
         <script
@@ -67,12 +84,12 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-[100dvh] bg-[#0A0E0C] text-[#E9EFEB] flex flex-col antialiased selection:bg-[#B8E636] selection:text-[#0A0E0C] pb-[calc(64px+env(safe-area-inset-bottom,0px)+24px)] md:pb-6">
+      <body className="min-h-[100dvh] bg-[var(--bg)] text-[var(--text)] flex flex-col antialiased selection:bg-[var(--accent-fill)] selection:text-[#0A0E0D] pb-[calc(78px+env(safe-area-inset-bottom,0px)+16px)] md:pb-8">
         <InstallPromptProvider>
           <SportProvider>
             <Navbar />
             <OfflineBanner />
-            <main className="flex-1 max-w-[430px] md:max-w-4xl lg:max-w-7xl w-full mx-auto px-[18px] py-3 min-w-0">
+            <main className="flex-1 max-w-[430px] md:max-w-4xl lg:max-w-7xl w-full mx-auto px-4 py-3 min-w-0">
               <TopSportBar />
               {children}
             </main>

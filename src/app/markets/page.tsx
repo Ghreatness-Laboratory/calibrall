@@ -88,7 +88,6 @@ export default function MarketExplorerPage() {
     return FOOTBALL_MARKET_OPTIONS.filter((o) => o.optionType === selectedOptionType);
   }, [isBasketball, selectedOptionType]);
 
-  // Evaluate upcoming fixtures for this specific market code / category
   const comparisons = useMemo(() => {
     if (isBasketball) {
       const list: {
@@ -152,7 +151,7 @@ export default function MarketExplorerPage() {
     const list: {
       fixtureId: string;
       fixture: Fixture;
-      prediction: any;
+      prediction: ReturnType<typeof evaluateFixtureMarkets>['predictions'][number];
     }[] = [];
 
     fixtures
@@ -202,30 +201,29 @@ export default function MarketExplorerPage() {
   if (isSwitching) {
     return (
       <div className="space-y-4 py-3 animate-pulse">
-        <div className="h-6 w-48 bg-[#151E19] rounded-[6px]" />
-        <div className="h-28 bg-[#101713] rounded-[14px] border border-white/[0.07]" />
+        <div className="h-7 w-52 bg-[var(--surface)] rounded-[8px]" />
+        <div className="h-28 bg-[var(--surface)] rounded-[18px] border border-[var(--line)]" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-3.5 py-1">
+    <div className="space-y-4 py-1">
       {/* Header */}
-      <div className="space-y-0.5 pb-1 border-b border-white/[0.07]">
-        <h1 className="text-[23px] font-[700] leading-[1.2] text-[#ECF1EE] tracking-[-0.025em]">
-          {isBasketball ? 'Basketball cross match totals explorer' : 'Cross match market explorer'}
+      <div className="space-y-1 pb-2 border-b border-[var(--line)]">
+        <h1 className="font-display text-[26px] font-bold leading-[1.15] text-[var(--text)] tracking-[-0.02em]">
+          {isBasketball ? 'Basketball cross-match totals' : 'Cross-match market explorer'}
         </h1>
-        <p className="text-[12px] text-[#8B9890]">
+        <p className="text-[12.5px] text-[var(--text-2)] leading-[1.5]">
           {isBasketball
             ? 'Compare calibrated game total, team total, and 1st half total probabilities across NBA, NCAAB, and EuroLeague.'
-            : 'Compare model probability, pricing, and calibration status for specific option lines across all European fixtures.'}
+            : 'Compare model probability, pricing, and calibration status for specific option lines across European fixtures.'}
         </p>
       </div>
 
-      {/* Saved copy or server error notice */}
       {(isSavedCopy || error) && (
-        <div className="p-2.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11.5px] flex items-center gap-2">
-          <Info className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+        <div className="p-3 rounded-[12px] bg-[var(--medium-soft)] border border-[var(--medium)]/30 text-[var(--medium)] text-[12px] flex items-center gap-2">
+          <Info className="w-4 h-4 shrink-0" />
           <span>
             {isSavedCopy
               ? `Showing saved copy${lastUpdated ? ` from ${lastUpdated}` : ''}${error ? ` (${error})` : ''}.`
@@ -236,7 +234,6 @@ export default function MarketExplorerPage() {
         </div>
       )}
 
-      {/* Basketball League Selector */}
       {isBasketball && (
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
           {(['ALL', 'NBA', 'NCAAB', 'EUROLEAGUE'] as const).map((lg) => (
@@ -244,10 +241,10 @@ export default function MarketExplorerPage() {
               key={lg}
               type="button"
               onClick={() => setBasketballLeagueFilter(lg)}
-              className={`h-[30px] px-3 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
+              className={`min-h-[44px] px-4 rounded-full text-[12px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
                 basketballLeagueFilter === lg
-                  ? 'bg-[#B8E636]/15 border-[#B8E636] text-[#B8E636] font-semibold'
-                  : 'bg-[#101713] border-white/[0.07] text-[#8B9890] hover:text-[#ECF1EE]'
+                  ? 'bg-[var(--accent-soft)] border-[var(--accent)] text-[var(--accent)] font-semibold'
+                  : 'bg-[var(--surface)] border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text)]'
               }`}
             >
               {lg === 'ALL' ? 'All' : lg === 'EUROLEAGUE' ? 'EuroLeague' : lg}
@@ -257,8 +254,7 @@ export default function MarketExplorerPage() {
       )}
 
       {/* Market Selector Card */}
-      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-3.5 space-y-3">
-        {/* Step 1: Option Type Filter */}
+      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
           {optionFilterTabs.map((tab) => (
             <button
@@ -281,10 +277,10 @@ export default function MarketExplorerPage() {
                 }
               }}
               type="button"
-              className={`h-[30px] px-3 rounded-full text-[11px] whitespace-nowrap transition-colors touch-press shrink-0 ${
+              className={`min-h-[44px] px-3.5 rounded-full text-[12px] whitespace-nowrap transition-colors touch-press shrink-0 border ${
                 selectedOptionType === tab.id
-                  ? 'bg-[rgba(182,230,59,0.12)] border border-[#B6E63B] text-[#B6E63B] font-semibold'
-                  : 'bg-[#151E19] text-[#8B9890] hover:text-[#ECF1EE] border border-white/[0.07]'
+                  ? 'bg-[var(--accent-soft)] border-[var(--accent)] text-[var(--accent)] font-semibold'
+                  : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--text)] border-[var(--line)]'
               }`}
             >
               {tab.label}
@@ -292,10 +288,9 @@ export default function MarketExplorerPage() {
           ))}
         </div>
 
-        {/* Step 2: Target Line Selector */}
-        <div className="pt-2 border-t border-white/[0.07]">
-          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8B9890] mb-2">
-            TARGET MARKET ({filteredOptions.length} AVAILABLE):
+        <div className="pt-2.5 border-t border-[var(--line)]">
+          <div className="text-[11.5px] font-medium text-[var(--text-2)] mb-2">
+            Target market ({filteredOptions.length} available)
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {filteredOptions.map((opt) => (
@@ -309,10 +304,10 @@ export default function MarketExplorerPage() {
                   }
                 }}
                 type="button"
-                className={`px-2.5 py-1 rounded-[8px] text-[12px] transition-colors font-medium touch-press ${
+                className={`min-h-[44px] px-3 rounded-[12px] text-[12px] transition-colors font-medium touch-press border ${
                   selectedMarketLine === opt.code
-                    ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold shadow-sm'
-                    : 'bg-[#151E19] hover:bg-white/[0.04] text-[#8B9890] hover:text-[#ECF1EE] border border-white/[0.07]'
+                    ? 'bg-[var(--accent-fill)] text-[var(--accent-ink)] border-transparent font-bold'
+                    : 'bg-[var(--surface-2)] hover:border-[var(--border-strong)] text-[var(--text-2)] hover:text-[var(--text)] border-[var(--line)]'
                 }`}
               >
                 {cleanDisplayText(opt.label)}
@@ -323,23 +318,23 @@ export default function MarketExplorerPage() {
       </div>
 
       {/* Comparisons Table */}
-      <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] overflow-hidden">
-        <div className="p-3 bg-[#151E19] border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]">
+      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] overflow-hidden">
+        <div className="p-4 bg-[var(--surface-2)] border-b border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]">
           <div>
-            <h2 className="font-semibold text-[#ECF1EE] flex items-center gap-2 text-[13px]">
-              <span>Cross match comparison:</span>
-              <span className="text-[#B6E63B]">{cleanDisplayText(activeOption?.label)}</span>
+            <h2 className="font-display font-semibold text-[var(--text)] flex items-center gap-2 text-[14px]">
+              <span>Cross-match comparison:</span>
+              <span className="text-[var(--accent)]">{cleanDisplayText(activeOption?.label)}</span>
             </h2>
-            <div className="text-[#8B9890] text-[11px] mt-0.5 flex items-center gap-2">
-              <span className="flex items-center gap-1 font-mono">
-                <Clock className="w-3 h-3 text-[#B6E63B]" />
+            <div className="text-[var(--text-2)] text-[11px] mt-0.5 flex items-center gap-2">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
                 <span>Period: {cleanDisplayText(activeOption?.period)}</span>
               </span>
               <span>·</span>
               <span>Ranked by calibrated probability</span>
             </div>
           </div>
-          <span className="font-mono text-[#8B9890] text-[11px] tabular-nums">
+          <span className="text-[var(--text-2)] text-[11.5px] tabular-nums">
             {comparisons.length} {isBasketball ? 'games' : 'fixtures'}
           </span>
         </div>
@@ -347,17 +342,17 @@ export default function MarketExplorerPage() {
         {comparisons.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[12px]">
-              <thead className="bg-[#101713] text-[#8B9890] text-[10px] font-mono uppercase tracking-[0.14em] border-b border-white/[0.07]">
+              <thead className="bg-[var(--surface)] text-[var(--text-2)] text-[11px] font-medium border-b border-[var(--line)]">
                 <tr>
-                  <th className="py-2.5 px-3">Matchup</th>
-                  <th className="py-2.5 px-3">Modeled selection</th>
-                  <th className="py-2.5 px-3">Probability</th>
-                  <th className="py-2.5 px-3">Price / Line source</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
+                  <th className="py-3 px-3.5">Matchup</th>
+                  <th className="py-3 px-3.5">Selection</th>
+                  <th className="py-3 px-3.5">Probability</th>
+                  <th className="py-3 px-3.5">Price / Source</th>
+                  <th className="py-3 px-3.5">Status</th>
+                  <th className="py-3 px-3.5 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.05]">
+              <tbody className="divide-y divide-[var(--line)]">
                 {isBasketball
                   ? (comparisons as Array<{
                       fixtureId: string;
@@ -367,97 +362,93 @@ export default function MarketExplorerPage() {
                       abstentionReason: string | null;
                       prob: number;
                     }>).map(({ fixture, pick, needsHistory, abstentionReason }) => (
-                      <tr key={fixture.id} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="py-3 px-3">
-                          <div className="font-medium text-[#ECF1EE]">
+                      <tr key={fixture.id} className="hover:bg-[var(--surface-2)]/50 transition-colors">
+                        <td className="py-3 px-3.5">
+                          <div className="font-medium text-[var(--text)]">
                             {cleanDisplayText(fixture.homeTeam.name)} vs {cleanDisplayText(fixture.awayTeam.name)}
                           </div>
-                          <div className="text-[11px] text-[#8B9890] font-mono">
+                          <div className="text-[11px] text-[var(--text-2)]">
                             {fixture.basketballStats?.league || fixture.competition.code}
                             {fixture.basketballStats?.neutral ? ' · Neutral' : ''}
                           </div>
                         </td>
-                        <td className="py-3 px-3 text-[#ECF1EE] font-medium">
+                        <td className="py-3 px-3.5 text-[var(--text)] font-medium">
                           {needsHistory || !pick ? (
-                            <span className="text-[#E8B04A]">Needs history</span>
+                            <span className="text-[var(--medium)]">Needs history</span>
                           ) : (
                             cleanDisplayText(pick.selection)
                           )}
                         </td>
-                        <td className="py-3 px-3 font-mono font-semibold text-[#B6E63B] tabular-nums">
+                        <td className="py-3 px-3.5 font-display font-bold text-[var(--accent)] tabular-nums">
                           {needsHistory || !pick ? '—' : `${(pick.calibratedProbability * 100).toFixed(1)}%`}
                         </td>
-                        <td className="py-3 px-3 font-mono text-[#ECF1EE] tabular-nums text-[11px]">
+                        <td className="py-3 px-3.5 text-[var(--text)] tabular-nums text-[11.5px]">
                           {needsHistory || !pick
                             ? cleanDisplayText(abstentionReason || 'Needs history')
                             : pick.isModelLine
-                            ? 'Model line - no market price'
-                            : `${pick.priceSource} @${pick.marketOdds?.toFixed(2)}${
-                                pick.expectedValue !== null
-                                  ? ` (EV ${pick.expectedValue >= 0 ? '+' : ''}${(pick.expectedValue * 100).toFixed(1)}%)`
-                                  : ''
-                              }`}
+                            ? 'Model line'
+                            : `${pick.priceSource} @${pick.marketOdds?.toFixed(2)}`}
                         </td>
-                        <td className="py-3 px-3 font-mono text-[11px]">
+                        <td className="py-3 px-3.5 text-[11px]">
                           {needsHistory || !pick ? (
-                            <span className="text-[#E8B04A]">ABSTAIN</span>
+                            <span className="text-[var(--medium)]">Abstained</span>
                           ) : (
-                            <span className={pick.tier === 'HIGH' ? 'text-[#B6E63B]' : 'text-[#8B9890]'}>
-                              {pick.tier}
+                            <span className={pick.tier === 'HIGH' ? 'text-[var(--accent)] font-semibold' : 'text-[var(--text-2)]'}>
+                              {pick.tier === 'HIGH' ? 'High' : pick.tier === 'MEDIUM' ? 'Medium' : 'Speculative'}
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-3 text-right">
+                        <td className="py-3 px-3.5 text-right">
                           <Link
                             href={`/matches/${fixture.id}`}
-                            className="inline-flex items-center gap-1 text-[11px] text-[#8B9890] hover:text-[#B6E63B] font-medium touch-press"
+                            className="inline-flex items-center gap-1 text-[11.5px] text-[var(--accent)] hover:underline font-semibold touch-press"
                           >
                             <span>Analyze</span>
-                            <ArrowUpRight className="w-3 h-3" />
+                            <ArrowUpRight className="w-3.5 h-3.5" />
                           </Link>
                         </td>
                       </tr>
                     ))
-                  : (comparisons as Array<{ fixtureId: string; fixture: Fixture; prediction: any }>).map(
-                      ({ fixture, prediction }) => (
-                        <tr key={fixture.id} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="py-3 px-3">
-                            <div className="font-medium text-[#ECF1EE]">
-                              {fixture.homeTeam.name} vs {fixture.awayTeam.name}
-                            </div>
-                            <div className="text-[11px] text-[#8B9890] font-mono">
-                              {fixture.competition.name}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-[#ECF1EE] font-medium">
-                            {cleanDisplayText(prediction.selection)}
-                          </td>
-                          <td className="py-3 px-3 font-mono font-semibold text-[#B6E63B] tabular-nums">
-                            {(prediction.modelProbability * 100).toFixed(1)}%
-                          </td>
-                          <td className="py-3 px-3 font-mono text-[#ECF1EE] tabular-nums">
-                            {prediction.marketOdds ? `@${formatOdds(prediction.marketOdds)}` : 'N/A'}
-                          </td>
-                          <td className="py-3 px-3 font-mono text-[11px] tabular-nums">
-                            <span className="text-[#8B9890]">Withheld: analysis only</span>
-                          </td>
-                          <td className="py-3 px-3 text-right">
-                            <Link
-                              href={`/matches/${fixture.id}`}
-                              className="inline-flex items-center gap-1 text-[11px] text-[#8B9890] hover:text-[#B6E63B] font-medium touch-press"
-                            >
-                              <span>Analyze</span>
-                              <ArrowUpRight className="w-3 h-3" />
-                            </Link>
-                          </td>
-                        </tr>
-                      )
-                    )}
+                  : (comparisons as Array<{
+                      fixtureId: string;
+                      fixture: Fixture;
+                      prediction: ReturnType<typeof evaluateFixtureMarkets>['predictions'][number];
+                    }>).map(({ fixture, prediction }) => (
+                      <tr key={fixture.id} className="hover:bg-[var(--surface-2)]/50 transition-colors">
+                        <td className="py-3 px-3.5">
+                          <div className="font-medium text-[var(--text)]">
+                            {fixture.homeTeam.name} vs {fixture.awayTeam.name}
+                          </div>
+                          <div className="text-[11px] text-[var(--text-2)]">{fixture.competition.name}</div>
+                        </td>
+                        <td className="py-3 px-3.5 text-[var(--text)] font-medium">
+                          {cleanDisplayText(prediction.selection)}
+                        </td>
+                        <td className="py-3 px-3.5 font-display font-bold text-[var(--accent)] tabular-nums">
+                          {(prediction.modelProbability * 100).toFixed(1)}%
+                        </td>
+                        <td className="py-3 px-3.5 text-[var(--text)] tabular-nums">
+                          {prediction.marketOdds ? `@${formatOdds(prediction.marketOdds)}` : '—'}
+                        </td>
+                        <td className="py-3 px-3.5 text-[11px]">
+                          <span className="text-[var(--text-2)]">Analysis only</span>
+                        </td>
+                        <td className="py-3 px-3.5 text-right">
+                          <Link
+                            href={`/matches/${fixture.id}`}
+                            className="inline-flex items-center gap-1 text-[11.5px] text-[var(--accent)] hover:underline font-semibold touch-press"
+                          >
+                            <span>Analyze</span>
+                            <ArrowUpRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <div className="p-8 text-center text-[12px] text-[#8B9890]">
+          <div className="p-8 text-center text-[12.5px] text-[var(--text-2)]">
             No fixtures found matching this line.
           </div>
         )}

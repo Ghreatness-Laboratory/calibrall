@@ -1,27 +1,28 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  ShieldCheck, 
-  CloudSun, 
-  Users, 
-  History, 
-  Scale, 
-  AlertTriangle, 
-  CheckCircle2, 
-  TrendingUp, 
-  Info,
+import {
+  ShieldCheck,
+  CloudSun,
+  Users,
+  History,
+  Scale,
+  AlertTriangle,
   Wind,
   Droplets,
   Thermometer,
   Layers,
   Activity,
-  Calendar
 } from 'lucide-react';
 import { computeManagerMatchup, ManagerMatchupScore } from '@/lib/prediction/managerStyleEngine';
 import { fetchKickoffWeather, WeatherCondition } from '@/lib/prediction/weatherEngine';
 import { evaluateContextualH2H, H2HEvaluationResult } from '@/lib/prediction/h2hEngine';
-import { generateMultiBookmakerPricing, blendModelWithMarket, OptionMarketPricing, ModelMarketBlendResult } from '@/lib/prediction/oddsEngine';
+import {
+  generateMultiBookmakerPricing,
+  blendModelWithMarket,
+  OptionMarketPricing,
+  ModelMarketBlendResult,
+} from '@/lib/prediction/oddsEngine';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import type { TeamHistoryAndForm } from '@/lib/data/matchesStore';
 
@@ -43,7 +44,6 @@ export default function QuantitativeFactorsAuditPanel({
   homeTeamName,
   awayTeamName,
   venueName,
-  kickoffTime,
   topPickOdds = 1.95,
   topPickSelection = 'Home Win',
   topPickProbability = 0.54,
@@ -58,7 +58,14 @@ export default function QuantitativeFactorsAuditPanel({
     awayForm: TeamHistoryAndForm;
     h2h: {
       totalMeetings: number;
-      meetings: any[];
+      meetings: Array<{
+        id?: string;
+        date?: string;
+        homeTeam: string;
+        awayTeam: string;
+        homeGoals: number;
+        awayGoals: number;
+      }>;
       winsA: number;
       draws: number;
       winsB: number;
@@ -68,13 +75,14 @@ export default function QuantitativeFactorsAuditPanel({
   } | null>(null);
   const [loadingForm, setLoadingForm] = useState<boolean>(true);
 
-  // Load team form & history from stored matches
   useEffect(() => {
     let isMounted = true;
     async function loadForm() {
       try {
         setLoadingForm(true);
-        const res = await fetch(`/api/v1/fixtures/form?home=${encodeURIComponent(homeTeamName)}&away=${encodeURIComponent(awayTeamName)}`);
+        const res = await fetch(
+          `/api/v1/fixtures/form?home=${encodeURIComponent(homeTeamName)}&away=${encodeURIComponent(awayTeamName)}`
+        );
         if (res.ok) {
           const json = await res.json();
           if (isMounted) setFormData(json);
@@ -86,57 +94,17 @@ export default function QuantitativeFactorsAuditPanel({
       }
     }
     loadForm();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [homeTeamName, awayTeamName]);
 
-  // Compute manager matchup
   const managerMatchup: ManagerMatchupScore = React.useMemo(() => {
     return computeManagerMatchup(homeTeamName, awayTeamName);
   }, [homeTeamName, awayTeamName]);
 
-  // Compute contextual H2H
-  const h2hResult: H2HEvaluationResult = React.useMemo(() => {
-    return evaluateContextualH2H(homeTeamName, awayTeamName, [
-      {
-        date: '2025 04 12',
-        season: '2024 25',
-        competitionCode: 'PL',
-        homeTeam: homeTeamName,
-        awayTeam: awayTeamName,
-        homeGoals: 2,
-        awayGoals: 1,
-        homeXg: 1.85,
-        awayXg: 1.10,
-        isSimilarManagerContext: true
-      },
-      {
-        date: '2024 11 02',
-        season: '2024 25',
-        competitionCode: 'PL',
-        homeTeam: awayTeamName,
-        awayTeam: homeTeamName,
-        homeGoals: 1,
-        awayGoals: 1,
-        homeXg: 1.20,
-        awayXg: 1.45,
-        isSimilarManagerContext: true
-      },
-      {
-        date: '2024 03 31',
-        season: '2023 24',
-        competitionCode: 'PL',
-        homeTeam: homeTeamName,
-        awayTeam: awayTeamName,
-        homeGoals: 0,
-        awayGoals: 0,
-        homeXg: 0.95,
-        awayXg: 0.80,
-        isSimilarManagerContext: true
-      }
-    ]);
-  }, [homeTeamName, awayTeamName]);
+  evaluateContextualH2H(homeTeamName, awayTeamName, []);
 
-  // Multi bookmaker odds pricing & de vigging
   const marketPricing: OptionMarketPricing = React.useMemo(() => {
     return generateMultiBookmakerPricing(marketCode, topPickSelection, topPickOdds);
   }, [marketCode, topPickSelection, topPickOdds]);
@@ -150,7 +118,6 @@ export default function QuantitativeFactorsAuditPanel({
     );
   }, [topPickProbability, marketPricing]);
 
-  // Kickoff weather effect
   useEffect(() => {
     let isMounted = true;
     async function loadWeather() {
@@ -165,346 +132,341 @@ export default function QuantitativeFactorsAuditPanel({
       }
     }
     loadWeather();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [venueName, homeTeamName]);
 
   return (
-    <div className="bg-[#101713] border border-white/[0.07] rounded-[14px] p-4 space-y-4">
-      {/* Header and Hypothesis Assurance */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.07] pb-3">
+    <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-4">
+      {/* Header and Sub-tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--line)] pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[#B6E63B]" />
-            <h3 className="text-[14px] font-semibold text-[#ECF1EE]">
-              Model Hypothesis & Input Telemetry
+            <ShieldCheck className="w-4 h-4 text-[var(--accent)]" />
+            <h3 className="font-display text-[14px] font-semibold text-[var(--text)]">
+              Model hypothesis &amp; input telemetry
             </h3>
           </div>
-          <p className="text-[11px] text-[#8B9890] mt-0.5">
-            Every input is an audited hypothesis retained solely upon walk forward validation gain.
+          <p className="text-[11.5px] text-[var(--text-2)] mt-0.5 leading-[1.45]">
+            Inputs retained only upon out-of-sample walk-forward validation gain.
           </p>
         </div>
 
-        {/* Tab switchers */}
-        <div className="flex items-center gap-1 bg-[#151E19] p-1 rounded-[11px] border border-white/[0.07] text-[11px] overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('form')}
-            type="button"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press shrink-0 ${
-              activeTab === 'form' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            <span>Form & History</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('tactics')}
-            type="button"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press shrink-0 ${
-              activeTab === 'tactics' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Coaches</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('weather')}
-            type="button"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press shrink-0 ${
-              activeTab === 'weather' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
-            }`}
-          >
-            <CloudSun className="w-3.5 h-3.5" />
-            <span>Weather</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('odds')}
-            type="button"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] font-medium transition-colors touch-press shrink-0 ${
-              activeTab === 'odds' ? 'bg-[#B6E63B] text-[#0A0F0D] font-bold' : 'text-[#8B9890] hover:text-[#ECF1EE]'
-            }`}
-          >
-            <Scale className="w-3.5 h-3.5" />
-            <span>Market De Vig</span>
-          </button>
+        {/* Underlined or compact tab switchers with >= 44px hit height */}
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none border-b border-[var(--line)] sm:border-b-0">
+          {(
+            [
+              { id: 'form', label: 'Form & history', icon: Activity },
+              { id: 'tactics', label: 'Coaches', icon: Users },
+              { id: 'weather', label: 'Weather', icon: CloudSun },
+              { id: 'odds', label: 'Market de-vig', icon: Scale },
+            ] as const
+          ).map((t) => {
+            const Icon = t.icon;
+            const active = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                type="button"
+                className={`min-h-[44px] px-3 flex items-center gap-1.5 text-[12px] font-semibold whitespace-nowrap shrink-0 border-b-2 transition-colors touch-press ${
+                  active
+                    ? 'border-[var(--accent)] text-[var(--accent)]'
+                    : 'border-transparent text-[var(--text-2)] hover:text-[var(--text)]'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* TAB 1: COACH PLAYING STYLE & TACTICAL PROFILE */}
+      {/* TAB: COACH PLAYING STYLE */}
       {activeTab === 'tactics' && (
         <div className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Home Manager */}
-            <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[10.5px] uppercase font-mono tracking-wider text-[#8B9890] block">Home Manager</span>
-                  <h4 className="text-[14px] font-bold text-[#ECF1EE]">{managerMatchup.homeManager.name}</h4>
+            {[
+              {
+                role: 'Home manager',
+                mgr: managerMatchup.homeManager,
+                isNew: managerMatchup.isHomeNewManager,
+                note: 'New manager adjustment active: Bayesian shrinkage to club prior applied.',
+              },
+              {
+                role: 'Away manager',
+                mgr: managerMatchup.awayManager,
+                isNew: managerMatchup.isAwayNewManager,
+                note: 'New manager adjustment active: shrunk to club prior.',
+              },
+            ].map((item) => (
+              <div
+                key={item.role}
+                className="p-3.5 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] space-y-2.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10.5px] text-[var(--text-2)] block">{item.role}</span>
+                    <h4 className="font-display text-[14px] font-bold text-[var(--text)]">
+                      {item.mgr.name}
+                    </h4>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10.5px] text-[var(--text-2)] block">Formation</span>
+                    <span className="text-[12px] text-[var(--accent)] font-semibold tabular-nums">
+                      {item.mgr.preferredFormation}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-[#8B9890] block">Formation</span>
-                  <span className="text-[12px] font-mono text-[#B6E63B] font-semibold">{managerMatchup.homeManager.preferredFormation}</span>
+
+                <div className="grid grid-cols-3 gap-2 pt-2 text-[11.5px] border-t border-[var(--line)] tabular-nums">
+                  <div>
+                    <span className="text-[var(--text-2)] block text-[10.5px]">PPDA press</span>
+                    <span className="text-[var(--text)] font-semibold">
+                      {item.mgr.pressingIntensityPpda.toFixed(1)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-2)] block text-[10.5px]">Possession</span>
+                    <span className="text-[var(--text)] font-semibold">
+                      {(item.mgr.possessionPct * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-2)] block text-[10.5px]">Tenure</span>
+                    <span className="text-[var(--text)] font-semibold">
+                      {item.mgr.tenureMatches} matches
+                    </span>
+                  </div>
                 </div>
+
+                {item.isNew && (
+                  <div className="px-2.5 py-1.5 rounded-[10px] bg-[var(--medium-soft)] border border-[var(--medium)]/30 text-[var(--medium)] text-[11px] flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{item.note}</span>
+                  </div>
+                )}
               </div>
-
-              <div className="grid grid-cols-3 gap-1.5 pt-1 text-[11px] border-t border-white/[0.05]">
-                <div>
-                  <span className="text-[#8B9890] block text-[10px]">PPDA (Press)</span>
-                  <span className="font-mono text-[#ECF1EE] font-semibold">{managerMatchup.homeManager.pressingIntensityPpda.toFixed(1)}</span>
-                </div>
-                <div>
-                  <span className="text-[#8B9890] block text-[10px]">Possession</span>
-                  <span className="font-mono text-[#ECF1EE] font-semibold">{(managerMatchup.homeManager.possessionPct * 100).toFixed(0)}%</span>
-                </div>
-                <div>
-                  <span className="text-[#8B9890] block text-[10px]">Tenure</span>
-                  <span className="font-mono text-[#ECF1EE] font-semibold">{managerMatchup.homeManager.tenureMatches} matches</span>
-                </div>
-              </div>
-
-              {managerMatchup.isHomeNewManager && (
-                <div className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10.5px] flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>New manager adjustment active: Bayesian shrinkage to club prior applied.</span>
-                </div>
-              )}
-            </div>
-
-            {/* Away Manager */}
-            <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[10.5px] uppercase font-mono tracking-wider text-[#8B9890] block">Away Manager</span>
-                  <h4 className="text-[14px] font-bold text-[#ECF1EE]">{managerMatchup.awayManager.name}</h4>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-[#8B9890] block">Formation</span>
-                  <span className="text-[12px] font-mono text-[#B6E63B] font-semibold">{managerMatchup.awayManager.preferredFormation}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-1.5 pt-1 text-[11px] border-t border-white/[0.05]">
-                <div>
-                  <span className="text-[#8B9890] block text-[10px]">PPDA (Press)</span>
-                  <span className="font-mono text-[#ECF1EE] font-semibold">{managerMatchup.awayManager.pressingIntensityPpda.toFixed(1)}</span>
-                </div>
-                <div>
-                  <span className="text-[#8B9890] block text-[10px]">Possession</span>
-                  <span className="font-mono text-[#ECF1EE] font-semibold">{(managerMatchup.awayManager.possessionPct * 100).toFixed(0)}%</span>
-                </div>
-                <div>
-                  <span className="text-[#8B9890] block text-[10px]">Tenure</span>
-                  <span className="font-mono text-[#ECF1EE] font-semibold">{managerMatchup.awayManager.tenureMatches} matches</span>
-                </div>
-              </div>
-
-              {managerMatchup.isAwayNewManager && (
-                <div className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10.5px] flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>New manager adjustment active: Shrunk to prior.</span>
-                </div>
-              )}
-            </div>
+            ))}
           </div>
 
-          {/* Tactical Impact Matrix */}
-          <div className="p-3 bg-[#151E19]/60 border border-white/[0.07] rounded-[11px] space-y-2">
-            <span className="text-[11px] font-semibold text-[#ECF1EE] block">Tactical Style Interaction Matrix</span>
-            <p className="text-[11.5px] text-[#8B9890]">{cleanDisplayText(managerMatchup.matchupNarrative)}</p>
+          <div className="p-3.5 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] space-y-2.5">
+            <span className="font-display text-[13px] font-semibold text-[var(--text)] block">
+              Tactical style interaction
+            </span>
+            <p className="text-[12.5px] text-[var(--text-2)] leading-[1.5]">
+              {cleanDisplayText(managerMatchup.matchupNarrative)}
+            </p>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Goals Multiplier</span>
-                <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">{managerMatchup.goalsImpactMultiplier}x</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 tabular-nums">
+              <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                <span className="text-[10.5px] text-[var(--text-2)] block">Goals mult</span>
+                <span className="font-display text-[14px] font-bold text-[var(--text)]">
+                  {managerMatchup.goalsImpactMultiplier}x
+                </span>
               </div>
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Corners Impact</span>
-                <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">{managerMatchup.cornersImpactMultiplier}x</span>
+              <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                <span className="text-[10.5px] text-[var(--text-2)] block">Corners impact</span>
+                <span className="font-display text-[14px] font-bold text-[var(--text)]">
+                  {managerMatchup.cornersImpactMultiplier}x
+                </span>
               </div>
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Cards Multiplier</span>
-                <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">{managerMatchup.cardsImpactMultiplier}x</span>
+              <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                <span className="text-[10.5px] text-[var(--text-2)] block">Cards mult</span>
+                <span className="font-display text-[14px] font-bold text-[var(--text)]">
+                  {managerMatchup.cardsImpactMultiplier}x
+                </span>
               </div>
-              <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                <span className="text-[10px] text-[#8B9890] block">Uncertainty Spread</span>
-                <span className="text-[13px] font-mono font-bold text-[#B6E63B]">{managerMatchup.uncertaintyMultiplier}x</span>
+              <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                <span className="text-[10.5px] text-[var(--text-2)] block">Uncertainty</span>
+                <span className="font-display text-[14px] font-bold text-[var(--accent)]">
+                  {managerMatchup.uncertaintyMultiplier}x
+                </span>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 2: KICKOFF WEATHER FORECAST */}
+      {/* TAB: KICKOFF WEATHER */}
       {activeTab === 'weather' && (
         <div className="space-y-3">
           {loadingWeather ? (
-            <div className="p-3.5 bg-[#101613] border border-[#1F2A24] rounded-[14px] space-y-2.5 animate-pulse">
-              <div className="h-4 w-44 bg-[#151D19] rounded-[4px]" />
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+            <div className="p-4 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] space-y-3 animate-pulse">
+              <div className="h-4 w-44 bg-[var(--surface)] rounded-[8px]" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="p-2 bg-[#151D19] rounded-[8px] space-y-1.5">
-                    <div className="h-2.5 w-16 bg-[#101613] rounded-[4px]" />
-                    <div className="h-4 w-12 bg-[#101613] rounded-[4px]" />
+                  <div key={i} className="p-2.5 bg-[var(--surface)] rounded-[10px] space-y-1.5">
+                    <div className="h-3 w-16 bg-[var(--surface-2)] rounded-[4px]" />
+                    <div className="h-5 w-12 bg-[var(--surface-2)] rounded-[4px]" />
                   </div>
                 ))}
               </div>
             </div>
           ) : weather ? (
-            <div className="space-y-3">
-              <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <CloudSun className="w-4 h-4 text-[#B6E63B]" />
-                    <span className="text-[13px] font-semibold text-[#ECF1EE]">{cleanDisplayText(weather.summary)}</span>
+            <div className="p-3.5 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CloudSun className="w-4 h-4 text-[var(--accent)]" />
+                  <span className="text-[13px] font-semibold text-[var(--text)]">
+                    {cleanDisplayText(weather.summary)}
+                  </span>
+                </div>
+                <span className="text-[10.5px] px-2.5 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--line)] text-[var(--text-2)]">
+                  {weather.source}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11.5px] tabular-nums">
+                <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                  <div className="flex items-center gap-1 text-[var(--text-2)] text-[10.5px]">
+                    <Thermometer className="w-3 h-3 text-[var(--medium)]" />
+                    <span>Temperature</span>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#101713] border border-white/[0.07] text-[#8B9890]">
-                    {weather.source}
+                  <span className="font-display text-[14px] font-bold text-[var(--text)] block mt-0.5">
+                    {weather.temperatureCelsius}°C
+                  </span>
+                  <span className="text-[10.5px] text-[var(--text-3)]">
+                    Feels {weather.feelsLikeCelsius}°C
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
-                  <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                    <div className="flex items-center gap-1 text-[#8B9890] text-[10px]">
-                      <Thermometer className="w-3 h-3 text-amber-400" />
-                      <span>Temperature</span>
-                    </div>
-                    <span className="text-[13px] font-mono font-bold text-[#ECF1EE] block mt-0.5">
-                      {weather.temperatureCelsius}°C
-                    </span>
-                    <span className="text-[10px] text-[#5E6A63]">Feels {weather.feelsLikeCelsius}°C</span>
+                <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                  <div className="flex items-center gap-1 text-[var(--text-2)] text-[10.5px]">
+                    <Droplets className="w-3 h-3 text-[var(--info)]" />
+                    <span>Precipitation</span>
                   </div>
-
-                  <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                    <div className="flex items-center gap-1 text-[#8B9890] text-[10px]">
-                      <Droplets className="w-3 h-3 text-cyan-400" />
-                      <span>Precipitation</span>
-                    </div>
-                    <span className="text-[13px] font-mono font-bold text-[#ECF1EE] block mt-0.5">
-                      {weather.precipitationMm} mm
-                    </span>
-                    <span className="text-[10px] text-[#5E6A63]">{weather.humidityPct}% humidity</span>
-                  </div>
-
-                  <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                    <div className="flex items-center gap-1 text-[#8B9890] text-[10px]">
-                      <Wind className="w-3 h-3 text-teal-400" />
-                      <span>Wind Speed</span>
-                    </div>
-                    <span className="text-[13px] font-mono font-bold text-[#ECF1EE] block mt-0.5">
-                      {weather.windSpeedKmh} km/h
-                    </span>
-                    <span className="text-[10px] text-[#5E6A63]">Surface vector</span>
-                  </div>
-
-                  <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                    <div className="flex items-center gap-1 text-[#8B9890] text-[10px]">
-                      <Layers className="w-3 h-3 text-emerald-400" />
-                      <span>Roof Status</span>
-                    </div>
-                    <span className="text-[13px] font-mono font-bold text-[#ECF1EE] block mt-0.5">
-                      {weather.isIndoorOrRoofed ? 'Roofed / Indoor' : 'Open Air Pitch'}
-                    </span>
-                    <span className="text-[10px] text-[#5E6A63]">{weather.isIndoorOrRoofed ? 'Weather neutralized' : 'Full ambient effect'}</span>
-                  </div>
+                  <span className="font-display text-[14px] font-bold text-[var(--text)] block mt-0.5">
+                    {weather.precipitationMm} mm
+                  </span>
+                  <span className="text-[10.5px] text-[var(--text-3)]">
+                    {weather.humidityPct}% humidity
+                  </span>
                 </div>
 
-                {weather.uncertaintyPenalty > 0 && (
-                  <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>
-                      {weather.missingDataReason || 'Missing forecast telemetry: Uncertainty spread widened by +15%.'}
-                    </span>
+                <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                  <div className="flex items-center gap-1 text-[var(--text-2)] text-[10.5px]">
+                    <Wind className="w-3 h-3 text-[var(--accent)]" />
+                    <span>Wind speed</span>
                   </div>
-                )}
+                  <span className="font-display text-[14px] font-bold text-[var(--text)] block mt-0.5">
+                    {weather.windSpeedKmh} km/h
+                  </span>
+                  <span className="text-[10.5px] text-[var(--text-3)]">Surface vector</span>
+                </div>
+
+                <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                  <div className="flex items-center gap-1 text-[var(--text-2)] text-[10.5px]">
+                    <Layers className="w-3 h-3 text-[var(--accent)]" />
+                    <span>Roof status</span>
+                  </div>
+                  <span className="font-display text-[13px] font-bold text-[var(--text)] block mt-0.5">
+                    {weather.isIndoorOrRoofed ? 'Roofed' : 'Open air'}
+                  </span>
+                  <span className="text-[10.5px] text-[var(--text-3)]">
+                    {weather.isIndoorOrRoofed ? 'Weather neutralized' : 'Ambient effect'}
+                  </span>
+                </div>
               </div>
+
+              {weather.uncertaintyPenalty > 0 && (
+                <div className="p-2.5 rounded-[10px] bg-[var(--medium-soft)] border border-[var(--medium)]/30 text-[11.5px] text-[var(--medium)] flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>
+                    {weather.missingDataReason ||
+                      'Missing forecast telemetry: uncertainty spread widened by +15%.'}
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-[11px] text-[11.5px] text-amber-300">
-              Stadium coordinate forecast currently unavailable. Engine penalizes model uncertainty bounds (+18% spread) rather than assuming neutral zero.
+            <div className="p-3.5 bg-[var(--medium-soft)] border border-[var(--medium)]/30 rounded-[12px] text-[12px] text-[var(--medium)]">
+              Stadium coordinate forecast currently unavailable. Engine penalizes model uncertainty bounds (+18% spread).
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 1: DEFINED TEAM FORM & SECONDARY H2H */}
+      {/* TAB: FORM & H2H */}
       {activeTab === 'form' && (
         <div className="space-y-4">
           {loadingForm ? (
-            <div className="p-3.5 bg-[#101613] border border-[#1F2A24] rounded-[14px] space-y-2.5 animate-pulse">
-              <div className="h-4 w-52 bg-[#151D19] rounded-[4px]" />
-              <div className="h-16 w-full bg-[#151D19] rounded-[10px]" />
-              <div className="h-16 w-full bg-[#151D19] rounded-[10px]" />
+            <div className="p-4 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] space-y-3 animate-pulse">
+              <div className="h-4 w-52 bg-[var(--surface)] rounded-[6px]" />
+              <div className="h-20 w-full bg-[var(--surface)] rounded-[12px]" />
+              <div className="h-20 w-full bg-[var(--surface)] rounded-[12px]" />
             </div>
           ) : formData ? (
             <>
-              {/* Form definition notice */}
-              <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] flex items-center justify-between gap-2">
+              <div className="p-3 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-[#B6E63B]" />
-                  <span className="text-[13px] font-semibold text-[#ECF1EE]">
-                    History Defined as Team Form
+                  <Activity className="w-4 h-4 text-[var(--accent)]" />
+                  <span className="font-display text-[13px] font-semibold text-[var(--text)]">
+                    Time-decayed team form
                   </span>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#101713] border border-white/[0.07] text-[#B6E63B]">
-                  Exponential Half-Life Decayed
+                <span className="text-[10.5px] px-2.5 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--line)] text-[var(--accent)] font-medium">
+                  Exponential half-life decayed
                 </span>
               </div>
 
-              {/* Two Column Team Form Comparison */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {/* Home Team Form Card */}
-                {([
-                  { form: formData.homeForm, label: 'Home Team', isHome: true },
-                  { form: formData.awayForm, label: 'Away Team', isHome: false }
-                ]).map(({ form, label, isHome }) => (
-                  <div key={label} className="p-3.5 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-3">
-                    {/* Team Header */}
-                    <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-white/[0.05] pb-2">
+                {[
+                  { form: formData.homeForm, label: 'Home team' },
+                  { form: formData.awayForm, label: 'Away team' },
+                ].map(({ form, label }) => (
+                  <div
+                    key={label}
+                    className="p-3.5 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] space-y-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] pb-2.5">
                       <div>
-                        <span className="text-[10px] uppercase font-mono tracking-wider text-[#8B9890] block">{label}</span>
-                        <h4 className="text-[14px] font-bold text-[#ECF1EE]">{form.teamName}</h4>
+                        <span className="text-[10.5px] text-[var(--text-2)] block">{label}</span>
+                        <h4 className="font-display text-[14px] font-bold text-[var(--text)]">
+                          {form.teamName}
+                        </h4>
                       </div>
-                      <div className="flex items-center gap-2 text-[11px]">
-                        <span className="px-2 py-0.5 rounded bg-[#101713] border border-white/[0.05] text-[#8B9890] font-mono">
-                          {form.storedMatchCount} stored matches
+                      <div className="flex items-center gap-1.5 text-[10.5px] tabular-nums">
+                        <span className="px-2 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--line)] text-[var(--text-2)]">
+                          {form.storedMatchCount} matches
                         </span>
                         {form.daysSinceLastMatch !== null && (
-                          <span className="px-2 py-0.5 rounded bg-[#101713] border border-white/[0.05] text-[#B6E63B] font-mono">
+                          <span className="px-2 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--line)] text-[var(--accent)] font-medium">
                             {form.daysSinceLastMatch}d rest
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Time Decayed Ratings */}
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                        <span className="text-[10px] text-[#8B9890] block">Decayed Attack Strength</span>
+                    <div className="grid grid-cols-2 gap-2 text-[11.5px] tabular-nums">
+                      <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                        <span className="text-[10.5px] text-[var(--text-2)] block">Attack rating</span>
                         <div className="flex items-baseline gap-1 mt-0.5">
-                          <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">
+                          <span className="font-display text-[14px] font-bold text-[var(--text)]">
                             {form.timeDecayedAttackRating.toFixed(2)}
                           </span>
-                          <span className="text-[9.5px] text-[#5E6A63] font-mono">(time-weighted)</span>
+                          <span className="text-[10.5px] text-[var(--text-3)]">weighted</span>
                         </div>
                       </div>
-                      <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                        <span className="text-[10px] text-[#8B9890] block">Decayed Defence Strength</span>
+                      <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                        <span className="text-[10.5px] text-[var(--text-2)] block">Defence rating</span>
                         <div className="flex items-baseline gap-1 mt-0.5">
-                          <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">
+                          <span className="font-display text-[14px] font-bold text-[var(--text)]">
                             {form.timeDecayedDefenseRating.toFixed(2)}
                           </span>
-                          <span className="text-[9.5px] text-[#5E6A63] font-mono">(lower is better)</span>
+                          <span className="text-[10.5px] text-[var(--text-3)]">lower better</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Last 5 Matches with Scores */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11.5px] font-semibold text-[#ECF1EE]">Last 5 Matches with Scores</span>
-                        <span className="text-[10.5px] font-mono font-bold text-[#B6E63B]">
+                        <span className="text-[12px] font-semibold text-[var(--text)]">
+                          Last 5 matches
+                        </span>
+                        <span className="text-[11px] font-bold text-[var(--accent)] tabular-nums">
                           {form.last5.formString}
                         </span>
                       </div>
@@ -514,94 +476,122 @@ export default function QuantitativeFactorsAuditPanel({
                           {form.last5.matches.map((m) => (
                             <div
                               key={m.id || m.provider_id}
-                              className="px-2.5 py-1.5 bg-[#101713] rounded-[8px] border border-white/[0.05] flex items-center justify-between text-[11px]"
+                              className="px-2.5 py-2 bg-[var(--surface)] rounded-[10px] border border-[var(--line)] flex items-center justify-between text-[11.5px]"
                             >
                               <div className="flex items-center gap-2 truncate">
-                                <span className={`w-4 h-4 rounded text-[9.5px] font-bold flex items-center justify-center font-mono ${
-                                  m.result === 'W' ? 'bg-[#B6E63B]/20 text-[#B6E63B] border border-[#B6E63B]/30' :
-                                  m.result === 'D' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                                  'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                                }`}>
+                                <span
+                                  className={`w-5 h-5 rounded-[6px] text-[10.5px] font-bold flex items-center justify-center shrink-0 ${
+                                    m.result === 'W'
+                                      ? 'bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30'
+                                      : m.result === 'D'
+                                      ? 'bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30'
+                                      : 'bg-[var(--danger-soft)] text-[var(--danger)] border border-[var(--danger)]/30'
+                                  }`}
+                                >
                                   {m.result}
                                 </span>
-                                <span className="text-[#8B9890] text-[10px] font-mono shrink-0">
-                                  {m.date ? new Date(m.date).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }) : '—'}
+                                <span className="text-[var(--text-2)] text-[10.5px] tabular-nums shrink-0">
+                                  {m.date
+                                    ? new Date(m.date).toLocaleDateString(undefined, {
+                                        month: 'numeric',
+                                        day: 'numeric',
+                                      })
+                                    : '—'}
                                 </span>
-                                <span className="text-[#ECF1EE] truncate">
+                                <span className="text-[var(--text)] truncate">
                                   {m.isHome ? `vs ${m.opponentName}` : `@ ${m.opponentName}`}
                                 </span>
                               </div>
-                              <span className="font-mono font-bold text-[#ECF1EE] text-[12px] tabular-nums shrink-0 ml-2">
-                                {m.teamScore} – {m.opponentScore}
+                              <span className="font-bold text-[var(--text)] text-[12px] tabular-nums shrink-0 ml-2">
+                                {m.teamScore} to {m.opponentScore}
                               </span>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="p-2 bg-[#101713] rounded-[8px] text-[11px] text-[#8B9890] text-center">
+                        <div className="p-2.5 bg-[var(--surface)] rounded-[10px] text-[11.5px] text-[var(--text-2)] text-center">
                           No recent finished matches recorded.
                         </div>
                       )}
                     </div>
 
-                    {/* Detailed Form Figures */}
-                    <div className="space-y-1.5 pt-1 border-t border-white/[0.05]">
-                      <span className="text-[11.5px] font-semibold text-[#ECF1EE] block">Form Figures & Rolling Splits</span>
-                      
-                      <div className="grid grid-cols-2 gap-1.5 text-[10.5px]">
-                        {/* Last 5 Summary */}
-                        <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-0.5">
-                          <span className="text-[#8B9890] font-mono block text-[9.5px]">Last 5 Window</span>
-                          <span className="text-[#ECF1EE] font-bold font-mono text-[11.5px] block">
-                            {form.last5.metrics.wins}W · {form.last5.metrics.draws}D · {form.last5.metrics.losses}L
+                    <div className="space-y-1.5 pt-2 border-t border-[var(--line)]">
+                      <span className="text-[12px] font-semibold text-[var(--text)] block">
+                        Rolling splits
+                      </span>
+
+                      <div className="grid grid-cols-2 gap-1.5 text-[11px] tabular-nums">
+                        <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)] space-y-0.5">
+                          <span className="text-[var(--text-2)] block text-[10.5px]">Last 5 window</span>
+                          <span className="text-[var(--text)] font-bold text-[12px] block">
+                            {form.last5.metrics.wins}W · {form.last5.metrics.draws}D ·{' '}
+                            {form.last5.metrics.losses}L
                           </span>
-                          <div className="text-[#8B9890] font-mono text-[10px] flex justify-between">
-                            <span>GF: {form.last5.metrics.goalsFor} | GA: {form.last5.metrics.goalsAgainst}</span>
-                            <span className={form.last5.metrics.goalDifference >= 0 ? 'text-[#B6E63B]' : 'text-rose-400'}>
-                              GD: {form.last5.metrics.goalDifference > 0 ? `+${form.last5.metrics.goalDifference}` : form.last5.metrics.goalDifference}
+                          <div className="text-[var(--text-2)] text-[10.5px] flex justify-between">
+                            <span>
+                              GF {form.last5.metrics.goalsFor} · GA {form.last5.metrics.goalsAgainst}
+                            </span>
+                            <span
+                              className={
+                                form.last5.metrics.goalDifference >= 0
+                                  ? 'text-[var(--accent)]'
+                                  : 'text-[var(--danger)]'
+                              }
+                            >
+                              {form.last5.metrics.goalDifference > 0
+                                ? `+${form.last5.metrics.goalDifference}`
+                                : form.last5.metrics.goalDifference}
                             </span>
                           </div>
-                          <span className="text-[#5E6A63] font-mono text-[9.5px] block">
-                            {form.last5.metrics.ppg} pts/game
-                          </span>
                         </div>
 
-                        {/* Last 10 Summary */}
-                        <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-0.5">
-                          <span className="text-[#8B9890] font-mono block text-[9.5px]">Last 10 Window</span>
-                          <span className="text-[#ECF1EE] font-bold font-mono text-[11.5px] block">
-                            {form.last10.metrics.wins}W · {form.last10.metrics.draws}D · {form.last10.metrics.losses}L
+                        <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)] space-y-0.5">
+                          <span className="text-[var(--text-2)] block text-[10.5px]">Last 10 window</span>
+                          <span className="text-[var(--text)] font-bold text-[12px] block">
+                            {form.last10.metrics.wins}W · {form.last10.metrics.draws}D ·{' '}
+                            {form.last10.metrics.losses}L
                           </span>
-                          <div className="text-[#8B9890] font-mono text-[10px] flex justify-between">
-                            <span>GF: {form.last10.metrics.goalsFor} | GA: {form.last10.metrics.goalsAgainst}</span>
-                            <span className={form.last10.metrics.goalDifference >= 0 ? 'text-[#B6E63B]' : 'text-rose-400'}>
-                              GD: {form.last10.metrics.goalDifference > 0 ? `+${form.last10.metrics.goalDifference}` : form.last10.metrics.goalDifference}
+                          <div className="text-[var(--text-2)] text-[10.5px] flex justify-between">
+                            <span>
+                              GF {form.last10.metrics.goalsFor} · GA {form.last10.metrics.goalsAgainst}
+                            </span>
+                            <span
+                              className={
+                                form.last10.metrics.goalDifference >= 0
+                                  ? 'text-[var(--accent)]'
+                                  : 'text-[var(--danger)]'
+                              }
+                            >
+                              {form.last10.metrics.goalDifference > 0
+                                ? `+${form.last10.metrics.goalDifference}`
+                                : form.last10.metrics.goalDifference}
                             </span>
                           </div>
-                          <span className="text-[#5E6A63] font-mono text-[9.5px] block">
-                            {form.last10.metrics.ppg} pts/game
+                        </div>
+
+                        <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)] space-y-0.5">
+                          <span className="text-[var(--text-2)] block text-[10.5px]">
+                            Home split ({form.homeSplit.matchesCount}G)
+                          </span>
+                          <span className="text-[var(--text)] font-semibold block">
+                            {form.homeSplit.wins}W · {form.homeSplit.draws}D ·{' '}
+                            {form.homeSplit.losses}L
+                          </span>
+                          <span className="text-[var(--text-3)] text-[10.5px] block">
+                            {form.homeSplit.ppg} PPG
                           </span>
                         </div>
 
-                        {/* Home Split */}
-                        <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-0.5">
-                          <span className="text-[#8B9890] font-mono block text-[9.5px]">Home Split ({form.homeSplit.matchesCount}G)</span>
-                          <span className="text-[#ECF1EE] font-mono text-[11px] font-semibold block">
-                            {form.homeSplit.wins}W · {form.homeSplit.draws}D · {form.homeSplit.losses}L
+                        <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)] space-y-0.5">
+                          <span className="text-[var(--text-2)] block text-[10.5px]">
+                            Away split ({form.awaySplit.matchesCount}G)
                           </span>
-                          <span className="text-[#5E6A63] font-mono text-[9.5px] block">
-                            GF: {form.homeSplit.goalsFor} | GA: {form.homeSplit.goalsAgainst} ({form.homeSplit.ppg} PPG)
+                          <span className="text-[var(--text)] font-semibold block">
+                            {form.awaySplit.wins}W · {form.awaySplit.draws}D ·{' '}
+                            {form.awaySplit.losses}L
                           </span>
-                        </div>
-
-                        {/* Away Split */}
-                        <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-0.5">
-                          <span className="text-[#8B9890] font-mono block text-[9.5px]">Away Split ({form.awaySplit.matchesCount}G)</span>
-                          <span className="text-[#ECF1EE] font-mono text-[11px] font-semibold block">
-                            {form.awaySplit.wins}W · {form.awaySplit.draws}D · {form.awaySplit.losses}L
-                          </span>
-                          <span className="text-[#5E6A63] font-mono text-[9.5px] block">
-                            GF: {form.awaySplit.goalsFor} | GA: {form.awaySplit.goalsAgainst} ({form.awaySplit.ppg} PPG)
+                          <span className="text-[var(--text-3)] text-[10.5px] block">
+                            {form.awaySplit.ppg} PPG
                           </span>
                         </div>
                       </div>
@@ -610,61 +600,67 @@ export default function QuantitativeFactorsAuditPanel({
                 ))}
               </div>
 
-              {/* Head-to-Head: Secondary Feature with Small Weight (Section Beneath Form) */}
-              <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.05] pb-2">
+              {/* Head-to-Head */}
+              <div className="p-3.5 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] pb-2">
                   <div className="flex items-center gap-2">
-                    <History className="w-4 h-4 text-[#8B9890]" />
-                    <span className="text-[13px] font-semibold text-[#ECF1EE]">
-                      Head-to-Head (Secondary Feature with Small Weight)
+                    <History className="w-4 h-4 text-[var(--text-2)]" />
+                    <span className="font-display text-[13px] font-semibold text-[var(--text)]">
+                      Head-to-head (secondary signal)
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#101713] border border-white/[0.07] text-[#B6E63B]">
-                    Weight: {(formData.h2h.sampleWeight * 100).toFixed(1)}% · Bayesian Shrinkage Applied
+                  <span className="text-[10.5px] px-2.5 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--line)] text-[var(--accent)] tabular-nums">
+                    Weight {(formData.h2h.sampleWeight * 100).toFixed(1)}%
                   </span>
                 </div>
 
-                <p className="text-[11.5px] text-[#8B9890]">
-                  {formData.h2h.weightDescription}. Form is the primary signal; historical meetings are strictly dampened toward the general model expectation to prevent small-sample overfitting.
+                <p className="text-[12px] text-[var(--text-2)] leading-[1.5]">
+                  {formData.h2h.weightDescription}. Historical meetings are dampened toward the general model expectation to prevent small-sample overfitting.
                 </p>
 
-                <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
-                  <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                    <span className="text-[10px] text-[#8B9890] block">Recent Meetings</span>
-                    <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">
+                <div className="grid grid-cols-3 gap-2 pt-1 text-[11.5px] tabular-nums">
+                  <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                    <span className="text-[10.5px] text-[var(--text-2)] block">Meetings</span>
+                    <span className="font-display text-[14px] font-bold text-[var(--text)]">
                       {formData.h2h.totalMeetings} games
                     </span>
                   </div>
-                  <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                    <span className="text-[10px] text-[#8B9890] block">Direct Head-to-Head</span>
-                    <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">
+                  <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                    <span className="text-[10.5px] text-[var(--text-2)] block">Direct record</span>
+                    <span className="font-display text-[14px] font-bold text-[var(--text)]">
                       {formData.h2h.winsA}W · {formData.h2h.draws}D · {formData.h2h.winsB}L
                     </span>
                   </div>
-                  <div className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                    <span className="text-[10px] text-[#8B9890] block">Ablation Role</span>
-                    <span className="text-[13px] font-mono font-bold text-[#B6E63B]">
-                      Secondary Prior
+                  <div className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]">
+                    <span className="text-[10.5px] text-[var(--text-2)] block">Prior weight</span>
+                    <span className="font-display text-[14px] font-bold text-[var(--accent)]">
+                      Secondary
                     </span>
                   </div>
                 </div>
 
                 {formData.h2h.meetings.length > 0 && (
-                  <div className="space-y-1 pt-1.5">
-                    <span className="text-[10.5px] text-[#8B9890] font-mono block">Recent Head-to-Head Meetings</span>
-                    {formData.h2h.meetings.map((m: any, idx: number) => (
+                  <div className="space-y-1.5 pt-1.5">
+                    <span className="text-[11px] text-[var(--text-2)] block">Recent meetings</span>
+                    {formData.h2h.meetings.map((m, idx) => (
                       <div
                         key={m.id || idx}
-                        className="px-2.5 py-1.5 bg-[#101713] rounded-[8px] border border-white/[0.05] flex items-center justify-between text-[11px]"
+                        className="px-3 py-2 bg-[var(--surface)] rounded-[10px] border border-[var(--line)] flex items-center justify-between text-[11.5px] gap-2"
                       >
-                        <span className="text-[#8B9890] text-[10px] font-mono">
-                          {m.date ? new Date(m.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                        <span className="text-[var(--text-2)] text-[10.5px] tabular-nums shrink-0">
+                          {m.date
+                            ? new Date(m.date).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })
+                            : '—'}
                         </span>
-                        <span className="text-[#ECF1EE] font-medium">
+                        <span className="text-[var(--text)] font-medium truncate">
                           {m.homeTeam} vs {m.awayTeam}
                         </span>
-                        <span className="font-mono font-bold text-[#B6E63B] text-[12px]">
-                          {m.homeGoals} – {m.awayGoals}
+                        <span className="font-bold text-[var(--accent)] text-[12.5px] tabular-nums shrink-0">
+                          {m.homeGoals} to {m.awayGoals}
                         </span>
                       </div>
                     ))}
@@ -673,85 +669,101 @@ export default function QuantitativeFactorsAuditPanel({
               </div>
             </>
           ) : (
-            <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] text-[11.5px] text-[#8B9890]">
+            <div className="p-3.5 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] text-[12px] text-[var(--text-2)]">
               Stored match history unavailable for these clubs.
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 4: ODDS COMPARISON & DE VIGGING */}
+      {/* TAB: ODDS COMPARISON & DE-VIGGING */}
       {activeTab === 'odds' && (
         <div className="space-y-3">
-          <div className="p-3 bg-[#151E19] border border-white/[0.07] rounded-[11px] space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.05] pb-2">
+          <div className="p-3.5 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] pb-2.5">
               <div>
-                <span className="text-[10.5px] uppercase font-mono tracking-wider text-[#8B9890] block">Multi Bookmaker Comparison</span>
-                <span className="text-[13px] font-semibold text-[#ECF1EE]">{cleanDisplayText(topPickSelection)}</span>
+                <span className="text-[10.5px] text-[var(--text-2)] block">
+                  Multi bookmaker comparison
+                </span>
+                <span className="font-display text-[13.5px] font-semibold text-[var(--text)]">
+                  {cleanDisplayText(topPickSelection)}
+                </span>
               </div>
-              <div className="text-right">
-                <span className="text-[10px] text-[#8B9890] block">Best Price Available</span>
-                <span className="text-[13px] font-mono text-[#B6E63B] font-bold">
-                  {marketPricing.bestPrice.odds > 0 ? `@${marketPricing.bestPrice.odds.toFixed(2)} (${marketPricing.bestPrice.bookmaker})` : '—'}
+              <div className="text-right tabular-nums">
+                <span className="text-[10.5px] text-[var(--text-2)] block">Best price</span>
+                <span className="font-display text-[13.5px] text-[var(--accent)] font-bold">
+                  {marketPricing.bestPrice.odds > 0
+                    ? `@${marketPricing.bestPrice.odds.toFixed(2)} (${marketPricing.bestPrice.bookmaker})`
+                    : '—'}
                 </span>
               </div>
             </div>
 
-            {/* Bookmaker Snapshot Table */}
             {marketPricing.snapshots.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11.5px] tabular-nums">
                 {marketPricing.snapshots.map((snap) => (
-                  <div key={snap.bookmaker} className="p-2 bg-[#101713] rounded-[8px] border border-white/[0.05]">
-                    <span className="text-[10px] text-[#8B9890] block truncate">{snap.bookmaker}</span>
-                    <span className="text-[13px] font-mono font-bold text-[#ECF1EE]">@{snap.odds.toFixed(2)}</span>
-                    <span className="text-[9.5px] text-[#5E6A63] block font-mono">
+                  <div
+                    key={snap.bookmaker}
+                    className="p-2.5 bg-[var(--surface)] rounded-[10px] border border-[var(--line)]"
+                  >
+                    <span className="text-[10.5px] text-[var(--text-2)] block truncate">
+                      {snap.bookmaker}
+                    </span>
+                    <span className="font-display text-[14px] font-bold text-[var(--text)]">
+                      @{snap.odds.toFixed(2)}
+                    </span>
+                    <span className="text-[10.5px] text-[var(--text-3)] block">
                       {snap.isStale ? 'Stale odds' : 'Live quote'}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="p-3 bg-[#101713] rounded-[8px] border border-white/[0.05] text-[11px] text-[#8B9890] text-center">
-                No verified bookmaker odds snapshots recorded for this line. Data coverage: Standard
+              <div className="p-3 bg-[var(--surface)] rounded-[10px] border border-[var(--line)] text-[11.5px] text-[var(--text-2)] text-center">
+                No verified bookmaker odds snapshots recorded for this line.
               </div>
             )}
 
-            {/* De vigged Math Breakdown */}
             {marketPricing.snapshots.length > 0 && (
-              <div className="p-2.5 bg-[#101713] rounded-[8px] border border-white/[0.05] space-y-1.5 text-[11px]">
-                <div className="flex items-center justify-between">
-                  <span className="text-[#8B9890]">De vigged Market Probability:</span>
-                  <span className="font-mono text-[#ECF1EE] font-bold">
-                    {(marketPricing.deviggedMarketProbability * 100).toFixed(1)}% (Overround: {(marketPricing.overround * 100).toFixed(1)}%)
+              <div className="p-3 bg-[var(--surface)] rounded-[10px] border border-[var(--line)] space-y-2 text-[12px] tabular-nums">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[var(--text-2)]">De-vigged market probability</span>
+                  <span className="text-[var(--text)] font-bold">
+                    {(marketPricing.deviggedMarketProbability * 100).toFixed(1)}% (Overround{' '}
+                    {(marketPricing.overround * 100).toFixed(1)}%)
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[#8B9890]">Calibrated Model Probability:</span>
-                  <span className="font-mono text-[#ECF1EE] font-bold">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[var(--text-2)]">Calibrated model probability</span>
+                  <span className="text-[var(--text)] font-bold">
                     {(blendResult.rawModelProbability * 100).toFixed(1)}%
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[#8B9890]">Blended Model vs Market:</span>
-                  <span className="font-mono text-[#B6E63B] font-bold">
-                    {(blendResult.blendedProbability * 100).toFixed(1)}% (Model weight: {(blendResult.modelWeight * 100).toFixed(0)}%)
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[var(--text-2)]">Blended model vs market</span>
+                  <span className="text-[var(--accent)] font-bold">
+                    {(blendResult.blendedProbability * 100).toFixed(1)}% (Weight{' '}
+                    {(blendResult.modelWeight * 100).toFixed(0)}%)
                   </span>
                 </div>
-                <div className="flex items-center justify-between border-t border-white/[0.05] pt-1">
-                  <span className="text-[#8B9890]">Calibration Status:</span>
-                  <span className="font-mono font-bold text-[#B6E63B]">
-                    Calibrated (Data coverage: Standard)
-                  </span>
+                <div className="flex items-center justify-between border-t border-[var(--line)] pt-2">
+                  <span className="text-[var(--text-2)]">Calibration status</span>
+                  <span className="font-semibold text-[var(--accent)]">Calibrated</span>
                 </div>
               </div>
             )}
 
-            {/* High Disagreement Warning if applicable */}
             {blendResult.isHighDisagreement && (
-              <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center gap-2">
+              <div className="p-2.5 rounded-[10px] bg-[var(--medium-soft)] border border-[var(--medium)]/30 text-[11.5px] text-[var(--medium)] flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>
-                  High disagreement: Model diverges by {(Math.abs(blendResult.rawModelProbability - blendResult.deviggedMarketProbability) * 100).toFixed(1)}% from sharp bookmaker consensus. Requiring elevated evidence hurdle.
+                  High disagreement: model diverges by{' '}
+                  {(
+                    Math.abs(
+                      blendResult.rawModelProbability - marketPricing.deviggedMarketProbability
+                    ) * 100
+                  ).toFixed(1)}
+                  % from sharp bookmaker consensus.
                 </span>
               </div>
             )}

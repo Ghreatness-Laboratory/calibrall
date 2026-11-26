@@ -62,8 +62,8 @@ export function runDixonColesV25Tests(): { passed: boolean; failures: string[] }
   // 4. "Safe" Absence Test: getRiskTierBadge NEVER produces the word "SAFE"
   const badgeSafe = getRiskTierBadge('SAFE' as any);
   const badgeHigh = getRiskTierBadge('HIGH' as any);
-  assert(badgeSafe.label === 'HIGH', 'Badge label for SAFE tier is converted to HIGH', `Got: ${badgeSafe.label}`);
-  assert(badgeHigh.label === 'HIGH', 'Badge label for HIGH tier is HIGH', `Got: ${badgeHigh.label}`);
+  assert(badgeSafe.label === 'High', 'Badge label for SAFE tier is converted to High', `Got: ${badgeSafe.label}`);
+  assert(badgeHigh.label === 'High', 'Badge label for HIGH tier is High', `Got: ${badgeHigh.label}`);
   assert(!badgeSafe.label.toLowerCase().includes('safe'), 'The word "Safe" does not exist in any badge label');
 
   // 5. Fixture Evaluation: Confidence Tiering and Absence of "Safe" across all predictions

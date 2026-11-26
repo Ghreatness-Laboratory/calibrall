@@ -14,7 +14,7 @@ export default function Footer() {
   });
 
   const toggleSection = (key: string) => {
-    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const sections = [
@@ -66,20 +66,19 @@ export default function Footer() {
   ];
 
   const activeSocials = footerSocials
-    .map(p => {
+    .map((p) => {
       const handle = creators.social[p.key];
       const url = getSocialUrl(p.key, handle);
       return { ...p, handle, url };
     })
-    .filter(item => Boolean(item.handle && item.url));
+    .filter((item) => Boolean(item.handle && item.url));
 
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="mt-6 pb-6 border-t border-[#1F2A24] pt-4 text-[12px] text-[#8B9892]">
-      <div className="max-w-[430px] md:max-w-4xl lg:max-w-7xl mx-auto px-[18px] space-y-3">
-        {/* Three Collapsible Accordion Rows */}
-        <div className="border border-[#1F2A24] bg-[#101613] rounded-[14px] divide-y divide-[#1F2A24] overflow-hidden">
+    <footer className="mt-6 pb-6 border-t border-[var(--line)] pt-4 text-[12.5px] text-[var(--text-2)]">
+      <div className="max-w-[430px] md:max-w-4xl lg:max-w-7xl mx-auto px-4 space-y-3">
+        <div className="border border-[var(--line)] bg-[var(--surface)] rounded-[18px] divide-y divide-[var(--line)] overflow-hidden">
           {sections.map((section) => {
             const isOpen = openSections[section.id];
             return (
@@ -87,39 +86,39 @@ export default function Footer() {
                 <button
                   onClick={() => toggleSection(section.id)}
                   type="button"
-                  className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-[#151D19] transition-colors select-none touch-press"
+                  className="w-full min-h-[44px] px-4 py-2.5 flex items-center justify-between text-left hover:bg-[var(--surface-2)] transition-colors select-none touch-press"
                   aria-expanded={isOpen}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-[600] text-[#E9EFEB]">
+                    <span className="text-[13px] font-semibold text-[var(--text)]">
                       {section.title}
                     </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[#151D19] text-[#5E6B65] border border-[#1F2A24]">
+                    <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-[var(--surface-2)] text-[var(--text-3)] border border-[var(--line)] tabular-nums">
                       {section.links.length}
                     </span>
                   </div>
 
                   <ChevronDown
-                    className={`w-4 h-4 text-[#8B9892] transition-transform duration-200 ${
-                      isOpen ? 'rotate-180 text-[#B8E636]' : ''
+                    className={`w-4 h-4 text-[var(--text-2)] transition-transform duration-200 ${
+                      isOpen ? 'rotate-180 text-[var(--accent)]' : ''
                     }`}
                     strokeWidth={2}
                   />
                 </button>
 
                 {isOpen && (
-                  <div className="px-3.5 pb-3 pt-1 bg-[#0A0E0C]/40">
-                    <ul className="space-y-1.5 text-[12px]">
+                  <div className="px-4 pb-3 pt-1 bg-[var(--bg)]/40">
+                    <ul className="space-y-1 text-[12.5px]">
                       {section.links.map((link, idx) => (
                         <li key={idx}>
                           <Link
                             href={link.href}
-                            className={`hover:text-[#E9EFEB] transition-colors flex items-center gap-1.5 py-0.5 ${
-                              link.isCreator ? 'text-[#B8E636]' : 'text-[#8B9892]'
+                            className={`min-h-[44px] hover:text-[var(--text)] transition-colors flex items-center gap-1.5 ${
+                              link.isCreator ? 'text-[var(--accent)]' : 'text-[var(--text-2)]'
                             }`}
                           >
                             {link.isCreator && (
-                              <Building2 className="w-3.5 h-3.5 text-[#B8E636] shrink-0" strokeWidth={2} />
+                              <Building2 className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" strokeWidth={2} />
                             )}
                             <span>{link.label}</span>
                           </Link>
@@ -133,7 +132,6 @@ export default function Footer() {
           })}
         </div>
 
-        {/* Social icon row */}
         {activeSocials.length > 0 && (
           <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
             {activeSocials.map((platform) => (
@@ -143,7 +141,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`Ghreatness Labs on ${platform.name}`}
-                className="w-[36px] h-[36px] min-w-[36px] min-h-[36px] rounded-[10px] border border-[#1F2A24] bg-[#101613] hover:bg-[#151D19] text-[#8B9892] hover:text-[#E9EFEB] flex items-center justify-center transition-colors touch-press focus-visible:outline-2 focus-visible:outline-[#B8E636]"
+                className="w-[44px] h-[44px] rounded-[12px] border border-[var(--line)] bg-[var(--surface)] hover:bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--text)] flex items-center justify-center transition-colors touch-press"
               >
                 <SocialIcon platform={platform.key} size={16} />
               </a>
@@ -151,18 +149,16 @@ export default function Footer() {
           </div>
         )}
 
-        {/* Data attribution section */}
-        <div className="pt-2 border-t border-[#1F2A24] text-center text-[10.5px] text-[#5E6B65] space-y-1 max-w-2xl mx-auto leading-relaxed">
+        <div className="pt-2 border-t border-[var(--line)] text-center text-[11px] text-[var(--text-3)] space-y-1 max-w-2xl mx-auto leading-relaxed">
           <p>
-            Data sources & attribution: <span className="text-[#8B9892]">football-data.co.uk</span>, <span className="text-[#8B9892]">football-data.org</span>, <span className="text-[#8B9892]">England Football Results</span> (CC BY 4.0), and <span className="text-[#8B9892]">TheSportsDB</span>.
+            Data sources & attribution: <span className="text-[var(--text-2)]">football-data.co.uk</span>, <span className="text-[var(--text-2)]">football-data.org</span>, <span className="text-[var(--text-2)]">England Football Results</span> (CC BY 4.0), and <span className="text-[var(--text-2)]">TheSportsDB</span>.
           </p>
-          <p className="font-medium text-[#8B9892]">
+          <p className="font-medium text-[var(--text-2)]">
             Statistical analysis, not financial or betting advice. 18+. Gamble responsibly.
           </p>
         </div>
 
-        {/* Ending centered footer line at 10px in subtle text color */}
-        <div className="text-center pt-1 text-[10px] text-[#5E6B65]">
+        <div className="text-center pt-1 text-[10.5px] text-[var(--text-3)]">
           © 2024–{currentYear} Calibrall. All model projections recorded on ledger.
         </div>
       </div>

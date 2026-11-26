@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Calendar, Target, BarChart3, User } from 'lucide-react';
+import { Home, Calendar, BarChart2, Award, User } from 'lucide-react';
 
 export default function BottomNav() {
   const pathname = usePathname();
@@ -38,7 +38,7 @@ export default function BottomNav() {
 
   const isHomeActive = pathname === '/';
   const isFixturesActive = pathname.startsWith('/matches');
-  const isPicksActive =
+  const isAnalysisActive =
     pathname.startsWith('/predictions') ||
     pathname.startsWith('/markets') ||
     pathname.startsWith('/saved');
@@ -69,14 +69,14 @@ export default function BottomNav() {
       id: 'analysis',
       label: 'Analysis',
       href: '/predictions',
-      icon: Target,
-      isActive: isPicksActive,
+      icon: BarChart2,
+      isActive: isAnalysisActive,
     },
     {
       id: 'record',
       label: 'Record',
       href: '/performance',
-      icon: BarChart3,
+      icon: Award,
       isActive: isRecordActive,
     },
     {
@@ -91,13 +91,13 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Primary navigation"
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#0A0E0C]/90 backdrop-blur-md border-t border-[#1F2A24] flex flex-col justify-between"
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[var(--bg)]/85 backdrop-blur-xl border-t border-[var(--line)] flex flex-col justify-start"
       style={{
-        height: 'calc(64px + env(safe-area-inset-bottom, 0px))',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        height: 'calc(62px + max(16px, env(safe-area-inset-bottom, 0px)))',
+        paddingBottom: 'max(16px, env(safe-area-inset-bottom, 0px))',
       }}
     >
-      <div className="grid grid-cols-5 w-full h-[64px] items-center px-1 max-w-[430px] mx-auto">
+      <div className="grid grid-cols-5 w-full h-[62px] items-center px-2 max-w-[430px] mx-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -105,24 +105,17 @@ export default function BottomNav() {
               key={tab.id}
               href={tab.href}
               aria-current={tab.isActive ? 'page' : undefined}
-              className="min-h-[44px] flex flex-col items-center justify-center transition-all duration-150 touch-press select-none py-1"
+              className="min-h-[44px] flex flex-col items-center justify-center gap-1 transition-all duration-150 touch-press select-none rounded-[12px]"
             >
-              <div
-                className={`w-[40px] h-[26px] rounded-[8px] flex items-center justify-center transition-colors ${
-                  tab.isActive ? 'bg-[#B8E636]/12' : 'bg-transparent'
+              <Icon
+                className={`w-[22px] h-[22px] transition-colors ${
+                  tab.isActive ? 'text-[var(--accent)]' : 'text-[var(--text-2)]'
                 }`}
-              >
-                <Icon
-                  className={`w-5 h-5 transition-colors ${
-                    tab.isActive ? 'text-[#B8E636]' : 'text-[#8B9892]'
-                  }`}
-                  strokeWidth={2}
-                />
-              </div>
-
+                strokeWidth={tab.isActive ? 2.2 : 1.75}
+              />
               <span
-                className={`text-[9.5px] leading-tight mt-1 whitespace-nowrap transition-colors ${
-                  tab.isActive ? 'text-[#B8E636] font-semibold' : 'text-[#8B9892] font-medium'
+                className={`text-[10.5px] leading-none whitespace-nowrap transition-colors ${
+                  tab.isActive ? 'text-[var(--accent)] font-semibold' : 'text-[var(--text-2)] font-medium'
                 }`}
               >
                 {tab.label}

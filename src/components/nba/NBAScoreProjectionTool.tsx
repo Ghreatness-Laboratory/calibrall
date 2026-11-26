@@ -1,33 +1,32 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { 
-  getAllNBATeamsList, 
-  NBA_TEAMS_CATALOG, 
-  NBA_SEASONS, 
-  NBASeason 
+import {
+  getAllNBATeamsList,
+  NBA_TEAMS_CATALOG,
+  NBA_SEASONS,
+  NBASeason,
 } from '@/lib/data/nbaSeedData';
-import { 
-  calculateNBAScoreProjection, 
-  validateTeamInputs, 
-  TeamEfficiencyInput, 
+import {
+  calculateNBAScoreProjection,
+  validateTeamInputs,
+  TeamEfficiencyInput,
   StepByStepCalculation,
   EFFICIENCY_MIN,
   EFFICIENCY_MAX,
   POSSESSIONS_MIN,
-  POSSESSIONS_MAX
+  POSSESSIONS_MAX,
 } from '@/lib/prediction/nbaMath';
-import { 
-  ArrowLeftRight, 
-  RefreshCw, 
-  Calculator, 
-  RotateCcw, 
-  CheckCircle2, 
-  TrendingUp, 
-  Clock, 
+import {
+  ArrowLeftRight,
+  RefreshCw,
+  Calculator,
+  RotateCcw,
+  CheckCircle2,
+  TrendingUp,
+  Clock,
   AlertTriangle,
-  Sparkles,
-  Info
+  Info,
 } from 'lucide-react';
 import { NBATeamStats } from '@/types';
 import { cleanDisplayText } from '@/lib/utils/formatText';
@@ -52,13 +51,11 @@ export default function NBAScoreProjectionTool() {
   const [statsError, setStatsError] = useState<string | null>(null);
   const [apiStats, setApiStats] = useState<Record<string, NBATeamStats>>({});
 
-  // Optional user-entered totals lines (no spreads)
   const [sportsbookTotal, setSportsbookTotal] = useState<string>('');
   const [sportsbookH1Total, setSportsbookH1Total] = useState<string>('');
 
   const allTeams = useMemo(() => getAllNBATeamsList(), []);
 
-  // Team A State - prefilled with Boston Celtics test example
   const [teamA, setTeamA] = useState<TeamFieldState>({
     teamAbbr: 'BOS',
     name: 'Boston Celtics',
@@ -72,7 +69,6 @@ export default function NBAScoreProjectionTool() {
     lastUpdated: 'Season 2024 to 2025 · Updated today',
   });
 
-  // Team B State - prefilled with Detroit Pistons test example
   const [teamB, setTeamB] = useState<TeamFieldState>({
     teamAbbr: 'DET',
     name: 'Detroit Pistons',
@@ -86,7 +82,6 @@ export default function NBAScoreProjectionTool() {
     lastUpdated: 'Season 2024 to 2025 · Updated today',
   });
 
-  // Fetch stats from server-side API route
   const fetchStats = useCallback(async (targetSeason: NBASeason, refresh = false) => {
     setIsLoadingStats(true);
     setStatsError(null);
@@ -115,22 +110,17 @@ export default function NBAScoreProjectionTool() {
     fetchStats(season);
   }, [season, fetchStats]);
 
-  // Update Team A inputs when selecting team from dropdown
   const handleSelectTeamA = (abbr: string) => {
     const catalogItem = NBA_TEAMS_CATALOG[abbr];
     if (!catalogItem) return;
 
     const pulled = apiStats[abbr] || catalogItem.statsBySeason[season];
-    const off = (pulled.offensiveEfficiency).toFixed(3);
-    const def = (pulled.defensiveEfficiency).toFixed(3);
-    const pos = (pulled.possessions).toFixed(1);
-
     setTeamA({
       teamAbbr: abbr,
       name: catalogItem.name,
-      offEff: off,
-      defEff: def,
-      poss: pos,
+      offEff: pulled.offensiveEfficiency.toFixed(3),
+      defEff: pulled.defensiveEfficiency.toFixed(3),
+      poss: pulled.possessions.toFixed(1),
       isOffEffManual: false,
       isDefEffManual: false,
       isPossManual: false,
@@ -140,22 +130,17 @@ export default function NBAScoreProjectionTool() {
     });
   };
 
-  // Update Team B inputs when selecting team from dropdown
   const handleSelectTeamB = (abbr: string) => {
     const catalogItem = NBA_TEAMS_CATALOG[abbr];
     if (!catalogItem) return;
 
     const pulled = apiStats[abbr] || catalogItem.statsBySeason[season];
-    const off = (pulled.offensiveEfficiency).toFixed(3);
-    const def = (pulled.defensiveEfficiency).toFixed(3);
-    const pos = (pulled.possessions).toFixed(1);
-
     setTeamB({
       teamAbbr: abbr,
       name: catalogItem.name,
-      offEff: off,
-      defEff: def,
-      poss: pos,
+      offEff: pulled.offensiveEfficiency.toFixed(3),
+      defEff: pulled.defensiveEfficiency.toFixed(3),
+      poss: pulled.possessions.toFixed(1),
       isOffEffManual: false,
       isDefEffManual: false,
       isPossManual: false,
@@ -165,75 +150,69 @@ export default function NBAScoreProjectionTool() {
     });
   };
 
-  // Swap Teams
   const handleSwapTeams = () => {
     const temp = { ...teamA };
     setTeamA({ ...teamB });
     setTeamB(temp);
   };
 
-  // Reset Team A to Auto
   const handleResetTeamA = () => {
     const catalogItem = NBA_TEAMS_CATALOG[teamA.teamAbbr];
     if (!catalogItem) return;
     const pulled = apiStats[teamA.teamAbbr] || catalogItem.statsBySeason[season];
-    setTeamA(prev => ({
+    setTeamA((prev) => ({
       ...prev,
-      offEff: (pulled.offensiveEfficiency).toFixed(3),
-      defEff: (pulled.defensiveEfficiency).toFixed(3),
-      poss: (pulled.possessions).toFixed(1),
+      offEff: pulled.offensiveEfficiency.toFixed(3),
+      defEff: pulled.defensiveEfficiency.toFixed(3),
+      poss: pulled.possessions.toFixed(1),
       isOffEffManual: false,
       isDefEffManual: false,
       isPossManual: false,
     }));
   };
 
-  // Reset Team B to Auto
   const handleResetTeamB = () => {
     const catalogItem = NBA_TEAMS_CATALOG[teamB.teamAbbr];
     if (!catalogItem) return;
     const pulled = apiStats[teamB.teamAbbr] || catalogItem.statsBySeason[season];
-    setTeamB(prev => ({
+    setTeamB((prev) => ({
       ...prev,
-      offEff: (pulled.offensiveEfficiency).toFixed(3),
-      defEff: (pulled.defensiveEfficiency).toFixed(3),
-      poss: (pulled.possessions).toFixed(1),
+      offEff: pulled.offensiveEfficiency.toFixed(3),
+      defEff: pulled.defensiveEfficiency.toFixed(3),
+      poss: pulled.possessions.toFixed(1),
       isOffEffManual: false,
       isDefEffManual: false,
       isPossManual: false,
     }));
   };
 
-  // Convert inputs to numbers
-  const inputA: TeamEfficiencyInput = useMemo(() => ({
-    name: teamA.name,
-    offensiveEfficiency: parseFloat(teamA.offEff),
-    defensiveEfficiency: parseFloat(teamA.defEff),
-    possessions: parseFloat(teamA.poss),
-  }), [teamA]);
+  const inputA: TeamEfficiencyInput = useMemo(
+    () => ({
+      name: teamA.name,
+      offensiveEfficiency: parseFloat(teamA.offEff),
+      defensiveEfficiency: parseFloat(teamA.defEff),
+      possessions: parseFloat(teamA.poss),
+    }),
+    [teamA]
+  );
 
-  const inputB: TeamEfficiencyInput = useMemo(() => ({
-    name: teamB.name,
-    offensiveEfficiency: parseFloat(teamB.offEff),
-    defensiveEfficiency: parseFloat(teamB.defEff),
-    possessions: parseFloat(teamB.poss),
-  }), [teamB]);
+  const inputB: TeamEfficiencyInput = useMemo(
+    () => ({
+      name: teamB.name,
+      offensiveEfficiency: parseFloat(teamB.offEff),
+      defensiveEfficiency: parseFloat(teamB.defEff),
+      possessions: parseFloat(teamB.poss),
+    }),
+    [teamB]
+  );
 
-  // Validation
-  const validation = useMemo(() => {
-    return validateTeamInputs(inputA, inputB);
-  }, [inputA, inputB]);
+  const validation = useMemo(() => validateTeamInputs(inputA, inputB), [inputA, inputB]);
 
-  // Calculation Results (strictly totals + 1st half totals, no spreads)
   const calculationResult: StepByStepCalculation | null = useMemo(() => {
     if (!validation.isValid) return null;
-    return calculateNBAScoreProjection(
-      inputA,
-      inputB,
-      {
-        totalLine: sportsbookTotal ? parseFloat(sportsbookTotal) : undefined,
-      }
-    );
+    return calculateNBAScoreProjection(inputA, inputB, {
+      totalLine: sportsbookTotal ? parseFloat(sportsbookTotal) : undefined,
+    });
   }, [inputA, inputB, validation.isValid, sportsbookTotal]);
 
   const h1ProjectedTotal = useMemo(() => {
@@ -251,29 +230,28 @@ export default function NBAScoreProjectionTool() {
   }, [h1ProjectedTotal, sportsbookH1Total]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--line)]">
         <div>
-          <h2 className="text-[18px] font-[620] text-[var(--text)] flex items-center gap-2">
-            <span>NBA Score Projection Engine</span>
-            <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded-[5px] bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30 font-[600]">
-              VERIFIED
+          <h2 className="font-display text-[18px] font-[700] text-[var(--text)] flex items-center gap-2">
+            <span>NBA score projection engine</span>
+            <span className="text-[10.5px] px-2.5 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30 font-semibold">
+              Verified
             </span>
           </h2>
-          <p className="text-[12px] text-[var(--text-2)] mt-0.5">
-            Offensive & Defensive efficiency ratings multiplied by pace possessions. Fully auditable step by step math.
+          <p className="text-[12.5px] text-[var(--text-2)] mt-0.5">
+            Offensive &amp; defensive efficiency ratings multiplied by pace possessions.
           </p>
         </div>
 
-        {/* Season & Refresh Actions */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 bg-[var(--surface-2)] border border-[var(--border)] px-2.5 py-1 rounded-[10px] text-[12px]">
-            <span className="text-[var(--text-3)] text-[10.5px]">Season:</span>
+          <div className="flex items-center gap-1.5 bg-[var(--surface-2)] border border-[var(--line)] px-3 min-h-[44px] rounded-[12px] text-[12px]">
+            <span className="text-[var(--text-3)] text-[11px]">Season:</span>
             <select
               value={season}
               onChange={(e) => setSeason(e.target.value as NBASeason)}
-              className="bg-transparent text-[var(--text)] font-medium focus:outline-hidden cursor-pointer text-[12px]"
+              className="bg-transparent text-[var(--text)] font-medium focus:outline-none cursor-pointer text-[12px]"
             >
               {NBA_SEASONS.map((s) => (
                 <option key={s} value={s} className="bg-[var(--bg)] text-[var(--text)]">
@@ -287,36 +265,35 @@ export default function NBAScoreProjectionTool() {
             onClick={() => fetchStats(season, true)}
             disabled={isLoadingStats}
             type="button"
-            className="h-[34px] px-3 rounded-[10px] bg-[var(--surface-2)] hover:bg-[var(--surface)] border border-[var(--border)] text-[12px] text-[var(--text-2)] hover:text-[var(--text)] flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            className="min-h-[44px] px-3.5 rounded-[12px] bg-[var(--surface-2)] hover:bg-[var(--surface)] border border-[var(--line)] text-[12px] text-[var(--text-2)] hover:text-[var(--text)] flex items-center gap-1.5 transition-colors disabled:opacity-50 touch-press"
             title="Refresh stats from live provider"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingStats ? 'animate-spin text-[var(--accent)]' : ''}`} strokeWidth={1.75} />
+            <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.75} />
             <span>{isLoadingStats ? 'Refreshing...' : 'Refresh stats'}</span>
           </button>
         </div>
       </div>
 
-      {/* Warning/Error notice if API limits reached */}
       {statsError && (
-        <div className="p-3 bg-[rgba(217,164,65,0.06)] border border-[rgba(217,164,65,0.30)] rounded-[12px] flex items-start gap-2.5 text-[11.5px] text-[var(--warn)]">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[var(--warn)]" strokeWidth={1.75} />
+        <div className="p-3.5 bg-[var(--medium-soft)] border border-[var(--medium)]/30 rounded-[12px] flex items-start gap-2.5 text-[12px] text-[var(--medium)]">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.75} />
           <div>
-            <span className="font-[600] text-[var(--text)]">API Status: </span>
+            <span className="font-[600] text-[var(--text)]">Status: </span>
             {statsError} You can type stats manually below.
           </div>
         </div>
       )}
 
-      {/* Two Team Panels Grid */}
+      {/* Two Team Panels */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-        {/* TEAM A PANEL */}
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3.5 space-y-3.5">
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+        {/* Team A */}
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3.5">
+          <div className="flex items-center justify-between pb-2.5 border-b border-[var(--line)]">
             <div>
-              <span className="text-[10px] font-mono text-[var(--accent)] uppercase tracking-wider font-semibold">
-                Team A (Home / Favorite)
+              <span className="text-[10.5px] text-[var(--accent)] font-semibold block">
+                Team A (Home)
               </span>
-              <h3 className="text-[14px] font-[620] text-[var(--text)]">
+              <h3 className="font-display text-[14px] font-[600] text-[var(--text)]">
                 {teamA.name}
               </h3>
             </div>
@@ -325,21 +302,22 @@ export default function NBAScoreProjectionTool() {
               <button
                 onClick={handleResetTeamA}
                 type="button"
-                className="text-[10.5px] text-[var(--text-3)] hover:text-[var(--accent)] flex items-center gap-1 transition-colors px-2 py-0.5 rounded-[5px] bg-[var(--surface-2)] border border-[var(--border)]"
+                className="min-h-[44px] text-[11px] text-[var(--text-2)] hover:text-[var(--accent)] flex items-center gap-1 transition-colors px-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] touch-press"
               >
-                <RotateCcw className="w-3 h-3" strokeWidth={1.75} />
-                <span>Reset to auto</span>
+                <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
+                <span>Reset auto</span>
               </button>
             )}
           </div>
 
-          {/* Team Dropdown Selector */}
           <div>
-            <label className="block text-[10.5px] text-[var(--text-3)] mb-1 font-medium">Select NBA Franchise (All 30)</label>
+            <label className="block text-[11px] text-[var(--text-2)] mb-1 font-medium">
+              Select NBA franchise
+            </label>
             <select
               value={teamA.teamAbbr}
               onChange={(e) => handleSelectTeamA(e.target.value)}
-              className="h-[40px] w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden focus:border-[var(--accent)] font-medium"
+              className="min-h-[44px] w-full bg-[var(--surface-2)] border border-[var(--line)] px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
             >
               {allTeams.map((t) => (
                 <option key={t.abbreviation} value={t.abbreviation} className="bg-[var(--bg)] text-[var(--text)]">
@@ -349,17 +327,17 @@ export default function NBAScoreProjectionTool() {
             </select>
           </div>
 
-          {/* Three Team Inputs */}
           <div className="space-y-3">
-            {/* 1. Offensive Efficiency */}
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
-                <span className="text-[var(--text-3)]">Offensive Efficiency (Pts / Poss)</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
-                  teamA.isOffEffManual 
-                    ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
-                }`}>
+                <span className="text-[var(--text-2)]">Offensive efficiency (Pts/Poss)</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10.5px] font-medium border ${
+                    teamA.isOffEffManual
+                      ? 'bg-[var(--medium-soft)] text-[var(--medium)] border-[var(--medium)]/30'
+                      : 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30'
+                  }`}
+                >
                   {teamA.isOffEffManual ? 'Manual' : 'Auto (ORtg/100)'}
                 </span>
               </div>
@@ -369,25 +347,26 @@ export default function NBAScoreProjectionTool() {
                 min={EFFICIENCY_MIN}
                 max={EFFICIENCY_MAX}
                 value={teamA.offEff}
-                onChange={(e) => setTeamA(prev => ({ ...prev, offEff: e.target.value, isOffEffManual: true }))}
-                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
-                  validation.errors.teamA?.offEff ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--accent)]'
+                onChange={(e) => setTeamA((prev) => ({ ...prev, offEff: e.target.value, isOffEffManual: true }))}
+                className={`min-h-[44px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] tabular-nums focus:outline-none ${
+                  validation.errors.teamA?.offEff ? 'border-[var(--danger)]' : 'border-[var(--line)] focus:border-[var(--accent)]'
                 }`}
               />
               {validation.errors.teamA?.offEff && (
-                <p className="text-[11px] text-rose-400 mt-1">{validation.errors.teamA.offEff}</p>
+                <p className="text-[11px] text-[var(--danger)] mt-1">{validation.errors.teamA.offEff}</p>
               )}
             </div>
 
-            {/* 2. Defensive Efficiency */}
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
-                <span className="text-[var(--text-3)]">Defensive Efficiency (Pts allowed / Poss)</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
-                  teamA.isDefEffManual 
-                    ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
-                }`}>
+                <span className="text-[var(--text-2)]">Defensive efficiency (Allowed/Poss)</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10.5px] font-medium border ${
+                    teamA.isDefEffManual
+                      ? 'bg-[var(--medium-soft)] text-[var(--medium)] border-[var(--medium)]/30'
+                      : 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30'
+                  }`}
+                >
                   {teamA.isDefEffManual ? 'Manual' : 'Auto (DRtg/100)'}
                 </span>
               </div>
@@ -397,26 +376,27 @@ export default function NBAScoreProjectionTool() {
                 min={EFFICIENCY_MIN}
                 max={EFFICIENCY_MAX}
                 value={teamA.defEff}
-                onChange={(e) => setTeamA(prev => ({ ...prev, defEff: e.target.value, isDefEffManual: true }))}
-                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
-                  validation.errors.teamA?.defEff ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--accent)]'
+                onChange={(e) => setTeamA((prev) => ({ ...prev, defEff: e.target.value, isDefEffManual: true }))}
+                className={`min-h-[44px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] tabular-nums focus:outline-none ${
+                  validation.errors.teamA?.defEff ? 'border-[var(--danger)]' : 'border-[var(--line)] focus:border-[var(--accent)]'
                 }`}
               />
               {validation.errors.teamA?.defEff && (
-                <p className="text-[11px] text-rose-400 mt-1">{validation.errors.teamA.defEff}</p>
+                <p className="text-[11px] text-[var(--danger)] mt-1">{validation.errors.teamA.defEff}</p>
               )}
             </div>
 
-            {/* 3. Possessions Per Game */}
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
-                <span className="text-[var(--text-3)]">Possessions Per Game (PACE)</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
-                  teamA.isPossManual 
-                    ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
-                }`}>
-                  {teamA.isPossManual ? 'Manual' : 'Auto (PACE)'}
+                <span className="text-[var(--text-2)]">Possessions per game (Pace)</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10.5px] font-medium border ${
+                    teamA.isPossManual
+                      ? 'bg-[var(--medium-soft)] text-[var(--medium)] border-[var(--medium)]/30'
+                      : 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30'
+                  }`}
+                >
+                  {teamA.isPossManual ? 'Manual' : 'Auto (Pace)'}
                 </span>
               </div>
               <input
@@ -425,32 +405,31 @@ export default function NBAScoreProjectionTool() {
                 min={POSSESSIONS_MIN}
                 max={POSSESSIONS_MAX}
                 value={teamA.poss}
-                onChange={(e) => setTeamA(prev => ({ ...prev, poss: e.target.value, isPossManual: true }))}
-                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
-                  validation.errors.teamA?.poss ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--accent)]'
+                onChange={(e) => setTeamA((prev) => ({ ...prev, poss: e.target.value, isPossManual: true }))}
+                className={`min-h-[44px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] tabular-nums focus:outline-none ${
+                  validation.errors.teamA?.poss ? 'border-[var(--danger)]' : 'border-[var(--line)] focus:border-[var(--accent)]'
                 }`}
               />
               {validation.errors.teamA?.poss && (
-                <p className="text-[11px] text-rose-400 mt-1">{validation.errors.teamA.poss}</p>
+                <p className="text-[11px] text-[var(--danger)] mt-1">{validation.errors.teamA.poss}</p>
               )}
             </div>
           </div>
 
-          {/* Stats Source Footer */}
-          <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-[10.5px] text-[var(--text-3)]">
-            <span className="truncate max-w-[200px]">{teamA.source || 'Stats source: NBA Advanced Ratings'}</span>
-            <span className="font-mono">{teamA.lastUpdated || `Season ${season}`}</span>
+          <div className="pt-2 border-t border-[var(--line)] flex items-center justify-between text-[10.5px] text-[var(--text-3)]">
+            <span className="truncate max-w-[200px]">{teamA.source || 'NBA Advanced Ratings'}</span>
+            <span>{teamA.lastUpdated || `Season ${season}`}</span>
           </div>
         </div>
 
-        {/* TEAM B PANEL */}
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3.5 space-y-3.5">
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+        {/* Team B */}
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3.5">
+          <div className="flex items-center justify-between pb-2.5 border-b border-[var(--line)]">
             <div>
-              <span className="text-[10px] font-mono text-[var(--info)] uppercase tracking-wider font-semibold">
-                Team B (Away / Underdog)
+              <span className="text-[10.5px] text-[var(--info)] font-semibold block">
+                Team B (Away)
               </span>
-              <h3 className="text-[14px] font-[620] text-[var(--text)]">
+              <h3 className="font-display text-[14px] font-[600] text-[var(--text)]">
                 {teamB.name}
               </h3>
             </div>
@@ -459,21 +438,22 @@ export default function NBAScoreProjectionTool() {
               <button
                 onClick={handleResetTeamB}
                 type="button"
-                className="text-[10.5px] text-[var(--text-3)] hover:text-[var(--info)] flex items-center gap-1 transition-colors px-2 py-0.5 rounded-[5px] bg-[var(--surface-2)] border border-[var(--border)]"
+                className="min-h-[44px] text-[11px] text-[var(--text-2)] hover:text-[var(--info)] flex items-center gap-1 transition-colors px-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] touch-press"
               >
-                <RotateCcw className="w-3 h-3" strokeWidth={1.75} />
-                <span>Reset to auto</span>
+                <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
+                <span>Reset auto</span>
               </button>
             )}
           </div>
 
-          {/* Team Dropdown Selector */}
           <div>
-            <label className="block text-[10.5px] text-[var(--text-3)] mb-1 font-medium">Select NBA Franchise (All 30)</label>
+            <label className="block text-[11px] text-[var(--text-2)] mb-1 font-medium">
+              Select NBA franchise
+            </label>
             <select
               value={teamB.teamAbbr}
               onChange={(e) => handleSelectTeamB(e.target.value)}
-              className="h-[40px] w-full bg-[var(--surface-2)] border border-[var(--border)] px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden focus:border-[var(--info)] font-medium"
+              className="min-h-[44px] w-full bg-[var(--surface-2)] border border-[var(--line)] px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--info)] font-medium"
             >
               {allTeams.map((t) => (
                 <option key={t.abbreviation} value={t.abbreviation} className="bg-[var(--bg)] text-[var(--text)]">
@@ -483,17 +463,17 @@ export default function NBAScoreProjectionTool() {
             </select>
           </div>
 
-          {/* Three Team Inputs */}
           <div className="space-y-3">
-            {/* 1. Offensive Efficiency */}
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
-                <span className="text-[var(--text-3)]">Offensive Efficiency (Pts / Poss)</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
-                  teamB.isOffEffManual 
-                    ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
-                }`}>
+                <span className="text-[var(--text-2)]">Offensive efficiency (Pts/Poss)</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10.5px] font-medium border ${
+                    teamB.isOffEffManual
+                      ? 'bg-[var(--medium-soft)] text-[var(--medium)] border-[var(--medium)]/30'
+                      : 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30'
+                  }`}
+                >
                   {teamB.isOffEffManual ? 'Manual' : 'Auto (ORtg/100)'}
                 </span>
               </div>
@@ -503,25 +483,26 @@ export default function NBAScoreProjectionTool() {
                 min={EFFICIENCY_MIN}
                 max={EFFICIENCY_MAX}
                 value={teamB.offEff}
-                onChange={(e) => setTeamB(prev => ({ ...prev, offEff: e.target.value, isOffEffManual: true }))}
-                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
-                  validation.errors.teamB?.offEff ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--info)]'
+                onChange={(e) => setTeamB((prev) => ({ ...prev, offEff: e.target.value, isOffEffManual: true }))}
+                className={`min-h-[44px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] tabular-nums focus:outline-none ${
+                  validation.errors.teamB?.offEff ? 'border-[var(--danger)]' : 'border-[var(--line)] focus:border-[var(--info)]'
                 }`}
               />
               {validation.errors.teamB?.offEff && (
-                <p className="text-[11px] text-rose-400 mt-1">{validation.errors.teamB.offEff}</p>
+                <p className="text-[11px] text-[var(--danger)] mt-1">{validation.errors.teamB.offEff}</p>
               )}
             </div>
 
-            {/* 2. Defensive Efficiency */}
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
-                <span className="text-[var(--text-3)]">Defensive Efficiency (Pts allowed / Poss)</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
-                  teamB.isDefEffManual 
-                    ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
-                }`}>
+                <span className="text-[var(--text-2)]">Defensive efficiency (Allowed/Poss)</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10.5px] font-medium border ${
+                    teamB.isDefEffManual
+                      ? 'bg-[var(--medium-soft)] text-[var(--medium)] border-[var(--medium)]/30'
+                      : 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30'
+                  }`}
+                >
                   {teamB.isDefEffManual ? 'Manual' : 'Auto (DRtg/100)'}
                 </span>
               </div>
@@ -531,26 +512,27 @@ export default function NBAScoreProjectionTool() {
                 min={EFFICIENCY_MIN}
                 max={EFFICIENCY_MAX}
                 value={teamB.defEff}
-                onChange={(e) => setTeamB(prev => ({ ...prev, defEff: e.target.value, isDefEffManual: true }))}
-                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
-                  validation.errors.teamB?.defEff ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--info)]'
+                onChange={(e) => setTeamB((prev) => ({ ...prev, defEff: e.target.value, isDefEffManual: true }))}
+                className={`min-h-[44px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] tabular-nums focus:outline-none ${
+                  validation.errors.teamB?.defEff ? 'border-[var(--danger)]' : 'border-[var(--line)] focus:border-[var(--info)]'
                 }`}
               />
               {validation.errors.teamB?.defEff && (
-                <p className="text-[11px] text-rose-400 mt-1">{validation.errors.teamB.defEff}</p>
+                <p className="text-[11px] text-[var(--danger)] mt-1">{validation.errors.teamB.defEff}</p>
               )}
             </div>
 
-            {/* 3. Possessions Per Game */}
             <div>
               <div className="flex items-center justify-between text-[11px] mb-1">
-                <span className="text-[var(--text-3)]">Possessions Per Game (PACE)</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-medium ${
-                  teamB.isPossManual 
-                    ? 'bg-amber-500/15 text-[var(--warn)] border border-amber-500/30' 
-                    : 'bg-[#B8E636]/12 text-[#B8E636] border border-[#B8E636]/30'
-                }`}>
-                  {teamB.isPossManual ? 'Manual' : 'Auto (PACE)'}
+                <span className="text-[var(--text-2)]">Possessions per game (Pace)</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10.5px] font-medium border ${
+                    teamB.isPossManual
+                      ? 'bg-[var(--medium-soft)] text-[var(--medium)] border-[var(--medium)]/30'
+                      : 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30'
+                  }`}
+                >
+                  {teamB.isPossManual ? 'Manual' : 'Auto (Pace)'}
                 </span>
               </div>
               <input
@@ -559,112 +541,104 @@ export default function NBAScoreProjectionTool() {
                 min={POSSESSIONS_MIN}
                 max={POSSESSIONS_MAX}
                 value={teamB.poss}
-                onChange={(e) => setTeamB(prev => ({ ...prev, poss: e.target.value, isPossManual: true }))}
-                className={`h-[40px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] focus:outline-hidden ${
-                  validation.errors.teamB?.poss ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[var(--border)] focus:border-[var(--info)]'
+                onChange={(e) => setTeamB((prev) => ({ ...prev, poss: e.target.value, isPossManual: true }))}
+                className={`min-h-[44px] w-full bg-[var(--surface-2)] border px-3 rounded-[12px] text-[13px] text-[var(--text)] tabular-nums focus:outline-none ${
+                  validation.errors.teamB?.poss ? 'border-[var(--danger)]' : 'border-[var(--line)] focus:border-[var(--info)]'
                 }`}
               />
               {validation.errors.teamB?.poss && (
-                <p className="text-[11px] text-rose-400 mt-1">{validation.errors.teamB.poss}</p>
+                <p className="text-[11px] text-[var(--danger)] mt-1">{validation.errors.teamB.poss}</p>
               )}
             </div>
           </div>
 
-          {/* Stats Source Footer */}
-          <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-[10.5px] text-[var(--text-3)]">
-            <span className="truncate max-w-[200px]">{teamB.source || 'Stats source: NBA Advanced Ratings'}</span>
-            <span className="font-mono">{teamB.lastUpdated || `Season ${season}`}</span>
+          <div className="pt-2 border-t border-[var(--line)] flex items-center justify-between text-[10.5px] text-[var(--text-3)]">
+            <span className="truncate max-w-[200px]">{teamB.source || 'NBA Advanced Ratings'}</span>
+            <span>{teamB.lastUpdated || `Season ${season}`}</span>
           </div>
         </div>
       </div>
 
-      {/* Action Buttons: Swap Teams & Calculate */}
+      {/* Action Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <button
           onClick={handleSwapTeams}
           type="button"
-          className="h-[40px] px-3.5 rounded-[12px] bg-[var(--surface)] hover:bg-[var(--surface-2)] border border-[var(--border)] text-[12.5px] font-medium text-[var(--text)] flex items-center gap-2 transition-colors touch-manipulation active:scale-[0.98]"
+          className="min-h-[44px] px-4 rounded-[12px] bg-[var(--surface)] hover:bg-[var(--surface-2)] border border-[var(--line)] text-[12.5px] font-medium text-[var(--text)] flex items-center gap-2 transition-colors touch-press"
         >
-          <ArrowLeftRight className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
+          <ArrowLeftRight className="w-4 h-4 text-[var(--accent)]" strokeWidth={1.75} />
           <span>Swap teams</span>
         </button>
 
-        {/* Optional Totals Line Inputs (Game Total & 1st Half Total only) */}
-        <div className="flex flex-wrap items-center gap-2.5 bg-[var(--surface)] border border-[var(--border)] px-3 py-1.5 rounded-[12px] text-[11.5px]">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[var(--text-3)]">Game Total Line:</span>
+        <div className="flex flex-wrap items-center gap-2.5 bg-[var(--surface)] border border-[var(--line)] p-2 rounded-[18px] text-[12px]">
+          <div className="flex items-center gap-2">
+            <span className="text-[var(--text-2)] pl-1">Game total line:</span>
             <input
               type="number"
               step="0.5"
               placeholder="Optional"
               value={sportsbookTotal}
               onChange={(e) => setSportsbookTotal(e.target.value)}
-              className="h-[40px] w-24 bg-[var(--surface-2)] border border-[var(--border)] px-2.5 rounded-[12px] text-center text-[var(--text)] text-[13px] tabular-nums"
+              className="min-h-[44px] w-24 bg-[var(--surface-2)] border border-[var(--line)] px-2.5 rounded-[12px] text-center text-[var(--text)] text-[13px] tabular-nums"
             />
           </div>
 
-          <div className="h-5 w-px bg-[var(--border)]" />
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-[var(--text-3)]">1st Half Line:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[var(--text-2)] pl-1">1st half line:</span>
             <input
               type="number"
               step="0.5"
               placeholder="Optional"
               value={sportsbookH1Total}
               onChange={(e) => setSportsbookH1Total(e.target.value)}
-              className="h-[40px] w-24 bg-[var(--surface-2)] border border-[var(--border)] px-2.5 rounded-[12px] text-center text-[var(--text)] text-[13px] tabular-nums"
+              className="min-h-[44px] w-24 bg-[var(--surface-2)] border border-[var(--line)] px-2.5 rounded-[12px] text-center text-[var(--text)] text-[13px] tabular-nums"
             />
           </div>
         </div>
       </div>
 
-      {/* RESULTS CARD: Step by Step Mathematical Breakdown */}
+      {/* Results Card */}
       {calculationResult && (
-        <div className="bg-[var(--surface)] border border-[var(--border-strong)] rounded-[12px] p-4 space-y-4">
-          {/* Top Banner: Final Projection & Winner */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 pb-3.5 border-b border-[var(--border)]">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 pb-3.5 border-b border-[var(--line)]">
             <div className="space-y-1">
-              <span className="text-[10.5px] font-mono uppercase tracking-[0.12em] text-[var(--accent)] font-semibold flex items-center gap-1.5">
+              <span className="text-[11px] text-[var(--accent)] font-semibold flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.75} />
-                <span>Model Output Summary</span>
+                <span>Model output summary</span>
               </span>
-              <div className="text-[20px] sm:text-[22px] font-semibold font-mono tabular-nums text-[var(--text)]">
+              <div className="font-display text-[20px] font-bold tabular-nums text-[var(--text)]">
                 {teamA.name}: <span className="text-[var(--accent)]">{calculationResult.aProjected.toFixed(2)}</span>
-                {'  '}·{'  '}
+                {' · '}
                 {teamB.name}: <span className="text-[var(--info)]">{calculationResult.bProjected.toFixed(2)}</span>
               </div>
             </div>
 
-            <div className="text-left sm:text-right bg-[var(--surface-2)] border border-[var(--border)] px-3.5 py-2 rounded-[10px]">
-              <div className="text-[10.5px] text-[var(--text-3)]">Projected Game &amp; 1H Totals</div>
-              <div className="text-[14px] font-[620] text-[var(--accent)] tabular-nums">
-                Game Total: {calculationResult.total.toFixed(2)} pts
+            <div className="text-left sm:text-right bg-[var(--surface-2)] border border-[var(--line)] px-3.5 py-2.5 rounded-[12px]">
+              <div className="text-[10.5px] text-[var(--text-2)]">Projected game &amp; 1H totals</div>
+              <div className="text-[14px] font-bold text-[var(--accent)] tabular-nums">
+                Game total: {calculationResult.total.toFixed(2)} pts
               </div>
-              <div className="text-[11.5px] font-mono text-[var(--text)] mt-0.5 tabular-nums">
-                1st Half Est: {h1ProjectedTotal !== null ? h1ProjectedTotal.toFixed(2) : '—'} pts
+              <div className="text-[12px] text-[var(--text)] mt-0.5 tabular-nums">
+                1st half est: {h1ProjectedTotal !== null ? h1ProjectedTotal.toFixed(2) : '—'} pts
               </div>
             </div>
           </div>
 
-          {/* Optional Totals Line Comparison Cards */}
           {(calculationResult.totalLean || h1Lean) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {calculationResult.totalLean && (
-                <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-[10px] space-y-1">
-                  <div className="flex items-center justify-between text-[10.5px]">
-                    <span className="text-[var(--text-3)] flex items-center gap-1">
+                <div className="p-3 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-[var(--text-2)] flex items-center gap-1">
                       <TrendingUp className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
-                      <span>Game Total Line ({calculationResult.totalLean.line})</span>
+                      <span>Game total ({calculationResult.totalLean.line})</span>
                     </span>
-                    <span className={`px-1.5 py-0.5 rounded-[4px] font-mono font-semibold text-[10px] ${
-                      calculationResult.totalLean.lean === 'OVER' 
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                    <span className="px-2 py-0.5 rounded-full font-semibold text-[10.5px] bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30">
+                      {calculationResult.totalLean.lean === 'OVER'
+                        ? 'Over lean'
                         : calculationResult.totalLean.lean === 'UNDER'
-                        ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                        : 'bg-white/10 text-white'
-                    }`}>
-                      {calculationResult.totalLean.lean} LEAN
+                        ? 'Under lean'
+                        : 'Even'}
                     </span>
                   </div>
                   <div className="text-[12.5px] font-medium text-[var(--text)]">
@@ -674,14 +648,14 @@ export default function NBAScoreProjectionTool() {
               )}
 
               {h1Lean && (
-                <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-[10px] space-y-1">
-                  <div className="flex items-center justify-between text-[10.5px]">
-                    <span className="text-[var(--text-3)] flex items-center gap-1">
+                <div className="p-3 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-[var(--text-2)] flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
-                      <span>1st Half Total Line ({h1Lean.line})</span>
+                      <span>1st half line ({h1Lean.line})</span>
                     </span>
-                    <span className="px-1.5 py-0.5 rounded-[4px] font-mono font-semibold text-[10px] bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30">
-                      {h1Lean.lean} LEAN
+                    <span className="px-2 py-0.5 rounded-full font-semibold text-[10.5px] bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30">
+                      {h1Lean.lean === 'OVER' ? 'Over lean' : h1Lean.lean === 'UNDER' ? 'Under lean' : 'Even'}
                     </span>
                   </div>
                   <div className="text-[12.5px] font-medium text-[var(--text)]">
@@ -692,96 +666,76 @@ export default function NBAScoreProjectionTool() {
             </div>
           )}
 
-          {/* Step by Step Math Visualization */}
+          {/* Step-by-Step Math */}
           <div className="space-y-2.5 pt-1">
-            <h3 className="text-[13px] font-[620] text-[var(--text)] flex items-center gap-1.5">
-              <Calculator className="w-3.5 h-3.5 text-[var(--accent)]" strokeWidth={1.75} />
-              <span>Exact Step by Step Mathematical Calculation</span>
+            <h3 className="font-display text-[14px] font-[600] text-[var(--text)] flex items-center gap-1.5">
+              <Calculator className="w-4 h-4 text-[var(--accent)]" strokeWidth={1.75} />
+              <span>Step-by-step mathematical breakdown</span>
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[12px] font-sans">
-              {/* Step 1: Offense */}
-              <div className="p-2.5 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1">
-                <div className="text-[11px] text-[var(--accent)] font-semibold">
-                  Step 1: Offense Calculation
-                </div>
-                <div className="text-[var(--muted)] text-[12px]">
-                  Formula: Offensive Efficiency × Possessions
-                </div>
-                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums text-[12px]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-[12px]">
+              <div className="p-3 bg-[var(--surface-2)] rounded-[12px] border border-[var(--line)] space-y-1">
+                <div className="text-[11px] text-[var(--accent)] font-semibold">Step 1: Offense calculation</div>
+                <div className="text-[var(--text-2)]">Offensive efficiency × possessions</div>
+                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums">
                   <div>
-                    <span className="text-[var(--muted)]">A offense ({teamA.name.split(' ').pop()}): </span>
+                    <span className="text-[var(--text-2)]">A offense ({teamA.name.split(' ').pop()}): </span>
                     <span>{inputA.offensiveEfficiency.toFixed(3)} × {inputA.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--accent)] font-semibold">{calculationResult.aOff.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--muted)]">B offense ({teamB.name.split(' ').pop()}): </span>
+                    <span className="text-[var(--text-2)]">B offense ({teamB.name.split(' ').pop()}): </span>
                     <span>{inputB.offensiveEfficiency.toFixed(3)} × {inputB.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--info)] font-semibold">{calculationResult.bOff.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Step 2: Defense */}
-              <div className="p-2.5 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1">
-                <div className="text-[11px] text-[var(--accent)] font-semibold">
-                  Step 2: Defense (Opponent Possessions)
-                </div>
-                <div className="text-[var(--muted)] text-[12px]">
-                  Formula: Defensive Efficiency × Opponent Possessions
-                </div>
-                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums text-[12px]">
+              <div className="p-3 bg-[var(--surface-2)] rounded-[12px] border border-[var(--line)] space-y-1">
+                <div className="text-[11px] text-[var(--accent)] font-semibold">Step 2: Defense adjustment</div>
+                <div className="text-[var(--text-2)]">Defensive efficiency × opponent possessions</div>
+                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums">
                   <div>
-                    <span className="text-[var(--muted)]">A defense (allows vs B): </span>
+                    <span className="text-[var(--text-2)]">A defense (vs B): </span>
                     <span>{inputA.defensiveEfficiency.toFixed(3)} × {inputB.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--accent)] font-semibold">{calculationResult.aDef.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--muted)]">B defense (allows vs A): </span>
+                    <span className="text-[var(--text-2)]">B defense (vs A): </span>
                     <span>{inputB.defensiveEfficiency.toFixed(3)} × {inputA.possessions.toFixed(1)} = </span>
                     <span className="text-[var(--info)] font-semibold">{calculationResult.bDef.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Step 3: Projected Score */}
-              <div className="p-2.5 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1">
-                <div className="text-[11px] text-[var(--accent)] font-semibold">
-                  Step 3: Projected Score (Averaging)
-                </div>
-                <div className="text-[var(--muted)] text-[12px]">
-                  Formula: (Team Offense + Opponent Allowed Defense) / 2
-                </div>
-                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums text-[12px]">
+              <div className="p-3 bg-[var(--surface-2)] rounded-[12px] border border-[var(--line)] space-y-1">
+                <div className="text-[11px] text-[var(--accent)] font-semibold">Step 3: Projected scores</div>
+                <div className="text-[var(--text-2)]">(Team offense + opponent allowed defense) / 2</div>
+                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums">
                   <div>
-                    <span className="text-[var(--muted)]">A projected: </span>
+                    <span className="text-[var(--text-2)]">A projected: </span>
                     <span>({calculationResult.aOff.toFixed(2)} + {calculationResult.bDef.toFixed(2)}) / 2 = </span>
                     <span className="text-[var(--accent)] font-semibold text-[13px]">{calculationResult.aProjected.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--muted)]">B projected: </span>
+                    <span className="text-[var(--text-2)]">B projected: </span>
                     <span>({calculationResult.bOff.toFixed(2)} + {calculationResult.aDef.toFixed(2)}) / 2 = </span>
                     <span className="text-[var(--info)] font-semibold text-[13px]">{calculationResult.bProjected.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Step 4: Game & 1st Half Totals */}
-              <div className="p-2.5 bg-[var(--surface-2)] rounded-[10px] border border-[var(--border)] space-y-1">
-                <div className="text-[11px] text-[var(--accent)] font-semibold">
-                  Step 4: Game &amp; 1st Half Totals
-                </div>
-                <div className="text-[var(--muted)] text-[12px]">
-                  Formula: Game Total = A proj + B proj; 1st Half = 50.3% share
-                </div>
-                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums text-[12px]">
+              <div className="p-3 bg-[var(--surface-2)] rounded-[12px] border border-[var(--line)] space-y-1">
+                <div className="text-[11px] text-[var(--accent)] font-semibold">Step 4: Game &amp; 1st half totals</div>
+                <div className="text-[var(--text-2)]">Game total = A + B · 1st half = 50.3% share</div>
+                <div className="text-[var(--text)] pt-0.5 space-y-1 tabular-nums">
                   <div>
-                    <span className="text-[var(--muted)]">Projected Game Total: </span>
+                    <span className="text-[var(--text-2)]">Projected game total: </span>
                     <span>{calculationResult.aProjected.toFixed(2)} + {calculationResult.bProjected.toFixed(2)} = </span>
                     <span className="text-[var(--accent)] font-semibold text-[13px]">{calculationResult.total.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--muted)]">Projected 1st Half Total: </span>
+                    <span className="text-[var(--text-2)]">Projected 1st half: </span>
                     <span>{calculationResult.total.toFixed(2)} × 0.503 = </span>
                     <span className="text-[var(--text)] font-semibold">{h1ProjectedTotal !== null ? h1ProjectedTotal.toFixed(2) : '—'} pts</span>
                   </div>
@@ -792,15 +746,15 @@ export default function NBAScoreProjectionTool() {
         </div>
       )}
 
-      {/* Responsible Use Footer Requirement */}
-      <div className="p-3 bg-[rgba(217,164,65,0.04)] border border-[rgba(217,164,65,0.3)] rounded-[10px] flex items-center justify-between text-[11px] text-[var(--text-3)]">
-        <span className="flex items-center gap-1.5">
-          <Info className="w-3.5 h-3.5 text-[var(--warn)] flex-shrink-0" strokeWidth={1.75} />
-          <span><strong className="text-[var(--text-2)] font-semibold">Responsible use:</strong> Statistical estimate, not a guaranteed outcome. Please use responsibly.</span>
+      {/* Responsible Use Footer */}
+      <div className="p-3.5 bg-[var(--medium-soft)] border border-[var(--medium)]/30 rounded-[12px] flex items-center justify-between gap-2 text-[11.5px] text-[var(--text-2)]">
+        <span className="flex items-center gap-2">
+          <Info className="w-4 h-4 text-[var(--medium)] shrink-0" strokeWidth={1.75} />
+          <span>
+            <strong className="text-[var(--text)] font-semibold">Responsible use:</strong> Statistical estimate, not a guaranteed outcome.
+          </span>
         </span>
-        <span className="font-mono text-[10.5px] text-[var(--text-3)] hidden sm:inline">
-          NBA Efficiency Model v1.0
-        </span>
+        <span className="text-[10.5px] text-[var(--text-3)] hidden sm:inline">NBA Efficiency v1.0</span>
       </div>
     </div>
   );
