@@ -140,6 +140,10 @@ export class ConfidenceEngine {
     optionType: SupportedOptionType
   ): V25ConfidenceAssessment {
     const isAsianHandicap = optionType === 'asian_handicap' || optionType === 'european_handicap';
+    const isMultiGoals =
+      optionType === 'multi_goals' ||
+      optionType === 'team_multi_goals' ||
+      optionType === 'first_half_multi_goals';
 
     // Base score computed from probability and data completeness minus uncertainty
     let confidenceScore = (calibratedProb * 0.55) + (dataCompleteness * 0.25) + (Math.max(0, edgeOverMarket) * 0.20) - (uncertaintySpread * 0.8);
@@ -149,7 +153,26 @@ export class ConfidenceEngine {
     let tier: ConfidenceTier = 'LOW';
     const hasAdverseNegativeEdge = edgeOverMarket !== undefined && edgeOverMarket < -0.05;
 
-    if (
+    if (isMultiGoals) {
+      if (
+        isTeamNewsEnabled() &&
+        calibratedProb >= 0.60 &&
+        uncertaintySpread <= 0.065 &&
+        dataCompleteness >= 0.80 &&
+        riskEvaluation.downgradesCount === 0
+      ) {
+        tier = 'HIGH';
+      } else if (
+        calibratedProb >= 0.48 &&
+        uncertaintySpread <= 0.085 &&
+        dataCompleteness >= 0.65 &&
+        riskEvaluation.downgradesCount <= 1
+      ) {
+        tier = 'MEDIUM';
+      } else {
+        tier = 'LOW';
+      }
+    } else if (
       isTeamNewsEnabled() &&
       calibratedProb >= 0.70 &&
       uncertaintySpread <= 0.055 &&

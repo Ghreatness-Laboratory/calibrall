@@ -380,6 +380,16 @@ export interface FixtureStatisticalContext {
   derbyName?: string;
   derbySource?: string;
   leagueCapabilities?: LeagueColumnCapabilities;
+  homeAvgScored?: number;
+  homeAvgConceded?: number;
+  awayAvgScored?: number;
+  awayAvgConceded?: number;
+  homeRecentTotals?: number[];
+  awayRecentTotals?: number[];
+  homeRecentGoals?: number[];
+  awayRecentGoals?: number[];
+  h2hMeetingsCount?: number;
+  h2hAvgTotalGoals?: number;
 }
 
 import { cleanDisplayText, displayName } from '../utils/formatText';
@@ -572,6 +582,16 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     stateTags.push('derby');
   }
 
+  const h2hMeetings = matchesStore.getHeadToHeadMeetingsSync(
+    fixture.homeTeam.id || fixture.homeTeam.name,
+    fixture.awayTeam.id || fixture.awayTeam.name,
+    fixture.kickoffTime
+  );
+  const h2hMeetingsCount = h2hMeetings.length;
+  const h2hAvgTotalGoals = h2hMeetingsCount > 0
+    ? Number((h2hMeetings.reduce((acc, m) => acc + (m.homeScore + m.awayScore), 0) / h2hMeetingsCount).toFixed(2))
+    : undefined;
+
   return {
     homeXg,
     awayXg,
@@ -616,6 +636,16 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     derbyName: derbyInfo.derbyName,
     derbySource: derbyInfo.source,
     leagueCapabilities: effectiveCapabilities,
+    homeAvgScored: homeDb.avgGoalsScored,
+    homeAvgConceded: homeDb.avgGoalsConceded,
+    awayAvgScored: awayDb.avgGoalsScored,
+    awayAvgConceded: awayDb.avgGoalsConceded,
+    homeRecentTotals: homeDb.recentMatchTotals,
+    awayRecentTotals: awayDb.recentMatchTotals,
+    homeRecentGoals: homeDb.recentTeamGoals,
+    awayRecentGoals: awayDb.recentTeamGoals,
+    h2hMeetingsCount,
+    h2hAvgTotalGoals,
   };
 }
 
@@ -677,6 +707,17 @@ export function buildFixtureContextFromStats(
     insufficientData: stats.insufficientData || fixture.insufficientData,
     hasRealTeamStrength: stats.hasRealTeamStrength,
     noRecommendationReason: stats.noRecommendationReason,
+    homeAvgScored: stats.homeAvgScored,
+    homeAvgConceded: stats.homeAvgConceded,
+    awayAvgScored: stats.awayAvgScored,
+    awayAvgConceded: stats.awayAvgConceded,
+    homeRecentTotals: stats.homeRecentTotals,
+    awayRecentTotals: stats.awayRecentTotals,
+    homeRecentGoals: stats.homeRecentGoals,
+    awayRecentGoals: stats.awayRecentGoals,
+    h2hMeetingsCount: stats.h2hMeetingsCount,
+    h2hAvgTotalGoals: stats.h2hAvgTotalGoals,
+    halfTimeSampleCount: stats.halfTimeSampleCount,
   };
 }
 

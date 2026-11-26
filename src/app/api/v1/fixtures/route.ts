@@ -5,6 +5,7 @@ import {
   getBasketballFixturesAndEvaluations,
   getBasketballFixtureByIdFromDb,
 } from '@/lib/basketball/readService';
+import { resolveRequestTier, redactExplanationForTier } from '@/lib/auth/tierAccess';
 import { Sport } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,7 @@ export const maxDuration = 60;
 
 export async function GET(request: Request) {
   try {
+    const tier = resolveRequestTier(request);
     const { searchParams } = new URL(request.url);
     const sport = (searchParams.get('sport') as Sport) || 'football';
     const rawCompetitionId = searchParams.get('competition_id') || searchParams.get('league') || undefined;
@@ -38,12 +40,27 @@ export async function GET(request: Request) {
         }
       }
 
+      let bbSummaryIdx = 0;
+      const redactedBbFixtures = result.fixtures.map((f) => {
+        if (!f.writtenExplanation) return f;
+        const redacted = redactExplanationForTier(f.writtenExplanation, tier, bbSummaryIdx++);
+        return { ...f, writtenExplanation: redacted };
+      });
+      const redactedEvals: typeof result.evaluationsById = {};
+      for (const [k, ev] of Object.entries(result.evaluationsById)) {
+        const matchedFix = redactedBbFixtures.find((f) => f.id === k);
+        redactedEvals[k] = ev.writtenExplanation
+          ? { ...ev, writtenExplanation: matchedFix?.writtenExplanation ?? redactExplanationForTier(ev.writtenExplanation, tier, 0) }
+          : ev;
+      }
+
       return NextResponse.json(
         {
           sport: 'basketball',
-          data: result.fixtures,
-          evaluations: result.evaluationsById,
-          total: result.fixtures.length,
+          tier,
+          data: redactedBbFixtures,
+          evaluations: redactedEvals,
+          total: redactedBbFixtures.length,
           liveDataAvailable: result.liveDataAvailable,
           lastUpdated: result.lastUpdated,
           lastSyncTimestamp: result.lastSyncTimestamp,
@@ -100,11 +117,19 @@ export async function GET(request: Request) {
       }
     }
 
+    let fbSummaryIdx = 0;
+    const redactedFootballFixtures = result.fixtures.map((f) => {
+      if (!f.writtenExplanation) return f;
+      const redacted = redactExplanationForTier(f.writtenExplanation, tier, fbSummaryIdx++);
+      return { ...f, writtenExplanation: redacted };
+    });
+
     return NextResponse.json(
       {
         sport: 'football',
-        data: result.fixtures,
-        total: result.fixtures.length,
+        tier,
+        data: redactedFootballFixtures,
+        total: redactedFootballFixtures.length,
         liveDataAvailable: result.liveDataAvailable,
         lastUpdated: result.lastUpdated,
         lastSyncTimestamp: result.lastSyncTimestamp,

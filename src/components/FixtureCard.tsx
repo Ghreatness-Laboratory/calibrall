@@ -11,6 +11,7 @@ import { getFixtureLineupState } from '@/lib/data/lineupsService';
 import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText, displayName, formatMatchTime } from '@/lib/utils/formatText';
 import { settleMarketPrediction, extractMatchStats } from '@/lib/prediction/settlementEngine';
+import WhyThisPickSheet from '@/components/WhyThisPickSheet';
 
 interface Props {
   fixture: Fixture;
@@ -41,6 +42,7 @@ export default function FixtureCard({
 }: Props) {
   const [isSaved, setIsSaved] = useState<boolean>(isSavedInitial ?? false);
   const [expandedRationale, setExpandedRationale] = useState<boolean>(false);
+  const [whySheetOpen, setWhySheetOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (isSavedInitial === undefined) {
@@ -344,9 +346,13 @@ export default function FixtureCard({
                 </span>
                 <span className="font-semibold text-[var(--accent)]">EV {evFormatted}</span>
               </>
-            ) : (
-              <span>Probability analysis only · No bookmaker odds</span>
-            )}
+              ) : (
+                <span>
+                  {topPrediction.priceSource
+                    ? cleanDisplayText(topPrediction.priceSource)
+                    : 'Probability analysis only · No bookmaker odds'}
+                </span>
+              )}
           </div>
 
           {/* Settlement banner when finished */}
@@ -370,8 +376,21 @@ export default function FixtureCard({
             </div>
           )}
 
-          {/* Short 2-sentence explanation with Read more */}
-          {fullExplanation && (
+          {/* Written 1-line explanation + Why this pick sheet */}
+          {fixture.writtenExplanation?.oneLineSummary ? (
+            <div className="pt-2 border-t border-[var(--line)] space-y-1">
+              <p className="text-[12.5px] leading-[1.5] text-[var(--text-2)]">
+                {cleanDisplayText(fixture.writtenExplanation.oneLineSummary)}
+              </p>
+              <button
+                type="button"
+                onClick={() => setWhySheetOpen(true)}
+                className="min-h-[44px] inline-flex items-center text-[12px] font-semibold text-[var(--accent)] touch-press -my-1"
+              >
+                Why this pick
+              </button>
+            </div>
+          ) : fullExplanation ? (
             <div className="pt-1 border-t border-[var(--line)]">
               <p className="text-[12.5px] leading-[1.5] text-[var(--text-2)]">
                 {expandedRationale ? fullExplanation : shortText}
@@ -386,7 +405,7 @@ export default function FixtureCard({
                 </button>
               )}
             </div>
-          )}
+          ) : null}
         </div>
       ) : (
         <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-3 space-y-2">
@@ -398,11 +417,21 @@ export default function FixtureCard({
           </div>
           <p className="text-[12.5px] leading-[1.5] text-[var(--text-2)]">
             {cleanDisplayText(
-              noRecommendationReason && noRecommendationReason !== 'Not enough data'
-                ? noRecommendationReason
-                : `${homeName} and ${awayName} lack qualifying predictive edge above the 70.0% calibration threshold.`
+              fixture.writtenExplanation?.oneLineSummary ||
+                (noRecommendationReason && noRecommendationReason !== 'Not enough data'
+                  ? noRecommendationReason
+                  : `${homeName} and ${awayName} lack qualifying predictive edge above the 70.0% calibration threshold.`)
             )}
           </p>
+          {fixture.writtenExplanation && (
+            <button
+              type="button"
+              onClick={() => setWhySheetOpen(true)}
+              className="min-h-[44px] inline-flex items-center text-[12px] font-semibold text-[var(--accent)] touch-press -my-2"
+            >
+              Why this pick
+            </button>
+          )}
         </div>
       )}
 
@@ -414,6 +443,14 @@ export default function FixtureCard({
         <span>View full analysis</span>
         <ChevronRight className="w-4 h-4 shrink-0" strokeWidth={2.2} />
       </Link>
+
+      <WhyThisPickSheet
+        open={whySheetOpen}
+        onClose={() => setWhySheetOpen(false)}
+        matchTitle={`${homeName} vs ${awayName}`}
+        pickLabel={topPrediction ? formatSelectionName(topPrediction.selection) : undefined}
+        explanation={fixture.writtenExplanation}
+      />
     </article>
   );
 }

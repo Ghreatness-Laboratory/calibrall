@@ -16,7 +16,8 @@ export type MarketFamily =
   | 'second_half_result' 
   | 'corners' 
   | 'bookings'
-  | 'handicap';
+  | 'handicap'
+  | 'multi_goals';
 
 export const MARKET_FAMILIES: MarketFamily[] = [
   'result',
@@ -30,6 +31,7 @@ export const MARKET_FAMILIES: MarketFamily[] = [
   'corners',
   'bookings',
   'handicap',
+  'multi_goals',
 ];
 
 export interface TeamHistoricalStats {
@@ -476,6 +478,32 @@ export function getMarketBaseline(
     else if (l <= -0.5) rate = isHome ? comp.homeWinRate : comp.awayWinRate;
     else if (l <= -0.25) rate = isHome ? comp.homeWinRate * 0.92 : comp.awayWinRate * 0.92;
     compRate = Number(rate.toFixed(3));
+    teamRate = compRate;
+  }
+
+  // 11. Multi Goals (Full match, Team Home/Away, First Half)
+  else if (
+    marketCode.startsWith('MULTI_GOALS_') ||
+    marketCode.startsWith('TEAM_MULTI_GOALS_') ||
+    marketCode.startsWith('FH_MULTI_GOALS_')
+  ) {
+    marketFamily = 'multi_goals';
+    const matchRange = marketCode.match(/(\d+)_(\d+)$/);
+    const minG = matchRange ? parseInt(matchRange[1], 10) : 2;
+    const maxG = matchRange ? parseInt(matchRange[2], 10) : 4;
+    let lambda = comp.avgGoals;
+    if (marketCode.startsWith('TEAM_MULTI_GOALS_HOME_')) {
+      lambda = comp.avgHomeGoals;
+    } else if (marketCode.startsWith('TEAM_MULTI_GOALS_AWAY_')) {
+      lambda = comp.avgAwayGoals;
+    } else if (marketCode.startsWith('FH_MULTI_GOALS_')) {
+      lambda = Math.max(0.5, comp.avgGoals * 0.439);
+    }
+    let sumP = 0;
+    for (let g = minG; g <= maxG; g++) {
+      sumP += poissonProb(lambda, g);
+    }
+    compRate = Number(Math.min(0.95, Math.max(0.05, sumP)).toFixed(4));
     teamRate = compRate;
   }
 

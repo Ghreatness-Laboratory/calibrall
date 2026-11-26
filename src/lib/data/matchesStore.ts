@@ -194,6 +194,10 @@ export interface DbTeamStatsSummary {
   cardAgainstRating: number;
   cardsSampleCount: number;
   recentForm: ('W' | 'D' | 'L')[];
+  avgGoalsScored: number;
+  avgGoalsConceded: number;
+  recentMatchTotals: number[];
+  recentTeamGoals: number[];
 }
 
 export interface ShrunkRefereeProfile {
@@ -1598,10 +1602,14 @@ class MatchesStore {
       return true;
     });
 
-    const inferredCompCode = competitionCodeHint || matches[0]?.competition_code;
+    const matchesSorted = [...matches].sort((a, b) =>
+      a.kickoff_time > b.kickoff_time ? -1 : a.kickoff_time < b.kickoff_time ? 1 : 0
+    );
+
+    const inferredCompCode = competitionCodeHint || matchesSorted[0]?.competition_code;
     const compCfg = getLeagueCalibratedConfig(inferredCompCode);
 
-    const storedMatchCount = matches.length;
+    const storedMatchCount = matchesSorted.length;
     if (storedMatchCount === 0) {
       const emptyResult: DbTeamStatsSummary = {
         teamId: canonicalId,
@@ -1630,26 +1638,46 @@ class MatchesStore {
         cardAgainstRating: 1.00,
         cardsSampleCount: 0,
         recentForm: [],
+        avgGoalsScored: 0,
+        avgGoalsConceded: 0,
+        recentMatchTotals: [],
+        recentTeamGoals: [],
       };
       this.teamStatsMemo.set(memoKey, { stats: emptyResult, computedAt: Date.now() });
       return emptyResult;
     }
 
-    const lastMatchDate = matches[0].kickoff_time;
+    const lastMatchDate = matchesSorted[0].kickoff_time;
     const refTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
     const daysSinceLastMatch = Math.max(0, Math.round((refTime - new Date(lastMatchDate).getTime()) / (1000 * 60 * 60 * 24)));
     const window120Start = refTime - (120 * 24 * 60 * 60 * 1000);
-    const matchesInLast120Days = matches.filter(m => {
+    const matchesInLast120Days = matchesSorted.filter(m => {
       const t = new Date(m.kickoff_time).getTime();
       return t >= window120Start && t <= refTime;
     }).length;
 
-    const recentForm: ('W' | 'D' | 'L')[] = matches.slice(0, 5).map(m => {
+    const recentForm: ('W' | 'D' | 'L')[] = matchesSorted.slice(0, 5).map(m => {
       const isHome = this.matchSideForTeam(m, idVariants, normName) === 'home';
       const ts = isHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
       const os = isHome ? (m.away_score ?? 0) : (m.home_score ?? 0);
       return ts > os ? 'W' : ts === os ? 'D' : 'L';
     });
+
+    const recent10Slice = matchesSorted.slice(0, 10);
+    const recentMatchTotals: number[] = recent10Slice.map(m => (m.home_score ?? 0) + (m.away_score ?? 0));
+    const recentTeamGoals: number[] = recent10Slice.map(m => {
+      const isHome = this.matchSideForTeam(m, idVariants, normName) === 'home';
+      return isHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
+    });
+    let rawTotalFor = 0;
+    let rawTotalAg = 0;
+    for (const m of recent10Slice) {
+      const isHome = this.matchSideForTeam(m, idVariants, normName) === 'home';
+      rawTotalFor += isHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
+      rawTotalAg += isHome ? (m.away_score ?? 0) : (m.home_score ?? 0);
+    }
+    const rawAvgScored = recent10Slice.length > 0 ? Number((rawTotalFor / recent10Slice.length).toFixed(2)) : 0;
+    const rawAvgConceded = recent10Slice.length > 0 ? Number((rawTotalAg / recent10Slice.length).toFixed(2)) : 0;
 
     if (storedMatchCount < 10) {
       const lowSampleResult: DbTeamStatsSummary = {
@@ -1679,6 +1707,10 @@ class MatchesStore {
         cardAgainstRating: 1.00,
         cardsSampleCount: 0,
         recentForm,
+        avgGoalsScored: rawAvgScored,
+        avgGoalsConceded: rawAvgConceded,
+        recentMatchTotals,
+        recentTeamGoals,
       };
       this.teamStatsMemo.set(memoKey, { stats: lowSampleResult, computedAt: Date.now() });
       return lowSampleResult;
@@ -1863,6 +1895,10 @@ class MatchesStore {
       cardAgainstRating,
       cardsSampleCount,
       recentForm,
+      avgGoalsScored: rawAvgScored,
+      avgGoalsConceded: rawAvgConceded,
+      recentMatchTotals,
+      recentTeamGoals,
     };
     this.teamStatsMemo.set(memoKey, { stats: summaryResult, computedAt: Date.now() });
     return summaryResult;

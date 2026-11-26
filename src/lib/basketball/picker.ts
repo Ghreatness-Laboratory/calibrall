@@ -17,6 +17,7 @@ import {
 } from './model';
 import { calibrateBasketballProbability } from './calibratedParams';
 import { cleanDisplayText } from '../utils/formatText';
+import type { WrittenMatchExplanation } from '@/types';
 
 export type BasketballPickTier = 'HIGH' | 'MEDIUM' | 'SPECULATIVE' | 'ABSTAIN';
 
@@ -74,6 +75,7 @@ export interface BasketballGameEvaluation {
   abstentionReason: string | null;
   topPick: BasketballPickCandidate | null;
   picks: BasketballPickCandidate[];
+  writtenExplanation?: WrittenMatchExplanation;
 }
 
 export const MODEL_LINE_PRICE_LABEL = 'model line - no market price';

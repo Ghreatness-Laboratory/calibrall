@@ -12,7 +12,8 @@ import {
 import { FIXTURE_STALE_LIMIT_MINUTES } from '@/lib/data/providerBudget';
 import { matchesDayFilter } from '@/lib/utils/dateWindow';
 import { cleanDisplayText } from '@/lib/utils/formatText';
-import { Competition, Fixture, MatchStatus, Team } from '@/types';
+import { Competition, Fixture, MatchStatus, Team, WrittenMatchAlternate, WrittenMatchExplanation } from '@/types';
+import { generateBasketballExplanation } from '@/lib/prediction/explanationGenerator';
 import {
   BasketballLeague,
   CURRENT_BASKETBALL_SEASON,
@@ -182,12 +183,41 @@ function createSeededLeagueState(league: BasketballLeague): LeagueBaselineState 
   return state;
 }
 
+function parseStoredBasketballExplanation(row: any): WrittenMatchExplanation | undefined {
+  if (!row || !row.summary) return undefined;
+  const fullSummary = cleanDisplayText(String(row.summary));
+  if (!fullSummary) return undefined;
+  const match = fullSummary.match(/^(.+?[.!?])(?:\s+|$)/);
+  const oneLineSummary = match ? match[1].trim() : fullSummary;
+  let reasoning: Record<string, any> = {};
+  let alternates: WrittenMatchAlternate[] = [];
+  try {
+    reasoning = typeof row.reasoning_json === 'string' ? JSON.parse(row.reasoning_json) : row.reasoning_json || {};
+  } catch {
+    reasoning = {};
+  }
+  try {
+    const parsedAlt = typeof row.alternates_json === 'string' ? JSON.parse(row.alternates_json) : row.alternates_json || [];
+    if (Array.isArray(parsedAlt)) alternates = parsedAlt;
+  } catch {
+    alternates = [];
+  }
+  return {
+    oneLineSummary,
+    fullSummary,
+    reasoning,
+    alternates,
+    generatedAt: String(row.recorded_at || new Date().toISOString()),
+  };
+}
+
 function buildFixtureFromEvaluation(
   game: StoredBbGame,
   ev: BasketballGameEvaluation,
   homeTeam: BbTeamRow | undefined,
   awayTeam: BbTeamRow | undefined,
-  quotes: BbOddsQuote[]
+  quotes: BbOddsQuote[],
+  storedExplanation?: WrittenMatchExplanation
 ): Fixture {
   const comp = BASKETBALL_COMPETITIONS[game.league];
   const uiHome = toUiTeam(homeTeam, game.home_id, comp.id);
@@ -199,7 +229,7 @@ function buildFixtureFromEvaluation(
   const kickoffTime = game.kickoff_utc || `${game.game_date}T19:00:00Z`;
   const projectedMargin = Math.round(Math.abs(proj.homeMean - proj.awayMean) * 10) / 10;
 
-  return {
+  const fixture: Fixture = {
     id: game.id,
     providerId: game.id,
     providerName: comp.freeFixturesProvider || game.source,
@@ -267,6 +297,12 @@ function buildFixtureFromEvaluation(
         : undefined,
     },
   };
+
+  const writtenExplanation =
+    storedExplanation || generateBasketballExplanation({ fixture, evaluation: ev });
+  fixture.writtenExplanation = writtenExplanation;
+  ev.writtenExplanation = writtenExplanation;
+  return fixture;
 }
 
 /**
@@ -429,6 +465,22 @@ export async function buildEvaluatedBasketballSlate(forceRefresh = false): Promi
     }
   }
 
+  const storedExplByGameId = new Map<string, WrittenMatchExplanation>();
+  for (const idChunk of chunkArray(windowIds, 200)) {
+    const { data: pickRows } = await supabase
+      .from('bb_picks')
+      .select('game_id, summary, reasoning_json, alternates_json, recorded_at, is_top_pick')
+      .in('game_id', idChunk);
+    for (const pr of pickRows || []) {
+      const gid = String(pr.game_id || '');
+      if (!gid) continue;
+      const parsed = parseStoredBasketballExplanation(pr);
+      if (parsed && (!storedExplByGameId.has(gid) || pr.is_top_pick === 1 || pr.is_top_pick === true)) {
+        storedExplByGameId.set(gid, parsed);
+      }
+    }
+  }
+
   const fixtures: Fixture[] = [];
   const evaluationsById: Record<string, BasketballGameEvaluation> = {};
 
@@ -443,7 +495,8 @@ export async function buildEvaluatedBasketballSlate(forceRefresh = false): Promi
         ev,
         teamMap.get(g.home_id),
         teamMap.get(g.away_id),
-        oddsByGameId.get(g.id) || []
+        oddsByGameId.get(g.id) || [],
+        storedExplByGameId.get(g.id)
       )
     );
   }
@@ -602,9 +655,10 @@ export async function getBasketballFixtureByIdFromDb(gameId: string): Promise<{
   if (!Array.isArray(rows) || rows.length === 0) return null;
   const game = parseGameRow(rows[0]);
 
-  const [{ data: teamRows }, { data: oddsRows }, { data: priorRawGames }] = await Promise.all([
+  const [{ data: teamRows }, { data: oddsRows }, { data: pickRows }, { data: priorRawGames }] = await Promise.all([
     supabase.from('bb_teams').select('id, league, name, aliases').in('id', [game.home_id, game.away_id]),
     supabase.from('bb_odds_snapshots').select('*').eq('game_id', game.id),
+    supabase.from('bb_picks').select('game_id, summary, reasoning_json, alternates_json, recorded_at, is_top_pick').eq('game_id', game.id),
     fetchAllRows<any>((from, to) =>
       supabase
         .from('bb_games')
@@ -656,8 +710,11 @@ export async function getBasketballFixtureByIdFromDb(gameId: string): Promise<{
     oddsSnapshots: quotes,
   });
 
+  const topPickRow = (pickRows || []).find((pr: any) => pr.summary && (pr.is_top_pick === 1 || pr.is_top_pick === true)) || (pickRows || []).find((pr: any) => pr.summary);
+  const storedExpl = parseStoredBasketballExplanation(topPickRow);
+
   return {
-    fixture: buildFixtureFromEvaluation(game, evaluation, homeTeam, awayTeam, quotes),
+    fixture: buildFixtureFromEvaluation(game, evaluation, homeTeam, awayTeam, quotes, storedExpl),
     evaluation,
     game,
   };

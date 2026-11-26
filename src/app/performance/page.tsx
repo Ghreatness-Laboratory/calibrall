@@ -33,6 +33,7 @@ import {
   OCTOBER_18_RETROSPECTIVE_DISCLAIMER,
 } from '@/lib/data/october18CaseStudy';
 import { forwardPickLedger } from '@/lib/prediction/forwardPickLedger';
+import { getStoredUser } from '@/lib/supabase/client';
 import DataStatusDiagnostics from '@/components/DataStatusDiagnostics';
 
 type MainSectionTab =
@@ -79,7 +80,13 @@ export default function PerformancePage() {
     let active = true;
     setBbLoading(true);
     setBbError(null);
-    fetch('/api/v1/performance/summary?sport=basketball', { cache: 'no-store' })
+    const userTier = getStoredUser()?.subscriptionTier || 'free';
+    fetch('/api/v1/performance/summary?sport=basketball', {
+      cache: 'no-store',
+      headers: {
+        'x-calibrall-tier': userTier,
+      },
+    })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -491,6 +498,12 @@ export default function PerformancePage() {
                         {row.brierError !== null ? ` · Brier ${row.brierError.toFixed(4)}` : ''}
                       </span>
                     </div>
+
+                    {row.summary && (
+                      <p className="text-[11.5px] leading-[1.45] text-[var(--text-2)] pt-1 border-t border-[var(--line)]">
+                        {cleanDisplayText(row.summary)}
+                      </p>
+                    )}
                   </div>
                 );
               })}
@@ -694,6 +707,7 @@ export default function PerformancePage() {
                   const isPending = pick.gradingStatus === 'PENDING';
                   const isWon = pick.settlementStatus === 'WON';
                   const isLost = pick.settlementStatus === 'LOST';
+                  const isVoid = pick.settlementStatus === 'VOID';
                   const shortenedSeal = pick.recordHash
                     ? `${pick.recordHash.slice(0, 10)}…${pick.recordHash.slice(-5)}`
                     : '0x12a9ef55…b7110';
@@ -725,6 +739,10 @@ export default function PerformancePage() {
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--danger-soft)] border border-[var(--danger)]/40 text-[var(--danger)]">
                               Lost
                             </span>
+                          ) : isVoid ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)]">
+                              Void
+                            </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--medium-soft)] border border-[var(--medium)]/40 text-[var(--medium)]">
                               Push
@@ -747,10 +765,22 @@ export default function PerformancePage() {
                         </div>
 
                         <div className="text-[12.5px] text-[var(--text)]">
-                          Selection <strong className="font-semibold text-[var(--accent)]">{cleanDisplayText(pick.selection)}</strong> @{' '}
-                          <span className="tabular-nums font-semibold">{pick.odds.toFixed(2)}</span>
+                          Selection <strong className="font-semibold text-[var(--accent)]">{cleanDisplayText(pick.selection)}</strong>{' '}
+                          {pick.odds > 0 ? (
+                            <>
+                              @ <span className="tabular-nums font-semibold">{pick.odds.toFixed(2)}</span>
+                            </>
+                          ) : (
+                            <span className="text-[11.5px] text-[var(--text-2)]">· Model line, no market price</span>
+                          )}
                         </div>
                       </div>
+
+                      {pick.summary && (
+                        <p className="text-[11.5px] leading-[1.45] text-[var(--text-2)] bg-[var(--surface-2)] border border-[var(--line)] rounded-[10px] p-2.5">
+                          {cleanDisplayText(pick.summary)}
+                        </p>
+                      )}
 
                       <div className="grid grid-cols-3 gap-2 bg-[var(--surface-2)] rounded-[12px] p-2.5 text-center text-[11.5px] border border-[var(--line)]">
                         <div>
@@ -762,7 +792,7 @@ export default function PerformancePage() {
                         <div>
                           <span className="text-[var(--text-3)] block text-[10.5px]">Bookmaker</span>
                           <span className="text-[var(--text)] tabular-nums">
-                            {(pick.impliedProbability * 100).toFixed(1)}%
+                            {pick.odds > 0 ? `${(pick.impliedProbability * 100).toFixed(1)}%` : 'No price'}
                           </span>
                         </div>
                         <div>
@@ -1384,27 +1414,56 @@ export default function PerformancePage() {
 
             <div className="border border-[var(--line)] bg-[var(--surface)] rounded-[18px] divide-y divide-[var(--line)] overflow-hidden">
               {breakdownSubTab === 'markets' ? (
-                report.byMarketCategory.map((cat, idx) => (
-                  <div key={idx} className="p-4 flex items-center justify-between gap-3 hover:bg-[var(--surface-2)]/50 transition-colors">
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-[600] text-[var(--text)] truncate">
-                        {cleanDisplayText(cat.name)}
+                <>
+                  {report.byMarketCategory.map((cat, idx) => (
+                    <div key={idx} className="p-4 flex items-center justify-between gap-3 hover:bg-[var(--surface-2)]/50 transition-colors">
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-[600] text-[var(--text)] truncate">
+                          {cleanDisplayText(cat.name)}
+                        </div>
+                        <div className="text-[11px] text-[var(--text-2)] mt-0.5 tabular-nums">
+                          n = {cat.sampleSize} · Brier {cat.brierScore.toFixed(3)}
+                        </div>
                       </div>
-                      <div className="text-[11px] text-[var(--text-2)] mt-0.5 tabular-nums">
-                        n = {cat.sampleSize} · Brier {cat.brierScore.toFixed(3)}
-                      </div>
-                    </div>
 
-                    <div className="text-right shrink-0">
-                      <div className="text-[15px] font-bold text-[var(--accent)] tabular-nums leading-tight">
-                        {(cat.hitRate * 100).toFixed(1)}%
-                      </div>
-                      <div className="text-[11px] text-[var(--text-2)] mt-0.5 tabular-nums">
-                        +{(cat.avgEdge * 100).toFixed(1)}% edge
+                      <div className="text-right shrink-0">
+                        <div className="text-[15px] font-bold text-[var(--accent)] tabular-nums leading-tight">
+                          {(cat.hitRate * 100).toFixed(1)}%
+                        </div>
+                        <div className="text-[11px] text-[var(--text-2)] mt-0.5 tabular-nums">
+                          +{(cat.avgEdge * 100).toFixed(1)}% edge
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  {forwardMetrics.multiGoalsMetrics.settledCount >= 30 ? (
+                    <div className="p-4 flex items-center justify-between gap-3 hover:bg-[var(--surface-2)]/50 transition-colors">
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-[600] text-[var(--text)] truncate">
+                          Multi goals
+                        </div>
+                        <div className="text-[11px] text-[var(--text-2)] mt-0.5 tabular-nums">
+                          n = {forwardMetrics.multiGoalsMetrics.settledCount} · Brier {forwardMetrics.multiGoalsMetrics.brierScore.toFixed(3)} · Log loss {forwardMetrics.multiGoalsMetrics.logLoss.toFixed(3)}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="text-[15px] font-bold text-[var(--accent)] tabular-nums leading-tight">
+                          {(forwardMetrics.multiGoalsMetrics.hitRate * 100).toFixed(1)}%
+                        </div>
+                        <div className="text-[11px] text-[var(--text-2)] mt-0.5 tabular-nums">
+                          {forwardMetrics.multiGoalsMetrics.wonCount}W / {forwardMetrics.multiGoalsMetrics.lostCount}L
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 flex items-center justify-between gap-3 text-[12px] text-[var(--text-2)]">
+                      <span>
+                        Multi goals forward tracking activates after 30 settled picks ({forwardMetrics.multiGoalsMetrics.settledCount} of 30 settled).
+                      </span>
+                    </div>
+                  )}
+                </>
               ) : breakdownSubTab === 'state_tags' ? (
                 report.byStateTag.map((tag, idx) => (
                   <div key={idx} className="p-4 flex items-center justify-between gap-3 hover:bg-[var(--surface-2)]/50 transition-colors">

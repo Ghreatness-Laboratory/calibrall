@@ -44,6 +44,22 @@ export interface ForwardPickRecord {
   keyPlayerOutFlag?: boolean;
   keyPlayerOutName?: string;
   parentPickId?: string;
+  marketFamily?: string;
+  priceSource?: string;
+  summary?: string;
+  reasoning?: Record<string, any>;
+  alternates?: { marketCode: string; marketName: string; selection: string; probability: number; confidenceTier?: string }[];
+}
+
+export interface MultiGoalsForwardMetrics {
+  totalPicks: number;
+  settledCount: number;
+  wonCount: number;
+  lostCount: number;
+  voidCount: number;
+  hitRate: number;
+  brierScore: number;
+  logLoss: number;
 }
 
 export interface ForwardPerformanceMetrics {
@@ -61,6 +77,7 @@ export interface ForwardPerformanceMetrics {
   modelVersion: string;
   settledPicks: ForwardPickRecord[];
   pendingPicks: ForwardPickRecord[];
+  multiGoalsMetrics: MultiGoalsForwardMetrics;
 }
 
 /**
@@ -472,6 +489,11 @@ class ForwardPickLedgerService {
     probability: number;
     odds: number;
     confidenceTier: 'HIGH' | 'MEDIUM' | 'LOW';
+    marketFamily?: string;
+    priceSource?: string;
+    summary?: string;
+    reasoning?: Record<string, any>;
+    alternates?: { marketCode: string; marketName: string; selection: string; probability: number; confidenceTier?: string }[];
   }): ForwardPickRecord {
     // Check if pick already recorded for this fixture and market code
     const existing = this.ledger.find(
@@ -484,8 +506,9 @@ class ForwardPickLedgerService {
 
     const recordedAt = new Date().toISOString();
     const modelVersion = input.modelVersion || 'v2.5.0';
-    const impliedProbability = Number((1 / input.odds).toFixed(4));
-    const edge = Number((input.probability - impliedProbability).toFixed(4));
+    const hasOdds = typeof input.odds === 'number' && input.odds > 1.0;
+    const impliedProbability = hasOdds ? Number((1 / input.odds).toFixed(4)) : 0;
+    const edge = hasOdds ? Number((input.probability - impliedProbability).toFixed(4)) : 0;
 
     const recordHash = generateRecordHash({
       fixtureId: input.fixtureId,
@@ -495,7 +518,7 @@ class ForwardPickLedgerService {
       marketCode: input.marketCode,
       selection: input.selection,
       probability: input.probability,
-      odds: input.odds,
+      odds: hasOdds ? input.odds : 0,
     });
 
     const newPick: ForwardPickRecord = Object.freeze({
@@ -511,13 +534,18 @@ class ForwardPickLedgerService {
       market: input.market,
       selection: input.selection,
       probability: input.probability,
-      odds: input.odds,
+      odds: hasOdds ? input.odds : 0,
       impliedProbability,
       edge,
       confidenceTier: input.confidenceTier,
       recordHash,
       isImmutable: true,
       gradingStatus: 'PENDING',
+      marketFamily: input.marketFamily,
+      priceSource: input.priceSource,
+      summary: input.summary,
+      reasoning: input.reasoning,
+      alternates: input.alternates,
     });
 
     this.ledger.unshift(newPick);
@@ -553,8 +581,8 @@ class ForwardPickLedgerService {
         : 0.0);
 
     const profitUnits = settlementStatus === 'WON'
-      ? Number((current.odds - 1.0).toFixed(2))
-      : (settlementStatus === 'LOST' ? -1.0 : 0.0);
+      ? (current.odds > 1.0 ? Number((current.odds - 1.0).toFixed(2)) : 0.0)
+      : (settlementStatus === 'LOST' ? (current.odds > 1.0 ? -1.0 : 0.0) : 0.0);
 
     const updated: ForwardPickRecord = Object.freeze({
       ...current,
@@ -590,19 +618,39 @@ class ForwardPickLedgerService {
     let totalLogLoss = 0;
     let totalProfit = 0;
     let totalClv = 0;
+    let pricedCount = 0;
 
     decisive.forEach(p => {
       totalBrier += p.brierError ?? 0;
       totalLogLoss += p.logLoss ?? 0;
-      totalProfit += p.profitUnits ?? 0;
-      totalClv += p.edge ?? 0;
+      if (p.odds > 1.0) {
+        totalProfit += p.profitUnits ?? 0;
+        totalClv += p.edge ?? 0;
+        pricedCount++;
+      }
     });
 
     const brierScore = decisive.length > 0 ? Number((totalBrier / decisive.length).toFixed(3)) : 0.149;
     const logLoss = decisive.length > 0 ? Number((totalLogLoss / decisive.length).toFixed(3)) : 0.445;
-    const yieldRoi = decisive.length > 0 ? Number(((totalProfit / decisive.length) * 100).toFixed(1)) : 14.8;
-    const averageClv = decisive.length > 0 ? Number(((totalClv / decisive.length) * 100).toFixed(1)) : 5.4;
+    const yieldRoi = pricedCount > 0 ? Number(((totalProfit / pricedCount) * 100).toFixed(1)) : 0;
+    const averageClv = pricedCount > 0 ? Number(((totalClv / pricedCount) * 100).toFixed(1)) : 0;
     const calibrationEce = 0.016; // 1.6% empirical ECE across forward bins
+
+    const isMultiGoalsRecord = (p: ForwardPickRecord) => {
+      const code = (p.marketCode || '').toUpperCase();
+      return p.marketFamily === 'multi_goals' ||
+        code.startsWith('MULTI_GOALS_') ||
+        code.startsWith('TEAM_MULTI_GOALS_') ||
+        code.startsWith('FH_MULTI_GOALS_');
+    };
+    const mgAll = this.ledger.filter(isMultiGoalsRecord);
+    const mgSettled = settled.filter(isMultiGoalsRecord);
+    const mgDecisive = mgSettled.filter(p => p.settlementStatus === 'WON' || p.settlementStatus === 'LOST');
+    const mgWon = mgSettled.filter(p => p.settlementStatus === 'WON').length;
+    const mgLost = mgSettled.filter(p => p.settlementStatus === 'LOST').length;
+    const mgVoid = mgSettled.filter(p => p.settlementStatus === 'PUSH' || p.settlementStatus === 'VOID').length;
+    const mgBrierSum = mgDecisive.reduce((acc, p) => acc + (p.brierError ?? 0), 0);
+    const mgLogLossSum = mgDecisive.reduce((acc, p) => acc + (p.logLoss ?? 0), 0);
 
     return {
       totalSettled: settled.length,
@@ -619,6 +667,16 @@ class ForwardPickLedgerService {
       modelVersion: 'v2.5.0',
       settledPicks: settled,
       pendingPicks: pending,
+      multiGoalsMetrics: {
+        totalPicks: mgAll.length,
+        settledCount: mgSettled.length,
+        wonCount: mgWon,
+        lostCount: mgLost,
+        voidCount: mgVoid,
+        hitRate: mgDecisive.length > 0 ? Number((mgWon / mgDecisive.length).toFixed(3)) : 0,
+        brierScore: mgDecisive.length > 0 ? Number((mgBrierSum / mgDecisive.length).toFixed(4)) : 0,
+        logLoss: mgDecisive.length > 0 ? Number((mgLogLossSum / mgDecisive.length).toFixed(4)) : 0,
+      },
     };
   }
 

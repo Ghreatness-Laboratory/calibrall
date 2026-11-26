@@ -45,6 +45,7 @@ const FAMILY_DISPLAY_NAMES: Record<MarketFamily, string> = {
   corners: 'Corners (Total & Team)',
   bookings: 'Disciplinary Bookings',
   handicap: 'Handicap (Asian & European)',
+  multi_goals: 'Multi Goals',
 };
 
 class MarketMonitor {
@@ -71,6 +72,7 @@ class MarketMonitor {
       first_half_goals: 3,
       second_half_result: 3,
       draw: 2,
+      multi_goals: 0,
     };
 
     let id = 1;
@@ -146,6 +148,7 @@ class MarketMonitor {
       corners: 0,
       bookings: 0,
       handicap: 0,
+      multi_goals: 0,
     };
 
     const dailyBreakdown: Record<string, Record<MarketFamily, number>> = {};
@@ -167,6 +170,7 @@ class MarketMonitor {
           corners: 0,
           bookings: 0,
           handicap: 0,
+          multi_goals: 0,
         };
       }
       if (dailyBreakdown[entry.dateStr][entry.marketFamily] !== undefined) {
@@ -302,6 +306,9 @@ export function getEquivalentCanonicalKey(marketCode?: string, selection?: strin
   }
   if (marketCode === 'DC_1X' || marketCode === 'AH_HOME_P0_5' || marketCode === 'AH_HOME_P0.5') {
     return 'EQUIV_HOME_OR_DRAW';
+  }
+  if (marketCode && (marketCode.startsWith('MULTI_GOALS_') || marketCode.startsWith('TEAM_MULTI_GOALS_') || marketCode.startsWith('FH_MULTI_GOALS_'))) {
+    return marketCode;
   }
   const s = (selection || '').trim();
   if (s.endsWith(' -0.5')) {

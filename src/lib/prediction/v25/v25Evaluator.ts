@@ -12,6 +12,7 @@ import {
   QualificationStatus,
   PickEvidence,
   VerifiedMatchOdds,
+  MultiGoalsMeta,
 } from '@/types';
 import { FeatureLayerEngine, V25FixtureFeatures } from './featureLayer';
 import { DixonColesV25Engine, V25ScorelineMatrix, COVARIATE_COEFFICIENTS } from './dixonColesV25';
@@ -28,6 +29,18 @@ import { checkMarketGating } from '../marketGating';
 import { devigCompleteMarket } from '../oddsEngine';
 
 export const PICK_CONFIDENCE_THRESHOLD = 0.70;
+export const MULTI_GOALS_HIGH_THRESHOLD = 0.60;
+
+export function getConfidenceThresholdForOption(optionType: SupportedOptionType): number {
+  if (
+    optionType === 'multi_goals' ||
+    optionType === 'team_multi_goals' ||
+    optionType === 'first_half_multi_goals'
+  ) {
+    return MULTI_GOALS_HIGH_THRESHOLD;
+  }
+  return PICK_CONFIDENCE_THRESHOLD;
+}
 
 export interface V25EvaluatedFixtureResult {
   engineVersion: 'v25.0';
@@ -62,6 +75,8 @@ interface RawOptionCandidate {
   handicapLine?: number;
   handicapType?: 'asian' | 'european';
   plainEnglishReason?: string;
+  multiGoalsMeta?: MultiGoalsMeta;
+  priceSource?: string;
 }
 
 type LadderKind = 'over' | 'under' | 'ah';
@@ -113,6 +128,13 @@ function getLadderInfo(p: Pick<MarketPrediction, 'marketCode' | 'marketCategory'
   if (p.optionType === 'asian_handicap' && p.handicapLine !== undefined) {
     const side = code.startsWith('AH_HOME_') ? 'home' : 'away';
     return { ladderKey: `ah_${side}`, kind: 'ah', numericValue: p.handicapLine };
+  }
+  if (
+    p.optionType === 'multi_goals' ||
+    p.optionType === 'team_multi_goals' ||
+    p.optionType === 'first_half_multi_goals'
+  ) {
+    return { ladderKey: 'multi_goals', kind: 'over', numericValue: 0 };
   }
   return null;
 }
@@ -322,7 +344,17 @@ export class DixonColesV25Evaluator {
       let skillVsDeviggedMarket: number | null | undefined = undefined;
       let calProb = cand.rawProb;
 
-      if (cand.marketOdds && cand.marketOdds > 1.0) {
+      if (cand.marketCategory === 'multi_goals' && cand.multiGoalsMeta) {
+        const calibration = DixonColesV25Engine.calibrateMultiGoalsPrediction(
+          cand.rawProb,
+          cand.multiGoalsMeta.scope,
+          features,
+          riskEval.downgradesCount
+        );
+        calProb = calibration.calibratedProb;
+        deviggedMarketProb = undefined;
+        skillVsDeviggedMarket = null;
+      } else if (cand.marketOdds && cand.marketOdds > 1.0) {
         if (deviggedMarketProb === undefined) {
           deviggedMarketProb = resolveExactDeviggedProb(cand.marketCode, cand.marketOdds, verifiedOdds, cand.handicapLine);
         }
@@ -408,6 +440,17 @@ export class DixonColesV25Evaluator {
         cand.optionType
       );
 
+      // Multi goals league-level speculative override & span tightness rule
+      const candThreshold = getConfidenceThresholdForOption(cand.optionType);
+      const isMultiGoalsCand = cand.marketCategory === 'multi_goals' && Boolean(cand.multiGoalsMeta);
+      const mgSpan = cand.multiGoalsMeta?.span ?? 0;
+      const passesMultiGoalsTightness = !isMultiGoalsCand || (mgSpan <= 3 || (mgSpan === 4 && calProb > 0.80));
+      const isSpeculativeOnlyLeague = isMultiGoalsCand && gate.tierMode === 'SPECULATIVE_ONLY';
+
+      if (isSpeculativeOnlyLeague) {
+        confAssessment.confidenceTier = 'LOW';
+      }
+
       // Qualification Status
       let qualStatus: QualificationStatus = 'UNQUALIFIED_MARGINAL';
       const hasNonPositiveSkillVsMarket = Boolean(
@@ -416,13 +459,15 @@ export class DixonColesV25Evaluator {
 
       if (!gate.isAllowed) {
         qualStatus = 'NO_RECOMMENDATION';
-      } else if (sanityTripwire) {
+      } else if (sanityTripwire || !passesMultiGoalsTightness) {
         qualStatus = 'UNQUALIFIED_MARGINAL';
+      } else if (isSpeculativeOnlyLeague) {
+        qualStatus = 'PROBABILITY_ANALYSIS_ONLY';
       } else if (hasNonPositiveSkillVsMarket || (cand.marketOdds && (ev ?? 0) <= 0)) {
         qualStatus = 'PROBABILITY_ANALYSIS_ONLY';
       } else if (!confAssessment.isHandicapQualified) {
         qualStatus = 'NO_RECOMMENDATION';
-      } else if (calProb < PICK_CONFIDENCE_THRESHOLD) {
+      } else if (calProb < candThreshold) {
         qualStatus = 'UNQUALIFIED_MARGINAL';
       } else if (cand.marketOdds && (ev ?? 0) > 0) {
         qualStatus = 'QUALIFIED_VALUE';
@@ -432,7 +477,7 @@ export class DixonColesV25Evaluator {
 
       // Ranking score (used for ordering; actual topPick prioritizes real-odds +EV first, then unpriced edge)
       let rankingScore = 0;
-      if (!gate.isAllowed || sanityTripwire || hasNonPositiveSkillVsMarket || calProb < PICK_CONFIDENCE_THRESHOLD) {
+      if (!gate.isAllowed || sanityTripwire || hasNonPositiveSkillVsMarket || calProb < candThreshold || !passesMultiGoalsTightness || isSpeculativeOnlyLeague) {
         rankingScore = 0;
       } else if (cand.marketOdds && (ev ?? 0) > 0) {
         // Real odds present: EV dominates ranking!
@@ -481,14 +526,69 @@ export class DixonColesV25Evaluator {
         hasKeyAttackerAbsent: features.homeAbsences.missingXgShare > 0.15,
       });
 
+      const candThresholdPct = (candThreshold * 100).toFixed(1);
+      let multiGoalsEvidenceStr: string | undefined;
+      let multiGoalsMetaWithHits = cand.multiGoalsMeta ? { ...cand.multiGoalsMeta } : undefined;
+      if (isMultiGoalsCand && multiGoalsMetaWithHits) {
+        const meta = multiGoalsMetaWithHits;
+        const expGoals = meta.expectedTotalGoals.toFixed(1);
+        const bandText = `${meta.minGoals} to ${meta.maxGoals} goals`;
+        const pPct = (calProb * 100).toFixed(1);
+        const hAvg = typeof context.homeAvgScored === 'number' && context.homeAvgScored > 0
+          ? context.homeAvgScored.toFixed(1)
+          : lambda.toFixed(1);
+        const aCon = typeof context.awayAvgConceded === 'number' && context.awayAvgConceded > 0
+          ? context.awayAvgConceded.toFixed(1)
+          : lambda.toFixed(1);
+        const hTotals = meta.scope === 'home'
+          ? (context.homeRecentGoals || [])
+          : meta.scope === 'away'
+          ? (context.awayRecentGoals || [])
+          : (context.homeRecentTotals || []);
+        const aTotals = meta.scope === 'home' || meta.scope === 'away'
+          ? []
+          : (context.awayRecentTotals || []);
+        let recentClause = '';
+        if (meta.scope === 'full_match' && hTotals.length > 0 && aTotals.length > 0) {
+          const hHits = hTotals.filter(g => g >= meta.minGoals && g <= meta.maxGoals).length;
+          const aHits = aTotals.filter(g => g >= meta.minGoals && g <= meta.maxGoals).length;
+          meta.last10Hits = hHits + aHits;
+          meta.last10Total = hTotals.length + aTotals.length;
+          recentClause = ` Home last ${hTotals.length} landed in ${bandText} in ${hHits} of ${hTotals.length}, away in ${aHits} of ${aTotals.length}.`;
+        } else if (meta.scope === 'home' && hTotals.length > 0) {
+          const hits = hTotals.filter(g => g >= meta.minGoals && g <= meta.maxGoals).length;
+          meta.last10Hits = hits;
+          meta.last10Total = hTotals.length;
+          recentClause = ` ${displayName(context.homeTeamName)} scored ${bandText} in ${hits} of last ${hTotals.length} matches.`;
+        } else if (meta.scope === 'away' && hTotals.length > 0) {
+          const hits = hTotals.filter(g => g >= meta.minGoals && g <= meta.maxGoals).length;
+          meta.last10Hits = hits;
+          meta.last10Total = hTotals.length;
+          recentClause = ` ${displayName(context.awayTeamName)} scored ${bandText} in ${hits} of last ${hTotals.length} matches.`;
+        }
+        const scopeLabel = meta.scope === 'home'
+          ? `${displayName(context.homeTeamName)} expects ${expGoals} goals`
+          : meta.scope === 'away'
+          ? `${displayName(context.awayTeamName)} expects ${expGoals} goals`
+          : meta.scope === 'first_half'
+          ? `Model expects ${expGoals} first half goals`
+          : `Model expects ${expGoals} total goals`;
+        const spanLabel = `range width ${meta.span}`;
+        multiGoalsEvidenceStr = `${scopeLabel}. P(${bandText}) = ${pPct}% (${spanLabel}). Home averages ${hAvg} scored, away concedes ${aCon}.${recentClause} Model line, no market price.`;
+      }
+
       const whyLineDefault = cleanDisplayText(
         !gate.isAllowed
           ? `Rejected: ${fam} failed walk forward Brier skill gate in ${gate.leagueGroup} (BSS ${gate.bss >= 0 ? '+' : ''}${gate.bss.toFixed(4)}, 95% CI [${gate.ciLower.toFixed(4)}, ${gate.ciUpper.toFixed(4)}]).`
-          : calProb < PICK_CONFIDENCE_THRESHOLD
-          ? `Below 70.0% confidence threshold (${(calProb * 100).toFixed(1)}% calibrated).`
+          : !passesMultiGoalsTightness
+          ? `Rejected: range width ${mgSpan} fails tightness rule (max width 3, or width 4 above 80.0% calibrated).`
+          : multiGoalsEvidenceStr
+          ? multiGoalsEvidenceStr
+          : calProb < candThreshold
+          ? `Below ${candThresholdPct}% confidence threshold (${(calProb * 100).toFixed(1)}% calibrated).`
           : cand.marketOdds
-          ? `Cleared 70.0% threshold (${(calProb * 100).toFixed(1)}%) with real price @${cand.marketOdds.toFixed(2)} (devigged ${((deviggedMarketProb ?? 0) * 100).toFixed(1)}%, EV ${(ev ?? 0) >= 0 ? '+' : ''}${((ev ?? 0) * 100).toFixed(1)}%).`
-          : `Cleared 70.0% threshold (${(calProb * 100).toFixed(1)}% vs ${(baseRate * 100).toFixed(1)}% baseline, +${(edgeOverBaseline * 100).toFixed(1)}% edge); no bookmaker odds stored so no EV claimed.`
+          ? `Cleared ${candThresholdPct}% threshold (${(calProb * 100).toFixed(1)}%) with real price @${cand.marketOdds.toFixed(2)} (devigged ${((deviggedMarketProb ?? 0) * 100).toFixed(1)}%, EV ${(ev ?? 0) >= 0 ? '+' : ''}${((ev ?? 0) * 100).toFixed(1)}%).`
+          : `Cleared ${candThresholdPct}% threshold (${(calProb * 100).toFixed(1)}% vs ${(baseRate * 100).toFixed(1)}% baseline, +${(edgeOverBaseline * 100).toFixed(1)}% edge); no bookmaker odds stored so no EV claimed.`
       );
 
       const evidence: PickEvidence = {
@@ -557,10 +657,12 @@ export class DixonColesV25Evaluator {
       const teamContextPrefix = `${homeLabel} (${homeSamples} matches stored) vs ${awayLabel} (${awaySamples} matches stored)`;
       const abstainReasonText = !gate.isAllowed
         ? `${teamContextPrefix}: ${gate.statusText}`
+        : !passesMultiGoalsTightness
+        ? `${teamContextPrefix}: Multi goals band width ${mgSpan} rejected by tightness filter.`
         : confAssessment.disqualificationReason
         ? `${teamContextPrefix}: ${confAssessment.disqualificationReason}`
-        : calProb < PICK_CONFIDENCE_THRESHOLD
-        ? `${teamContextPrefix}: Calibrated probability ${(calProb * 100).toFixed(1)}% below 70.0% threshold.`
+        : calProb < candThreshold
+        ? `${teamContextPrefix}: Calibrated probability ${(calProb * 100).toFixed(1)}% below ${candThresholdPct}% threshold.`
         : undefined;
 
       const prediction: MarketPrediction = {
@@ -600,7 +702,9 @@ export class DixonColesV25Evaluator {
         winProb: cand.winProb,
         pushProb: cand.pushProb,
         lossProb: cand.lossProb,
-        plainEnglishReason: cand.plainEnglishReason ? cleanDisplayText(cand.plainEnglishReason) : undefined,
+        plainEnglishReason: multiGoalsEvidenceStr
+          ? cleanDisplayText(multiGoalsEvidenceStr)
+          : (cand.plainEnglishReason ? cleanDisplayText(cand.plainEnglishReason) : undefined),
         stateTags: context.stateTags || [],
         lineupStatus: context.lineupConfirmed ? 'confirmed' : 'pre-lineup',
         topFactorContributions: [],
@@ -621,8 +725,8 @@ export class DixonColesV25Evaluator {
         baselineProbability: baseRate,
         edgeOverBaseline,
         isGenericPick,
-        isValidated: gate.isAllowed,
-        validationStatus: gate.isAllowed ? 'validated' : 'unvalidated',
+        isValidated: gate.isAllowed && !isSpeculativeOnlyLeague,
+        validationStatus: gate.isAllowed && !isSpeculativeOnlyLeague ? 'validated' : 'unvalidated',
         brierSkillScore: gate.bss,
         sanityTripwire,
         tripwireReason: tripwireReason ? cleanDisplayText(tripwireReason) : undefined,
@@ -632,6 +736,8 @@ export class DixonColesV25Evaluator {
         deviggedMarketProb,
         equivalentCanonicalKey: getEquivalentCanonicalKey(cand.marketCode, cand.selection),
         evidence,
+        multiGoalsMeta: multiGoalsMetaWithHits,
+        priceSource: cand.priceSource,
       };
 
       processed.push(prediction);
@@ -653,7 +759,14 @@ export class DixonColesV25Evaluator {
       if (p.optionType === 'asian_handicap' && (p.handicapLine ?? 0) >= 1.5) return false;
 
       const pickProb = p.calibratedProbability ?? p.modelProbability;
-      if (pickProb < PICK_CONFIDENCE_THRESHOLD) return false;
+      const threshold = getConfidenceThresholdForOption(p.optionType);
+      if (pickProb < threshold) return false;
+
+      if (p.multiGoalsMeta) {
+        const span = p.multiGoalsMeta.span;
+        if (span >= 5) return false;
+        if (span === 4 && pickProb <= 0.80) return false;
+      }
 
       if (p.marketOdds && p.marketOdds > 1.0) {
         return (p.expectedValue ?? 0) > 0 && (p.skillVsDeviggedMarket ?? 0) > 0;
@@ -663,7 +776,7 @@ export class DixonColesV25Evaluator {
       return (p.edgeOverBaseline ?? 0) > 0.010;
     });
 
-    // 7. No Default Lines: Collapse each directional ladder to ONLY the highest/strictest line clearing 70%
+    // 7. No Default Lines: Collapse each directional ladder to ONLY the highest/strictest line clearing hurdle
     const allLadderCandidates = new Map<string, MarketPrediction[]>();
     for (const p of processed) {
       const li = getLadderInfo(p);
@@ -676,6 +789,17 @@ export class DixonColesV25Evaluator {
     const ladderWinners = new Map<string, MarketPrediction>();
     const nonLadderEligible: MarketPrediction[] = [];
 
+    const scoreMultiGoalsCandidate = (p: MarketPrediction): number => {
+      const span = p.multiGoalsMeta?.span ?? 3;
+      const prob = p.calibratedProbability ?? p.modelProbability;
+      const edge = p.edgeOverBaseline ?? 0;
+      // Strongly prefer span <= 3 over span === 4; reward tighter span === 2 at >= 60%
+      if (span >= 5) return -10;
+      if (span === 4) return prob > 0.80 ? (prob * 0.5 + edge) : -10;
+      const tightnessBonus = span === 2 ? 0.06 : 0.0;
+      return 10 + prob + tightnessBonus + edge * 0.5;
+    };
+
     for (const p of rawEligible) {
       const li = getLadderInfo(p);
       if (!li) {
@@ -685,6 +809,12 @@ export class DixonColesV25Evaluator {
       const existing = ladderWinners.get(li.ladderKey);
       if (!existing) {
         ladderWinners.set(li.ladderKey, p);
+        continue;
+      }
+      if (li.ladderKey === 'multi_goals') {
+        if (scoreMultiGoalsCandidate(p) > scoreMultiGoalsCandidate(existing)) {
+          ladderWinners.set(li.ladderKey, p);
+        }
         continue;
       }
       const existLi = getLadderInfo(existing)!;
@@ -703,6 +833,17 @@ export class DixonColesV25Evaluator {
 
     // Annotate exact whyLineChosen on winning ladder picks showing rejected stricter & omitted easier lines
     for (const [ladderKey, winner] of ladderWinners.entries()) {
+      if (ladderKey === 'multi_goals') {
+        const meta = winner.multiGoalsMeta;
+        const wProbPct = ((winner.calibratedProbability ?? winner.modelProbability) * 100).toFixed(1);
+        const text = cleanDisplayText(
+          `${winner.plainEnglishReason || `Best tight Multi goals band clearing 60.0% (${wProbPct}%, range width ${meta?.span ?? 3}).`}`
+        );
+        if (winner.evidence) {
+          winner.evidence.whyLineChosen = text;
+        }
+        continue;
+      }
       const wLi = getLadderInfo(winner)!;
       const siblings = allLadderCandidates.get(ladderKey) || [];
       let nextStricter: MarketPrediction | null = null;
@@ -1314,6 +1455,117 @@ export class DixonColesV25Evaluator {
         rawProb: matrix.secondHalfResult.awayWin,
         marketOdds: undefined,
       });
+    }
+
+    // 11. MULTI GOALS (Full match 12 ranges, Team Home/Away 4 ranges each, optional 1st Half 2 ranges)
+    const fullMatchBands: [number, number][] = [
+      [1, 2], [1, 3], [1, 4], [1, 5],
+      [2, 3], [2, 4], [2, 5], [2, 6],
+      [3, 4], [3, 5], [3, 6], [4, 6],
+    ];
+    for (const [minG, maxG] of fullMatchBands) {
+      const bandKey = `${minG}-${maxG}`;
+      const rawP = matrix.multiGoals.fullMatch[bandKey] ?? 0;
+      const span = maxG - minG + 1;
+      list.push({
+        marketCode: `MULTI_GOALS_${minG}_${maxG}`,
+        optionType: 'multi_goals',
+        marketCategory: 'multi_goals',
+        marketName: 'Multi goals',
+        selection: `Multi goals ${minG} to ${maxG}`,
+        period: 'REGULAR_TIME',
+        settlementRule: `Regular time 90m total goals between ${minG} and ${maxG} inclusive excluding extra time.`,
+        rawProb: rawP,
+        marketOdds: undefined,
+        priceSource: 'model line - no market price',
+        multiGoalsMeta: {
+          scope: 'full_match',
+          minGoals: minG,
+          maxGoals: maxG,
+          span,
+          band: `${minG} to ${maxG}`,
+          expectedTotalGoals: Number((lambda + mu).toFixed(2)),
+        },
+      });
+    }
+
+    const teamBands: [number, number][] = [[0, 1], [1, 2], [1, 3], [2, 3]];
+    for (const [minG, maxG] of teamBands) {
+      const bandKey = `${minG}-${maxG}`;
+      const span = maxG - minG + 1;
+      list.push({
+        marketCode: `TEAM_MULTI_GOALS_HOME_${minG}_${maxG}`,
+        optionType: 'team_multi_goals',
+        marketCategory: 'multi_goals',
+        marketName: `${home} multi goals`,
+        selection: `${home} multi goals ${minG} to ${maxG}`,
+        period: 'REGULAR_TIME',
+        settlementRule: `${home} 90m regular time goals between ${minG} and ${maxG} inclusive excluding extra time.`,
+        rawProb: matrix.multiGoals.home[bandKey] ?? 0,
+        marketOdds: undefined,
+        priceSource: 'model line - no market price',
+        multiGoalsMeta: {
+          scope: 'home',
+          minGoals: minG,
+          maxGoals: maxG,
+          span,
+          band: `${minG} to ${maxG}`,
+          expectedTotalGoals: Number(lambda.toFixed(2)),
+        },
+      });
+      list.push({
+        marketCode: `TEAM_MULTI_GOALS_AWAY_${minG}_${maxG}`,
+        optionType: 'team_multi_goals',
+        marketCategory: 'multi_goals',
+        marketName: `${away} multi goals`,
+        selection: `${away} multi goals ${minG} to ${maxG}`,
+        period: 'REGULAR_TIME',
+        settlementRule: `${away} 90m regular time goals between ${minG} and ${maxG} inclusive excluding extra time.`,
+        rawProb: matrix.multiGoals.away[bandKey] ?? 0,
+        marketOdds: undefined,
+        priceSource: 'model line - no market price',
+        multiGoalsMeta: {
+          scope: 'away',
+          minGoals: minG,
+          maxGoals: maxG,
+          span,
+          band: `${minG} to ${maxG}`,
+          expectedTotalGoals: Number(mu.toFixed(2)),
+        },
+      });
+    }
+
+    const hasExplicitHalfSample =
+      cap.hasHalfTimeGoals &&
+      (context.halfTimeSampleCount === undefined || context.halfTimeSampleCount >= 6);
+    if (hasExplicitHalfSample) {
+      const halfBands: [number, number][] = [[0, 1], [1, 2]];
+      const leagueHalvesShare = getLeagueCalibratedConfig(context.competitionCode)?.halves?.firstHalfGoalShare ?? 0.439;
+      const expectedFirstHalfGoals = Number(((lambda + mu) * leagueHalvesShare).toFixed(2));
+      for (const [minG, maxG] of halfBands) {
+        const bandKey = `${minG}-${maxG}`;
+        const span = maxG - minG + 1;
+        list.push({
+          marketCode: `FH_MULTI_GOALS_${minG}_${maxG}`,
+          optionType: 'first_half_multi_goals',
+          marketCategory: 'multi_goals',
+          marketName: '1st half multi goals',
+          selection: `1st half multi goals ${minG} to ${maxG}`,
+          period: 'FIRST_HALF',
+          settlementRule: `First half goals between ${minG} and ${maxG} inclusive.`,
+          rawProb: matrix.multiGoals.firstHalf[bandKey] ?? 0,
+          marketOdds: undefined,
+          priceSource: 'model line - no market price',
+          multiGoalsMeta: {
+            scope: 'first_half',
+            minGoals: minG,
+            maxGoals: maxG,
+            span,
+            band: `${minG} to ${maxG}`,
+            expectedTotalGoals: expectedFirstHalfGoals,
+          },
+        });
+      }
     }
 
     return list;

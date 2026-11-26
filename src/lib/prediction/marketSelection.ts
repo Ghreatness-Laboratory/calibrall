@@ -119,6 +119,7 @@ export function getMarketFamily(optionType: SupportedOptionType, marketCode: str
   if (optionType === 'draw') return 'draw';
   if (optionType === 'double_chance' || marketCode.startsWith('DC_')) return 'double_chance';
   if (optionType === 'both_teams_to_score' || marketCode.startsWith('BTTS_')) return 'both_teams_to_score';
+  if (optionType === 'multi_goals' || optionType === 'team_multi_goals' || optionType === 'first_half_multi_goals' || marketCategory === 'multi_goals' || marketCode.startsWith('MULTI_GOALS_') || marketCode.startsWith('TEAM_MULTI_GOALS_') || marketCode.startsWith('FH_MULTI_GOALS_')) return 'multi_goals';
   if (optionType === 'first_half_goals' || marketCode.startsWith('FH_')) return 'first_half_goals';
   if (optionType === 'second_half_result' || marketCode.startsWith('2H_')) return 'second_half_result';
   if (optionType === 'highest_scoring_half' || marketCode.startsWith('HSH_')) return 'highest_scoring_half';
@@ -2051,7 +2052,13 @@ export function selectDiversifiedSlatePicks<T extends SlatePickCandidate>(
     if (p.optionType === 'asian_handicap' && (p.handicapLine ?? 0) >= 1.5) return false;
     if ((p.rankingScore ?? 0) <= 0) return false;
     const prob = p.calibratedProbability ?? p.modelProbability;
-    if (prob < 0.70) return false;
+    const isMultiGoals = p.optionType === 'multi_goals' || p.optionType === 'team_multi_goals' || p.optionType === 'first_half_multi_goals' || p.marketCategory === 'multi_goals';
+    const minProb = isMultiGoals ? 0.60 : 0.70;
+    if (prob < minProb) return false;
+    if (p.multiGoalsMeta) {
+      if (p.multiGoalsMeta.span >= 5) return false;
+      if (p.multiGoalsMeta.span === 4 && prob <= 0.80) return false;
+    }
     if (p.marketOdds && p.marketOdds > 1.0) {
       return (p.expectedValue ?? 0) > 0 && (p.skillVsDeviggedMarket ?? 0) > 0;
     }

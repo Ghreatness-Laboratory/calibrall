@@ -25,6 +25,8 @@ import {
   BasketballPickCandidate,
   BASKETBALL_MODEL_VERSION,
 } from './picker';
+import { generateBasketballExplanation } from '@/lib/prediction/explanationGenerator';
+import type { Fixture, WrittenMatchAlternate } from '@/types';
 
 export interface BasketballForwardLeagueBreakdown {
   league: BasketballLeague;
@@ -94,6 +96,9 @@ export interface BasketballForwardPickRow {
   isTopPick: boolean;
   recordHash: string;
   evidenceLine: string;
+  summary?: string;
+  reasoning?: Record<string, any>;
+  alternates?: WrittenMatchAlternate[];
   settlementStatus: 'PENDING' | 'WON' | 'LOST' | 'PUSH' | 'VOID';
   actualValue: number | null;
   actualScore: string | null;
@@ -147,7 +152,7 @@ export async function recordPreTipoffBasketballPicks(params: {
   const nowMs = params.nowMs ?? Date.now();
   const nowIso = new Date(nowMs).toISOString();
 
-  const candidatePicks: Array<{ pick: BasketballPickCandidate; game: StoredBbGame; id: string }> = [];
+  const candidatePicks: Array<{ ev: BasketballGameEvaluation; pick: BasketballPickCandidate; game: StoredBbGame; id: string }> = [];
   let skippedLiveOrStarted = 0;
 
   for (const ev of params.evaluations) {
@@ -169,6 +174,7 @@ export async function recordPreTipoffBasketballPicks(params: {
 
     candidatePicks.push({
       id: makePickId(game.id, pick.marketCategory, pick.side),
+      ev,
       pick,
       game,
     });
@@ -200,7 +206,17 @@ export async function recordPreTipoffBasketballPicks(params: {
     return { recordedCount: 0, skippedExisting, skippedLiveOrStarted };
   }
 
-  const pickPayloads = newEntries.map(({ id, pick, game }) => {
+  // Fetch team names for deterministic explanation templates when ev.writtenExplanation is absent
+  const bbTeamNameMap = new Map<string, string>();
+  const teamIdsNeeded = Array.from(new Set(newEntries.flatMap((e) => [e.game.home_id, e.game.away_id])));
+  for (const chunk of chunkArray(teamIdsNeeded, 200)) {
+    const { data: teamRows } = await supabase.from('bb_teams').select('id, name').in('id', chunk);
+    for (const tr of teamRows || []) {
+      bbTeamNameMap.set(String(tr.id), String(tr.name));
+    }
+  }
+
+  const pickPayloads = newEntries.map(({ id, ev, pick, game }) => {
     const kickoffIso = game.kickoff_utc || `${game.game_date}T00:00:00Z`;
     const recordHash = computeBasketballPickHash({
       gameId: game.id,
@@ -212,6 +228,40 @@ export async function recordPreTipoffBasketballPicks(params: {
       probability: pick.calibratedProbability,
       marketOdds: pick.marketOdds,
     });
+
+    const homeLabel = bbTeamNameMap.get(game.home_id) || game.home_id;
+    const awayLabel = bbTeamNameMap.get(game.away_id) || game.away_id;
+    const stubFixture: Fixture = {
+      id: game.id,
+      providerId: game.id,
+      providerName: game.source,
+      fetchTime: nowIso,
+      source: game.source,
+      competitionId: `comp_${game.league.toLowerCase()}`,
+      competition: {
+        id: `comp_${game.league.toLowerCase()}`,
+        code: game.league,
+        name: game.league,
+        country: game.league === 'EUROLEAGUE' ? 'Europe' : 'USA',
+        emblemUrl: '',
+        tier: 1,
+        avgGoalsPerGame: 220,
+        avgCornersPerGame: 0,
+        avgCardsPerGame: 0,
+        isActive: true,
+      },
+      seasonYear: game.season,
+      sport: 'basketball',
+      homeTeam: { id: game.home_id, name: homeLabel, shortName: homeLabel, tla: homeLabel.slice(0, 3).toUpperCase(), crestUrl: '' },
+      awayTeam: { id: game.away_id, name: awayLabel, shortName: awayLabel, tla: awayLabel.slice(0, 3).toUpperCase(), crestUrl: '' },
+      kickoffTime: kickoffIso,
+      status: game.status as any,
+      homeScore: game.home_pts,
+      awayScore: game.away_pts,
+      dataFreshness: nowIso,
+    };
+
+    const expl = ev.writtenExplanation || generateBasketballExplanation({ fixture: stubFixture, evaluation: ev });
 
     return {
       id,
@@ -242,6 +292,9 @@ export async function recordPreTipoffBasketballPicks(params: {
         side: pick.side,
         passedBaselineGate: pick.passedBaselineGate,
       },
+      summary: expl.fullSummary,
+      reasoning_json: JSON.stringify(expl.reasoning || {}),
+      alternates_json: JSON.stringify(expl.alternates || []),
       record_hash: recordHash,
       recorded_at: nowIso,
       kickoff_utc: kickoffIso,
@@ -768,6 +821,23 @@ export async function getBasketballForwardRecords(limit = 50): Promise<Basketbal
       } catch {
         evObj = {};
       }
+      let reasoningObj: Record<string, any> | undefined = undefined;
+      try {
+        if (p.reasoning_json) {
+          reasoningObj = typeof p.reasoning_json === 'string' ? JSON.parse(p.reasoning_json) : p.reasoning_json;
+        }
+      } catch {
+        reasoningObj = undefined;
+      }
+      let alternatesArr: WrittenMatchAlternate[] | undefined = undefined;
+      try {
+        if (p.alternates_json) {
+          const parsedAlt = typeof p.alternates_json === 'string' ? JSON.parse(p.alternates_json) : p.alternates_json;
+          if (Array.isArray(parsedAlt)) alternatesArr = parsedAlt;
+        }
+      } catch {
+        alternatesArr = undefined;
+      }
 
       return {
         id: String(p.id),
@@ -798,6 +868,9 @@ export async function getBasketballForwardRecords(limit = 50): Promise<Basketbal
         isTopPick: Boolean(p.is_top_pick === 1 || p.is_top_pick === true),
         recordHash: String(p.record_hash || ''),
         evidenceLine: String(evObj.evidenceLine || ''),
+        summary: p.summary ? String(p.summary) : undefined,
+        reasoning: reasoningObj,
+        alternates: alternatesArr,
         settlementStatus: (s?.settlement_status || 'PENDING') as 'PENDING' | 'WON' | 'LOST' | 'PUSH' | 'VOID',
         actualValue: s?.actual_value !== null && s?.actual_value !== undefined ? Number(s.actual_value) : null,
         actualScore: s?.actual_score || null,

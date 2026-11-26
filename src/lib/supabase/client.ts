@@ -632,6 +632,22 @@ export function getLocalDatabase(): any {
           observed_at TEXT NOT NULL,
           updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS football_picks (
+          fixture_id TEXT PRIMARY KEY,
+          competition_code TEXT,
+          kickoff_time TEXT,
+          market_code TEXT,
+          market_name TEXT,
+          selection TEXT,
+          calibrated_probability REAL,
+          confidence_tier TEXT,
+          price_source TEXT,
+          summary TEXT NOT NULL,
+          reasoning_json TEXT NOT NULL,
+          alternates_json TEXT NOT NULL,
+          model_version TEXT NOT NULL,
+          recorded_at TEXT NOT NULL
+        );
       `);
 
       // Ensure columns exist on older tables
@@ -641,6 +657,9 @@ export function getLocalDatabase(): any {
       try { db.exec('ALTER TABLE bb_picks ADD COLUMN is_model_line INTEGER NOT NULL DEFAULT 1;'); } catch (_) {}
       try { db.exec('ALTER TABLE bb_picks ADD COLUMN price_source TEXT;'); } catch (_) {}
       try { db.exec("ALTER TABLE bb_picks ADD COLUMN evidence_json TEXT DEFAULT '{}';"); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN summary TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN reasoning_json TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN alternates_json TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE teams ADD COLUMN is_promoted INTEGER DEFAULT 0;'); } catch (_) {}
       try { db.exec('ALTER TABLE matches ADD COLUMN referee TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE matches ADD COLUMN result TEXT;'); } catch (_) {}
@@ -1101,6 +1120,7 @@ export function setStoredUser(user: UserProfile) {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(DEMO_USER_KEY, JSON.stringify(user));
+    document.cookie = `calibrall_tier=${encodeURIComponent(user.subscriptionTier || 'free')}; path=/; max-age=31536000; samesite=lax`;
   } catch (e) {
     console.error('Failed to store user profile', e);
   }

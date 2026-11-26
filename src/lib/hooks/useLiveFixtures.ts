@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Fixture, Sport } from '@/types';
 import type { BasketballGameEvaluation } from '@/lib/basketball/picker';
+import { getStoredUser } from '@/lib/supabase/client';
 
 export interface SkippedLeagueDiagnostic {
   leagueCode: string;
@@ -210,8 +211,12 @@ export function useLiveFixtures(
       if (status && status !== 'ALL') query.set('status', status);
       if (day && day !== 'ALL') query.set('day', day);
 
+      const userTier = getStoredUser()?.subscriptionTier || 'free';
       const res = await fetch(`/api/v1/fixtures?${query.toString()}`, {
         cache: 'no-store',
+        headers: {
+          'x-calibrall-tier': userTier,
+        },
       });
 
       const text = await res.text();

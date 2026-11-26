@@ -384,6 +384,10 @@ export interface HalfGoalsDistributionResult {
     draw: number;
     awayWin: number;
     overUnderGoals: Record<number, { over: number; under: number }>;
+    multiGoals: {
+      '0-1': number;
+      '1-2': number;
+    };
   };
   secondHalf: {
     homeXg: number;
@@ -531,6 +535,10 @@ export function generateHalfByHalfGoalDistribution(
       draw: h1Draw,
       awayWin: h1Away,
       overUnderGoals: h1GoalsOU,
+      multiGoals: {
+        '0-1': Number(((t1Dist[0] ?? 0) + (t1Dist[1] ?? 0)).toFixed(6)),
+        '1-2': Number(((t1Dist[1] ?? 0) + (t1Dist[2] ?? 0)).toFixed(6)),
+      },
     },
     secondHalf: {
       homeXg: h2Xg,

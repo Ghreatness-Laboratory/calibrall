@@ -5,7 +5,12 @@
 // Families that fail are labelled "unvalidated" and CANNOT be top picks.
 
 import { MarketFamily, MARKET_FAMILIES } from './baselines';
-import { getCalibratedParams, getLeagueCapabilities, WalkForwardMarketValidation } from './calibratedParams';
+import {
+  getCalibratedParams,
+  getLeagueCapabilities,
+  getMultiGoalsLeagueValidation,
+  WalkForwardMarketValidation,
+} from './calibratedParams';
 
 export interface FamilyValidationStatus {
   family: MarketFamily;
@@ -160,9 +165,11 @@ export function checkMarketGating(
   ciUpper: number;
   statusText: string;
   cannotBeTopPick: boolean;
+  tierMode?: 'ENABLED' | 'SPECULATIVE_ONLY' | 'DISABLED';
 } {
-  const leagueGroup = typeof competitionCodeOrMinSample === 'string'
-    ? getLeagueCapabilities(competitionCodeOrMinSample).leagueGroup
+  const compCode = typeof competitionCodeOrMinSample === 'string' ? competitionCodeOrMinSample : undefined;
+  const leagueGroup = compCode
+    ? getLeagueCapabilities(compCode).leagueGroup
     : 'UK_WITH_REF';
   const effectiveMinSample = typeof competitionCodeOrMinSample === 'number'
     ? competitionCodeOrMinSample
@@ -181,6 +188,7 @@ export function checkMarketGating(
       ciUpper: reg.bootstrapCi95Upper,
       statusText: `Unvalidated (${leagueGroup}): insufficient held-out matches (${reg.matchesCount} < ${effectiveMinSample})`,
       cannotBeTopPick: true,
+      tierMode: 'DISABLED',
     };
   }
 
@@ -194,7 +202,38 @@ export function checkMarketGating(
       ciUpper: reg.bootstrapCi95Upper,
       statusText: `Unvalidated (${leagueGroup}): BSS ${reg.brierSkillScore.toFixed(4)} with 95% CI [${reg.bootstrapCi95Lower.toFixed(4)}, ${reg.bootstrapCi95Upper.toFixed(4)}] does not clear 0`,
       cannotBeTopPick: true,
+      tierMode: family === 'multi_goals' ? 'SPECULATIVE_ONLY' : 'DISABLED',
     };
+  }
+
+  if (family === 'multi_goals' && compCode) {
+    const leagueMulti = getMultiGoalsLeagueValidation(compCode);
+    if (leagueMulti && (!leagueMulti.beatsBaseline || leagueMulti.tierMode === 'SPECULATIVE_ONLY')) {
+      return {
+        isAllowed: true,
+        leagueGroup,
+        matches: leagueMulti.matches,
+        bss: leagueMulti.brierSkill,
+        ciLower: leagueMulti.ci95Lower,
+        ciUpper: leagueMulti.ci95Upper,
+        statusText: `Speculative (${leagueMulti.competitionCode}): Multi goals did not beat league naive baseline (BSS ${leagueMulti.brierSkill.toFixed(4)})`,
+        cannotBeTopPick: true,
+        tierMode: 'SPECULATIVE_ONLY',
+      };
+    }
+    if (leagueMulti && leagueMulti.tierMode === 'DISABLED') {
+      return {
+        isAllowed: false,
+        leagueGroup,
+        matches: leagueMulti.matches,
+        bss: leagueMulti.brierSkill,
+        ciLower: leagueMulti.ci95Lower,
+        ciUpper: leagueMulti.ci95Upper,
+        statusText: `Disabled (${leagueMulti.competitionCode}): Multi goals disabled in league backtest`,
+        cannotBeTopPick: true,
+        tierMode: 'DISABLED',
+      };
+    }
   }
 
   return {
@@ -206,5 +245,6 @@ export function checkMarketGating(
     ciUpper: reg.bootstrapCi95Upper,
     statusText: `Validated (${leagueGroup}): BSS +${reg.brierSkillScore.toFixed(4)}, 95% CI [+${reg.bootstrapCi95Lower.toFixed(4)}, +${reg.bootstrapCi95Upper.toFixed(4)}] (${reg.matchesCount} matches)`,
     cannotBeTopPick: false,
+    tierMode: 'ENABLED',
   };
 }

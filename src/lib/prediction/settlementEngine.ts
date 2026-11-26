@@ -21,6 +21,7 @@ export interface MatchStatsSummary {
   awayScore: number;
   homeHalfTimeScore: number;
   awayHalfTimeScore: number;
+  hasRealHalfTimeScores?: boolean;
   homeCorners: number;
   awayCorners: number;
   totalCorners: number;
@@ -76,8 +77,13 @@ const ADMIN_AUDIT_LOGS: AdminOverrideAuditLog[] = [
 export function extractMatchStats(fixture: Fixture): MatchStatsSummary {
   const homeScore = fixture.homeScore ?? 0;
   const awayScore = fixture.awayScore ?? 0;
-  const homeHt = fixture.homeHalfTimeScore ?? Math.floor(homeScore / 2);
-  const awayHt = fixture.awayHalfTimeScore ?? Math.floor(awayScore / 2);
+  const hasRealHalfTimeScores =
+    typeof fixture.homeHalfTimeScore === 'number' &&
+    typeof fixture.awayHalfTimeScore === 'number' &&
+    !isNaN(fixture.homeHalfTimeScore) &&
+    !isNaN(fixture.awayHalfTimeScore);
+  const homeHt = hasRealHalfTimeScores ? fixture.homeHalfTimeScore! : Math.floor(homeScore / 2);
+  const awayHt = hasRealHalfTimeScores ? fixture.awayHalfTimeScore! : Math.floor(awayScore / 2);
 
   const homeCorners = fixture.homeCorners ?? 5;
   const awayCorners = fixture.awayCorners ?? 4;
@@ -96,6 +102,7 @@ export function extractMatchStats(fixture: Fixture): MatchStatsSummary {
     awayScore,
     homeHalfTimeScore: homeHt,
     awayHalfTimeScore: awayHt,
+    hasRealHalfTimeScores,
     homeCorners,
     awayCorners,
     totalCorners,
@@ -259,6 +266,42 @@ export function settleMarketPrediction(
     } else {
       status = 'LOST';
       comparisonText = `Cards: ${cards} vs line ${line} (${isOver ? 'Under' : 'Over'})`;
+    }
+  }
+
+  // 6b. MULTI GOALS (Full match, Team Home/Away, First Half — 90m / HT only, no extra time)
+  else if (
+    code.startsWith('MULTI_GOALS_') ||
+    code.startsWith('TEAM_MULTI_GOALS_') ||
+    code.startsWith('FH_MULTI_GOALS_')
+  ) {
+    const rangeMatch = code.match(/(\d+)_(\d+)$/);
+    const minG = rangeMatch ? parseInt(rangeMatch[1], 10) : (prediction.multiGoalsMeta?.minGoals ?? 2);
+    const maxG = rangeMatch ? parseInt(rangeMatch[2], 10) : (prediction.multiGoalsMeta?.maxGoals ?? 4);
+
+    if (code.startsWith('FH_MULTI_GOALS_')) {
+      if (stats.hasRealHalfTimeScores === false) {
+        actualValue = 'HT score unavailable';
+        status = 'VOID';
+        comparisonText = 'Half time score unavailable; selection voided.';
+      } else {
+        const htGoals = stats.homeHalfTimeScore + stats.awayHalfTimeScore;
+        actualValue = htGoals;
+        status = htGoals >= minG && htGoals <= maxG ? 'WON' : 'LOST';
+        comparisonText = `1st half goals: ${htGoals} vs band ${minG} to ${maxG} (${status === 'WON' ? 'Hit' : 'Miss'})`;
+      }
+    } else if (code.startsWith('TEAM_MULTI_GOALS_HOME_')) {
+      actualValue = homeG;
+      status = homeG >= minG && homeG <= maxG ? 'WON' : 'LOST';
+      comparisonText = `Home goals: ${homeG} vs band ${minG} to ${maxG} (${status === 'WON' ? 'Hit' : 'Miss'})`;
+    } else if (code.startsWith('TEAM_MULTI_GOALS_AWAY_')) {
+      actualValue = awayG;
+      status = awayG >= minG && awayG <= maxG ? 'WON' : 'LOST';
+      comparisonText = `Away goals: ${awayG} vs band ${minG} to ${maxG} (${status === 'WON' ? 'Hit' : 'Miss'})`;
+    } else {
+      actualValue = totalG;
+      status = totalG >= minG && totalG <= maxG ? 'WON' : 'LOST';
+      comparisonText = `90m total goals: ${totalG} vs band ${minG} to ${maxG} (${status === 'WON' ? 'Hit' : 'Miss'})`;
     }
   }
 

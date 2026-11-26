@@ -31,6 +31,7 @@ import {
 type MarketGroupFilter =
   | 'ALL'
   | 'goals'
+  | 'multi_goals'
   | 'corners'
   | 'cards'
   | 'handicap'
@@ -353,6 +354,14 @@ export default function PredictionsPage() {
         p.marketCategory === 'goal_bounds'
       );
     }
+    if (group === 'multi_goals') {
+      return (
+        p.marketCategory === 'multi_goals' ||
+        p.optionType === 'multi_goals' ||
+        p.optionType === 'team_multi_goals' ||
+        p.optionType === 'first_half_multi_goals'
+      );
+    }
     return true;
   };
 
@@ -445,6 +454,7 @@ export default function PredictionsPage() {
   const footballMarketFilters: { id: MarketGroupFilter; label: string }[] = [
     { id: 'ALL', label: 'All markets' },
     { id: 'goals', label: 'Goals' },
+    { id: 'multi_goals', label: 'Multi goals' },
     { id: 'results', label: 'Results' },
     { id: 'corners', label: 'Corners' },
     { id: 'cards', label: 'Cards' },
@@ -955,7 +965,11 @@ export default function PredictionsPage() {
 
                         <div className="flex items-center justify-between text-[11px] pt-0.5 tabular-nums">
                           <span className="text-[var(--text-2)]">
-                            {hasRealOdds ? 'Calibrated' : 'Data coverage: Standard'}
+                            {hasRealOdds
+                              ? 'Calibrated'
+                              : p.priceSource
+                              ? cleanDisplayText(p.priceSource)
+                              : 'Data coverage: Standard'}
                           </span>
                           {hasRealOdds && (
                             <span className="bg-[var(--surface)] px-2 py-0.5 rounded-full border border-[var(--line)] text-[var(--text)]">

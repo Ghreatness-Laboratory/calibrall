@@ -166,7 +166,48 @@ export interface CalibratedParamsData {
     'UK_WITH_REF' | 'EURO_NO_REF' | 'EXTRA_GOALS_ONLY',
     Record<string, WalkForwardMarketValidation>
   >;
+  multiGoalsValidation?: {
+    generatedAt?: string;
+    heldOutMatches?: number;
+    overall?: {
+      samples: number;
+      modelBrier: number;
+      naiveBrier: number;
+      brierSkill: number;
+      modelLogLoss: number;
+      naiveLogLoss: number;
+      ece: number;
+    };
+    plattParams?: {
+      global: MultiGoalsPlattParams;
+      fullMatch: MultiGoalsPlattParams;
+      team: MultiGoalsPlattParams;
+      firstHalf: MultiGoalsPlattParams;
+    };
+    perLeague?: Record<string, MultiGoalsLeagueValidation>;
+  };
   leagues: Record<string, CalibratedLeagueConfig>;
+}
+
+export interface MultiGoalsPlattParams {
+  a: number;
+  b: number;
+}
+
+export interface MultiGoalsLeagueValidation {
+  competitionCode: string;
+  leagueGroup: 'UK_WITH_REF' | 'EURO_NO_REF' | 'EXTRA_GOALS_ONLY';
+  matches: number;
+  samples: number;
+  modelBrier: number;
+  baseBrier: number;
+  modelLogLoss: number;
+  baseLogLoss: number;
+  brierSkill: number;
+  ci95Lower: number;
+  ci95Upper: number;
+  beatsBaseline: boolean;
+  tierMode: 'ENABLED' | 'SPECULATIVE_ONLY' | 'DISABLED';
 }
 
 const DATA = calibratedParamsJson as unknown as CalibratedParamsData;
@@ -247,4 +288,25 @@ export function resolveLeagueGoalMeans(compCode?: string | null): {
     dixonColesRho: -0.05,
     sampleSize: 0,
   };
+}
+
+export function getMultiGoalsPlattParams(): {
+  global: MultiGoalsPlattParams;
+  fullMatch: MultiGoalsPlattParams;
+  team: MultiGoalsPlattParams;
+  firstHalf: MultiGoalsPlattParams;
+} {
+  const p = DATA.multiGoalsValidation?.plattParams;
+  return {
+    global: p?.global ?? { a: 0.9914, b: 0.0168 },
+    fullMatch: p?.fullMatch ?? { a: 0.9821, b: 0.0255 },
+    team: p?.team ?? { a: 1.0137, b: 0.003 },
+    firstHalf: p?.firstHalf ?? { a: 0.8749, b: 0.0712 },
+  };
+}
+
+export function getMultiGoalsLeagueValidation(compCode?: string | null): MultiGoalsLeagueValidation | null {
+  const canon = getCanonicalLeagueKey(compCode);
+  if (!canon) return null;
+  return DATA.multiGoalsValidation?.perLeague?.[canon] || null;
 }

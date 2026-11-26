@@ -429,6 +429,67 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
     },
     isEnabled: false,
   },
+  multi_goals: {
+    type: 'multi_goals',
+    title: 'Multi goals (Full match)',
+    category: 'multi_goals',
+    period: 'REGULAR_TIME',
+    description: 'Total match goals falling inside a tight goal band such as 2 to 4 goals.',
+    defaultSelections: ['Multi goals 1 to 3', 'Multi goals 2 to 4', 'Multi goals 2 to 3', 'Multi goals 3 to 5'],
+    settlementRule: 'Official 90 minute regular time total goals excluding extra time.',
+    dataRequirements: {
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.80,
+      maxUncertaintyScore: 0.20,
+    },
+    qualificationCriteria: {
+      minProbability: 0.60,
+      minEv: 0.00,
+      minEdge: 0.01,
+    },
+    isEnabled: true,
+  },
+  team_multi_goals: {
+    type: 'team_multi_goals',
+    title: 'Team multi goals',
+    category: 'multi_goals',
+    period: 'REGULAR_TIME',
+    description: 'Home or away team goals falling inside an exact target band such as 1 to 2 goals.',
+    defaultSelections: ['Home multi goals 1 to 2', 'Away multi goals 0 to 1', 'Home multi goals 1 to 3'],
+    settlementRule: 'Official 90 minute team goals excluding extra time.',
+    dataRequirements: {
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.80,
+      maxUncertaintyScore: 0.20,
+    },
+    qualificationCriteria: {
+      minProbability: 0.60,
+      minEv: 0.00,
+      minEdge: 0.01,
+    },
+    isEnabled: true,
+  },
+  first_half_multi_goals: {
+    type: 'first_half_multi_goals',
+    title: '1st half multi goals',
+    category: 'multi_goals',
+    period: 'FIRST_HALF',
+    description: 'First half total goals falling inside 0 to 1 or 1 to 2 goals when half time data is verified.',
+    defaultSelections: ['1st half multi goals 0 to 1', '1st half multi goals 1 to 2'],
+    settlementRule: 'First half goals scored before the half time whistle.',
+    dataRequirements: {
+      requiresHalfData: true,
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.80,
+      maxUncertaintyScore: 0.20,
+    },
+    qualificationCriteria: {
+      minProbability: 0.60,
+      minEv: 0.00,
+      minEdge: 0.01,
+    },
+    isEnabled: true,
+  },
   moneyline: {
     type: 'moneyline',
     title: 'Moneyline (Winner)',
@@ -575,6 +636,12 @@ export function getOptionTypeLabel(type: SupportedOptionType | string): string {
       return 'Booking points';
     case 'win_draw_combo':
       return 'Win & goal combos';
+    case 'multi_goals':
+      return 'Multi goals';
+    case 'team_multi_goals':
+      return 'Team multi goals';
+    case 'first_half_multi_goals':
+      return '1st half multi goals';
     default:
       return type ? type.replace(/_/g, ' ') : '';
   }
@@ -729,7 +796,8 @@ export function formatSelectionName(name: string): string {
     .replace(/Highest Scoring Half: 2nd Half/gi, 'Highest scoring half: 2nd half')
     .replace(/Highest Scoring Half: 1st Half/gi, 'Highest scoring half: 1st half')
     .replace(/1st Half Over ([0-9.]+) Goals/gi, '1st half over $1 goals')
-    .replace(/1st Half Under ([0-9.]+) Goals/gi, '1st half under $1 goals');
+    .replace(/1st Half Under ([0-9.]+) Goals/gi, '1st half under $1 goals')
+    .replace(/(Multi goals|multi goals|1st half multi goals)\s+(\d+)-(\d+)/gi, (_m, prefix, a, b) => `${prefix} ${a} to ${b}`);
 
   return cleanDisplayText(cleaned);
 }

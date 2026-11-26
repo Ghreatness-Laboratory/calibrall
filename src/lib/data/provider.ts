@@ -11,6 +11,10 @@
 import { Competition, Fixture, FixtureContext, Team, VerifiedMatchOdds, MatchStatus } from '@/types';
 import { getFixtureStatistics, buildFixtureContextFromStats } from './seedData';
 import { evaluateFixtureMarkets } from '../prediction/marketSelection';
+import {
+  loadStoredFootballExplanation,
+  persistOrLoadImmutableFootballExplanation,
+} from '../prediction/footballPickPersistence';
 import { computeRequestDateWindow } from '../utils/dateWindow';
 import { serverCache } from '../cache/serverCache';
 import { checkAndLogStartupEnv } from '../config/envAudit';
@@ -858,6 +862,24 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         halves: !stats.leagueCapabilities.hasHalfTimeGoals,
       };
     }
+
+    try {
+      const storedExpl = loadStoredFootballExplanation(updatedFixture.id);
+      if (storedExpl) {
+        updatedFixture.writtenExplanation = storedExpl;
+      } else {
+        const ctx = buildFixtureContextFromStats(updatedFixture, stats);
+        const evaluated = evaluateFixtureMarkets(ctx);
+        updatedFixture.writtenExplanation = persistOrLoadImmutableFootballExplanation(
+          updatedFixture,
+          evaluated,
+          ctx
+        );
+      }
+    } catch {
+      // Non-fatal explanation attachment failure
+    }
+
     return updatedFixture;
   }
 
@@ -1526,11 +1548,17 @@ export async function getEvaluatedFixture(fixtureId: string) {
   if (!context) return null;
 
   const evaluated = evaluateFixtureMarkets(context);
+  const writtenExplanation = persistOrLoadImmutableFootballExplanation(fixture, evaluated, context);
+  fixture.writtenExplanation = writtenExplanation;
+  if (evaluated.topPick) {
+    evaluated.topPick.writtenExplanation = writtenExplanation;
+  }
   return {
     fixture,
     context,
     predictions: evaluated.predictions,
     topPick: evaluated.topPick,
     noRecommendationReason: evaluated.noRecommendationReason,
+    writtenExplanation,
   };
 }

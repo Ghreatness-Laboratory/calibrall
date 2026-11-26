@@ -9,6 +9,7 @@ import TeamCrest from '../TeamCrest';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import type { BasketballGameEvaluation, BasketballPickCandidate } from '@/lib/basketball/picker';
 import type { BasketballMarketCategory } from '@/lib/basketball/markets';
+import WhyThisPickSheet from '../WhyThisPickSheet';
 
 export type BasketballMarketGroupFilter = 'ALL' | 'game_total' | 'team_total' | 'h1_total';
 
@@ -62,6 +63,8 @@ export default function NBAGameCard({
   isSavedInitial,
 }: NBAGameCardProps) {
   const [isSaved, setIsSaved] = useState<boolean>(isSavedInitial ?? false);
+  const [whySheetOpen, setWhySheetOpen] = useState<boolean>(false);
+  const writtenExplanation = fixture.writtenExplanation || evaluation?.writtenExplanation;
 
   useEffect(() => {
     if (isSavedInitial === undefined) {
@@ -367,6 +370,21 @@ export default function NBAGameCard({
         </div>
       )}
 
+      {writtenExplanation?.oneLineSummary && (
+        <div className="pt-1 border-t border-[var(--line)] space-y-1">
+          <p className="text-[12.5px] leading-[1.5] text-[var(--text-2)]">
+            {cleanDisplayText(writtenExplanation.oneLineSummary)}
+          </p>
+          <button
+            type="button"
+            onClick={() => setWhySheetOpen(true)}
+            className="min-h-[44px] inline-flex items-center text-[12px] font-semibold text-[var(--accent)] touch-press -my-1"
+          >
+            Why this pick
+          </button>
+        </div>
+      )}
+
       <Link
         href={`/matches/${fixture.id}`}
         className="min-h-[44px] -mx-1 px-2 rounded-[12px] flex items-center justify-between text-[12.5px] font-semibold text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors touch-press"
@@ -374,6 +392,14 @@ export default function NBAGameCard({
         <span>View full analysis</span>
         <ChevronRight className="w-4 h-4" strokeWidth={2} />
       </Link>
+
+      <WhyThisPickSheet
+        open={whySheetOpen}
+        onClose={() => setWhySheetOpen(false)}
+        matchTitle={`${homeName} vs ${awayName}`}
+        pickLabel={displayPick ? `${displayPick.selection} pts` : undefined}
+        explanation={writtenExplanation}
+      />
     </div>
   );
 }

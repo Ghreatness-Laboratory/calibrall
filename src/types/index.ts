@@ -18,6 +18,7 @@ export type MarketCategory =
   | 'draw_no_bet'
   | 'handicap'
   | 'goal_bounds'
+  | 'multi_goals'
   | 'combos'
   | 'moneyline'
   | 'spread'
@@ -40,6 +41,9 @@ export type SupportedOptionType =
   | 'european_handicap'
   | 'goal_bounds'
   | 'team_goal_bounds'
+  | 'multi_goals'
+  | 'team_multi_goals'
+  | 'first_half_multi_goals'
   | 'corner_handicap'
   | 'team_bookings'
   | 'booking_points'
@@ -216,6 +220,46 @@ export interface FixtureContext {
   missingFactors?: MissingFactorFlag[];
   verifiedOdds?: VerifiedMatchOdds;
   noRecommendationReason?: string;
+  homeAvgScored?: number;
+  homeAvgConceded?: number;
+  awayAvgScored?: number;
+  awayAvgConceded?: number;
+  homeRecentTotals?: number[];
+  awayRecentTotals?: number[];
+  homeRecentGoals?: number[];
+  awayRecentGoals?: number[];
+  h2hMeetingsCount?: number;
+  h2hAvgTotalGoals?: number;
+  halfTimeSampleCount?: number;
+}
+
+export interface WrittenMatchAlternate {
+  marketCode: string;
+  marketName: string;
+  selection: string;
+  probability: number;
+  confidenceTier?: ConfidenceTier;
+}
+
+export interface WrittenMatchExplanation {
+  oneLineSummary: string;
+  fullSummary: string;
+  reasoning: Record<string, any>;
+  alternates: WrittenMatchAlternate[];
+  generatedAt: string;
+  tierLocked?: boolean;
+  dailySummaryLimitReached?: boolean;
+}
+
+export interface MultiGoalsMeta {
+  scope: 'full_match' | 'home' | 'away' | 'first_half';
+  minGoals: number;
+  maxGoals: number;
+  span: number;
+  band: string;
+  expectedTotalGoals: number;
+  last10Hits?: number;
+  last10Total?: number;
 }
 
 export interface VerifiedMatchOdds {
@@ -358,8 +402,19 @@ export interface Fixture {
     derbyName?: string;
     derbySource?: string;
     leagueCapabilities?: LeagueColumnCapabilities;
+    homeAvgScored?: number;
+    homeAvgConceded?: number;
+    awayAvgScored?: number;
+    awayAvgConceded?: number;
+    homeRecentTotals?: number[];
+    awayRecentTotals?: number[];
+    homeRecentGoals?: number[];
+    awayRecentGoals?: number[];
+    h2hMeetingsCount?: number;
+    h2hAvgTotalGoals?: number;
   };
   verifiedOdds?: VerifiedMatchOdds;
+  writtenExplanation?: WrittenMatchExplanation;
   hasCoachChange?: boolean;
   coachChangeNote?: string;
   h2hSummary?: string;
@@ -529,6 +584,9 @@ export interface MarketPrediction {
   deviggedMarketProb?: number;
   equivalentCanonicalKey?: string;
   evidence?: PickEvidence;
+  multiGoalsMeta?: MultiGoalsMeta;
+  priceSource?: string;
+  writtenExplanation?: WrittenMatchExplanation;
 }
 
 export interface PickEvidence {

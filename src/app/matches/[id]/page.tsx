@@ -17,9 +17,12 @@ import {
   AlertCircle,
   AlertTriangle,
   CornerUpRight,
+  Lock,
+  Sparkles,
+  ArrowUpRight,
 } from 'lucide-react';
-import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/supabase/client';
-import { Fixture, MarketPrediction } from '@/types';
+import { toggleStoredSavedFixture, getStoredSavedFixtures, getStoredUser } from '@/lib/supabase/client';
+import { Fixture, MarketPrediction, WrittenMatchExplanation } from '@/types';
 import { formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import type { BasketballGameEvaluation, BasketballPickCandidate } from '@/lib/basketball/picker';
 import type { BasketballMarketCategory } from '@/lib/basketball/markets';
@@ -99,9 +102,15 @@ export default function MatchAnalysisPage() {
       try {
         setIsLoading(true);
         const isBb = id?.startsWith('bbg_') || id?.startsWith('nba_');
+        const userTier = getStoredUser()?.subscriptionTier || 'free';
         const res = await fetch(
           `/api/v1/fixtures?sport=${isBb ? 'basketball' : 'football'}&id=${encodeURIComponent(id)}`,
-          { cache: 'no-store' }
+          {
+            cache: 'no-store',
+            headers: {
+              'x-calibrall-tier': userTier,
+            },
+          }
         );
         if (!res.ok) {
           setFixture(null);
@@ -469,6 +478,74 @@ export default function MatchAnalysisPage() {
               </div>
             )}
 
+            {(fixture.writtenExplanation || bbEvaluation?.writtenExplanation) && (() => {
+              const expl: WrittenMatchExplanation = (fixture.writtenExplanation || bbEvaluation?.writtenExplanation)!;
+              return (
+                <section className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-[14px] font-display font-semibold text-[var(--text)]">
+                      <Sparkles className="w-4 h-4 text-[var(--accent)] shrink-0" />
+                      <span>Model explanation</span>
+                    </div>
+                    {expl.tierLocked && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30">
+                        <Lock className="w-3 h-3" />
+                        <span>Pro feature</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {expl.tierLocked ? (
+                    <div className="space-y-2.5">
+                      <p className="text-[12.5px] text-[var(--text)] leading-[1.5]">
+                        {cleanDisplayText(expl.oneLineSummary)}
+                      </p>
+                      <Link
+                        href="/pricing"
+                        className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 rounded-[12px] bg-[var(--accent-fill)] text-[#0A0E0D] font-semibold text-[12.5px] touch-press"
+                      >
+                        <span>Upgrade to Pro for full explanation and alternates</span>
+                        <ArrowUpRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-[13px] text-[var(--text)] leading-[1.55]">
+                        {cleanDisplayText(expl.fullSummary || expl.oneLineSummary)}
+                      </p>
+                      {expl.alternates && expl.alternates.length > 0 && (
+                        <div className="space-y-1.5 pt-2 border-t border-[var(--line)]">
+                          <div className="text-[11.5px] font-semibold text-[var(--text-2)]">
+                            Next 2 best alternates
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {expl.alternates.slice(0, 2).map((alt) => (
+                              <div
+                                key={alt.marketCode}
+                                className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-2.5 flex items-center justify-between gap-2"
+                              >
+                                <div className="min-w-0">
+                                  <div className="text-[12.5px] font-semibold text-[var(--text)] truncate">
+                                    {cleanDisplayText(alt.selection)}
+                                  </div>
+                                  <div className="text-[10.5px] text-[var(--text-3)] truncate">
+                                    {cleanDisplayText(alt.marketName)}
+                                  </div>
+                                </div>
+                                <span className="font-display text-[13.5px] font-bold text-[var(--accent)] tabular-nums shrink-0">
+                                  {(alt.probability * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </section>
+              );
+            })()}
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
               <div className="lg:col-span-7 bg-[var(--surface)] border border-[var(--line)] rounded-[18px] overflow-hidden divide-y divide-[var(--line)]">
                 <div className="p-3.5 flex items-center justify-between">
@@ -751,11 +828,15 @@ export default function MatchAnalysisPage() {
                   {topPickTier.label}
                 </span>
               )}
-              {topPick.marketOdds && topPick.marketOdds > 1.0 && (
+              {topPick.marketOdds && topPick.marketOdds > 1.0 ? (
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text)] tabular-nums">
                   @{formatOdds(topPick.marketOdds)}
                 </span>
-              )}
+              ) : topPick.priceSource ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)]">
+                  {cleanDisplayText(topPick.priceSource)}
+                </span>
+              ) : null}
             </div>
           </div>
 
@@ -816,6 +897,76 @@ export default function MatchAnalysisPage() {
               >
                 {pickExpanded ? 'Show less' : 'Read more'}
               </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 2b. Written Match Explanation & Next 2 Best Alternates */}
+      {fixture.writtenExplanation && (
+        <section className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[14px] font-display font-semibold text-[var(--text)]">
+              <Sparkles className="w-4 h-4 text-[var(--accent)] shrink-0" />
+              <span>Model explanation</span>
+            </div>
+            {fixture.writtenExplanation.tierLocked && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30">
+                <Lock className="w-3 h-3" />
+                <span>Pro feature</span>
+              </span>
+            )}
+          </div>
+
+          {fixture.writtenExplanation.tierLocked ? (
+            <div className="space-y-2.5">
+              <p className="text-[12.5px] text-[var(--text)] leading-[1.5]">
+                {cleanDisplayText(fixture.writtenExplanation.oneLineSummary)}
+              </p>
+              <Link
+                href="/pricing"
+                className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 rounded-[12px] bg-[var(--accent-fill)] text-[#0A0E0D] font-semibold text-[12.5px] touch-press"
+              >
+                <span>Upgrade to Pro for full explanation and alternates</span>
+                <ArrowUpRight className="w-4 h-4" />
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-[13px] text-[var(--text)] leading-[1.55]">
+                {cleanDisplayText(
+                  fixture.writtenExplanation.fullSummary || fixture.writtenExplanation.oneLineSummary
+                )}
+              </p>
+
+              {fixture.writtenExplanation.alternates &&
+                fixture.writtenExplanation.alternates.length > 0 && (
+                  <div className="space-y-1.5 pt-2 border-t border-[var(--line)]">
+                    <div className="text-[11.5px] font-semibold text-[var(--text-2)]">
+                      Next 2 best alternates
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {fixture.writtenExplanation.alternates.slice(0, 2).map((alt) => (
+                        <div
+                          key={alt.marketCode}
+                          className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-2.5 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-[12.5px] font-semibold text-[var(--text)] truncate">
+                              {cleanDisplayText(alt.selection)}
+                            </div>
+                            <div className="text-[10.5px] text-[var(--text-3)] truncate">
+                              {cleanDisplayText(alt.marketName)}
+                            </div>
+                          </div>
+                          <span className="font-display text-[13.5px] font-bold text-[var(--accent)] tabular-nums shrink-0">
+                            {(alt.probability * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
             </div>
           )}
         </section>

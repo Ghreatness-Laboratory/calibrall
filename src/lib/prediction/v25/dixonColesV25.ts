@@ -9,7 +9,11 @@ import {
   generateHalfByHalfGoalDistribution
 } from '../math';
 import { V25FixtureFeatures } from './featureLayer';
-import { getCalibratedParams, getLeagueCalibratedConfig } from '../calibratedParams';
+import {
+  getCalibratedParams,
+  getLeagueCalibratedConfig,
+  getMultiGoalsPlattParams,
+} from '../calibratedParams';
 import { MarketCategory } from '@/types';
 
 export interface V25AsianHandicapOutcome {
@@ -75,6 +79,12 @@ export interface V25ScorelineMatrix {
     '3+': number;
     '4+': number;
   };
+  multiGoals: {
+    fullMatch: Record<string, number>;
+    home: Record<string, number>;
+    away: Record<string, number>;
+    firstHalf: Record<string, number>;
+  };
 }
 
 export interface V25CornerDistribution {
@@ -133,6 +143,11 @@ export const PLATT_CALIBRATION_PARAMS: Record<MarketCategory, { a: number; b: nu
   handicap: { a: 0.935, b: -0.018, marketBlendWeight: 0.52 }, // Conservative Platt scaling for Asian handicap
   goal_bounds: { a: 0.960, b: +0.005, marketBlendWeight: 0.64 },
   combos: { a: 0.920, b: -0.014, marketBlendWeight: 0.50 },
+  multi_goals: {
+    a: getMultiGoalsPlattParams().global.a,
+    b: getMultiGoalsPlattParams().global.b,
+    marketBlendWeight: 0.0,
+  },
   moneyline: { a: 0.950, b: 0.0, marketBlendWeight: 0.55 },
   spread: { a: 0.940, b: 0.0, marketBlendWeight: 0.52 },
   total_points: { a: 0.950, b: 0.0, marketBlendWeight: 0.55 },
@@ -278,6 +293,23 @@ export class DixonColesV25Engine {
       '0-1': 0, '0-2': 0, '1-2': 0, '1-3': 0, '2-3': 0, '2-4': 0, '2+': 0, '3+': 0, '4+': 0,
     };
 
+    const multiGoals = {
+      fullMatch: {
+        '1-2': 0, '1-3': 0, '1-4': 0, '1-5': 0,
+        '2-3': 0, '2-4': 0, '2-5': 0, '2-6': 0,
+        '3-4': 0, '3-5': 0, '3-6': 0, '4-6': 0,
+      } as Record<string, number>,
+      home: {
+        '0-1': 0, '1-2': 0, '1-3': 0, '2-3': 0,
+      } as Record<string, number>,
+      away: {
+        '0-1': 0, '1-2': 0, '1-3': 0, '2-3': 0,
+      } as Record<string, number>,
+      firstHalf: {
+        '0-1': 0, '1-2': 0,
+      } as Record<string, number>,
+    };
+
     for (let h = 0; h <= maxGoals; h++) {
       for (let a = 0; a <= maxGoals; a++) {
         const p = matrix[h][a];
@@ -327,6 +359,31 @@ export class DixonColesV25Engine {
         if (totalGoals >= 3) goalBounds['3+'] += p;
         if (totalGoals >= 4) goalBounds['4+'] += p;
 
+        // Multi goals full match (12 ranges)
+        if (totalGoals >= 1 && totalGoals <= 2) multiGoals.fullMatch['1-2'] += p;
+        if (totalGoals >= 1 && totalGoals <= 3) multiGoals.fullMatch['1-3'] += p;
+        if (totalGoals >= 1 && totalGoals <= 4) multiGoals.fullMatch['1-4'] += p;
+        if (totalGoals >= 1 && totalGoals <= 5) multiGoals.fullMatch['1-5'] += p;
+        if (totalGoals >= 2 && totalGoals <= 3) multiGoals.fullMatch['2-3'] += p;
+        if (totalGoals >= 2 && totalGoals <= 4) multiGoals.fullMatch['2-4'] += p;
+        if (totalGoals >= 2 && totalGoals <= 5) multiGoals.fullMatch['2-5'] += p;
+        if (totalGoals >= 2 && totalGoals <= 6) multiGoals.fullMatch['2-6'] += p;
+        if (totalGoals >= 3 && totalGoals <= 4) multiGoals.fullMatch['3-4'] += p;
+        if (totalGoals >= 3 && totalGoals <= 5) multiGoals.fullMatch['3-5'] += p;
+        if (totalGoals >= 3 && totalGoals <= 6) multiGoals.fullMatch['3-6'] += p;
+        if (totalGoals >= 4 && totalGoals <= 6) multiGoals.fullMatch['4-6'] += p;
+
+        // Team multi goals (home & away marginals)
+        if (h >= 0 && h <= 1) multiGoals.home['0-1'] += p;
+        if (h >= 1 && h <= 2) multiGoals.home['1-2'] += p;
+        if (h >= 1 && h <= 3) multiGoals.home['1-3'] += p;
+        if (h >= 2 && h <= 3) multiGoals.home['2-3'] += p;
+
+        if (a >= 0 && a <= 1) multiGoals.away['0-1'] += p;
+        if (a >= 1 && a <= 2) multiGoals.away['1-2'] += p;
+        if (a >= 1 && a <= 3) multiGoals.away['1-3'] += p;
+        if (a >= 2 && a <= 3) multiGoals.away['2-3'] += p;
+
         // Asian Handicap settlements per line:
         ahLines.forEach(line => {
           this.accumulateAsianHandicap(asianHandicap.home[line], h, a, line, p);
@@ -370,6 +427,9 @@ export class DixonColesV25Engine {
       explicitHalfXg
     );
 
+    multiGoals.firstHalf['0-1'] = halfDist.firstHalf.multiGoals['0-1'];
+    multiGoals.firstHalf['1-2'] = halfDist.firstHalf.multiGoals['1-2'];
+
     return {
       matrix,
       lambda,
@@ -397,6 +457,7 @@ export class DixonColesV25Engine {
         awayWin: halfDist.secondHalf.awayWin,
       },
       goalBounds,
+      multiGoals,
     };
   }
 
@@ -582,6 +643,42 @@ export class DixonColesV25Engine {
       rawModelProb: Number(rawModelProb.toFixed(4)),
       deviggedMarketProb: deviggedMarketProb !== undefined ? Number(deviggedMarketProb.toFixed(4)) : undefined,
       blendedProb: Number(blendedProb.toFixed(4)),
+      calibratedProb,
+      uncertaintySpread,
+      ciLower90,
+      ciUpper90,
+    };
+  }
+
+  /**
+   * Calibrates Multi goals probabilities using scope-specific walk-forward Platt parameters.
+   */
+  public static calibrateMultiGoalsPrediction(
+    rawModelProb: number,
+    scope: 'full_match' | 'home' | 'away' | 'first_half',
+    features?: V25FixtureFeatures,
+    riskFlagsCount: number = 0
+  ): V25CalibratedPrediction {
+    const plattSet = getMultiGoalsPlattParams();
+    const p = scope === 'full_match'
+      ? plattSet.fullMatch
+      : (scope === 'first_half' ? plattSet.firstHalf : plattSet.team);
+
+    const z = this.logit(rawModelProb);
+    const calibratedProb = Number(this.sigmoid(p.a * z + p.b).toFixed(4));
+
+    const completeness = features?.dataCompletenessScore ?? 0.90;
+    const baseSpread = 0.036 + (1 - completeness) * 0.045;
+    const riskExpansion = riskFlagsCount * 0.009;
+    const uncertaintySpread = Number(Math.min(0.12, Math.max(0.024, baseSpread + riskExpansion)).toFixed(4));
+
+    const ciLower90 = Number(Math.max(0.01, calibratedProb - uncertaintySpread * 1.645).toFixed(4));
+    const ciUpper90 = Number(Math.min(0.99, calibratedProb + uncertaintySpread * 1.645).toFixed(4));
+
+    return {
+      rawModelProb: Number(rawModelProb.toFixed(4)),
+      deviggedMarketProb: undefined,
+      blendedProb: Number(rawModelProb.toFixed(4)),
       calibratedProb,
       uncertaintySpread,
       ciLower90,
