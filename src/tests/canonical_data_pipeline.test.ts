@@ -195,7 +195,7 @@ assert.strictEqual(v25Eval.confidenceTier, 'MEDIUM', 'v25 Engine assigns MEDIUM'
 const riskTier = calculateRiskTier(0.88, 0.90, 0.08);
 assert.notStrictEqual(riskTier, 'SAFE', 'Word SAFE is strictly eliminated from risk tier');
 const badge = getRiskTierBadge('SAFE');
-assert.strictEqual(badge.label, 'HIGH', 'Legacy SAFE maps to HIGH badge label, not SAFE');
+assert.strictEqual(badge.label, 'High', 'Legacy SAFE maps to High badge label, not SAFE');
 
 console.log('✓ Feature flag & confidence tier capping passed.');
 

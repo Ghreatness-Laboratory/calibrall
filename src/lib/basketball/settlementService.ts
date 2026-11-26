@@ -255,6 +255,7 @@ export async function recordPreTipoffBasketballPicks(params: {
       homeTeam: { id: game.home_id, name: homeLabel, shortName: homeLabel, tla: homeLabel.slice(0, 3).toUpperCase(), crestUrl: '' },
       awayTeam: { id: game.away_id, name: awayLabel, shortName: awayLabel, tla: awayLabel.slice(0, 3).toUpperCase(), crestUrl: '' },
       kickoffTime: kickoffIso,
+      matchday: 1,
       status: game.status as any,
       homeScore: game.home_pts,
       awayScore: game.away_pts,

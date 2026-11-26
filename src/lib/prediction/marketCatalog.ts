@@ -478,7 +478,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
     defaultSelections: ['1st half multi goals 0 to 1', '1st half multi goals 1 to 2'],
     settlementRule: 'First half goals scored before the half time whistle.',
     dataRequirements: {
-      requiresHalfData: true,
+      requiresHalfLevelData: true,
       minSampleSizeMatches: 10,
       minDataCoverageScore: 0.80,
       maxUncertaintyScore: 0.20,

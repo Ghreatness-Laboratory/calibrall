@@ -177,6 +177,13 @@ export function generateFootballExplanation(params: {
     sentence2 += ` ${cleanDisplayText(`Both clubs landed in ${topPick.multiGoalsMeta.band} goals in ${topPick.multiGoalsMeta.last10Hits} of ${topPick.multiGoalsMeta.last10Total} recent matches.`)}`;
   }
 
+  const stateTags = context?.stateTags || [];
+  const hasScheduleCongestion =
+    stateTags.includes('fixture-congested') || stateTags.includes('high-fatigue');
+  const hasKeyAbsences = stateTags.includes('key-absences');
+  const isLowScoringTendency = totalXg > 0 && totalXg < 2.2;
+  const isModerateSample = homeSamples < 15 || awaySamples < 15;
+
   const contextDrivers: string[] = [];
   if (
     context?.refereeAnnounced &&
@@ -185,35 +192,60 @@ export function generateFootballExplanation(params: {
     context.refereeLeagueBaseline !== undefined
   ) {
     contextDrivers.push(
-      `Referee ${cleanDisplayText(context.referee)} averages ${context.refereeShrunkRate.toFixed(2)} shrunk cards vs ${context.refereeLeagueBaseline.toFixed(2)} league baseline.`
+      `referee ${cleanDisplayText(context.referee)} averages ${context.refereeShrunkRate.toFixed(2)} cards vs ${context.refereeLeagueBaseline.toFixed(2)} league baseline`
     );
   }
   if (context?.isDerby) {
-    contextDrivers.push('Fixture carries derby rivalry intensity.');
+    contextDrivers.push('derby rivalry intensity applies');
+  }
+  if (context?.factors?.schedule_fatigue?.isMeasured && context.factors.schedule_fatigue.description) {
+    contextDrivers.push(cleanDisplayText(context.factors.schedule_fatigue.description).replace(/\.$/, ''));
+  } else if (hasScheduleCongestion) {
+    contextDrivers.push('fixture congestion raises rotation risk');
+  }
+  if (hasKeyAbsences) {
+    contextDrivers.push('squad absences weigh on attacking output');
+  }
+  if (isLowScoringTendency) {
+    contextDrivers.push(`low scoring projection (${totalXg.toFixed(2)} combined xG)`);
+  }
+  if (isModerateSample) {
+    contextDrivers.push(`moderate sample depth (${homeSamples} vs ${awaySamples} matches)`);
   }
 
-  let sentence3 = '';
+  let sentence3Context = '';
+  if (contextDrivers.length > 0) {
+    const joined = contextDrivers.slice(0, 3).join('; ');
+    sentence3Context = cleanDisplayText(`${joined.charAt(0).toUpperCase() + joined.slice(1)}.`);
+  }
+
+  let sentence4Market = '';
   if (topPick) {
     const lineupText = context?.lineupConfirmed ? 'confirmed team news' : 'pre lineup projections';
     if (topPick.marketOdds && topPick.marketOdds > 1 && topPick.expectedValue !== undefined && topPick.expectedValue !== null) {
       const evPct = (topPick.expectedValue * 100).toFixed(1);
       const evSign = topPick.expectedValue >= 0 ? '+' : '\u2212';
-      sentence3 = cleanDisplayText(
+      sentence4Market = cleanDisplayText(
         `Backed by ${topPick.marketOdds.toFixed(2)} market odds (${evSign}${Math.abs(Number(evPct)).toFixed(1)}% EV) on ${lineupText}.`
       );
     } else {
-      sentence3 = cleanDisplayText(`Model line, no market price published; evaluated on ${lineupText}.`);
+      sentence4Market = cleanDisplayText(`Model line, no market price published; evaluated on ${lineupText}.`);
     }
     if (topPick.multiGoalsMeta) {
-      sentence3 += ` ${cleanDisplayText(`Selected band ${topPick.multiGoalsMeta.band} keeps range width at ${topPick.multiGoalsMeta.span} around ${topPick.multiGoalsMeta.expectedTotalGoals.toFixed(2)} expected goals.`)}`;
+      sentence4Market += ` ${cleanDisplayText(`Selected band ${topPick.multiGoalsMeta.band} keeps range width at ${topPick.multiGoalsMeta.span} around ${topPick.multiGoalsMeta.expectedTotalGoals.toFixed(2)} expected goals.`)}`;
+    } else if (!sentence3Context && topPick.evidence?.whyLineChosen) {
+      const ladderSnippet = cleanDisplayText(topPick.evidence.whyLineChosen).split('.')[0]?.trim();
+      if (ladderSnippet) {
+        sentence4Market = `${sentence4Market} ${ladderSnippet}.`;
+      }
     }
   } else {
-    sentence3 = cleanDisplayText(
+    sentence4Market = cleanDisplayText(
       evaluation.noRecommendationReason || 'Market edge and data uncertainty checks kept this fixture in abstain mode.'
     );
   }
 
-  const parts = [sentence1, sentence2, ...contextDrivers.map(cleanDisplayText), sentence3].filter(Boolean);
+  const parts = [sentence1, sentence2, sentence3Context, sentence4Market].filter(Boolean);
   const fullSummary = parts.slice(0, 4).join(' ');
 
   return {
@@ -240,6 +272,9 @@ export function generateFootballExplanation(params: {
       refereeLeagueBaseline: context?.refereeAnnounced ? context.refereeLeagueBaseline ?? null : null,
       isDerby: Boolean(context?.isDerby),
       lineupConfirmed: Boolean(context?.lineupConfirmed),
+      stateTags,
+      lowScoringTendency: isLowScoringTendency,
+      moderateSampleRisk: isModerateSample,
       topPick: topPick
         ? {
             marketCode: topPick.marketCode,
@@ -348,16 +383,33 @@ export function generateBasketballExplanation(params: {
     `Model projects ${home} ${proj.homeMean.toFixed(1)} pts and ${away} ${proj.awayMean.toFixed(1)} pts (${proj.gameTotalMean.toFixed(1)} total pts, std ${proj.gameTotalStd.toFixed(1)}), with ${home} averaging ${proj.homeAvgScored.toFixed(1)} scored vs ${away} allowing ${proj.awayAvgAllowed.toFixed(1)}.`
   );
 
-  let restNote = '';
+  const paceDeltaStr =
+    proj.paceAdjustment >= 0
+      ? `+${proj.paceAdjustment.toFixed(1)}`
+      : `\u2212${Math.abs(proj.paceAdjustment).toFixed(1)}`;
+  const paceSummary =
+    Math.abs(proj.paceAdjustment) >= 0.3
+      ? `pace matchup shifts total by ${paceDeltaStr} pts`
+      : `neutral pace matchup (${paceDeltaStr} pts)`;
+
+  let restSummary = '';
   if (proj.homeIsB2B && proj.awayIsB2B) {
-    restNote = `Both ${home} and ${away} play on zero days rest in a back to back spot.`;
+    restSummary = `both teams play on zero days rest in a back to back spot`;
   } else if (proj.homeIsB2B) {
-    restNote = `${home} plays on a back to back (${proj.homeRestDays ?? 0} rest days vs ${proj.awayRestDays ?? 'N/A'} for ${away}).`;
+    restSummary = `${home} plays on a back to back (${proj.homeRestDays ?? 0}d rest vs ${proj.awayRestDays ?? 'N/A'}d for ${away})`;
   } else if (proj.awayIsB2B) {
-    restNote = `${away} plays on a back to back (${proj.awayRestDays ?? 0} rest days vs ${proj.homeRestDays ?? 'N/A'} for ${home}).`;
+    restSummary = `${away} plays on a back to back (${proj.awayRestDays ?? 0}d rest vs ${proj.homeRestDays ?? 'N/A'}d for ${home})`;
   } else {
-    restNote = `Rest stands at ${proj.homeRestDays ?? 'N/A'} days for ${home} and ${proj.awayRestDays ?? 'N/A'} days for ${away}.`;
+    restSummary = `rest stands at ${proj.homeRestDays ?? 'N/A'} days for ${home} and ${proj.awayRestDays ?? 'N/A'} days for ${away}`;
   }
+
+  const thinSampleNote =
+    proj.homeGamesPlayed < 10 || proj.awayGamesPlayed < 10
+      ? `; early sample risk (${proj.homeGamesPlayed} vs ${proj.awayGamesPlayed} games)`
+      : '';
+  const contextSentence = cleanDisplayText(
+    `${paceSummary.charAt(0).toUpperCase() + paceSummary.slice(1)} and ${restSummary}${thinSampleNote}.`
+  );
 
   let marketNote = '';
   if (topPick && !topPick.isModelLine && topPick.marketOdds) {
@@ -365,16 +417,16 @@ export function generateBasketballExplanation(params: {
       topPick.expectedValue !== null && topPick.expectedValue !== undefined
         ? ` (${topPick.expectedValue >= 0 ? '+' : '\u2212'}${Math.abs(topPick.expectedValue * 100).toFixed(1)}% EV)`
         : '';
-    marketNote = `Compared against ${cleanDisplayText(topPick.priceSource)} line ${topPick.line.toFixed(1)} at ${topPick.marketOdds.toFixed(2)} odds${evPart}.`;
+    marketNote = `Model projects ${topPick.projectedMean.toFixed(1)} vs ${cleanDisplayText(topPick.priceSource)} line ${topPick.line.toFixed(1)} (game total ${proj.gameTotalMean.toFixed(1)}) at ${topPick.marketOdds.toFixed(2)} odds${evPart}.`;
   } else if (fixture.basketballStats?.sportsbookTotal !== undefined) {
-    marketNote = `Model line, no market price published; projection sits vs ${fixture.basketballStats.sportsbookTotal.toFixed(1)} posted total.`;
+    marketNote = `Model total ${proj.gameTotalMean.toFixed(1)} pts vs ${fixture.basketballStats.sportsbookTotal.toFixed(1)} posted total; model line, no market price published.`;
   } else if (topPick) {
-    marketNote = `Model line, no market price published at ${topPick.line.toFixed(1)} pts.`;
+    marketNote = `Model projects ${topPick.projectedMean.toFixed(1)} vs ${topPick.line.toFixed(1)} line (game total ${proj.gameTotalMean.toFixed(1)} pts); model line, no market price published.`;
   } else if (evaluation.abstentionReason) {
     marketNote = cleanDisplayText(evaluation.abstentionReason);
   }
 
-  const fullSummary = [sentence1, sentence2, cleanDisplayText(restNote), cleanDisplayText(marketNote)]
+  const fullSummary = [sentence1, sentence2, contextSentence, cleanDisplayText(marketNote)]
     .filter(Boolean)
     .slice(0, 4)
     .join(' ');
@@ -396,6 +448,9 @@ export function generateBasketballExplanation(params: {
       projectedTotalStd: Number(proj.gameTotalStd.toFixed(1)),
       homeAvgScored: Number(proj.homeAvgScored.toFixed(1)),
       awayAvgAllowed: Number(proj.awayAvgAllowed.toFixed(1)),
+      homePaceDelta: Number(proj.homePaceDelta.toFixed(2)),
+      awayPaceDelta: Number(proj.awayPaceDelta.toFixed(2)),
+      paceAdjustment: Number(proj.paceAdjustment.toFixed(2)),
       homeRestDays: proj.homeRestDays,
       awayRestDays: proj.awayRestDays,
       homeIsB2B: proj.homeIsB2B,

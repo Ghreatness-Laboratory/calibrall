@@ -582,14 +582,15 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     stateTags.push('derby');
   }
 
-  const h2hMeetings = matchesStore.getHeadToHeadMeetingsSync(
+  const h2hResult = matchesStore.getHeadToHeadMeetingsSync(
     fixture.homeTeam.id || fixture.homeTeam.name,
     fixture.awayTeam.id || fixture.awayTeam.name,
     fixture.kickoffTime
   );
+  const h2hMeetings = h2hResult.meetings;
   const h2hMeetingsCount = h2hMeetings.length;
   const h2hAvgTotalGoals = h2hMeetingsCount > 0
-    ? Number((h2hMeetings.reduce((acc, m) => acc + (m.homeScore + m.awayScore), 0) / h2hMeetingsCount).toFixed(2))
+    ? Number((h2hMeetings.reduce((acc, m) => acc + (m.homeGoals + m.awayGoals), 0) / h2hMeetingsCount).toFixed(2))
     : undefined;
 
   return {

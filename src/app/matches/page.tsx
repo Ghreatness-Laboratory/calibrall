@@ -15,7 +15,7 @@ import type { BasketballLeague } from '@/lib/basketball/markets';
 import { RotateCw, Info, Search, Calendar, X, AlertCircle } from 'lucide-react';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 
-type FootballMarketGroup = 'ALL' | 'results' | 'goals' | 'corners' | 'cards';
+type FootballMarketGroup = 'ALL' | 'results' | 'goals' | 'multi_goals' | 'corners' | 'cards';
 type BasketballLeagueFilter = 'ALL' | BasketballLeague;
 type BasketballMarketFilter = BasketballMarketGroupFilter;
 
@@ -135,6 +135,14 @@ export default function MatchesPage() {
         p.marketCategory === 'total_goals' ||
         p.marketCategory === 'team_goals' ||
         p.marketCategory === 'btts'
+      );
+    }
+    if (group === 'multi_goals') {
+      return (
+        p.optionType === 'multi_goals' ||
+        p.optionType === 'team_multi_goals' ||
+        p.optionType === 'first_half_multi_goals' ||
+        p.marketCategory === 'multi_goals'
       );
     }
     if (group === 'corners') {
@@ -281,6 +289,7 @@ export default function MatchesPage() {
     { id: 'ALL', label: 'All markets' },
     { id: 'results', label: 'Results' },
     { id: 'goals', label: 'Goals' },
+    { id: 'multi_goals', label: 'Multi goals' },
     { id: 'corners', label: 'Corners' },
     { id: 'cards', label: 'Cards' },
   ];
