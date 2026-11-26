@@ -108,7 +108,7 @@ export default function WhyThisPickSheet({
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-lg bg-[var(--surface)] border border-[var(--line)] rounded-t-[24px] sm:rounded-[20px] p-5 pb-7 sm:pb-5 space-y-4 max-h-[85vh] overflow-y-auto"
+        className="w-full sm:max-w-lg bg-[var(--surface)] border border-[var(--line)] rounded-t-[24px] sm:rounded-[20px] p-5 pb-7 sm:pb-5 space-y-4 max-h-[85vh] overflow-y-auto overscroll-y-contain"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">

@@ -76,7 +76,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="mt-6 pb-6 border-t border-[var(--line)] pt-4 text-[12.5px] text-[var(--text-2)]">
+    <footer className="mt-6 pb-[calc(78px+env(safe-area-inset-bottom,0px))] md:pb-8 border-t border-[var(--line)] pt-4 text-[12.5px] text-[var(--text-2)]">
       <div className="max-w-[430px] md:max-w-4xl lg:max-w-7xl mx-auto px-4 space-y-3">
         <div className="border border-[var(--line)] bg-[var(--surface)] rounded-[18px] divide-y divide-[var(--line)] overflow-hidden">
           {sections.map((section) => {
