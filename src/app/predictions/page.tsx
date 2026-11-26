@@ -7,7 +7,12 @@ import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
 import { MarketPrediction, Team } from '@/types';
 import CompetitionFilter from '@/components/CompetitionFilter';
-import { CountryCompetitionGroup } from '@/lib/data/canonicalCompetitions';
+import {
+  CountryCompetitionGroup,
+  buildCompetitionGroupsFromFixtures,
+  getFixtureCanonicalCompetitionId,
+  normalizeSelectedCompetitionIds,
+} from '@/lib/data/competitionSearch';
 import { DayFilterType } from '@/lib/utils/dateWindow';
 import { SlidersHorizontal, AlertCircle, Info, ChevronRight } from 'lucide-react';
 import {
@@ -18,7 +23,7 @@ import {
 } from '@/lib/prediction/marketCatalog';
 import { checkDerby } from '@/lib/prediction/contextFactors';
 import { useSport } from '@/lib/context/SportContext';
-import type { BasketballLeague, BasketballMarketCategory } from '@/lib/basketball/markets';
+import type { BasketballMarketCategory } from '@/lib/basketball/markets';
 import type { BasketballGameEvaluation, BasketballPickCandidate } from '@/lib/basketball/picker';
 import TeamCrest from '@/components/TeamCrest';
 import {
@@ -53,31 +58,45 @@ const BB_CATEGORY_LABELS: Record<BasketballMarketCategory, string> = {
 export default function PredictionsPage() {
   const { sport, isSwitching } = useSport();
   const isBasketball = sport === 'basketball';
+  const isMultiSport = sport === 'all';
 
-  const [selectedCompId, setSelectedCompId] = useState<string>('ALL');
-  const [selectedBbLeague, setSelectedBbLeague] = useState<'ALL' | BasketballLeague>('ALL');
+  const [selectedCompIds, setSelectedCompIds] = useState<string[]>([]);
   const [selectedDay, setSelectedDay] = useState<DayFilterType>('ALL');
   const [selectedRiskTier, setSelectedRiskTier] = useState<string>('ALL');
   const [selectedMarketGroup, setSelectedMarketGroup] = useState<MarketGroupFilter>('ALL');
   const [onlyValuePicks, setOnlyValuePicks] = useState<boolean>(false);
   const [minProb, setMinProb] = useState<number>(0.5);
-  const [compGroups, setCompGroups] = useState<CountryCompetitionGroup[]>([]);
-  const [totalCompFixtures, setTotalCompFixtures] = useState<number>(0);
+  const [apiCompGroups, setApiCompGroups] = useState<CountryCompetitionGroup[] | null>(null);
+  const [apiTotalCompFixtures, setApiTotalCompFixtures] = useState<number | null>(null);
 
   useEffect(() => {
-    if (isBasketball) return;
-    fetch('/api/v1/competitions?sport=football', { cache: 'no-store' })
-      .then((res) => res.json())
+    setSelectedCompIds((prev) => normalizeSelectedCompetitionIds(prev, sport));
+  }, [sport]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('sport', sport);
+    params.set('include_empty', 'true');
+    if (selectedDay !== 'ALL') params.set('day', selectedDay);
+    fetch(`/api/v1/competitions?${params.toString()}`, { cache: 'no-store' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((json) => {
-        if (json.groupedByCountry && Array.isArray(json.groupedByCountry)) {
-          setCompGroups(json.groupedByCountry);
+        if (Array.isArray(json.groupedByCountry)) {
+          setApiCompGroups(json.groupedByCountry);
         }
         if (typeof json.totalFixtures === 'number') {
-          setTotalCompFixtures(json.totalFixtures);
+          setApiTotalCompFixtures(json.totalFixtures);
         }
       })
-      .catch((err) => console.error('[PredictionsPage] Error fetching active competitions:', err));
-  }, [isBasketball]);
+      .catch((err) => {
+        console.error('[PredictionsPage] Error fetching active competitions:', err);
+        setApiCompGroups(null);
+        setApiTotalCompFixtures(null);
+      });
+  }, [sport, selectedDay]);
 
   const {
     fixtures,
@@ -91,11 +110,33 @@ export default function PredictionsPage() {
     isSavedCopy,
     evaluations,
   } = useLiveFixtures(
-    isBasketball ? selectedBbLeague : selectedCompId,
+    selectedCompIds.length > 0 ? selectedCompIds : 'ALL',
     'ALL',
     sport,
     selectedDay
   );
+
+  const { compGroups, totalCompFixtures } = useMemo(() => {
+    if (
+      Array.isArray(apiCompGroups) &&
+      apiCompGroups.length > 0 &&
+      ((apiTotalCompFixtures ?? 0) > 0 || fixtures.length === 0 || selectedCompIds.length > 0)
+    ) {
+      return { compGroups: apiCompGroups, totalCompFixtures: apiTotalCompFixtures ?? 0 };
+    }
+    const derived = buildCompetitionGroupsFromFixtures({
+      fixtures,
+      sport,
+      day: selectedDay,
+      hideZeroFixtures: false,
+    });
+    return {
+      compGroups: derived.groupedByCountry,
+      totalCompFixtures: derived.totalFixtures,
+    };
+  }, [apiCompGroups, apiTotalCompFixtures, fixtures, sport, selectedDay, selectedCompIds.length]);
+
+  const selectedCompSet = useMemo(() => new Set(selectedCompIds), [selectedCompIds]);
 
   const allPredictions = useMemo(() => {
     if (isBasketball) return [];
@@ -130,7 +171,9 @@ export default function PredictionsPage() {
       noRecommendationReason?: string;
     }[] = [];
 
-    fixtures.forEach((fixture) => {
+    fixtures
+      .filter((f) => f.sport !== 'basketball')
+      .forEach((fixture) => {
       if (!storedHistoryMode) {
         if (fixture.status === 'FINISHED' || fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED')
           return;
@@ -155,7 +198,7 @@ export default function PredictionsPage() {
         fixtureName: `${displayName(fixture.homeTeam)} vs ${displayName(fixture.awayTeam)}`,
         homeTeam: fixture.homeTeam,
         awayTeam: fixture.awayTeam,
-        compId: fixture.competitionId || fixture.competition.id,
+        compId: getFixtureCanonicalCompetitionId(fixture),
         compCode: fixture.competition.code,
         compName: fixture.competition.name,
         kickoff: fixture.kickoffTime,
@@ -190,7 +233,7 @@ export default function PredictionsPage() {
   }, [fixtures, isBasketball, storedHistoryMode]);
 
   const basketballMatches = useMemo(() => {
-    if (!isBasketball) return [];
+    if (!isBasketball && !isMultiSport) return [];
     const now = Date.now();
     const out: Array<{
       fixture: (typeof fixtures)[number];
@@ -202,8 +245,8 @@ export default function PredictionsPage() {
     }> = [];
 
     for (const fixture of fixtures) {
-      const gameLeague = fixture.basketballStats?.league || fixture.competition?.code;
-      if (selectedBbLeague !== 'ALL' && gameLeague !== selectedBbLeague) {
+      if (fixture.sport !== 'basketball') continue;
+      if (selectedCompSet.size > 0 && !selectedCompSet.has(getFixtureCanonicalCompetitionId(fixture))) {
         continue;
       }
       if (
@@ -292,7 +335,8 @@ export default function PredictionsPage() {
     fixtures,
     evaluations,
     isBasketball,
-    selectedBbLeague,
+    isMultiSport,
+    selectedCompSet,
     selectedRiskTier,
     selectedMarketGroup,
     onlyValuePicks,
@@ -370,7 +414,7 @@ export default function PredictionsPage() {
     return allPredictions
       .filter((item) => {
         const p = item.prediction;
-        if (selectedCompId !== 'ALL' && item.compId !== selectedCompId) {
+        if (selectedCompSet.size > 0 && !selectedCompSet.has(item.compId)) {
           return false;
         }
         if (selectedRiskTier !== 'ALL') {
@@ -402,7 +446,7 @@ export default function PredictionsPage() {
   }, [
     allPredictions,
     isBasketball,
-    selectedCompId,
+    selectedCompSet,
     selectedRiskTier,
     selectedMarketGroup,
     onlyValuePicks,
@@ -470,7 +514,25 @@ export default function PredictionsPage() {
     { id: 'h1_total', label: '1st half' },
   ];
 
-  const activeMarketFilters = isBasketball ? basketballMarketFilters : footballMarketFilters;
+  const activeMarketFilters = isBasketball
+    ? basketballMarketFilters
+    : isMultiSport
+    ? [...footballMarketFilters, ...basketballMarketFilters.slice(1)]
+    : footballMarketFilters;
+
+  const compNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const g of compGroups) {
+      for (const c of g.competitions) {
+        map.set(c.id, cleanDisplayText(c.name));
+      }
+    }
+    return map;
+  }, [compGroups]);
+
+  const removeCompId = (idToRemove: string) => {
+    setSelectedCompIds((prev) => prev.filter((id) => id !== idToRemove));
+  };
 
   if (isSwitching || isLoading) {
     return (
@@ -483,6 +545,10 @@ export default function PredictionsPage() {
     );
   }
 
+  const totalMultiSportFixtures = groupedMatches.length + basketballMatches.length;
+  const totalMultiSportPicks =
+    filtered.length + basketballMatches.reduce((s, m) => s + m.picks.length, 0);
+
   return (
     <div className="space-y-4 py-1">
       {/* Header */}
@@ -492,8 +558,10 @@ export default function PredictionsPage() {
         </h1>
         <p className="text-[12.5px] text-[var(--text-2)] leading-[1.5]">
           {isBasketball
-            ? 'Calibrated NBA, NCAAB Division I & EuroLeague totals · Local tip-off times'
-            : 'Pre-kickoff probability models and statistical evaluations · All times WAT'}
+            ? 'Calibrated NBA, NCAAB Division I & EuroLeague totals · Local tip off times'
+            : isMultiSport
+            ? 'Football and basketball probability models across active competitions'
+            : 'Pre kickoff probability models and statistical evaluations · All times WAT'}
           {lastUpdated ? ` · Updated ${lastUpdated}` : ''}
         </p>
       </div>
@@ -561,44 +629,13 @@ export default function PredictionsPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {isBasketball ? (
-            <div>
-              <label className="block text-[var(--text-2)] mb-1.5 text-[11px]">League</label>
-              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
-                {(
-                  [
-                    { id: 'ALL', label: 'All' },
-                    { id: 'NBA', label: 'NBA' },
-                    { id: 'NCAAB', label: 'NCAAB' },
-                    { id: 'EUROLEAGUE', label: 'EuroLeague' },
-                  ] as const
-                ).map((chip) => {
-                  const isActive = selectedBbLeague === chip.id;
-                  return (
-                    <button
-                      key={chip.id}
-                      type="button"
-                      onClick={() => setSelectedBbLeague(chip.id)}
-                      className={`min-h-[44px] px-4 rounded-full text-[12px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
-                        isActive
-                          ? 'bg-[var(--accent-soft)] border-[var(--accent)] text-[var(--accent)] font-semibold'
-                          : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text)]'
-                      }`}
-                    >
-                      {chip.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <CompetitionFilter
-              selectedCompetitionId={selectedCompId}
-              onSelectCompetitionId={setSelectedCompId}
-              groups={compGroups}
-              totalFixturesCount={totalCompFixtures || fixtures.length}
-            />
-          )}
+          <CompetitionFilter
+            selectedCompetitionIds={selectedCompIds}
+            onApplyCompetitionIds={setSelectedCompIds}
+            groups={compGroups}
+            totalFixturesCount={totalCompFixtures}
+            showSportBadge={isMultiSport}
+          />
 
           <div>
             <label className="block text-[var(--text-2)] mb-1.5 text-[11px]">Confidence</label>
@@ -700,6 +737,30 @@ export default function PredictionsPage() {
         </div>
       </div>
 
+      {/* Selected competition chips */}
+      {selectedCompIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {selectedCompIds.map((compId) => (
+            <button
+              key={compId}
+              type="button"
+              onClick={() => removeCompId(compId)}
+              className="inline-flex items-center gap-1.5 min-h-[34px] px-3 rounded-full bg-[var(--accent-soft)] border border-[var(--accent)]/40 text-[var(--accent)] text-[12px] font-medium hover:bg-[var(--accent)]/15 transition-colors touch-press"
+            >
+              <span>{compNameById.get(compId) || compId}</span>
+              <span aria-hidden="true">×</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setSelectedCompIds([])}
+            className="min-h-[34px] px-2.5 text-[12px] text-[var(--text-2)] hover:text-[var(--text)] underline-offset-2 hover:underline touch-press"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
       {/* Results header count */}
       <div className="flex items-center justify-between text-[12px] text-[var(--text-2)] px-1 tabular-nums">
         <span className="font-medium text-[var(--text)]">
@@ -708,16 +769,17 @@ export default function PredictionsPage() {
                 (s, m) => s + m.picks.length,
                 0
               )} lines)`
+            : isMultiSport
+            ? `${totalMultiSportFixtures} fixtures (${totalMultiSportPicks} selections)`
             : `${groupedMatches.length} fixtures (${filtered.length} selections)`}
         </span>
         <span className="text-[var(--text-3)]">Ranked by probability</span>
       </div>
 
       {/* Results Grid */}
-      {isBasketball ? (
-        basketballMatches.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {basketballMatches.map(({ fixture, needsHistory, abstentionReason, picks }) => {
+      {(isBasketball || isMultiSport) && basketballMatches.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {basketballMatches.map(({ fixture, needsHistory, abstentionReason, picks }) => {
               const homeName = displayName(fixture.homeTeam);
               const awayName = displayName(fixture.awayTeam);
               const leagueCode =
@@ -839,19 +901,22 @@ export default function PredictionsPage() {
                   )}
                 </div>
               );
-            })}
-          </div>
-        ) : (
-          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-6 text-center space-y-1.5">
-            <p className="font-display text-[14px] font-semibold text-[var(--text)]">
-              {selectedDay === 'today' ? 'No games today' : 'No basketball totals match filters'}
-            </p>
-            <p className="text-[12px] text-[var(--text-2)]">
-              Try lowering minimum probability, switching league, or unchecking priced-only filter.
-            </p>
-          </div>
-        )
-      ) : groupedMatches.length > 0 ? (
+          })}
+        </div>
+      )}
+
+      {isBasketball && basketballMatches.length === 0 && (
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-6 text-center space-y-1.5">
+          <p className="font-display text-[14px] font-semibold text-[var(--text)]">
+            {selectedDay === 'today' ? 'No games today' : 'No basketball totals match filters'}
+          </p>
+          <p className="text-[12px] text-[var(--text-2)]">
+            Try lowering minimum probability, switching league, or unchecking priced only filter.
+          </p>
+        </div>
+      )}
+
+      {!isBasketball && groupedMatches.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {groupedMatches.map((group) => {
             const homeName = displayName(group.homeTeam);
@@ -985,16 +1050,20 @@ export default function PredictionsPage() {
             );
           })}
         </div>
-      ) : (
-        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-6 text-center space-y-1.5">
-          <p className="font-display text-[14px] font-semibold text-[var(--text)]">
-            No models match current filters
-          </p>
-          <p className="text-[12px] text-[var(--text-2)]">
-            Try lowering the minimum probability or selecting another competition.
-          </p>
-        </div>
       )}
+
+      {!isBasketball &&
+        groupedMatches.length === 0 &&
+        (!isMultiSport || basketballMatches.length === 0) && (
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-6 text-center space-y-1.5">
+            <p className="font-display text-[14px] font-semibold text-[var(--text)]">
+              No models match current filters
+            </p>
+            <p className="text-[12px] text-[var(--text-2)]">
+              Try lowering the minimum probability or selecting another competition.
+            </p>
+          </div>
+        )}
 
       {/* Responsible use disclaimer */}
       <div className="rounded-[18px] p-3.5 border border-[var(--medium)]/30 bg-[var(--medium-soft)] flex items-start gap-2.5 mt-2">

@@ -1,4 +1,5 @@
 export type Sport = 'football' | 'basketball';
+export type SportFilter = Sport | 'all';
 
 export type MatchStatus = 'TIMED' | 'SCHEDULED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | 'POSTPONED' | 'CANCELED';
 

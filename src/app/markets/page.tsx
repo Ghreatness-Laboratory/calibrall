@@ -155,7 +155,7 @@ export default function MarketExplorerPage() {
     }[] = [];
 
     fixtures
-      .filter((f) => f.status !== 'FINISHED')
+      .filter((f) => f.status !== 'FINISHED' && f.sport !== 'basketball')
       .forEach((fixture) => {
         const stats = getFixtureStatistics(fixture);
         const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));

@@ -1,7 +1,7 @@
 // CALIBRALL: Client-Safe Canonical Competitions Catalog, Accent/Alias Search & Day-Scoped Grouping
 // Pure module with ZERO database or Node.js imports so Client Components and Server APIs share one truth.
 
-import type { Competition, Fixture, Sport } from '@/types';
+import type { Competition, Fixture, Sport, SportFilter } from '@/types';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import { matchesDayFilter, type DayFilterType } from '@/lib/utils/dateWindow';
 
@@ -737,7 +737,7 @@ export function normalizeSearchText(value: unknown): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[._\-\/'’`]+/g, ' ')
+    .replace(/[._\-\u2013\u2014/'’`]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -829,7 +829,7 @@ export function buildCompetitionGroupsFromFixtures(options: {
 
   const countsById = new Map<string, number>();
   for (const f of fixtures) {
-    const rawId = (f.competitionId || f.competition?.id || '').trim().toLowerCase();
+    const rawId = getFixtureCanonicalCompetitionId(f);
     if (!rawId || !CANONICAL_COMPETITIONS_CATALOG[rawId]) continue;
     const isBb = isBasketballCompetitionId(rawId) || f.sport === 'basketball';
     if (sport === 'football' && isBb) continue;
@@ -919,3 +919,64 @@ export function buildCompetitionGroupsFromFixtures(options: {
     totalFixtures,
   };
 }
+
+export function canonicalizeCompetitionId(rawId: string | null | undefined): string | null {
+  if (!rawId || typeof rawId !== 'string') return null;
+  const clean = rawId.trim().toLowerCase();
+  if (!clean || clean === 'all') return null;
+  if (clean === 'comp_ec') return 'comp_eng_national_league';
+  if (Object.prototype.hasOwnProperty.call(CANONICAL_COMPETITIONS_CATALOG, clean)) {
+    return clean;
+  }
+  const prefixed = clean.startsWith('comp_') ? clean : `comp_${clean}`;
+  if (Object.prototype.hasOwnProperty.call(CANONICAL_COMPETITIONS_CATALOG, prefixed)) {
+    return prefixed;
+  }
+  const byCode = Object.values(CANONICAL_COMPETITIONS_CATALOG).find(
+    (c) => c.code.toLowerCase() === clean
+  );
+  return byCode ? byCode.id : null;
+}
+
+export function getFixtureCanonicalCompetitionId(fixture: Pick<Fixture, 'competitionId' | 'competition' | 'basketballStats'>): string {
+  const candidates = [
+    fixture.competitionId,
+    fixture.competition?.id,
+    fixture.basketballStats?.league,
+    fixture.competition?.code,
+  ];
+  for (const cand of candidates) {
+    const canon = canonicalizeCompetitionId(cand);
+    if (canon) return canon;
+  }
+  return (fixture.competitionId || fixture.competition?.id || '').trim().toLowerCase();
+}
+
+export function normalizeSelectedCompetitionIds(
+  raw: string | string[] | null | undefined,
+  sport: SportFilter = 'all'
+): string[] {
+  if (!raw) return [];
+  const items = Array.isArray(raw) ? raw : String(raw).split(',');
+  const result: string[] = [];
+  const seen = new Set<string>();
+
+  for (const item of items) {
+    const trimmed = String(item || '').trim().toLowerCase();
+    if (!trimmed || trimmed === 'all') continue;
+    const canonId = canonicalizeCompetitionId(trimmed);
+    if (!canonId) continue;
+    const meta = CANONICAL_COMPETITIONS_CATALOG[canonId];
+    if (!meta) continue;
+    const compSport: Sport = meta.sport || (isBasketballCompetitionId(canonId) ? 'basketball' : 'football');
+    if (sport === 'football' && compSport !== 'football') continue;
+    if (sport === 'basketball' && compSport !== 'basketball') continue;
+    if (!seen.has(canonId)) {
+      seen.add(canonId);
+      result.push(canonId);
+    }
+  }
+
+  return result;
+}
+

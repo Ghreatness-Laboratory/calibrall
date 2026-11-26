@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -26,8 +26,32 @@ export default function Navbar() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [isMonochrome, setIsMonochrome] = useState<boolean>(false);
   const [utcTime, setUtcTime] = useState<string>('');
+  const headerRef = useRef<HTMLElement>(null);
 
   const isFixtureDetail = /^\/matches\/[^/]+$/.test(pathname);
+
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof window === 'undefined') return;
+
+    const updateOffset = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.height > 0) {
+        document.documentElement.style.setProperty('--app-header-offset', `${Math.ceil(rect.height)}px`);
+      } else {
+        document.documentElement.style.removeProperty('--app-header-offset');
+      }
+    };
+
+    updateOffset();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateOffset) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', updateOffset);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', updateOffset);
+    };
+  }, [isFixtureDetail, isAuthenticated]);
 
   useEffect(() => {
     try {
@@ -90,13 +114,14 @@ export default function Navbar() {
 
   return (
     <header
+      ref={headerRef}
       className={`${
         isFixtureDetail ? 'hidden md:block' : 'block'
       } fixed top-0 left-0 right-0 z-40 bg-[var(--bg)]/95 backdrop-blur-xl border-b border-[var(--line)]`}
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
       <div className="max-w-[430px] md:max-w-4xl lg:max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between h-[52px] gap-2">
+        <div className="flex items-center justify-between min-h-[54px] py-1 gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <Link
               href={isAuthenticated ? '/fixtures' : '/'}
@@ -203,7 +228,11 @@ export default function Navbar() {
                         </span>
                       </div>
                       <div className="mt-1.5 text-[10.5px] text-[var(--text-3)]">
-                        {isBasketball ? 'Basketball totals engine' : 'Football probability engine'}
+                        {isBasketball
+                          ? 'Basketball totals engine'
+                          : sport === 'all'
+                          ? 'Multi sport probability engine'
+                          : 'Football probability engine'}
                       </div>
                     </div>
                     <div className="py-1">

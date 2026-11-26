@@ -24,14 +24,14 @@ export default function SavedMatchesPage() {
   }, []);
 
   const savedBasketballFixtures = useMemo(() => {
-    if (sport !== 'basketball') return [];
-    return fixtures.filter((f) => savedIds.includes(f.id));
+    if (sport !== 'basketball' && sport !== 'all') return [];
+    return fixtures.filter((f) => f.sport === 'basketball' && savedIds.includes(f.id));
   }, [fixtures, savedIds, sport]);
 
   const savedFixtures = useMemo(() => {
     if (sport === 'basketball') return [];
     const raw = fixtures
-      .filter((f) => savedIds.includes(f.id))
+      .filter((f) => f.sport !== 'basketball' && savedIds.includes(f.id))
       .map((fixture) => {
         const stats = getFixtureStatistics(fixture);
         const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
@@ -88,26 +88,25 @@ export default function SavedMatchesPage() {
       )}
 
       {isLoaded &&
-      (sport === 'basketball' ? savedBasketballFixtures.length > 0 : savedFixtures.length > 0) ? (
+      (savedBasketballFixtures.length > 0 || savedFixtures.length > 0) ? (
         <div className="space-y-3">
-          {sport === 'basketball'
-            ? savedBasketballFixtures.map((fixture) => (
-                <NBAGameCard
-                  key={fixture.id}
-                  fixture={fixture}
-                  evaluation={evaluations?.[fixture.id]}
-                  isSavedInitial={true}
-                />
-              ))
-            : savedFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
-                <FixtureCard
-                  key={fixture.id}
-                  fixture={fixture}
-                  topPrediction={topPick}
-                  noRecommendationReason={noRecommendationReason}
-                  isSavedInitial={true}
-                />
-              ))}
+          {savedBasketballFixtures.map((fixture) => (
+            <NBAGameCard
+              key={fixture.id}
+              fixture={fixture}
+              evaluation={evaluations?.[fixture.id]}
+              isSavedInitial={true}
+            />
+          ))}
+          {savedFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
+            <FixtureCard
+              key={fixture.id}
+              fixture={fixture}
+              topPrediction={topPick}
+              noRecommendationReason={noRecommendationReason}
+              isSavedInitial={true}
+            />
+          ))}
         </div>
       ) : isLoaded && savedIds.length > 0 && !liveDataAvailable ? (
         <div className="p-8 text-center bg-[var(--surface)] border border-[var(--line)] rounded-[18px] space-y-2.5">

@@ -746,38 +746,104 @@ export async function getBasketballFixtureByIdFromDb(gameId: string): Promise<{
   };
 }
 
-export async function getBasketballCompetitionsSummary(day?: string) {
+export async function getBasketballCompetitionsSummary(
+  day?: string,
+  options?: { includeEmpty?: boolean }
+) {
   const slate = await buildEvaluatedBasketballSlate(false);
-  const list = (['NBA', 'NCAAB', 'EUROLEAGUE'] as BasketballLeague[])
+  const { getCanonicalCompetition, loadCanonicalCompetitionCatalog } = await import('@/lib/data/canonicalCompetitions');
+  const canonicalCatalog = await loadCanonicalCompetitionCatalog('basketball');
+  const unmappedFixtures: Array<{
+    id: string;
+    providerId: string | null;
+    homeTeamName: string;
+    awayTeamName: string;
+    rawCompetitionId: string | null;
+    rawCompetitionCode: string | null;
+    source: string;
+    kickoffTime: string | null;
+    reason: string;
+  }> = [];
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const now = new Date();
+      const startDt = new Date(now.getTime() - 10 * 86_400_000).toISOString().slice(0, 10);
+      const endDt = new Date(now.getTime() + 14 * 86_400_000).toISOString().slice(0, 10);
+      const { data: rawBb } = await fetchAllRows<any>((from, to) =>
+        supabase
+          .from('bb_games')
+          .select('id, league, game_date, kickoff_utc, home_id, away_id, source')
+          .gte('game_date', startDt)
+          .lte('game_date', endDt)
+          .order('id', { ascending: true })
+          .range(from, to)
+      );
+      for (const r of rawBb || []) {
+        const rawLeague = String(r.league || '').trim();
+        const mapped = getCanonicalCompetition(rawLeague);
+        if (!mapped || (mapped.sport || 'football') !== 'basketball') {
+          unmappedFixtures.push({
+            id: String(r.id || 'unknown'),
+            providerId: r.id ? String(r.id) : null,
+            homeTeamName: String(r.home_id || 'Unknown Home'),
+            awayTeamName: String(r.away_id || 'Unknown Away'),
+            rawCompetitionId: null,
+            rawCompetitionCode: rawLeague || null,
+            source: String(r.source || 'db:bb_games'),
+            kickoffTime: r.kickoff_utc ? String(r.kickoff_utc) : r.game_date ? `${String(r.game_date).slice(0, 10)}T19:00:00Z` : null,
+            reason: rawLeague ? `Unmapped basketball league "${rawLeague}"` : 'Missing basketball league',
+          });
+        }
+      }
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  const allList = (['NBA', 'NCAAB', 'EUROLEAGUE'] as BasketballLeague[])
     .map((league) => {
-      const comp = BASKETBALL_COMPETITIONS[league];
+      const baseComp = BASKETBALL_COMPETITIONS[league];
+      const canonical = canonicalCatalog.get(baseComp.id) || baseComp;
       const windowFixtures = slate.fixtures.filter((f) => {
         if ((f.basketballStats?.league || f.competition.code) !== league) return false;
-        if (day && day !== 'ALL') return matchesDayFilter(f.kickoffTime, day);
+        if (day && day.trim().toUpperCase() !== 'ALL') return matchesDayFilter(f.kickoffTime, day);
         return true;
       });
       return {
-        ...comp,
+        ...canonical,
         sport: 'basketball' as const,
-        aliases: comp.aliases || [],
-        sortOrder: comp.sortOrder ?? 100,
-        name: cleanDisplayText(comp.name),
+        aliases: Array.from(new Set([...(baseComp.aliases || []), ...(canonical.aliases || [])])),
+        sortOrder: canonical.sortOrder ?? baseComp.sortOrder ?? 100,
+        name: cleanDisplayText(canonical.name),
         fixtureCount: windowFixtures.length,
         storedMatchCount: slate.leagueCounts[league]?.totalStored || windowFixtures.length,
         hasFreeFixturesSource: true,
-        freeFixturesProvider: comp.freeFixturesProvider || 'Free Public API',
+        freeFixturesProvider: baseComp.freeFixturesProvider || 'Free Public API',
       };
     })
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
+  const totalFixtures = allList.reduce((s, c) => s + c.fixtureCount, 0);
+  const includeEmpty = options?.includeEmpty !== false;
+  const list = includeEmpty ? allList : allList.filter((c) => c.fixtureCount > 0);
+
+  const byCountry = new Map<string, typeof list>();
+  for (const c of list) {
+    const arr = byCountry.get(c.country) || [];
+    arr.push(c);
+    byCountry.set(c.country, arr);
+  }
+  const groupedByCountry = Array.from(byCountry.entries()).map(([country, competitions]) => ({
+    country,
+    competitions,
+  }));
+
   return {
     competitions: list,
-    groupedByCountry: [
-      { country: 'USA', competitions: list.filter((c) => c.country === 'USA') },
-      { country: 'Europe', competitions: list.filter((c) => c.country === 'Europe') },
-    ].filter((g) => g.competitions.length > 0),
+    groupedByCountry,
     total: list.length,
-    totalFixtures: list.reduce((s, c) => s + c.fixtureCount, 0),
-    unmappedFixtures: [] as Array<never>,
+    totalFixtures,
+    unmappedFixtures,
   };
 }

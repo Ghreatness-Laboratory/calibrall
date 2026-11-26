@@ -58,7 +58,7 @@ export type DayFilterType = 'ALL' | 'today' | 'tomorrow' | 'weekend';
  * Checks if a fixture kickoffTime matches the selected day filter in UTC.
  */
 export function matchesDayFilter(kickoffTime: string, day: DayFilterType | string): boolean {
-  if (!day || day === 'ALL') return true;
+  if (!day || day.trim().toUpperCase() === 'ALL') return true;
 
   const now = new Date();
   const todayYmd = now.toISOString().slice(0, 10);

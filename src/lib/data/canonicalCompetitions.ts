@@ -421,7 +421,7 @@ export async function getCompetitionsFromDatabase(
           if (sport === 'football' && compSport !== 'football') continue;
           if (sport === 'basketball' && compSport !== 'basketball') continue;
 
-          if (options?.day && options.day !== 'ALL') {
+          if (options?.day && options.day.trim().toUpperCase() !== 'ALL') {
             if (!matchesDayFilter(row.kickoff_time, options.day)) {
               continue;
             }

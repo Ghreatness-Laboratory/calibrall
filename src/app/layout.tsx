@@ -113,8 +113,13 @@ export default async function RootLayout({
           <InstallPromptProvider>
             <SportProvider>
               <Navbar />
-              <OfflineBanner />
-              <main className="flex-1 max-w-[430px] md:max-w-4xl lg:max-w-7xl w-full mx-auto px-4 pt-[calc(53px+env(safe-area-inset-top,0px)+14px)] pb-[calc(78px+env(safe-area-inset-bottom,0px))] md:pb-8 min-w-0">
+              <main
+                className="flex-1 max-w-[430px] md:max-w-4xl lg:max-w-7xl w-full mx-auto px-4 pb-[calc(78px+env(safe-area-inset-bottom,0px))] md:pb-8 min-w-0"
+                style={{
+                  paddingTop: 'calc(var(--app-header-offset, calc(56px + env(safe-area-inset-top, 0px))) + 16px)',
+                }}
+              >
+                <OfflineBanner />
                 <TopSportBar />
                 {children}
               </main>

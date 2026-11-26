@@ -9,73 +9,126 @@ import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import NBAScoreProjectionTool from '@/components/nba/NBAScoreProjectionTool';
 import CompetitionFilter from '@/components/CompetitionFilter';
-import { CountryCompetitionGroup } from '@/lib/data/canonicalCompetitions';
+import {
+  CountryCompetitionGroup,
+  buildCompetitionGroupsFromFixtures,
+  fixtureMatchesSearchQuery,
+  getFixtureCanonicalCompetitionId,
+  normalizeSelectedCompetitionIds,
+} from '@/lib/data/competitionSearch';
 import { matchesDayFilter } from '@/lib/utils/dateWindow';
-import { Search, Zap, TrendingUp, AlertCircle, Calendar } from 'lucide-react';
-import type { BasketballLeague } from '@/lib/basketball/markets';
+import { Search, Zap, TrendingUp, AlertCircle, Calendar, X } from 'lucide-react';
 
 export default function DashboardPage() {
   const { sport, isSwitching } = useSport();
   const isBasketball = sport === 'basketball';
+  const isMultiSport = sport === 'all';
 
-  const [selectedCompId, setSelectedCompId] = useState<string>('ALL');
-  const [selectedBbLeague, setSelectedBbLeague] = useState<'ALL' | BasketballLeague>('ALL');
+  const [selectedCompIds, setSelectedCompIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'completed'>('upcoming');
-  const [compGroups, setCompGroups] = useState<CountryCompetitionGroup[]>([]);
-  const [totalCompFixtures, setTotalCompFixtures] = useState<number>(0);
+  const [apiCompGroups, setApiCompGroups] = useState<CountryCompetitionGroup[] | null>(null);
+  const [apiTotalCompFixtures, setApiTotalCompFixtures] = useState<number | null>(null);
 
   useEffect(() => {
-    if (isBasketball) return;
-    fetch('/api/v1/competitions?sport=football', { cache: 'no-store' })
-      .then((res) => res.json())
+    setSelectedCompIds((prev) => normalizeSelectedCompetitionIds(prev, sport));
+  }, [sport]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setDebouncedSearchQuery('');
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const dayParam = activeTab === 'today' ? 'today' : 'ALL';
+    fetch(`/api/v1/competitions?sport=${encodeURIComponent(sport)}&day=${dayParam}&include_empty=true`, {
+      cache: 'no-store',
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((json) => {
-        if (json.groupedByCountry && Array.isArray(json.groupedByCountry)) {
-          setCompGroups(json.groupedByCountry);
+        if (Array.isArray(json.groupedByCountry)) {
+          setApiCompGroups(json.groupedByCountry);
         }
         if (typeof json.totalFixtures === 'number') {
-          setTotalCompFixtures(json.totalFixtures);
+          setApiTotalCompFixtures(json.totalFixtures);
         }
       })
-      .catch((err) => console.error('[DashboardPage] Error fetching active competitions:', err));
-  }, [isBasketball]);
+      .catch((err) => {
+        console.error('[DashboardPage] Error fetching active competitions:', err);
+        setApiCompGroups(null);
+        setApiTotalCompFixtures(null);
+      });
+  }, [sport, activeTab]);
 
   const { fixtures, lastUpdated, error, isOffline, isSavedCopy, evaluations } = useLiveFixtures(
-    isBasketball ? selectedBbLeague : selectedCompId,
+    selectedCompIds.length > 0 ? selectedCompIds : 'ALL',
     'ALL',
     sport,
     activeTab === 'today' ? 'today' : 'ALL'
   );
 
+  const { compGroups, totalCompFixtures } = useMemo(() => {
+    const dayParam = activeTab === 'today' ? 'today' : 'ALL';
+    if (Array.isArray(apiCompGroups) && apiCompGroups.length > 0 && ((apiTotalCompFixtures ?? 0) > 0 || fixtures.length === 0 || selectedCompIds.length > 0)) {
+      return { compGroups: apiCompGroups, totalCompFixtures: apiTotalCompFixtures ?? 0 };
+    }
+    const derived = buildCompetitionGroupsFromFixtures({
+      fixtures,
+      sport,
+      day: dayParam,
+      hideZeroFixtures: false,
+    });
+    return {
+      compGroups: derived.groupedByCountry,
+      totalCompFixtures: derived.totalFixtures,
+    };
+  }, [apiCompGroups, apiTotalCompFixtures, fixtures, sport, activeTab, selectedCompIds.length]);
+
+  const selectedCompSet = useMemo(() => new Set(selectedCompIds), [selectedCompIds]);
+
   const evaluatedFixtures = useMemo(() => {
     if (isBasketball) return [];
-    const raw = fixtures.map((fixture) => {
-      const stats = getFixtureStatistics(fixture);
-      const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
+    const raw = fixtures
+      .filter((f) => f.sport !== 'basketball')
+      .map((fixture) => {
+        const stats = getFixtureStatistics(fixture);
+        const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
 
-      return {
-        fixtureId: fixture.id,
-        fixture,
-        predictions: evalResult.predictions,
-        topPick: evalResult.topPick,
-        noRecommendationReason: evalResult.noRecommendationReason || stats.noRecommendationReason,
-      };
-    });
+        return {
+          fixtureId: fixture.id,
+          fixture,
+          predictions: evalResult.predictions,
+          topPick: evalResult.topPick,
+          noRecommendationReason: evalResult.noRecommendationReason || stats.noRecommendationReason,
+        };
+      });
     return selectDiversifiedSlatePicks(raw, 0.4);
   }, [fixtures, isBasketball]);
 
+  const footballEvalById = useMemo(() => {
+    const map = new Map<string, (typeof evaluatedFixtures)[number]>();
+    for (const item of evaluatedFixtures) {
+      map.set(item.fixtureId, item);
+    }
+    return map;
+  }, [evaluatedFixtures]);
+
   const filteredList = useMemo(() => {
-    if (isBasketball) return [];
+    if (isBasketball || isMultiSport) return [];
     const subset = evaluatedFixtures.filter(({ fixture }) => {
-      if (selectedCompId !== 'ALL' && (fixture.competitionId || fixture.competition.id) !== selectedCompId) {
+      if (selectedCompSet.size > 0 && !selectedCompSet.has(getFixtureCanonicalCompetitionId(fixture))) {
         return false;
       }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesHome = fixture.homeTeam.name.toLowerCase().includes(q);
-        const matchesAway = fixture.awayTeam.name.toLowerCase().includes(q);
-        const matchesComp = fixture.competition.name.toLowerCase().includes(q);
-        if (!matchesHome && !matchesAway && !matchesComp) return false;
+      if (debouncedSearchQuery.trim() && !fixtureMatchesSearchQuery(fixture, debouncedSearchQuery)) {
+        return false;
       }
       if (activeTab === 'completed') {
         return fixture.status === 'FINISHED';
@@ -85,21 +138,16 @@ export default function DashboardPage() {
       return fixture.status !== 'FINISHED';
     });
     return selectDiversifiedSlatePicks(subset, 0.4);
-  }, [evaluatedFixtures, selectedCompId, searchQuery, activeTab, isBasketball]);
+  }, [evaluatedFixtures, selectedCompSet, debouncedSearchQuery, activeTab, isBasketball, isMultiSport]);
 
   const filteredBasketball = useMemo(() => {
     if (!isBasketball) return [];
     return fixtures.filter((fixture) => {
-      const gameLeague = fixture.basketballStats?.league || fixture.competition?.code;
-      if (selectedBbLeague !== 'ALL' && gameLeague !== selectedBbLeague) {
+      if (selectedCompSet.size > 0 && !selectedCompSet.has(getFixtureCanonicalCompetitionId(fixture))) {
         return false;
       }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesHome = fixture.homeTeam.name.toLowerCase().includes(q);
-        const matchesAway = fixture.awayTeam.name.toLowerCase().includes(q);
-        const matchesLeague = (gameLeague || '').toLowerCase().includes(q);
-        if (!matchesHome && !matchesAway && !matchesLeague) return false;
+      if (debouncedSearchQuery.trim() && !fixtureMatchesSearchQuery(fixture, debouncedSearchQuery)) {
+        return false;
       }
       if (activeTab === 'completed') {
         return fixture.status === 'FINISHED';
@@ -108,7 +156,25 @@ export default function DashboardPage() {
       }
       return fixture.status !== 'FINISHED';
     });
-  }, [fixtures, selectedBbLeague, searchQuery, activeTab, isBasketball]);
+  }, [fixtures, selectedCompSet, debouncedSearchQuery, activeTab, isBasketball]);
+
+  const filteredAllSports = useMemo(() => {
+    if (!isMultiSport) return [];
+    return fixtures.filter((fixture) => {
+      if (selectedCompSet.size > 0 && !selectedCompSet.has(getFixtureCanonicalCompetitionId(fixture))) {
+        return false;
+      }
+      if (debouncedSearchQuery.trim() && !fixtureMatchesSearchQuery(fixture, debouncedSearchQuery)) {
+        return false;
+      }
+      if (activeTab === 'completed') {
+        return fixture.status === 'FINISHED';
+      } else if (activeTab === 'today') {
+        return fixture.status !== 'FINISHED' && matchesDayFilter(fixture.kickoffTime, 'today');
+      }
+      return fixture.status !== 'FINISHED';
+    });
+  }, [fixtures, selectedCompSet, debouncedSearchQuery, activeTab, isMultiSport]);
 
   if (isSwitching) {
     return (
@@ -146,11 +212,24 @@ export default function DashboardPage() {
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-3)]" strokeWidth={2} />
           <input
             type="text"
-            placeholder={isBasketball ? 'Search NBA, NCAAB or EuroLeague...' : 'Search club or league...'}
+            placeholder={isBasketball ? 'Search basketball team or league' : 'Search club or league'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full sm:w-64 min-h-[44px] bg-[var(--surface)] border border-[var(--line)] pl-10 pr-3.5 rounded-[12px] text-[13px] text-[var(--text)] placeholder-[var(--text-3)] focus:outline-none focus:border-[var(--accent)]"
+            className="w-full sm:w-64 min-h-[44px] bg-[var(--surface)] border border-[var(--line)] pl-10 pr-10 rounded-[12px] text-[13px] text-[var(--text)] placeholder-[var(--text-3)] focus:outline-none focus:border-[var(--accent)]"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setDebouncedSearchQuery('');
+              }}
+              className="absolute inset-y-0 right-0 min-w-[44px] flex items-center justify-center text-[var(--text-2)] hover:text-[var(--text)]"
+              aria-label="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -241,47 +320,48 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {isBasketball ? (
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
-            {(
-              [
-                { id: 'ALL', label: 'All' },
-                { id: 'NBA', label: 'NBA' },
-                { id: 'NCAAB', label: 'NCAAB' },
-                { id: 'EUROLEAGUE', label: 'EuroLeague' },
-              ] as const
-            ).map((chip) => {
-              const active = selectedBbLeague === chip.id;
+        <div className="w-full sm:w-72">
+          <CompetitionFilter
+            selectedCompetitionIds={selectedCompIds}
+            onApplyCompetitionIds={setSelectedCompIds}
+            groups={compGroups}
+            totalFixturesCount={totalCompFixtures}
+            showSportBadge={isMultiSport}
+          />
+        </div>
+      </div>
+
+      {/* Matchup Grid */}
+      {isMultiSport ? (
+        filteredAllSports.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredAllSports.map((f) => {
+              if (f.sport === 'basketball') {
+                return <NBAGameCard key={f.id} fixture={f} evaluation={evaluations?.[f.id]} />;
+              }
+              const ev = footballEvalById.get(f.id);
               return (
-                <button
-                  key={chip.id}
-                  type="button"
-                  onClick={() => setSelectedBbLeague(chip.id)}
-                  className={`min-h-[44px] px-4 rounded-full text-[12px] font-medium whitespace-nowrap transition-colors touch-press shrink-0 border ${
-                    active
-                      ? 'bg-[var(--accent-soft)] border-[var(--accent)] text-[var(--accent)] font-semibold'
-                      : 'bg-[var(--surface)] border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text)]'
-                  }`}
-                >
-                  {chip.label}
-                </button>
+                <FixtureCard
+                  key={f.id}
+                  fixture={f}
+                  topPrediction={ev?.topPick}
+                  noRecommendationReason={ev?.noRecommendationReason}
+                />
               );
             })}
           </div>
         ) : (
-          <div className="w-full sm:w-72">
-            <CompetitionFilter
-              selectedCompetitionId={selectedCompId}
-              onSelectCompetitionId={setSelectedCompId}
-              groups={compGroups}
-              totalFixturesCount={totalCompFixtures || fixtures.length}
-            />
+          <div className="p-8 text-center bg-[var(--surface)] border border-dashed border-[var(--border-strong)] rounded-[18px] space-y-2.5">
+            <div className="w-10 h-10 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] flex items-center justify-center mx-auto text-[var(--text-3)]">
+              <Calendar className="w-4 h-4" strokeWidth={1.75} />
+            </div>
+            <h3 className="font-display text-[var(--text)] font-semibold text-[14px]">No games scheduled</h3>
+            <p className="text-[12px] text-[var(--text-2)] max-w-sm mx-auto">
+              No fixtures matching your active competition or search filters.
+            </p>
           </div>
-        )}
-      </div>
-
-      {/* Matchup Grid */}
-      {isBasketball ? (
+        )
+      ) : isBasketball ? (
         filteredBasketball.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredBasketball.map((f) => (

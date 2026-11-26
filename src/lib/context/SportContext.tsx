@@ -2,11 +2,11 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { Sport } from '@/types';
+import { SportFilter } from '@/types';
 
 interface SportContextType {
-  sport: Sport;
-  setSport: (newSport: Sport) => void;
+  sport: SportFilter;
+  setSport: (newSport: SportFilter) => void;
   isSwitching: boolean;
 }
 
@@ -18,23 +18,30 @@ const SportContext = createContext<SportContextType>({
 
 const STORAGE_KEY = 'matchmind_selected_sport';
 
+function parseSportValue(val: string | null | undefined): SportFilter | null {
+  const clean = (val || '').trim().toLowerCase();
+  if (clean === 'football' || clean === 'basketball' || clean === 'all') {
+    return clean;
+  }
+  return null;
+}
+
 function SportContextProviderInner({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  const [sport, setSportState] = useState<Sport>('football');
+  const [sport, setSportState] = useState<SportFilter>('football');
   const [isSwitching, setIsSwitching] = useState<boolean>(false);
-  const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   // Initialize sport from URL or localStorage
   useEffect(() => {
-    let initialSport: Sport = 'football';
+    let initialSport: SportFilter = 'football';
 
     // 1. Check URL query param
-    const param = searchParams.get('sport')?.toLowerCase();
-    if (param === 'basketball' || param === 'football') {
-      initialSport = param as Sport;
+    const paramSport = parseSportValue(searchParams.get('sport'));
+    if (paramSport) {
+      initialSport = paramSport;
       try {
         localStorage.setItem(STORAGE_KEY, initialSport);
       } catch {
@@ -43,9 +50,9 @@ function SportContextProviderInner({ children }: { children: React.ReactNode }) 
     } else {
       // 2. Check localStorage
       try {
-        const stored = localStorage.getItem(STORAGE_KEY)?.toLowerCase();
-        if (stored === 'basketball' || stored === 'football') {
-          initialSport = stored as Sport;
+        const storedSport = parseSportValue(localStorage.getItem(STORAGE_KEY));
+        if (storedSport) {
+          initialSport = storedSport;
         }
       } catch {
         // Safe fallback
@@ -53,10 +60,9 @@ function SportContextProviderInner({ children }: { children: React.ReactNode }) 
     }
 
     setSportState(initialSport);
-    setIsInitialized(true);
   }, [searchParams]);
 
-  const setSport = useCallback((newSport: Sport) => {
+  const setSport = useCallback((newSport: SportFilter) => {
     if (newSport === sport) return;
 
     setIsSwitching(true);

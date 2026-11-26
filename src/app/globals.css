@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  --app-header-offset: calc(56px + env(safe-area-inset-top, 0px));
   --bg: #0A0E0D;
   --surface: #101614;
   --surface-1: #101614;
@@ -84,6 +85,7 @@
 html {
   background-color: var(--bg);
   scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--app-header-offset, calc(56px + env(safe-area-inset-top, 0px))) + 16px);
 }
 
 /* GLOBAL TEXT RULE: Disable automatic browser hyphenation everywhere */

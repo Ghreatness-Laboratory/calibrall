@@ -642,10 +642,17 @@ export async function getFixturesFromDatabase(options?: {
         .order('id', { ascending: true })
         .range(from, to);
 
-      if (filterCompIds && filterCompIds.length === 1) {
-        query = query.eq('competition_id', filterCompIds[0]);
-      } else if (filterCompIds && filterCompIds.length > 1) {
-        query = query.in('competition_id', filterCompIds);
+      if (filterCompIds && filterCompIds.length > 0) {
+        const dbFilterTokens = new Set<string>(filterCompIds);
+        if (dbFilterTokens.has('comp_eng_national_league')) {
+          dbFilterTokens.add('comp_ec');
+        }
+        const tokenList = Array.from(dbFilterTokens);
+        if (tokenList.length === 1) {
+          query = query.eq('competition_id', tokenList[0]);
+        } else {
+          query = query.in('competition_id', tokenList);
+        }
       }
 
       if (options?.status && options.status !== 'ALL') {
