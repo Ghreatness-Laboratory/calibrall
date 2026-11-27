@@ -8,6 +8,32 @@ export const PLAN_PERIOD_DAYS = 30;
 export const MS_PER_DAY = 86_400_000;
 export const FREE_DAILY_SUMMARY_LIMIT = 3;
 
+export type SlipBuildStyle = 'safest' | 'balanced';
+
+export interface SlipBuilderTierPolicy {
+  tier: AccountTierId;
+  isAdmin: boolean;
+  dailyBuildLimit: number | null; // null = unlimited
+  minTargetOdds: number;
+  maxTargetOdds: number;
+  minLegs: number;
+  maxLegs: number;
+  allowedStyles: SlipBuildStyle[];
+  balancedStyleAllowed: boolean;
+  bestPriceComparison: boolean;
+}
+
+export const SLIP_BUILDER_GLOBAL_BOUNDS = {
+  minTargetOdds: 1.5,
+  maxTargetOdds: 10.0,
+  minLegs: 2,
+  maxLegs: 6,
+  defaultMaxLegs: 4,
+  targetToleranceRatio: 0.08,
+  maxSameLeagueLegs: 2,
+  maxPriceAgeMinutes: 180,
+} as const;
+
 export interface TierRuleConfig {
   id: AccountTierId;
   name: string;
@@ -24,6 +50,10 @@ export interface TierRuleConfig {
   allMarketsAccess: boolean;
   scorelineMatrixAccess: boolean;
   apiWorkflowAccess: boolean;
+  slipBuilderDailyLimit: number | null; // null = unlimited
+  slipBuilderMaxTargetOdds: number;
+  slipBuilderAllowedStyles: SlipBuildStyle[];
+  slipBuilderBestPriceComparison: boolean;
   summary: string;
   features: string[];
   limitations: string[];
@@ -53,16 +83,22 @@ export const TIER_RULES: Record<AccountTierId, TierRuleConfig> = {
     allMarketsAccess: true,
     scorelineMatrixAccess: false,
     apiWorkflowAccess: false,
+    slipBuilderDailyLimit: 1,
+    slipBuilderMaxTargetOdds: 3.0,
+    slipBuilderAllowedStyles: ['safest'],
+    slipBuilderBestPriceComparison: false,
     summary:
-      `Active for ${TRIAL_DAYS} days after email confirmation: fixtures, calibrated probabilities, public track record, and 3 match summaries per day.`,
+      `Active for ${TRIAL_DAYS} days after email confirmation: fixtures, calibrated probabilities, public track record, 3 match summaries per day, and 1 slip build per day up to 3.0 odds.`,
     features: [
       `${TRIAL_DAYS}-day trial access upon email confirmation`,
       'Daily fixture probabilities & Record ledger',
       '3 full match summary lines per day',
+      '1 Slip Builder run per day (Safest style, up to 3.0 odds)',
       'Football & basketball coverage',
     ],
     limitations: [
       'Requires Pro or Premium after 7 days',
+      'Slip Builder capped at 1 build/day, 3.0 target odds, and Safest style',
       'Full written explanation locked behind paid plan',
       'Model drivers & 2 alternate picks hidden',
       'Poisson scoreline matrix restricted',
@@ -84,15 +120,22 @@ export const TIER_RULES: Record<AccountTierId, TierRuleConfig> = {
     allMarketsAccess: true,
     scorelineMatrixAccess: true,
     apiWorkflowAccess: false,
+    slipBuilderDailyLimit: 5,
+    slipBuilderMaxTargetOdds: 10.0,
+    slipBuilderAllowedStyles: ['safest'],
+    slipBuilderBestPriceComparison: false,
     summary:
-      'Unlimited match explanations, multi market comparisons, corners, and disciplinary factors.',
+      'Unlimited match explanations, multi market comparisons, corners, disciplinary factors, and 5 Slip Builder runs per day.',
     features: [
       'Unlimited daily match explanations',
+      '5 Slip Builder runs per day (Safest style, targets up to 10.0)',
       'All football & basketball markets',
       'Model drivers & 2 alternate picks delivered by API',
       'Referee & situational context factors',
     ],
-    limitations: ['Priority research & calibration export workflows reserved for Premium'],
+    limitations: [
+      'Balanced slip style, unlimited slip builds & bookmaker best price comparison reserved for Premium',
+    ],
   },
   premium: {
     id: 'premium',
@@ -110,13 +153,18 @@ export const TIER_RULES: Record<AccountTierId, TierRuleConfig> = {
     allMarketsAccess: true,
     scorelineMatrixAccess: true,
     apiWorkflowAccess: true,
+    slipBuilderDailyLimit: null,
+    slipBuilderMaxTargetOdds: 10.0,
+    slipBuilderAllowedStyles: ['safest', 'balanced'],
+    slipBuilderBestPriceComparison: true,
     summary:
-      'Complete access to every statistical breakdown, calibration curve, and API workflow.',
+      'Complete access to every statistical breakdown, calibration curve, unlimited Slip Builder with Balanced style & bookmaker price comparison, and API workflow.',
     features: [
       'Everything in Pro access',
+      'Unlimited Slip Builder runs (Safest & Balanced styles, targets up to 10.0)',
+      'Best price comparison across stored bookmakers',
       'Full Poisson matrix & alternates',
       'Priority calibration audit access',
-      'Full league & market research coverage',
     ],
     limitations: [],
   },
@@ -129,9 +177,43 @@ export const ADMIN_OVERRIDE_RULE = {
   allSportsAccess: true,
   allMarketsAccess: true,
   allLeaguesAccess: true,
+  slipBuilderDailyLimit: null as number | null,
+  slipBuilderMaxTargetOdds: 10.0,
+  slipBuilderAllowedStyles: ['safest', 'balanced'] as SlipBuildStyle[],
+  slipBuilderBestPriceComparison: true,
   description:
     'Admin accounts permanently receive Premium access across every page, market, league, and sport with no expiry.',
 };
+
+export function getSlipBuilderTierPolicy(
+  tier: AccountTierId | string | undefined,
+  isAdmin: boolean = false
+): SlipBuilderTierPolicy {
+  const effectiveTier: AccountTierId = isAdmin
+    ? ADMIN_OVERRIDE_RULE.effectiveTier
+    : tier === 'premium' || tier === 'pro'
+    ? tier
+    : 'free';
+  const cfg = TIER_RULES[effectiveTier];
+  const allowedStyles = isAdmin
+    ? [...ADMIN_OVERRIDE_RULE.slipBuilderAllowedStyles]
+    : [...cfg.slipBuilderAllowedStyles];
+
+  return {
+    tier: effectiveTier,
+    isAdmin,
+    dailyBuildLimit: isAdmin ? ADMIN_OVERRIDE_RULE.slipBuilderDailyLimit : cfg.slipBuilderDailyLimit,
+    minTargetOdds: SLIP_BUILDER_GLOBAL_BOUNDS.minTargetOdds,
+    maxTargetOdds: isAdmin ? ADMIN_OVERRIDE_RULE.slipBuilderMaxTargetOdds : cfg.slipBuilderMaxTargetOdds,
+    minLegs: SLIP_BUILDER_GLOBAL_BOUNDS.minLegs,
+    maxLegs: SLIP_BUILDER_GLOBAL_BOUNDS.maxLegs,
+    allowedStyles,
+    balancedStyleAllowed: allowedStyles.includes('balanced'),
+    bestPriceComparison: isAdmin
+      ? ADMIN_OVERRIDE_RULE.slipBuilderBestPriceComparison
+      : cfg.slipBuilderBestPriceComparison,
+  };
+}
 
 export function formatMonthlyPrice(tierId: AccountTierId): string {
   if (tierId === 'free') return TIER_RULES.free.billingLabel;

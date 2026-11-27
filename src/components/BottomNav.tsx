@@ -44,7 +44,8 @@ export default function BottomNav() {
   const isAnalysisActive =
     pathname.startsWith('/predictions') ||
     pathname.startsWith('/picks') ||
-    pathname.startsWith('/markets');
+    pathname.startsWith('/markets') ||
+    pathname.startsWith('/slips');
   const isRecordActive = pathname.startsWith('/performance') || pathname.startsWith('/record');
   const isSavedActive = pathname.startsWith('/saved');
   const isAccountActive =

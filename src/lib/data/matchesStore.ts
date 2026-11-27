@@ -2584,11 +2584,18 @@ class MatchesStore {
 
     for (const r of rows) {
       if (!r || !r.decimal_odds || r.decimal_odds <= 1.0) continue;
+      if (!merged.bookmakerName && r.bookmaker) merged.bookmakerName = r.bookmaker;
+      if (!merged.observedAt && r.observed_at) merged.observedAt = r.observed_at;
+
       if (r.market_code === '1X2_HOME' && !merged.homeWin) merged.homeWin = r.decimal_odds;
       else if (r.market_code === '1X2_DRAW' && !merged.draw) merged.draw = r.decimal_odds;
       else if (r.market_code === '1X2_AWAY' && !merged.awayWin) merged.awayWin = r.decimal_odds;
+      else if (r.market_code === 'TOTAL_GOALS_O15' && !merged.over15Goals) merged.over15Goals = r.decimal_odds;
+      else if (r.market_code === 'TOTAL_GOALS_U15' && !merged.under15Goals) merged.under15Goals = r.decimal_odds;
       else if (r.market_code === 'TOTAL_GOALS_O25' && !merged.over25Goals) merged.over25Goals = r.decimal_odds;
       else if (r.market_code === 'TOTAL_GOALS_U25' && !merged.under25Goals) merged.under25Goals = r.decimal_odds;
+      else if (r.market_code === 'TOTAL_GOALS_O35' && !merged.over35Goals) merged.over35Goals = r.decimal_odds;
+      else if (r.market_code === 'TOTAL_GOALS_U35' && !merged.under35Goals) merged.under35Goals = r.decimal_odds;
       else if (r.market_code === 'ASIAN_HANDICAP_HOME') {
         const line = parseAhLine(r.selection);
         if (line !== null) {
@@ -2617,6 +2624,128 @@ class MatchesStore {
     }
 
     return Object.keys(merged).length > 0 ? merged : existing;
+  }
+
+  /**
+   * Batch-reads all stored bookmaker quotes for a set of match IDs (live_pre_kickoff & csv_pre_match).
+   * Strictly DB/in-memory read only (0 external API calls).
+   */
+  async getBookmakerQuotesForMatches(matchIds: string[]): Promise<Record<string, StoredOddsSnapshot[]>> {
+    const out: Record<string, StoredOddsSnapshot[]> = {};
+    const cleanIds = Array.from(new Set(matchIds.map((id) => String(id).trim()).filter(Boolean)));
+    if (cleanIds.length === 0) return out;
+
+    const addRow = (row: StoredOddsSnapshot) => {
+      if (!row || !row.match_id || !Number.isFinite(Number(row.decimal_odds)) || Number(row.decimal_odds) <= 1.01) {
+        return;
+      }
+      const list = out[row.match_id] || [];
+      list.push({
+        id: row.id,
+        match_id: String(row.match_id),
+        bookmaker: String(row.bookmaker || 'Bookmaker'),
+        market_code: String(row.market_code || ''),
+        selection: String(row.selection || ''),
+        decimal_odds: Number(row.decimal_odds),
+        observed_at: row.observed_at ? String(row.observed_at) : null,
+        snapshot_type: row.snapshot_type,
+        source: String(row.source || 'odds_snapshots'),
+      });
+      out[row.match_id] = list;
+    };
+
+    const isRemote = persistenceBackendInfo().isRemoteSupabase;
+    if (isSupabaseConfigured && supabase && isRemote) {
+      for (const batch of chunkArray(cleanIds, 200)) {
+        const { data, error } = await supabase
+          .from('odds_snapshots')
+          .select('*')
+          .in('match_id', batch)
+          .in('snapshot_type', ['live_pre_kickoff', 'csv_pre_match']);
+        if (!error && Array.isArray(data)) {
+          for (const r of data) addRow(r as StoredOddsSnapshot);
+        }
+      }
+      return out;
+    }
+
+    if (typeof window === 'undefined' && !isProductionRuntime()) {
+      try {
+        const db = getLocalDatabase();
+        if (db) {
+          for (const batch of chunkArray(cleanIds, 200)) {
+            const placeholders = batch.map(() => '?').join(', ');
+            const rows = db
+              .prepare(
+                `SELECT * FROM odds_snapshots WHERE match_id IN (${placeholders}) AND snapshot_type IN ('live_pre_kickoff', 'csv_pre_match') ORDER BY observed_at DESC, decimal_odds DESC`
+              )
+              .all(...batch) as StoredOddsSnapshot[];
+            for (const r of rows) addRow(r);
+          }
+          return out;
+        }
+      } catch (_) {}
+    }
+
+    const wanted = new Set(cleanIds);
+    for (const o of this.inMemoryOdds.values()) {
+      if (wanted.has(o.match_id) && (o.snapshot_type === 'live_pre_kickoff' || o.snapshot_type === 'csv_pre_match')) {
+        addRow(o);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Persists live pre-kickoff bookmaker snapshots into odds_snapshots + in-memory cache.
+   */
+  async upsertLiveOddsSnapshots(snapshots: StoredOddsSnapshot[]): Promise<number> {
+    if (!snapshots || snapshots.length === 0) return 0;
+
+    const deduped = new Map<string, StoredOddsSnapshot & { id: string }>();
+    for (const s of snapshots) {
+      if (!s.match_id || !s.bookmaker || !s.market_code || !Number.isFinite(s.decimal_odds) || s.decimal_odds <= 1.01) {
+        continue;
+      }
+      const uniqueKey = `${s.match_id}:${s.bookmaker}:${s.market_code}:${s.source}`;
+      const id =
+        s.id ||
+        `odds_${s.match_id}_${s.market_code}_${s.bookmaker.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_${s.source.replace(/[^a-z0-9]+/g, '_')}`;
+      const normalized: StoredOddsSnapshot & { id: string } = {
+        id,
+        match_id: s.match_id,
+        bookmaker: s.bookmaker,
+        market_code: s.market_code,
+        selection: s.selection,
+        decimal_odds: Math.round(Number(s.decimal_odds) * 1000) / 1000,
+        observed_at: s.observed_at || new Date().toISOString(),
+        snapshot_type: s.snapshot_type || 'live_pre_kickoff',
+        source: s.source || 'the-odds-api',
+      };
+      deduped.set(uniqueKey, normalized);
+      this.inMemoryOdds.set(uniqueKey, normalized);
+    }
+
+    const rows = Array.from(deduped.values());
+    if (rows.length === 0) return 0;
+    this.rebuildOddsIndex();
+
+    if (isSupabaseConfigured && supabase) {
+      let saved = 0;
+      for (const chunk of chunkArray(rows, 250)) {
+        const { error } = await supabase.from('odds_snapshots').upsert(chunk, {
+          onConflict: 'match_id,bookmaker,market_code,source',
+        });
+        if (!error) {
+          saved += chunk.length;
+        } else if (isProductionRuntime()) {
+          throw new Error(`[MatchesStore] Failed to upsert live odds snapshots: ${error.message}`);
+        }
+      }
+      return saved;
+    }
+
+    return rows.length;
   }
 
   /**

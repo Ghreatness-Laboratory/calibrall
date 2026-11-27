@@ -10,6 +10,7 @@ import type {
   BasketballForwardPickRow,
 } from '@/lib/basketball/settlementService';
 import PerformanceChart from '@/components/PerformanceChart';
+import SlipRecordSection from '@/components/slips/SlipRecordSection';
 import { useSport } from '@/lib/context/SportContext';
 import { ValidationAndBenchmarksEngine } from '@/lib/prediction/validationAndBenchmarks';
 import { PROVIDER_COVERAGE_AUDIT } from '@/lib/data/historicalDataset';
@@ -505,6 +506,8 @@ export default function PerformancePage() {
             </div>
           )}
         </div>
+
+        <SlipRecordSection />
 
         <DataStatusDiagnostics />
       </div>
@@ -1508,6 +1511,8 @@ export default function PerformancePage() {
           </div>
         )}
       </div>
+
+      <SlipRecordSection />
 
       <p className="text-center pt-2 pb-1 text-[11px] text-[var(--text-3)]">
         Statistical estimate notice: Past calibration across walk-forward validation windows does not guarantee future outcomes.

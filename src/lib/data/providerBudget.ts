@@ -187,7 +187,7 @@ export const PROVIDER_BUDGETS: Record<ProviderId, ProviderBudgetSpec> = {
     scheduleRefreshIntervalMinutes: 720,
     budgetedCallsPerDay: 16,
     beforeCallsPerDayEstimate: 'Uncapped blind polling of 10 leagues every 6h (up to 40/day) exhausting 500/month in <13 days',
-    notes: 'Runs at most twice daily, ordering leagues by upcoming pick count descending and fetching h2h odds (1 credit/league) ONLY for leagues with qualified picks (<=16 credits/day).',
+    notes: 'Runs at most twice daily, ordering leagues by upcoming pick count descending and fetching h2h + totals (2 credits/league) ONLY for biggest active leagues with qualified picks (<=16 credits/day).',
   },
   espn_soccer: {
     id: 'espn_soccer',

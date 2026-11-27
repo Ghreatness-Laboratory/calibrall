@@ -90,6 +90,77 @@ export function toggleStoredSavedFixture(fixtureId: string): boolean {
   }
 }
 
+export interface StoredSavedSlip {
+  slipId: string;
+  savedAt: string;
+  targetOdds: number;
+  style: string;
+  combinedOdds: number;
+  combinedProbability: number;
+  estimatedHitChancePct: number;
+  includesModelFairOdds: boolean;
+  honestNotice: string;
+  legs: Array<{
+    matchId: string;
+    sport: 'football' | 'basketball';
+    matchLabel: string;
+    competitionName: string;
+    kickoffTime: string;
+    marketName: string;
+    selection: string;
+    decimalOdds: number;
+    oddsSourceType: 'real_bookmaker' | 'model_fair';
+    bookmakerName: string;
+    priceAgeLabel: string;
+    calibratedProbability: number;
+    confidenceTier: 'HIGH' | 'MEDIUM';
+    oneLineWhy: string;
+  }>;
+}
+
+const SAVED_SLIPS_KEY = 'calibrall_saved_slips_v1';
+
+export function getStoredSavedSlips(): StoredSavedSlip[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(SAVED_SLIPS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveSlipToStorage(slip: StoredSavedSlip): StoredSavedSlip[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const existing = getStoredSavedSlips().filter((s) => s.slipId !== slip.slipId);
+    const updated = [slip, ...existing].slice(0, 30);
+    localStorage.setItem(SAVED_SLIPS_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return [];
+  }
+}
+
+export function removeSavedSlipFromStorage(slipId: string): StoredSavedSlip[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const updated = getStoredSavedSlips().filter((s) => s.slipId !== slipId);
+    localStorage.setItem(SAVED_SLIPS_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return [];
+  }
+}
+
+export function clearStoredSavedSlips(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SAVED_SLIPS_KEY, JSON.stringify([]));
+  } catch {}
+}
+
 /**
  * Purges all cached user data on logout or account deletion:
  * - localStorage & sessionStorage entries (saved fixtures, cached slates, legacy demo keys, preferences)

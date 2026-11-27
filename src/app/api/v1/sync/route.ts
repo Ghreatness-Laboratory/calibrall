@@ -27,6 +27,7 @@ import {
   getProviderSyncState,
 } from '@/lib/data/providerCallLogger';
 import { syncBasketballLivePipeline } from '@/lib/basketball/liveSync';
+import { ensureDailyRecordSlips, settleDailyRecordSlips } from '@/lib/slips/dailySlipRecord';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -266,11 +267,23 @@ async function handleSync(request: Request) {
     }
 
     // 3. The Odds API: ONLY for odds, ordered by upcoming pick count descending, AT MOST twice a day
+    // Requests h2h + totals (2 credits per league per fetch: 4 biggest active leagues x 2 runs/day <= 16/day cap).
     const oddsApiKey = process.env.ODDS_API_KEY?.trim();
     if (oddsApiKey && mode !== 'live') {
       const attemptIso = new Date().toISOString();
       const runsCompletedToday = await countOddsSyncRunsToday();
-      const callsTodayBeforeRun = await getProviderCallCountToday('the-odds-api');
+      const recentLogsToday = (await getRecentProviderCalls(200)).filter(
+        l =>
+          l.provider === 'the-odds-api' &&
+          l.timestamp.startsWith(attemptIso.slice(0, 10)) &&
+          l.syncMode !== 'health_probe' &&
+          !String(l.leagueCode || '').startsWith('BB_')
+      );
+      let creditsUsedTodayBeforeRun = 0;
+      for (const l of recentLogsToday) {
+        const lastCost = Number(l.quotaHeaders?.['x-requests-last']);
+        creditsUsedTodayBeforeRun += Number.isFinite(lastCost) && lastCost > 0 ? lastCost : 2;
+      }
       const dailyCap = PROVIDER_BUDGETS['the-odds-api'].dailyQuotaLimit ?? 16;
       const existingOddsState = await getProviderSyncState('provider:the-odds-api');
 
@@ -315,10 +328,13 @@ async function handleSync(request: Request) {
         leagueName: string;
         upcomingMatchesWithPicks: number;
         matchesUpdated: number;
+        creditsSpent: number;
       }> = [];
       const oddsSkipped: SkippedLeagueRecord[] = [];
       let oddsCalls = 0;
+      let creditsSpentThisRun = 0;
       let matchesUpdated = 0;
+      let snapshotsUpserted = 0;
       let lastOk = false;
       let lastStatus: number | null = null;
       let lastErr: string | null = null;
@@ -368,8 +384,11 @@ async function handleSync(request: Request) {
           runsCompletedToday,
           maxRunsPerDay: 2,
           callsMade: 0,
-          callsToday: callsTodayBeforeRun,
+          creditsSpentThisRun: 0,
+          creditsToday: creditsUsedTodayBeforeRun,
           dailyCap,
+          marketsRequested: ['h2h', 'totals'],
+          creditsPerLeagueFetch: 2,
           quotaRemaining: lastQuotaRemaining,
           upcomingMatchesWithPicks: upcomingWithPicks.length,
           leaguesOrderedByUpcomingPicks,
@@ -378,12 +397,14 @@ async function handleSync(request: Request) {
           leaguesWithoutOdds: oddsSkipped,
         };
       } else {
-        const perRunRemainingDaily = Math.max(0, dailyCap - callsTodayBeforeRun);
-        const runCap = Math.min(8, perRunRemainingDaily);
+        const CREDITS_PER_LEAGUE = 2; // h2h (1) + totals (1) in regions=eu
+        const perRunRemainingDaily = Math.max(0, dailyCap - creditsUsedTodayBeforeRun);
+        const runCreditCap = Math.min(8, perRunRemainingDaily); // Up to 4 leagues x 2 markets per run = 8 credits/run (<= 16/day)
         const targetLeagues = orderedOddsLeagues.filter(
           item => (pickFixturesByLeague.get(item.code)?.length || 0) > 0
         );
         let abortedEarlyReason: string | null = null;
+        const { matchesStore } = await import('@/lib/data/matchesStore');
 
         for (let idx = 0; idx < orderedOddsLeagues.length; idx++) {
           const item = orderedOddsLeagues[idx];
@@ -411,24 +432,27 @@ async function handleSync(request: Request) {
             continue;
           }
 
-          if (oddsCalls >= runCap) {
+          if (creditsSpentThisRun + CREDITS_PER_LEAGUE > runCreditCap) {
             oddsSkipped.push({
               leagueCode: item.code,
               leagueName: item.name,
               tier: getLeaguePriorityTier(item.code),
               provider: 'the-odds-api',
-              reason: `Daily Odds API credit cap reached (${callsTodayBeforeRun + oddsCalls}/${dailyCap} calls/day)`,
+              reason: `Daily Odds API credit cap reached (${creditsUsedTodayBeforeRun + creditsSpentThisRun}/${dailyCap} credits/day)`,
             });
             continue;
           }
 
           oddsCalls++;
-          const oddsUrl = `https://api.the-odds-api.com/v4/sports/${item.sportKey}/odds/?apiKey=${oddsApiKey}&regions=eu&markets=h2h`;
+          const oddsUrl = `https://api.the-odds-api.com/v4/sports/${item.sportKey}/odds/?apiKey=${oddsApiKey}&regions=eu&markets=h2h,totals&oddsFormat=decimal`;
           const res = await loggedProviderFetch('the-odds-api', oddsUrl, {
             leagueCode: item.code,
             syncMode: mode,
             timeoutMs: 8000,
           });
+          const headerCost = Number(res.quotaHeaders['x-requests-last']);
+          const callCost = Number.isFinite(headerCost) && headerCost > 0 ? headerCost : CREDITS_PER_LEAGUE;
+          creditsSpentThisRun += callCost;
           lastStatus = res.status;
           if (Object.keys(res.quotaHeaders).length > 0) lastQuotaHeaders = res.quotaHeaders;
           if (res.quotaRemaining) lastQuotaRemaining = res.quotaRemaining;
@@ -436,6 +460,16 @@ async function handleSync(request: Request) {
           if (res.ok && Array.isArray(res.json)) {
             lastOk = true;
             const updates: Array<{ id: string; providerId: string; verifiedOdds: any }> = [];
+            const rawSnapshots: Array<{
+              match_id: string;
+              bookmaker: string;
+              market_code: string;
+              selection: string;
+              decimal_odds: number;
+              observed_at: string;
+              snapshot_type: 'live_pre_kickoff';
+              source: string;
+            }> = [];
 
             for (const fix of leaguePickFixtures) {
               const matchedEvent = res.json.find((ev: any) =>
@@ -449,23 +483,157 @@ async function handleSync(request: Request) {
               const homePrices: number[] = [];
               const drawPrices: number[] = [];
               const awayPrices: number[] = [];
+              const over15Prices: number[] = [];
+              const under15Prices: number[] = [];
+              const over25Prices: number[] = [];
+              const under25Prices: number[] = [];
+              const over35Prices: number[] = [];
+              const under35Prices: number[] = [];
               let bookmakerName = '';
+              let newestObservedAt = attemptIso;
 
               for (const bk of matchedEvent.bookmakers) {
-                const h2hMarket = Array.isArray(bk.markets) ? bk.markets.find((m: any) => m.key === 'h2h') : null;
-                if (!h2hMarket || !Array.isArray(h2hMarket.outcomes)) continue;
-                if (!bookmakerName && bk.title) bookmakerName = String(bk.title);
+                const bkTitle = String(bk.title || bk.key || '').trim() || 'Bookmaker';
+                if (!bookmakerName) bookmakerName = bkTitle;
+                const observedAt =
+                  typeof bk.last_update === 'string' && bk.last_update ? bk.last_update : attemptIso;
+                if (observedAt > newestObservedAt) newestObservedAt = observedAt;
 
-                for (const outcome of h2hMarket.outcomes) {
-                  const price = Number(outcome.price);
-                  if (!isFinite(price) || price <= 1.01) continue;
-                  const outName = String(outcome.name || '');
-                  if (outName.toLowerCase() === 'draw') {
-                    drawPrices.push(price);
-                  } else if (outName === matchedEvent.home_team) {
-                    homePrices.push(price);
-                  } else if (outName === matchedEvent.away_team) {
-                    awayPrices.push(price);
+                const h2hMarket = Array.isArray(bk.markets) ? bk.markets.find((m: any) => m.key === 'h2h') : null;
+                if (h2hMarket && Array.isArray(h2hMarket.outcomes)) {
+                  for (const outcome of h2hMarket.outcomes) {
+                    const price = Number(outcome.price);
+                    if (!isFinite(price) || price <= 1.01) continue;
+                    const outName = String(outcome.name || '');
+                    if (outName.toLowerCase() === 'draw') {
+                      drawPrices.push(price);
+                      rawSnapshots.push({
+                        match_id: fix.id,
+                        bookmaker: bkTitle,
+                        market_code: '1X2_DRAW',
+                        selection: 'Draw',
+                        decimal_odds: price,
+                        observed_at: observedAt,
+                        snapshot_type: 'live_pre_kickoff',
+                        source: 'the-odds-api',
+                      });
+                    } else if (outName === matchedEvent.home_team) {
+                      homePrices.push(price);
+                      rawSnapshots.push({
+                        match_id: fix.id,
+                        bookmaker: bkTitle,
+                        market_code: '1X2_HOME',
+                        selection: `${fix.homeTeam.name} win`,
+                        decimal_odds: price,
+                        observed_at: observedAt,
+                        snapshot_type: 'live_pre_kickoff',
+                        source: 'the-odds-api',
+                      });
+                    } else if (outName === matchedEvent.away_team) {
+                      awayPrices.push(price);
+                      rawSnapshots.push({
+                        match_id: fix.id,
+                        bookmaker: bkTitle,
+                        market_code: '1X2_AWAY',
+                        selection: `${fix.awayTeam.name} win`,
+                        decimal_odds: price,
+                        observed_at: observedAt,
+                        snapshot_type: 'live_pre_kickoff',
+                        source: 'the-odds-api',
+                      });
+                    }
+                  }
+                }
+
+                const totalsMarket = Array.isArray(bk.markets)
+                  ? bk.markets.find((m: any) => m.key === 'totals')
+                  : null;
+                if (totalsMarket && Array.isArray(totalsMarket.outcomes)) {
+                  for (const outcome of totalsMarket.outcomes) {
+                    const price = Number(outcome.price);
+                    const point = Number(outcome.point);
+                    const outLabel = String(outcome.name || '').toLowerCase();
+                    if (!isFinite(price) || price <= 1.01 || !isFinite(point)) continue;
+                    const roundedPoint = Math.round(point * 10) / 10;
+                    if (roundedPoint === 1.5) {
+                      if (outLabel === 'over') {
+                        over15Prices.push(price);
+                        rawSnapshots.push({
+                          match_id: fix.id,
+                          bookmaker: bkTitle,
+                          market_code: 'TOTAL_GOALS_O15',
+                          selection: 'Over 1.5 Goals',
+                          decimal_odds: price,
+                          observed_at: observedAt,
+                          snapshot_type: 'live_pre_kickoff',
+                          source: 'the-odds-api',
+                        });
+                      } else if (outLabel === 'under') {
+                        under15Prices.push(price);
+                        rawSnapshots.push({
+                          match_id: fix.id,
+                          bookmaker: bkTitle,
+                          market_code: 'TOTAL_GOALS_U15',
+                          selection: 'Under 1.5 Goals',
+                          decimal_odds: price,
+                          observed_at: observedAt,
+                          snapshot_type: 'live_pre_kickoff',
+                          source: 'the-odds-api',
+                        });
+                      }
+                    } else if (roundedPoint === 2.5) {
+                      if (outLabel === 'over') {
+                        over25Prices.push(price);
+                        rawSnapshots.push({
+                          match_id: fix.id,
+                          bookmaker: bkTitle,
+                          market_code: 'TOTAL_GOALS_O25',
+                          selection: 'Over 2.5 Goals',
+                          decimal_odds: price,
+                          observed_at: observedAt,
+                          snapshot_type: 'live_pre_kickoff',
+                          source: 'the-odds-api',
+                        });
+                      } else if (outLabel === 'under') {
+                        under25Prices.push(price);
+                        rawSnapshots.push({
+                          match_id: fix.id,
+                          bookmaker: bkTitle,
+                          market_code: 'TOTAL_GOALS_U25',
+                          selection: 'Under 2.5 Goals',
+                          decimal_odds: price,
+                          observed_at: observedAt,
+                          snapshot_type: 'live_pre_kickoff',
+                          source: 'the-odds-api',
+                        });
+                      }
+                    } else if (roundedPoint === 3.5) {
+                      if (outLabel === 'over') {
+                        over35Prices.push(price);
+                        rawSnapshots.push({
+                          match_id: fix.id,
+                          bookmaker: bkTitle,
+                          market_code: 'TOTAL_GOALS_O35',
+                          selection: 'Over 3.5 Goals',
+                          decimal_odds: price,
+                          observed_at: observedAt,
+                          snapshot_type: 'live_pre_kickoff',
+                          source: 'the-odds-api',
+                        });
+                      } else if (outLabel === 'under') {
+                        under35Prices.push(price);
+                        rawSnapshots.push({
+                          match_id: fix.id,
+                          bookmaker: bkTitle,
+                          market_code: 'TOTAL_GOALS_U35',
+                          selection: 'Under 3.5 Goals',
+                          decimal_odds: price,
+                          observed_at: observedAt,
+                          snapshot_type: 'live_pre_kickoff',
+                          source: 'the-odds-api',
+                        });
+                      }
+                    }
                   }
                 }
               }
@@ -476,8 +644,14 @@ async function handleSync(request: Request) {
               const homeWin = avg(homePrices);
               const draw = avg(drawPrices);
               const awayWin = avg(awayPrices);
+              const over15Goals = avg(over15Prices);
+              const under15Goals = avg(under15Prices);
+              const over25Goals = avg(over25Prices);
+              const under25Goals = avg(under25Prices);
+              const over35Goals = avg(over35Prices);
+              const under35Goals = avg(under35Prices);
 
-              if (homeWin && awayWin) {
+              if (homeWin || awayWin || over25Goals || over15Goals) {
                 updates.push({
                   id: fix.id,
                   providerId: fix.providerId,
@@ -485,7 +659,14 @@ async function handleSync(request: Request) {
                     homeWin,
                     draw,
                     awayWin,
+                    over15Goals,
+                    under15Goals,
+                    over25Goals,
+                    under25Goals,
+                    over35Goals,
+                    under35Goals,
                     bookmakerName: bookmakerName || 'EU Bookmaker Consensus',
+                    observedAt: newestObservedAt,
                   },
                 });
               }
@@ -496,6 +677,9 @@ async function handleSync(request: Request) {
               leagueUpdated = await updateFixtureVerifiedOddsInDatabase(updates);
               matchesUpdated += leagueUpdated;
             }
+            if (rawSnapshots.length > 0) {
+              snapshotsUpserted += await matchesStore.upsertLiveOddsSnapshots(rawSnapshots);
+            }
 
             if (leagueUpdated > 0) {
               leaguesWithOddsUpdated.push({
@@ -503,6 +687,7 @@ async function handleSync(request: Request) {
                 leagueName: item.name,
                 upcomingMatchesWithPicks: leaguePickFixtures.length,
                 matchesUpdated: leagueUpdated,
+                creditsSpent: callCost,
               });
             } else {
               oddsSkipped.push({
@@ -513,7 +698,7 @@ async function handleSync(request: Request) {
                 reason:
                   res.json.length === 0
                     ? `Queried Odds API (${leaguePickFixtures.length} picks) but 0 active events returned`
-                    : `Queried Odds API (${leaguePickFixtures.length} picks, ${res.json.length} events) but 0 matched fixtures had EU H2H quotes`,
+                    : `Queried Odds API (${leaguePickFixtures.length} picks, ${res.json.length} events) but 0 matched fixtures had EU h2h/totals quotes`,
               });
             }
           } else {
@@ -551,7 +736,7 @@ async function handleSync(request: Request) {
           quotaRemaining: lastQuotaRemaining,
           quotaHeaders: lastQuotaHeaders,
           skippedLeagues: oddsSkipped,
-          callsUsedLastRun: oddsCalls,
+          callsUsedLastRun: creditsSpentThisRun,
         });
 
         if (matchesUpdated > 0) {
@@ -563,11 +748,17 @@ async function handleSync(request: Request) {
           status: lastOk ? 'ONLINE' : 'ERROR',
           runsToday: oddsCalls > 0 ? runsCompletedToday + 1 : runsCompletedToday,
           maxRunsPerDay: 2,
+          marketsRequested: ['h2h', 'totals'],
+          creditsPerLeagueFetch: 2,
           leaguesOrderedByUpcomingPicks,
           leaguesWithUpcomingPicks: leaguesOrderedByUpcomingPicks.filter(l => l.upcomingMatchesWithPicks > 0),
           leaguesWithOddsUpdated,
           callsMade: oddsCalls,
+          creditsSpentThisRun,
+          creditsToday: creditsUsedTodayBeforeRun + creditsSpentThisRun,
+          dailyCap,
           matchesUpdatedWithOdds: matchesUpdated,
+          snapshotsUpserted,
           quotaRemaining: lastQuotaRemaining,
           quotaUsedThisMonth: lastQuotaHeaders['x-requests-used'] || null,
           monthlyAllowance: 500,
@@ -576,6 +767,22 @@ async function handleSync(request: Request) {
         };
       }
     }
+  }
+
+  // 3b. Daily Public Slip Accountability Record (generate pre-kickoff snapshot + settle finished legs)
+  try {
+    const settledDaily = await settleDailyRecordSlips();
+    const ensuredDaily = await ensureDailyRecordSlips();
+    results['dailySlips'] = {
+      status: 'OK',
+      ...settledDaily,
+      ...ensuredDaily,
+    };
+  } catch (err: any) {
+    results['dailySlips'] = {
+      status: 'WARN',
+      error: err?.message || 'Daily slip record check failed',
+    };
   }
 
   // 4. Database check & exact fixtures row count

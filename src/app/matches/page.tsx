@@ -21,7 +21,8 @@ import {
 } from '@/lib/data/competitionSearch';
 import { matchesDayFilter, DayFilterType } from '@/lib/utils/dateWindow';
 import { Fixture, MarketPrediction } from '@/types';
-import { RotateCw, Info, Search, Calendar, X, AlertCircle, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { RotateCw, Info, Search, Calendar, X, AlertCircle, AlertTriangle, Layers } from 'lucide-react';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 
 type FootballMarketGroup = 'ALL' | 'results' | 'goals' | 'multi_goals' | 'corners' | 'cards';
@@ -573,19 +574,29 @@ function MatchesPageInner() {
             </p>
           </div>
 
-          <button
-            onClick={handleRefresh}
-            type="button"
-            disabled={isRefreshing}
-            className="min-w-[44px] min-h-[44px] rounded-[12px] border border-[var(--line)] bg-[var(--surface)] hover:bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--text)] flex items-center justify-center transition-colors touch-press shrink-0"
-            title="Refresh fixtures"
-            aria-label="Refresh fixtures"
-          >
-            <RotateCw
-              className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[var(--accent)]' : ''}`}
-              strokeWidth={2}
-            />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/slips"
+              className="min-h-[44px] px-3 rounded-[12px] bg-[var(--accent-soft)] border border-[var(--accent)]/40 text-[12px] font-semibold text-[var(--accent)] hover:bg-[var(--accent-soft)]/80 flex items-center gap-1.5 transition-colors touch-press whitespace-nowrap"
+            >
+              <Layers className="w-3.5 h-3.5" strokeWidth={2} />
+              <span>Build a slip</span>
+            </Link>
+
+            <button
+              onClick={handleRefresh}
+              type="button"
+              disabled={isRefreshing}
+              className="min-w-[44px] min-h-[44px] rounded-[12px] border border-[var(--line)] bg-[var(--surface)] hover:bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--text)] flex items-center justify-center transition-colors touch-press shrink-0"
+              title="Refresh fixtures"
+              aria-label="Refresh fixtures"
+            >
+              <RotateCw
+                className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[var(--accent)]' : ''}`}
+                strokeWidth={2}
+              />
+            </button>
+          </div>
         </div>
       </div>
 

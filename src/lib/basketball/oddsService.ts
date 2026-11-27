@@ -215,6 +215,55 @@ function extractConsensusTotalsQuote(
   };
 }
 
+function extractIndividualBookmakerTotalsQuotes(
+  bookmakers: any[],
+  marketKey: 'totals' | 'totals_h1',
+  gameId: string,
+  league: BasketballLeague,
+  marketCategory: 'game_total' | 'h1_game_total',
+  targetLine: number | null,
+  observedAt: string
+): BbOddsQuote[] {
+  if (!Array.isArray(bookmakers) || targetLine === null) return [];
+  const quotes: BbOddsQuote[] = [];
+  for (const bk of bookmakers) {
+    const market = Array.isArray(bk?.markets)
+      ? bk.markets.find((m: any) => m?.key === marketKey)
+      : null;
+    if (!market || !Array.isArray(market.outcomes)) continue;
+    const bkName = String(bk?.title || bk?.key || '').trim();
+    if (!bkName) continue;
+
+    let overOdds: number | null = null;
+    let underOdds: number | null = null;
+    for (const outcome of market.outcomes) {
+      const line = Number(outcome?.point);
+      const price = Number(outcome?.price);
+      const sideLabel = String(outcome?.name || '').toLowerCase();
+      if (!Number.isFinite(line) || !Number.isFinite(price) || price <= 1.01) continue;
+      if (Math.abs(Math.round(line * 2) / 2 - targetLine) > 0.01) continue;
+      if (sideLabel === 'over') overOdds = price;
+      else if (sideLabel === 'under') underOdds = price;
+    }
+    if (overOdds !== null || underOdds !== null) {
+      const slug = bkName.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 24);
+      quotes.push({
+        id: `bbo_${gameId}_${marketCategory}_game_bk_${slug}`,
+        game_id: gameId,
+        league,
+        market_category: marketCategory,
+        side: 'game',
+        line: targetLine,
+        over_odds: overOdds,
+        under_odds: underOdds,
+        bookmaker: bkName,
+        observed_at: typeof bk?.last_update === 'string' && bk.last_update ? bk.last_update : observedAt,
+      });
+    }
+  }
+  return quotes;
+}
+
 function extractTeamTotalsQuotes(
   bookmakers: any[],
   gameId: string,
@@ -500,7 +549,20 @@ export async function syncBasketballOdds(params: {
 
       const bookmakers = Array.isArray(ev?.bookmakers) ? ev.bookmakers : [];
       const q = extractConsensusTotalsQuote(bookmakers, 'totals', matched.id, league, 'game_total', nowIso);
-      if (q) collectedQuotes.push(q);
+      if (q) {
+        collectedQuotes.push(q);
+        collectedQuotes.push(
+          ...extractIndividualBookmakerTotalsQuotes(
+            bookmakers,
+            'totals',
+            matched.id,
+            league,
+            'game_total',
+            q.line,
+            nowIso
+          )
+        );
+      }
 
       if (ev?.id && params.highTierGameIds.has(matched.id)) {
         const homeTeam = params.teamLookup.get(matched.home_id) || { id: matched.home_id, name: matched.home_id, aliases: [] };
@@ -556,7 +618,20 @@ export async function syncBasketballOdds(params: {
       'h1_game_total',
       nowIso
     );
-    if (h1Quote) collectedQuotes.push(h1Quote);
+    if (h1Quote) {
+      collectedQuotes.push(h1Quote);
+      collectedQuotes.push(
+        ...extractIndividualBookmakerTotalsQuotes(
+          bookmakers,
+          'totals_h1',
+          target.game.id,
+          target.game.league,
+          'h1_game_total',
+          h1Quote.line,
+          nowIso
+        )
+      );
+    }
 
     const teamQuotes = extractTeamTotalsQuotes(
       bookmakers,
@@ -598,7 +673,20 @@ export async function syncBasketballOdds(params: {
           matchedCount++;
           const bookmakers = Array.isArray(ev?.bookmakers) ? ev.bookmakers : [];
           const q = extractConsensusTotalsQuote(bookmakers, 'totals', matched.id, 'NCAAB', 'game_total', nowIso);
-          if (q) collectedQuotes.push(q);
+          if (q) {
+            collectedQuotes.push(q);
+            collectedQuotes.push(
+              ...extractIndividualBookmakerTotalsQuotes(
+                bookmakers,
+                'totals',
+                matched.id,
+                'NCAAB',
+                'game_total',
+                q.line,
+                nowIso
+              )
+            );
+          }
         }
         notes.push(`NCAAB totals: matched ${matchedCount} scheduled games.`);
       } else {

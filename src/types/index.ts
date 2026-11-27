@@ -310,8 +310,12 @@ export interface VerifiedMatchOdds {
   homeWin?: number;
   draw?: number;
   awayWin?: number;
+  over15Goals?: number;
+  under15Goals?: number;
   over25Goals?: number;
   under25Goals?: number;
+  over35Goals?: number;
+  under35Goals?: number;
   bttsYes?: number;
   bttsNo?: number;
   over95Corners?: number;
@@ -321,6 +325,8 @@ export interface VerifiedMatchOdds {
   asianHandicapLine?: number;
   asianHandicapHome?: Record<string, number>;
   asianHandicapAway?: Record<string, number>;
+  bookmakerName?: string;
+  observedAt?: string;
 }
 
 export interface Competition {

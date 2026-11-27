@@ -495,7 +495,7 @@ export function validateExplanationConsistency(params: {
     issues.push({ code: 'MISSING_PERCENT_UNIT', detail: 'Threshold number appears without % unit.', severity: 'error' });
   }
   if (
-    /\b(?:projects?|projected|averages?|averaging)\s+\d+(?:\.\d+)?\s*(?:[.;,]|$)/i.test(full) ||
+    /\b(?:projects?|projected|averages?|averaging)\s+\d+(?:\.\d+)?(?!\d)(?!\.\d)\s*(?:[.;,]|$)/i.test(full) ||
     /\bstd\s+\d+(?:\.\d+)?(?!\d)(?!\.\d)(?!\s*(?:pts|points|%))/i.test(full)
   ) {
     issues.push({ code: 'DANGLING_NUMBER_UNITLESS', detail: 'Projected or averaged number appears without an explicit unit.', severity: 'error' });

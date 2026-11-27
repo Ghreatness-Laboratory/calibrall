@@ -15,7 +15,7 @@ import {
   normalizeSelectedCompetitionIds,
 } from '@/lib/data/competitionSearch';
 import { DayFilterType } from '@/lib/utils/dateWindow';
-import { SlidersHorizontal, AlertCircle, Info, ChevronRight } from 'lucide-react';
+import { SlidersHorizontal, AlertCircle, Info, ChevronRight, Layers } from 'lucide-react';
 import {
   formatOdds,
   formatSelectionName,
@@ -554,18 +554,28 @@ export default function PredictionsPage() {
   return (
     <div className="space-y-4 py-1">
       {/* Header */}
-      <div className="space-y-1">
-        <h1 className="font-display text-[26px] font-bold leading-[1.15] text-[var(--text)] tracking-[-0.02em]">
-          Market intelligence
-        </h1>
-        <p className="text-[12.5px] text-[var(--text-2)] leading-[1.5]">
-          {isBasketball
-            ? 'Calibrated NBA, NCAAB Division I & EuroLeague totals · Local tip off times'
-            : isMultiSport
-            ? 'Football and basketball probability models across active competitions'
-            : 'Pre kickoff probability models and statistical evaluations · All times WAT'}
-          {lastUpdated ? ` · Updated ${lastUpdated}` : ''}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1 min-w-0">
+          <h1 className="font-display text-[26px] font-bold leading-[1.15] text-[var(--text)] tracking-[-0.02em]">
+            Market intelligence
+          </h1>
+          <p className="text-[12.5px] text-[var(--text-2)] leading-[1.5]">
+            {isBasketball
+              ? 'Calibrated NBA, NCAAB Division I & EuroLeague totals · Local tip off times'
+              : isMultiSport
+              ? 'Football and basketball probability models across active competitions'
+              : 'Pre kickoff probability models and statistical evaluations · All times WAT'}
+            {lastUpdated ? ` · Updated ${lastUpdated}` : ''}
+          </p>
+        </div>
+
+        <Link
+          href="/slips"
+          className="min-h-[44px] px-3 rounded-[12px] bg-[var(--accent-soft)] border border-[var(--accent)]/40 text-[12px] font-semibold text-[var(--accent)] hover:bg-[var(--accent-soft)]/80 flex items-center gap-1.5 transition-colors touch-press shrink-0 whitespace-nowrap"
+        >
+          <Layers className="w-3.5 h-3.5" strokeWidth={2} />
+          <span>Build a slip</span>
+        </Link>
       </div>
 
       {/* Notices */}

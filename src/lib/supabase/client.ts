@@ -751,9 +751,40 @@ export function getLocalDatabase(): any {
           fallback_applied INTEGER NOT NULL DEFAULT 0,
           detected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS daily_slip_sets (
+          id TEXT PRIMARY KEY,
+          slip_date TEXT NOT NULL,
+          sport_scope TEXT NOT NULL DEFAULT 'all',
+          target_odds REAL NOT NULL,
+          rank_index INTEGER NOT NULL DEFAULT 1,
+          style TEXT NOT NULL DEFAULT 'safest',
+          status TEXT NOT NULL DEFAULT 'PENDING',
+          combined_odds REAL NOT NULL,
+          settled_odds REAL,
+          combined_probability REAL NOT NULL,
+          legs_count INTEGER NOT NULL,
+          includes_model_fair INTEGER NOT NULL DEFAULT 0,
+          first_kickoff_utc TEXT,
+          legs_json TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          settled_at TEXT,
+          UNIQUE(slip_date, target_odds, rank_index)
+        );
+        CREATE TABLE IF NOT EXISTS slip_build_usage (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          usage_date TEXT NOT NULL,
+          build_count INTEGER NOT NULL DEFAULT 0,
+          last_build_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, usage_date)
+        );
       `);
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_explanation_issues_detected ON explanation_issues(detected_at DESC);'); } catch (_) {}
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_explanation_issues_fixture ON explanation_issues(fixture_id);'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_daily_slip_sets_date ON daily_slip_sets(slip_date DESC, target_odds ASC);'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_daily_slip_sets_status ON daily_slip_sets(status);'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_slip_build_usage_user_date ON slip_build_usage(user_id, usage_date);'); } catch (_) {}
 
       // Ensure columns exist on older tables
       try { db.exec('ALTER TABLE profiles ADD COLUMN pending_tier TEXT;'); } catch (_) {}

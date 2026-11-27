@@ -108,7 +108,7 @@ export default function Navbar() {
 
   const navLinks = [
     { label: 'Fixtures', href: '/fixtures', matchPrefixes: ['/fixtures', '/matches'] },
-    { label: 'Analysis', href: '/predictions', matchPrefixes: ['/predictions', '/picks'] },
+    { label: 'Analysis', href: '/predictions', matchPrefixes: ['/predictions', '/picks', '/slips'] },
     { label: 'Markets', href: '/markets', matchPrefixes: ['/markets'] },
     { label: 'Record', href: '/performance', matchPrefixes: ['/performance', '/record'] },
     { label: 'Watchlist', href: '/saved', matchPrefixes: ['/saved'] },
