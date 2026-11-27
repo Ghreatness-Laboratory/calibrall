@@ -6,7 +6,10 @@ import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/s
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
-import { syncSlateExplanations } from '@/lib/prediction/explanationGenerator';
+import {
+  generateFootballExplanation,
+  syncSlateExplanations,
+} from '@/lib/prediction/explanationGenerator';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard, { BasketballMarketGroupFilter } from '@/components/nba/NBAGameCard';
 import CompetitionFilter from '@/components/CompetitionFilter';
@@ -1001,7 +1004,7 @@ function MatchesPageInner() {
         )
       ) : filteredFootball.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {filteredFootball.map(({ fixture, topPick, predictions, noRecommendationReason, writtenExplanation }) => {
+          {filteredFootball.map(({ fixture, context, topPick, predictions, noRecommendationReason, writtenExplanation }) => {
             const focusedMultiGoalsPick =
               selectedFootballGroup === 'multi_goals' && topPick?.marketCategory !== 'multi_goals'
                 ? predictions.find(
@@ -1014,9 +1017,36 @@ function MatchesPageInner() {
                 : topPick;
             const syncedWrittenExplanation =
               focusedMultiGoalsPick &&
-              writtenExplanation?.activePickMarketCode &&
-              writtenExplanation.activePickMarketCode !== focusedMultiGoalsPick.marketCode
-                ? undefined
+              topPick?.marketCode !== focusedMultiGoalsPick.marketCode
+                ? (() => {
+                    const regenerated = generateFootballExplanation({
+                      fixture,
+                      evaluation: {
+                        topPick: focusedMultiGoalsPick,
+                        predictions,
+                        noRecommendationReason,
+                      },
+                      context,
+                    });
+                    if (writtenExplanation?.tierLocked) {
+                      return {
+                        ...regenerated,
+                        fullSummary: '',
+                        driverTiles: [],
+                        reasoning: {},
+                        alternates: [],
+                        tierLocked: true,
+                        dailySummaryLimitReached: Boolean(writtenExplanation.dailySummaryLimitReached),
+                      };
+                    }
+                    return writtenExplanation
+                      ? {
+                          ...regenerated,
+                          tierLocked: writtenExplanation.tierLocked,
+                          dailySummaryLimitReached: writtenExplanation.dailySummaryLimitReached,
+                        }
+                      : regenerated;
+                  })()
                 : writtenExplanation;
             return (
               <FixtureCard

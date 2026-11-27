@@ -1023,8 +1023,8 @@ export default function PredictionsPage() {
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-display text-[14px] font-semibold text-[var(--text)] truncate">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-display text-[14px] font-semibold text-[var(--text)] break-words leading-snug min-w-0">
                             {cleanDisplayText(formatSelectionName(p.selection))}
                           </span>
                           <span className="font-display text-[14px] font-bold text-[var(--accent)] tabular-nums shrink-0">

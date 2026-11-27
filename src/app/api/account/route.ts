@@ -10,6 +10,14 @@ import {
   maybeSendPaidRenewalReminderEmail,
   maybeSendTrialReminderEmail,
 } from '@/lib/notifications/trialReminders';
+import {
+  LOCAL_SESSION_COOKIE_NAME,
+  isLocalAuthAllowed,
+} from '@/lib/auth/localSession';
+import {
+  deleteLocalUserAccount,
+  updateLocalProfileDisplayName,
+} from '@/lib/auth/localAuthDb';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -77,26 +85,38 @@ export async function PATCH(request: Request) {
   }
 
   const serviceClient = getSupabaseServiceClient();
+  let updatedData: any = null;
   if (!serviceClient) {
-    return NextResponse.json(
-      { error: 'Supabase service role is not configured on the server.' },
-      { status: 503 }
-    );
-  }
+    if (!isLocalAuthAllowed()) {
+      return NextResponse.json(
+        { error: 'Supabase service role is not configured on the server.' },
+        { status: 503 }
+      );
+    }
+    updatedData = updateLocalProfileDisplayName(session.user.id, rawName);
+    if (!updatedData) {
+      return NextResponse.json(
+        { error: 'Failed to update local profile.' },
+        { status: 500 }
+      );
+    }
+  } else {
+    const { data, error } = await serviceClient
+      .from('profiles')
+      .update({ display_name: rawName })
+      .eq('id', session.user.id)
+      .select('id, email, display_name, role, tier, tier_expires_at, created_at')
+      .single();
 
-  const { data, error } = await serviceClient
-    .from('profiles')
-    .update({ display_name: rawName })
-    .eq('id', session.user.id)
-    .select('id, email, display_name, role, tier, tier_expires_at, created_at')
-    .single();
-
-  if (error || !data) {
-    return NextResponse.json(
-      { error: error?.message || 'Failed to update profile.' },
-      { status: 500 }
-    );
+    if (error || !data) {
+      return NextResponse.json(
+        { error: error?.message || 'Failed to update profile.' },
+        { status: 500 }
+      );
+    }
+    updatedData = data;
   }
+  const data = updatedData;
 
   return NextResponse.json(
     {
@@ -152,19 +172,22 @@ export async function DELETE(request: Request) {
 
   const serviceClient = getSupabaseServiceClient();
   if (!serviceClient) {
-    return NextResponse.json(
-      { error: 'Supabase service role is not configured on the server.' },
-      { status: 503 }
-    );
-  }
-
-  // Delete from auth.users (cascades to public.profiles via FK ON DELETE CASCADE)
-  const { error: deleteErr } = await serviceClient.auth.admin.deleteUser(session.user.id);
-  if (deleteErr) {
-    return NextResponse.json(
-      { error: deleteErr.message || 'Failed to delete user account.' },
-      { status: 500 }
-    );
+    if (!isLocalAuthAllowed()) {
+      return NextResponse.json(
+        { error: 'Supabase service role is not configured on the server.' },
+        { status: 503 }
+      );
+    }
+    deleteLocalUserAccount(session.user.id);
+  } else {
+    // Delete from auth.users (cascades to public.profiles via FK ON DELETE CASCADE)
+    const { error: deleteErr } = await serviceClient.auth.admin.deleteUser(session.user.id);
+    if (deleteErr) {
+      return NextResponse.json(
+        { error: deleteErr.message || 'Failed to delete user account.' },
+        { status: 500 }
+      );
+    }
   }
 
   // Also clear SSR auth cookies
@@ -192,6 +215,16 @@ export async function DELETE(request: Request) {
       await supabase.auth.signOut();
     } catch {}
   }
+
+  const forwardedProto = request.headers.get('x-forwarded-proto') || '';
+  const isHttps = forwardedProto.includes('https') || request.url.startsWith('https://');
+  response.cookies.set(LOCAL_SESSION_COOKIE_NAME, '', {
+    httpOnly: true,
+    path: '/',
+    maxAge: 0,
+    sameSite: isHttps ? 'none' : 'lax',
+    secure: isHttps,
+  });
 
   for (const c of cookieStore.getAll()) {
     if (c.name.startsWith('sb-') || c.name === 'calibrall_tier') {

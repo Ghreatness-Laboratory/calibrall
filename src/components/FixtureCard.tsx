@@ -43,7 +43,8 @@ export default function FixtureCard({
   writtenExplanation,
   isSavedInitial,
 }: Props) {
-  const candidateExplanation = writtenExplanation || fixture.writtenExplanation;
+  const candidateExplanation =
+    writtenExplanation !== undefined ? writtenExplanation : fixture.writtenExplanation;
   const activeExplanation =
     !topPrediction ||
     !candidateExplanation?.activePickMarketCode ||

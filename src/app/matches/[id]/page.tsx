@@ -1056,10 +1056,10 @@ export default function MatchAnalysisPage() {
                           className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-2.5 flex items-center justify-between gap-2"
                         >
                           <div className="min-w-0">
-                            <div className="text-[12.5px] font-semibold text-[var(--text)] truncate">
+                            <div className="text-[12.5px] font-semibold text-[var(--text)] break-words leading-snug">
                               {cleanDisplayText(alt.selection)}
                             </div>
-                            <div className="text-[10.5px] text-[var(--text-3)] truncate">
+                            <div className="text-[10.5px] text-[var(--text-3)] leading-snug">
                               {cleanDisplayText(alt.marketName)}
                             </div>
                           </div>

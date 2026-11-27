@@ -56,7 +56,32 @@ function SignupForm() {
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setErrorMsg('Supabase authentication is not configured in this environment.');
+      setSubmitting(true);
+      try {
+        const res = await fetch('/api/auth/local', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'signup',
+            email: email.trim(),
+            password,
+            displayName: displayName.trim() || undefined,
+            confirmed18Plus,
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setErrorMsg(json?.error || 'Unable to create account right now.');
+          return;
+        }
+        await refreshProfile();
+        router.push(nextTarget);
+        router.refresh();
+      } catch (err: any) {
+        setErrorMsg(err?.message || 'Unable to create account right now.');
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
 

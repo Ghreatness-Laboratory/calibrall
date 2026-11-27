@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getServerSupabaseConfig } from '@/lib/supabase/serverAuth';
+import { LOCAL_SESSION_COOKIE_NAME } from '@/lib/auth/localSession';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export async function POST() {
+export async function POST(request: Request) {
   const cookieStore = cookies();
   const { url, anonKey, isAuthConfigured } = getServerSupabaseConfig();
 
@@ -36,6 +37,16 @@ export async function POST() {
       await supabase.auth.signOut();
     } catch {}
   }
+
+  const forwardedProto = request.headers.get('x-forwarded-proto') || '';
+  const isHttps = forwardedProto.includes('https') || request.url.startsWith('https://');
+  response.cookies.set(LOCAL_SESSION_COOKIE_NAME, '', {
+    httpOnly: true,
+    path: '/',
+    maxAge: 0,
+    sameSite: isHttps ? 'none' : 'lax',
+    secure: isHttps,
+  });
 
   for (const c of cookieStore.getAll()) {
     if (c.name.startsWith('sb-') || c.name === 'calibrall_tier') {

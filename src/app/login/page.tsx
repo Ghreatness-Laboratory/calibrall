@@ -40,7 +40,30 @@ function LoginForm() {
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setErrorMsg('Supabase authentication is not configured in this environment.');
+      setSubmitting(true);
+      try {
+        const res = await fetch('/api/auth/local', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'login',
+            email: email.trim(),
+            password,
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setErrorMsg(json?.error || 'Unable to sign in right now.');
+          return;
+        }
+        await refreshProfile();
+        router.push(nextTarget);
+        router.refresh();
+      } catch (err: any) {
+        setErrorMsg(err?.message || 'Unable to sign in right now.');
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
 
@@ -61,6 +84,30 @@ function LoginForm() {
       setErrorMsg(err?.message || 'Unable to sign in right now.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleLocalTrialLogin = async () => {
+    setErrorMsg(null);
+    setOauthLoading(true);
+    try {
+      const res = await fetch('/api/auth/local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'demo' }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(json?.error || 'Unable to start local trial session.');
+        return;
+      }
+      await refreshProfile();
+      router.push(nextTarget);
+      router.refresh();
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Unable to start local trial session.');
+    } finally {
+      setOauthLoading(false);
     }
   };
 
@@ -169,7 +216,7 @@ function LoginForm() {
           </button>
         </form>
 
-        {authReady && (
+        {authReady ? (
           <>
             <div className="relative flex items-center py-1">
               <div className="flex-grow border-t border-[var(--line)]" />
@@ -185,6 +232,24 @@ function LoginForm() {
             >
               {oauthLoading && <Loader2 className="w-4 h-4 animate-spin" />}
               <span>Continue with Google</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="relative flex items-center py-1">
+              <div className="flex-grow border-t border-[var(--line)]" />
+              <span className="shrink mx-3 text-[11px] text-[var(--text-3)]">or</span>
+              <div className="flex-grow border-t border-[var(--line)]" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLocalTrialLogin}
+              disabled={submitting || oauthLoading}
+              className="w-full min-h-[44px] rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] hover:border-[var(--border-strong)] text-[13px] font-semibold text-[var(--text)] flex items-center justify-center gap-2 transition-colors disabled:opacity-50 touch-press"
+            >
+              {oauthLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>Continue with local trial account</span>
             </button>
           </>
         )}

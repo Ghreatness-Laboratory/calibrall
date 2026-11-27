@@ -500,7 +500,10 @@ export function validateExplanationConsistency(params: {
   ) {
     issues.push({ code: 'DANGLING_NUMBER_UNITLESS', detail: 'Projected or averaged number appears without an explicit unit.', severity: 'error' });
   }
-  if (/\b1\s+(?:meetings|matches|days|games|cards|corners|goals)\b/i.test(`${full} ${tilesText}`)) {
+  const sanitizedPluralCheck = `${full} ${tilesText}`
+    .replace(/\b(?:to|and)\s+1\s+goals\b/gi, 'to 1')
+    .replace(/\d+\.1\s+(?:meetings|matches|days|games|cards|corners|goals)\b/gi, '');
+  if (/\b1\s+(?:meetings|matches|days|games|cards|corners|goals)\b/i.test(sanitizedPluralCheck)) {
     issues.push({ code: 'PLURALIZATION_BUG', detail: 'Singular count used with plural noun.', severity: 'error' });
   }
   if (/\bbookings?\b/i.test(combinedDisplay)) {

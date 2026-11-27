@@ -260,11 +260,19 @@ export function persistOrLoadImmutableFootballExplanation(
   const kickoffMs = Date.parse(fixture.kickoffTime);
   const isPreKickoff = isUpcoming && Number.isFinite(kickoffMs) && kickoffMs > Date.now();
 
-  // 1. Post-kickoff rows are ALWAYS immutable. Pre-kickoff rows are reused once at current model_version.
+  // 1. Post-kickoff rows are ALWAYS immutable. Pre-kickoff rows are reused once at current model_version,
+  //    unless the stored row is a pre-kickoff `thin_history` placeholder and real match history is now available.
   const existing = loadStoredFootballExplanation(fixture.id, {
     requireCurrentVersion: isPreKickoff,
   });
-  if (existing) {
+  const hasRealDataNow = Boolean(
+    evaluation.topPick ||
+      (evaluation.predictions && evaluation.predictions.length > 0) ||
+      (context && !context.insufficientData && context.hasRealTeamStrength !== false)
+  );
+  const isStaleThinHistory =
+    isPreKickoff && existing?.reasoning?.status === 'thin_history' && hasRealDataNow;
+  if (existing && !isStaleThinHistory) {
     return existing;
   }
 

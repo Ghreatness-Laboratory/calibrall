@@ -3,7 +3,7 @@ import {
   getMiddlewareAuthSession,
   isSafeRedirectPath,
   type ServerAuthSession,
-} from '@/lib/supabase/serverAuth';
+} from '@/lib/supabase/authCore';
 import {
   isAdminPagePath,
   isAuthEntryPath,

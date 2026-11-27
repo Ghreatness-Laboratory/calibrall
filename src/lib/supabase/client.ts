@@ -779,6 +779,13 @@ export function getLocalDatabase(): any {
           updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(user_id, usage_date)
         );
+        CREATE TABLE IF NOT EXISTS local_auth_users (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          display_name TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
       `);
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_explanation_issues_detected ON explanation_issues(detected_at DESC);'); } catch (_) {}
       try { db.exec('CREATE INDEX IF NOT EXISTS idx_explanation_issues_fixture ON explanation_issues(fixture_id);'); } catch (_) {}

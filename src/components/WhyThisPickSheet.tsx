@@ -347,7 +347,7 @@ export default function WhyThisPickSheet({
               </h3>
               {headerPickLabel && (
                 <div className="flex items-center gap-2 min-w-0">
-                  <p className="text-[12.5px] font-semibold text-[var(--text-2)] truncate">
+                  <p className="text-[12.5px] font-semibold text-[var(--text-2)] break-words leading-snug">
                     {cleanDisplayText(headerPickLabel)}
                   </p>
                   {typeof calProb === 'number' && (
@@ -449,10 +449,10 @@ export default function WhyThisPickSheet({
                         className="min-h-[48px] px-3 py-2.5 bg-[var(--surface-2)] flex items-center justify-between gap-2"
                       >
                         <div className="min-w-0">
-                          <div className="text-[13px] font-semibold text-[var(--text)] truncate">
+                          <div className="text-[13px] font-semibold text-[var(--text)] break-words leading-snug">
                             {cleanDisplayText(alt.selection)}
                           </div>
-                          <div className="text-[10.5px] text-[var(--text-3)] truncate">
+                          <div className="text-[10.5px] text-[var(--text-3)] leading-snug">
                             {cleanDisplayText(alt.marketName)}
                           </div>
                         </div>

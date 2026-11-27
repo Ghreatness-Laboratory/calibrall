@@ -203,9 +203,9 @@ export default function MarketComparisonTable({
         >
           {/* Left: Market name & subtext */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span
-                className={`font-display font-semibold truncate text-[13.5px] leading-snug ${
+                className={`font-display font-semibold break-words text-[13.5px] leading-snug ${
                   isSelected ? 'text-[var(--accent)]' : 'text-[var(--text)]'
                 }`}
               >
@@ -629,14 +629,19 @@ export default function MarketComparisonTable({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {topFullMatchMultiGoals && (
                   <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] space-y-1">
-                    <div className="text-[11px] text-[var(--text-2)]">
-                      Top full match band (width {topFullMatchMultiGoals.multiGoalsMeta?.span ?? 3})
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--text-2)]">
+                      <span>Top full match band (width {topFullMatchMultiGoals.multiGoalsMeta?.span ?? 3})</span>
+                      {topFullMatchMultiGoals.isSpeculative && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-[var(--medium-soft)] text-[var(--medium)] rounded-full border border-[var(--medium)]/30 font-semibold">
+                          Speculative
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[13px] font-semibold text-[var(--text)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[13px] font-semibold text-[var(--text)] break-words">
                         {cleanDisplayText(topFullMatchMultiGoals.selection)}
                       </span>
-                      <span className="font-display text-[14px] text-[var(--accent)] font-bold tabular-nums">
+                      <span className="font-display text-[14px] text-[var(--accent)] font-bold tabular-nums shrink-0">
                         {((topFullMatchMultiGoals.calibratedProbability ?? topFullMatchMultiGoals.modelProbability) * 100).toFixed(1)}%
                       </span>
                     </div>
@@ -645,14 +650,19 @@ export default function MarketComparisonTable({
 
                 {topTeamMultiGoals && (
                   <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] space-y-1">
-                    <div className="text-[11px] text-[var(--text-2)]">
-                      Top team band (width {topTeamMultiGoals.multiGoalsMeta?.span ?? 2})
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--text-2)]">
+                      <span>Top team band (width {topTeamMultiGoals.multiGoalsMeta?.span ?? 2})</span>
+                      {topTeamMultiGoals.isSpeculative && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-[var(--medium-soft)] text-[var(--medium)] rounded-full border border-[var(--medium)]/30 font-semibold">
+                          Speculative
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[13px] font-semibold text-[var(--text)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[13px] font-semibold text-[var(--text)] break-words">
                         {cleanDisplayText(topTeamMultiGoals.selection)}
                       </span>
-                      <span className="font-display text-[14px] text-[var(--accent)] font-bold tabular-nums">
+                      <span className="font-display text-[14px] text-[var(--accent)] font-bold tabular-nums shrink-0">
                         {((topTeamMultiGoals.calibratedProbability ?? topTeamMultiGoals.modelProbability) * 100).toFixed(1)}%
                       </span>
                     </div>
