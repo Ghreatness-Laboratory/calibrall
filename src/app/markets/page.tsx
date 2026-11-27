@@ -36,6 +36,14 @@ const FOOTBALL_MARKET_OPTIONS: {
   { code: 'HSH_2ND', label: '8. Highest scoring half: 2nd half', optionType: 'highest_scoring_half', category: 'half_time', period: 'Full time' },
   { code: 'FH_GOALS_O05', label: '9. 1st half over 0.5 goals', optionType: 'first_half_goals', category: 'half_time', period: '1st half' },
   { code: '2H_RESULT_HOME', label: '10. 2nd half result: Home win', optionType: 'second_half_result', category: 'half_time', period: '2nd half' },
+  { code: 'MULTI_GOALS_1_3', label: '11. Multi goals: 1 to 3 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'MULTI_GOALS_2_4', label: '11. Multi goals: 2 to 4 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'MULTI_GOALS_2_3', label: '11. Multi goals: 2 to 3 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'MULTI_GOALS_3_5', label: '11. Multi goals: 3 to 5 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'TEAM_MULTI_GOALS_HOME_1_2', label: '11. Home multi goals: 1 to 2', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'TEAM_MULTI_GOALS_AWAY_0_1', label: '11. Away multi goals: 0 to 1', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'FH_MULTI_GOALS_0_1', label: '11. 1st half multi goals: 0 to 1', optionType: 'first_half_multi_goals', category: 'multi_goals', period: '1st half' },
+  { code: 'FH_MULTI_GOALS_1_2', label: '11. 1st half multi goals: 1 to 2', optionType: 'first_half_multi_goals', category: 'multi_goals', period: '1st half' },
 ];
 
 const BASKETBALL_MARKET_OPTIONS: {
@@ -85,6 +93,14 @@ export default function MarketExplorerPage() {
       return BASKETBALL_MARKET_OPTIONS.filter((o) => o.category === selectedOptionType);
     }
     if (selectedOptionType === 'ALL') return FOOTBALL_MARKET_OPTIONS;
+    if (selectedOptionType === 'multi_goals') {
+      return FOOTBALL_MARKET_OPTIONS.filter(
+        (o) =>
+          o.optionType === 'multi_goals' ||
+          o.optionType === 'team_multi_goals' ||
+          o.optionType === 'first_half_multi_goals'
+      );
+    }
     return FOOTBALL_MARKET_OPTIONS.filter((o) => o.optionType === selectedOptionType);
   }, [isBasketball, selectedOptionType]);
 
@@ -176,7 +192,7 @@ export default function MarketExplorerPage() {
     marketOptions.find((o) => o.code === selectedMarketLine) || marketOptions[0];
 
   const footballOptionTabs = [
-    { id: 'ALL', label: 'All 10 option types' },
+    { id: 'ALL', label: 'All market types' },
     { id: 'win', label: '1. Win' },
     { id: 'draw', label: '2. Draw' },
     { id: 'double_chance', label: '3. Double chance' },
@@ -187,6 +203,7 @@ export default function MarketExplorerPage() {
     { id: 'highest_scoring_half', label: '8. Highest half' },
     { id: 'first_half_goals', label: '9. 1st half goals' },
     { id: 'second_half_result', label: '10. 2nd half result' },
+    { id: 'multi_goals', label: 'Multi goals' },
   ];
 
   const basketballOptionTabs = [
@@ -427,11 +444,29 @@ export default function MarketExplorerPage() {
                         <td className="py-3 px-3.5 font-display font-bold text-[var(--accent)] tabular-nums">
                           {(prediction.modelProbability * 100).toFixed(1)}%
                         </td>
-                        <td className="py-3 px-3.5 text-[var(--text)] tabular-nums">
-                          {prediction.marketOdds ? `@${formatOdds(prediction.marketOdds)}` : '—'}
+                        <td className="py-3 px-3.5 text-[var(--text)] tabular-nums text-[11.5px]">
+                          {prediction.marketOdds
+                            ? `@${formatOdds(prediction.marketOdds)}`
+                            : prediction.priceSource
+                            ? cleanDisplayText(prediction.priceSource)
+                            : '—'}
                         </td>
                         <td className="py-3 px-3.5 text-[11px]">
-                          <span className="text-[var(--text-2)]">Analysis only</span>
+                          <span
+                            className={
+                              prediction.confidenceTier === 'HIGH'
+                                ? 'text-[var(--accent)] font-semibold'
+                                : 'text-[var(--text-2)]'
+                            }
+                          >
+                            {prediction.confidenceTier === 'HIGH'
+                              ? 'High'
+                              : prediction.confidenceTier === 'MEDIUM'
+                              ? 'Medium'
+                              : prediction.marketCategory === 'multi_goals'
+                              ? 'Speculative'
+                              : 'Analysis only'}
+                          </span>
                         </td>
                         <td className="py-3 px-3.5 text-right">
                           <Link

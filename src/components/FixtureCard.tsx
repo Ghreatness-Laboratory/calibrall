@@ -318,7 +318,7 @@ export default function FixtureCard({
             )}
           </div>
 
-          {/* Probability meter with 70% threshold tick */}
+          {/* Probability meter with threshold tick (60% for Multi goals, 70% standard) */}
           {!isFinished && (
             <div className="relative w-full h-1.5 bg-[var(--surface)] rounded-full overflow-hidden">
               <div
@@ -328,7 +328,7 @@ export default function FixtureCard({
               <span
                 aria-hidden="true"
                 className="absolute top-0 bottom-0 w-[1.5px] bg-[var(--text)]/50"
-                style={{ left: '70%' }}
+                style={{ left: topPrediction.marketCategory === 'multi_goals' ? '60%' : '70%' }}
               />
             </div>
           )}

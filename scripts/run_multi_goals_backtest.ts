@@ -927,7 +927,7 @@ async function main() {
     }
     const modelLL = totMLL / Math.max(1, totK);
     const baseLL = totBLL / Math.max(1, totK);
-    const beatsBaseline = clusters.length >= 30 && boot.brierSkill > 0 && boot.modelBrier < boot.baseBrier;
+    const beatsBaseline = clusters.length >= 30 && boot.brierSkill > 0 && boot.ci95Lower > 0 && boot.modelBrier < boot.baseBrier;
     const tierMode: 'ENABLED' | 'SPECULATIVE_ONLY' | 'DISABLED' =
       clusters.length < 30
         ? 'DISABLED'
@@ -990,6 +990,11 @@ async function main() {
     MEDIUM: { n: 0, hits: 0, sumPred: 0, sumBrier: 0, sumBaseBrier: 0 },
     SPECULATIVE: { n: 0, hits: 0, sumPred: 0, sumBrier: 0, sumBaseBrier: 0 },
   };
+  const rangeTierStats: Record<'HIGH' | 'MEDIUM' | 'SPECULATIVE', { n: number; hits: number; sumPred: number; sumBrier: number; sumBaseBrier: number }> = {
+    HIGH: { n: 0, hits: 0, sumPred: 0, sumBrier: 0, sumBaseBrier: 0 },
+    MEDIUM: { n: 0, hits: 0, sumPred: 0, sumBrier: 0, sumBaseBrier: 0 },
+    SPECULATIVE: { n: 0, hits: 0, sumPred: 0, sumBrier: 0, sumBaseBrier: 0 },
+  };
   const selectedRangeCounts = new Map<string, { n: number; hits: number }>();
 
   for (const [, obsList] of Array.from(matchObsMap.entries())) {
@@ -999,6 +1004,23 @@ async function main() {
       return false;
     });
     if (eligible.length === 0) continue;
+
+    for (const o of eligible) {
+      const lPass = perLeagueResults[o.competitionCode]?.beatsBaseline ?? true;
+      let oTier: 'HIGH' | 'MEDIUM' | 'SPECULATIVE' = 'SPECULATIVE';
+      if (!lPass) {
+        oTier = 'SPECULATIVE';
+      } else if (o.calProb >= 0.60 && (o.span <= 3 || o.calProb > 0.80)) {
+        oTier = 'HIGH';
+      } else if (o.calProb >= 0.48 && o.calProb > o.baseProb) {
+        oTier = 'MEDIUM';
+      }
+      rangeTierStats[oTier].n += 1;
+      rangeTierStats[oTier].hits += o.y;
+      rangeTierStats[oTier].sumPred += o.calProb;
+      rangeTierStats[oTier].sumBrier += (o.calProb - o.y) ** 2;
+      rangeTierStats[oTier].sumBaseBrier += (o.baseProb - o.y) ** 2;
+    }
 
     // Score candidates: prefer High >= 0.60 with tightest span & highest calibrated prob
     eligible.sort((a, b) => {
@@ -1088,6 +1110,20 @@ async function main() {
     );
   }
 
+  console.log('\n--- 4b. ALL ELIGIBLE TIGHT RANGE EVALUATIONS BY TIER ---');
+  console.log('Tier        | Samples | MeanPred | HitRate  | ModelBrier | BaseBrier');
+  console.log('------------+---------+----------+----------+------------+----------');
+  for (const tier of ['HIGH', 'MEDIUM', 'SPECULATIVE'] as const) {
+    const t = rangeTierStats[tier];
+    if (t.n === 0) {
+      console.log(`${tier.padEnd(11)} |       0 |        - |        - |          - |         -`);
+      continue;
+    }
+    console.log(
+      `${tier.padEnd(11)} | ${String(t.n).padStart(7)} | ${(t.sumPred / t.n * 100).toFixed(1).padStart(7)}% | ${(t.hits / t.n * 100).toFixed(1).padStart(7)}% | ${(t.sumBrier / t.n).toFixed(5).padStart(10)} | ${(t.sumBaseBrier / t.n).toFixed(5).padStart(9)}`
+    );
+  }
+
   const reportPayload = {
     generatedAt: new Date().toISOString(),
     overall: {
@@ -1121,6 +1157,21 @@ async function main() {
           tier,
           {
             matches: t.n,
+            meanPred: t.n > 0 ? Number((t.sumPred / t.n).toFixed(4)) : 0,
+            hitRate: t.n > 0 ? Number((t.hits / t.n).toFixed(4)) : 0,
+            modelBrier: t.n > 0 ? Number((t.sumBrier / t.n).toFixed(5)) : 0,
+            baseBrier: t.n > 0 ? Number((t.sumBaseBrier / t.n).toFixed(5)) : 0,
+          },
+        ];
+      })
+    ),
+    byRangeTier: Object.fromEntries(
+      (['HIGH', 'MEDIUM', 'SPECULATIVE'] as const).map(tier => {
+        const t = rangeTierStats[tier];
+        return [
+          tier,
+          {
+            samples: t.n,
             meanPred: t.n > 0 ? Number((t.sumPred / t.n).toFixed(4)) : 0,
             hitRate: t.n > 0 ? Number((t.hits / t.n).toFixed(4)) : 0,
             modelBrier: t.n > 0 ? Number((t.sumBrier / t.n).toFixed(5)) : 0,

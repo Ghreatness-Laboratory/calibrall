@@ -806,7 +806,7 @@ export default function MatchAnalysisPage() {
           <p className="text-[12.5px] text-[var(--text)] leading-[1.5]">
             {cleanDisplayText(
               noRecommendationReason ||
-                `Model pick withheld: ${homeName} and ${awayName} do not meet the 70.0% calibrated threshold with sufficient sample depth.`
+                `Model pick withheld: ${homeName} and ${awayName} do not meet the calibrated probability hurdle with sufficient sample depth.`
             )}
           </p>
         </section>
@@ -856,7 +856,7 @@ export default function MatchAnalysisPage() {
             )}
           </div>
 
-          {/* Probability meter with 70% threshold tick */}
+          {/* Probability meter with threshold tick (60% for Multi goals, 70% standard) */}
           {topPickProb !== null && (
             <div className="space-y-1">
               <div className="relative w-full h-2 rounded-full bg-[var(--surface-2)] overflow-hidden">
@@ -867,12 +867,14 @@ export default function MatchAnalysisPage() {
                 <span
                   aria-hidden="true"
                   className="absolute top-0 bottom-0 w-[2px] bg-[var(--text)]"
-                  style={{ left: '70%' }}
+                  style={{ left: topPick.marketCategory === 'multi_goals' ? '60%' : '70%' }}
                 />
               </div>
               <div className="flex items-center justify-between text-[10.5px] text-[var(--text-3)] tabular-nums">
                 <span>0%</span>
-                <span className="text-[var(--text-2)] font-medium">70% threshold</span>
+                <span className="text-[var(--text-2)] font-medium">
+                  {topPick.marketCategory === 'multi_goals' ? '60% threshold' : '70% threshold'}
+                </span>
                 <span>100%</span>
               </div>
             </div>

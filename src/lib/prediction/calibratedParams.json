@@ -455,10 +455,10 @@
         "modelBrier": 0.21883,
         "baseBrier": 0.22077,
         "brierSkill": 0.0088,
-        "ci95Lower": 0.0072,
+        "ci95Lower": 0.0071,
         "ci95Upper": 0.0103,
         "allowed": true,
-        "reason": "Allowed: Multi goals BSS +0.0088 (95% CI [+0.0072, +0.0103] > 0 across 14005 held-out matches)."
+        "reason": "Allowed: Multi goals BSS +0.0088 (95% CI [+0.0071, +0.0103] > 0 across 14005 held-out matches)."
       }
     },
     "EURO_NO_REF": {
@@ -614,9 +614,9 @@
         "baseBrier": 0.22194,
         "brierSkill": 0.0127,
         "ci95Lower": 0.0113,
-        "ci95Upper": 0.014,
+        "ci95Upper": 0.0141,
         "allowed": true,
-        "reason": "Allowed: Multi goals BSS +0.0127 (95% CI [+0.0113, +0.0140] > 0 across 18671 held-out matches)."
+        "reason": "Allowed: Multi goals BSS +0.0127 (95% CI [+0.0113, +0.0141] > 0 across 18671 held-out matches)."
       }
     },
     "EXTRA_GOALS_ONLY": {
@@ -766,15 +766,15 @@
       "multi_goals": {
         "leagueGroup": "EXTRA_GOALS_ONLY",
         "market": "multi_goals",
-        "matches": 23401,
-        "samples": 468002,
-        "modelBrier": 0.21809,
-        "baseBrier": 0.22013,
-        "brierSkill": 0.0092,
+        "matches": 23408,
+        "samples": 468152,
+        "modelBrier": 0.21808,
+        "baseBrier": 0.22012,
+        "brierSkill": 0.0093,
         "ci95Lower": 0.0079,
-        "ci95Upper": 0.0106,
+        "ci95Upper": 0.0107,
         "allowed": true,
-        "reason": "Allowed: Multi goals BSS +0.0092 (95% CI [+0.0079, +0.0106] > 0 across 23401 held-out matches)."
+        "reason": "Allowed: Multi goals BSS +0.0093 (95% CI [+0.0079, +0.0107] > 0 across 23408 held-out matches)."
       }
     }
   },
@@ -2935,42 +2935,42 @@
     }
   },
   "multiGoalsValidation": {
-    "generatedAt": "2026-11-26T15:59:17.156Z",
+    "generatedAt": "2026-11-27T11:14:28.857Z",
     "overall": {
-      "heldOutMatches": 56077,
-      "totalRangeEvaluations": 1186794,
+      "heldOutMatches": 56084,
+      "totalRangeEvaluations": 1186944,
       "modelBrier": 0.21864,
       "naiveBrier": 0.22092,
       "brierSkill": 0.0103,
-      "modelLogLoss": 0.62692,
+      "modelLogLoss": 0.6269,
       "naiveLogLoss": 0.63194,
-      "ece": 0.00206
+      "ece": 0.00207
     },
     "plattParams": {
       "global": {
-        "a": 0.9914,
+        "a": 0.9915,
         "b": 0.0168
       },
       "fullMatch": {
-        "a": 0.9821,
-        "b": 0.0255
+        "a": 0.9822,
+        "b": 0.0254
       },
       "team": {
         "a": 1.0137,
-        "b": 0.003
+        "b": 0.0031
       },
       "firstHalf": {
-        "a": 0.8749,
-        "b": 0.0712
+        "a": 0.8738,
+        "b": 0.072
       }
     },
     "byTier": {
       "HIGH": {
-        "matches": 56077,
-        "meanPred": 0.7489,
-        "hitRate": 0.7514,
-        "modelBrier": 0.18527,
-        "baseBrier": 0.19204
+        "matches": 47057,
+        "meanPred": 0.7501,
+        "hitRate": 0.755,
+        "modelBrier": 0.18342,
+        "baseBrier": 0.191
       },
       "MEDIUM": {
         "matches": 0,
@@ -2980,26 +2980,26 @@
         "baseBrier": 0
       },
       "SPECULATIVE": {
-        "matches": 0,
-        "meanPred": 0,
-        "hitRate": 0,
-        "modelBrier": 0,
-        "baseBrier": 0
+        "matches": 9027,
+        "meanPred": 0.742,
+        "hitRate": 0.7326,
+        "modelBrier": 0.19479,
+        "baseBrier": 0.19733
       }
     },
     "perLeague": {
       "ARG": {
         "competitionCode": "ARG",
         "leagueGroup": "EXTRA_GOALS_ONLY",
-        "matches": 2830,
-        "samples": 56600,
-        "modelBrier": 0.21237,
-        "baseBrier": 0.21347,
-        "modelLogLoss": 0.61327,
-        "baseLogLoss": 0.61593,
-        "brierSkill": 0.0051,
-        "ci95Lower": 0.0001,
-        "ci95Upper": 0.0097,
+        "matches": 2828,
+        "samples": 56560,
+        "modelBrier": 0.21234,
+        "baseBrier": 0.21346,
+        "modelLogLoss": 0.6132,
+        "baseLogLoss": 0.61589,
+        "brierSkill": 0.0052,
+        "ci95Lower": 0.0006,
+        "ci95Upper": 0.0098,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3010,11 +3010,11 @@
         "samples": 19140,
         "modelBrier": 0.2185,
         "baseBrier": 0.22067,
-        "modelLogLoss": 0.62673,
+        "modelLogLoss": 0.62674,
         "baseLogLoss": 0.63143,
         "brierSkill": 0.0098,
-        "ci95Lower": 0.0038,
-        "ci95Upper": 0.0167,
+        "ci95Lower": 0.0036,
+        "ci95Upper": 0.0164,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3028,8 +3028,8 @@
         "modelLogLoss": 0.63132,
         "baseLogLoss": 0.63873,
         "brierSkill": 0.0152,
-        "ci95Lower": 0.0101,
-        "ci95Upper": 0.02,
+        "ci95Lower": 0.01,
+        "ci95Upper": 0.0201,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3037,14 +3037,14 @@
         "competitionCode": "BSA",
         "leagueGroup": "EXTRA_GOALS_ONLY",
         "matches": 2000,
-        "samples": 39982,
-        "modelBrier": 0.21275,
-        "baseBrier": 0.21369,
-        "modelLogLoss": 0.61372,
-        "baseLogLoss": 0.61579,
-        "brierSkill": 0.0044,
-        "ci95Lower": -0.0001,
-        "ci95Upper": 0.0088,
+        "samples": 39992,
+        "modelBrier": 0.21272,
+        "baseBrier": 0.21365,
+        "modelLogLoss": 0.61366,
+        "baseLogLoss": 0.61569,
+        "brierSkill": 0.0043,
+        "ci95Lower": 0.0002,
+        "ci95Upper": 0.0089,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3058,8 +3058,8 @@
         "modelLogLoss": 0.62814,
         "baseLogLoss": 0.63955,
         "brierSkill": 0.0233,
-        "ci95Lower": 0.0175,
-        "ci95Upper": 0.0294,
+        "ci95Lower": 0.017,
+        "ci95Upper": 0.0297,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3074,7 +3074,7 @@
         "baseLogLoss": 0.6432,
         "brierSkill": 0.0122,
         "ci95Lower": 0.0075,
-        "ci95Upper": 0.0173,
+        "ci95Upper": 0.0174,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3088,10 +3088,10 @@
         "modelLogLoss": 0.63739,
         "baseLogLoss": 0.63854,
         "brierSkill": 0.0024,
-        "ci95Lower": -0.0019,
-        "ci95Upper": 0.0072,
-        "beatsBaseline": true,
-        "tierMode": "ENABLED"
+        "ci95Lower": -0.002,
+        "ci95Upper": 0.0068,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
       },
       "DNK": {
         "competitionCode": "DNK",
@@ -3100,13 +3100,13 @@
         "samples": 19340,
         "modelBrier": 0.21997,
         "baseBrier": 0.22121,
-        "modelLogLoss": 0.6298,
+        "modelLogLoss": 0.62981,
         "baseLogLoss": 0.63243,
         "brierSkill": 0.0056,
-        "ci95Lower": -0.0005,
-        "ci95Upper": 0.0119,
-        "beatsBaseline": true,
-        "tierMode": "ENABLED"
+        "ci95Lower": -0.0003,
+        "ci95Upper": 0.0114,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
       },
       "E0": {
         "competitionCode": "E0",
@@ -3118,8 +3118,8 @@
         "modelLogLoss": 0.6303,
         "baseLogLoss": 0.63657,
         "brierSkill": 0.013,
-        "ci95Lower": 0.0083,
-        "ci95Upper": 0.0181,
+        "ci95Lower": 0.0085,
+        "ci95Upper": 0.0178,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3134,7 +3134,7 @@
         "baseLogLoss": 0.62455,
         "brierSkill": 0.0065,
         "ci95Lower": 0.0025,
-        "ci95Upper": 0.01,
+        "ci95Upper": 0.0103,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3148,8 +3148,8 @@
         "modelLogLoss": 0.62661,
         "baseLogLoss": 0.63029,
         "brierSkill": 0.0074,
-        "ci95Lower": 0.0039,
-        "ci95Upper": 0.0112,
+        "ci95Lower": 0.0038,
+        "ci95Upper": 0.0111,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3163,10 +3163,10 @@
         "modelLogLoss": 0.62677,
         "baseLogLoss": 0.62846,
         "brierSkill": 0.0033,
-        "ci95Lower": -0.0008,
-        "ci95Upper": 0.0072,
-        "beatsBaseline": true,
-        "tierMode": "ENABLED"
+        "ci95Lower": -0.0006,
+        "ci95Upper": 0.0073,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
       },
       "EC": {
         "competitionCode": "EC",
@@ -3178,8 +3178,8 @@
         "modelLogLoss": 0.62786,
         "baseLogLoss": 0.63369,
         "brierSkill": 0.0121,
-        "ci95Lower": 0.0079,
-        "ci95Upper": 0.0161,
+        "ci95Lower": 0.008,
+        "ci95Upper": 0.0162,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3194,7 +3194,7 @@
         "baseLogLoss": 0.64008,
         "brierSkill": 0.0098,
         "ci95Lower": 0.0055,
-        "ci95Upper": 0.0147,
+        "ci95Upper": 0.0143,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3208,10 +3208,10 @@
         "modelLogLoss": 0.63032,
         "baseLogLoss": 0.63206,
         "brierSkill": 0.0034,
-        "ci95Lower": -0.0012,
+        "ci95Lower": -0.001,
         "ci95Upper": 0.0083,
-        "beatsBaseline": true,
-        "tierMode": "ENABLED"
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
       },
       "FIN": {
         "competitionCode": "FIN",
@@ -3224,7 +3224,7 @@
         "baseLogLoss": 0.64009,
         "brierSkill": 0.022,
         "ci95Lower": 0.013,
-        "ci95Upper": 0.0309,
+        "ci95Upper": 0.0306,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3235,11 +3235,11 @@
         "samples": 22724,
         "modelBrier": 0.21612,
         "baseBrier": 0.22156,
-        "modelLogLoss": 0.62138,
+        "modelLogLoss": 0.62139,
         "baseLogLoss": 0.63331,
         "brierSkill": 0.0245,
-        "ci95Lower": 0.0184,
-        "ci95Upper": 0.0314,
+        "ci95Lower": 0.0181,
+        "ci95Upper": 0.031,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3253,8 +3253,8 @@
         "modelLogLoss": 0.62063,
         "baseLogLoss": 0.62893,
         "brierSkill": 0.017,
-        "ci95Lower": 0.012,
-        "ci95Upper": 0.022,
+        "ci95Lower": 0.0114,
+        "ci95Upper": 0.0227,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3268,10 +3268,10 @@
         "modelLogLoss": 0.6244,
         "baseLogLoss": 0.62551,
         "brierSkill": 0.0023,
-        "ci95Lower": -0.0014,
-        "ci95Upper": 0.0062,
-        "beatsBaseline": true,
-        "tierMode": "ENABLED"
+        "ci95Lower": -0.0017,
+        "ci95Upper": 0.0064,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
       },
       "IRL": {
         "competitionCode": "IRL",
@@ -3283,38 +3283,38 @@
         "modelLogLoss": 0.62138,
         "baseLogLoss": 0.62726,
         "brierSkill": 0.0121,
-        "ci95Lower": 0.0054,
-        "ci95Upper": 0.018,
+        "ci95Lower": 0.0052,
+        "ci95Upper": 0.0184,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
       "JPN": {
         "competitionCode": "JPN",
         "leagueGroup": "EXTRA_GOALS_ONLY",
-        "matches": 1533,
-        "samples": 30660,
-        "modelBrier": 0.2203,
-        "baseBrier": 0.22162,
-        "modelLogLoss": 0.63071,
-        "baseLogLoss": 0.63367,
-        "brierSkill": 0.006,
-        "ci95Lower": 0.0002,
-        "ci95Upper": 0.0113,
+        "matches": 1540,
+        "samples": 30800,
+        "modelBrier": 0.22017,
+        "baseBrier": 0.22159,
+        "modelLogLoss": 0.63042,
+        "baseLogLoss": 0.63358,
+        "brierSkill": 0.0064,
+        "ci95Lower": 0.0012,
+        "ci95Upper": 0.0117,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
       "MEX": {
         "competitionCode": "MEX",
         "leagueGroup": "EXTRA_GOALS_ONLY",
-        "matches": 1747,
-        "samples": 34940,
-        "modelBrier": 0.21989,
-        "baseBrier": 0.22159,
-        "modelLogLoss": 0.62981,
-        "baseLogLoss": 0.63347,
+        "matches": 1751,
+        "samples": 35020,
+        "modelBrier": 0.21994,
+        "baseBrier": 0.22161,
+        "modelLogLoss": 0.62991,
+        "baseLogLoss": 0.63353,
         "brierSkill": 0.0076,
-        "ci95Lower": 0.0025,
-        "ci95Upper": 0.0126,
+        "ci95Lower": 0.003,
+        "ci95Upper": 0.0125,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3328,8 +3328,8 @@
         "modelLogLoss": 0.63039,
         "baseLogLoss": 0.63965,
         "brierSkill": 0.0192,
-        "ci95Lower": 0.0139,
-        "ci95Upper": 0.0241,
+        "ci95Lower": 0.0142,
+        "ci95Upper": 0.0242,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3343,8 +3343,8 @@
         "modelLogLoss": 0.63498,
         "baseLogLoss": 0.64063,
         "brierSkill": 0.0116,
-        "ci95Lower": 0.0068,
-        "ci95Upper": 0.0161,
+        "ci95Lower": 0.0065,
+        "ci95Upper": 0.0165,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3359,7 +3359,7 @@
         "baseLogLoss": 0.63355,
         "brierSkill": 0.0231,
         "ci95Lower": 0.0177,
-        "ci95Upper": 0.0289,
+        "ci95Upper": 0.0284,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3373,7 +3373,7 @@
         "modelLogLoss": 0.6261,
         "baseLogLoss": 0.62849,
         "brierSkill": 0.005,
-        "ci95Lower": 0.0007,
+        "ci95Lower": 0.0005,
         "ci95Upper": 0.0096,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
@@ -3385,11 +3385,11 @@
         "samples": 31580,
         "modelBrier": 0.2164,
         "baseBrier": 0.2185,
-        "modelLogLoss": 0.62198,
+        "modelLogLoss": 0.62199,
         "baseLogLoss": 0.62687,
         "brierSkill": 0.0096,
-        "ci95Lower": 0.0041,
-        "ci95Upper": 0.0148,
+        "ci95Lower": 0.0043,
+        "ci95Upper": 0.0149,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3403,7 +3403,7 @@
         "modelLogLoss": 0.62335,
         "baseLogLoss": 0.63436,
         "brierSkill": 0.0223,
-        "ci95Lower": 0.0145,
+        "ci95Lower": 0.0144,
         "ci95Upper": 0.0298,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
@@ -3418,7 +3418,7 @@
         "modelLogLoss": 0.62527,
         "baseLogLoss": 0.63719,
         "brierSkill": 0.0243,
-        "ci95Lower": 0.0176,
+        "ci95Lower": 0.0175,
         "ci95Upper": 0.0311,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
@@ -3430,13 +3430,13 @@
         "samples": 15444,
         "modelBrier": 0.22447,
         "baseBrier": 0.22464,
-        "modelLogLoss": 0.64008,
+        "modelLogLoss": 0.64007,
         "baseLogLoss": 0.6403,
         "brierSkill": 0.0008,
-        "ci95Lower": -0.0069,
-        "ci95Upper": 0.0086,
-        "beatsBaseline": true,
-        "tierMode": "ENABLED"
+        "ci95Lower": -0.0063,
+        "ci95Upper": 0.0079,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
       },
       "SC2": {
         "competitionCode": "SC2",
@@ -3448,8 +3448,8 @@
         "modelLogLoss": 0.6283,
         "baseLogLoss": 0.63376,
         "brierSkill": 0.0114,
-        "ci95Lower": 0.0039,
-        "ci95Upper": 0.0178,
+        "ci95Lower": 0.0045,
+        "ci95Upper": 0.0181,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3463,10 +3463,10 @@
         "modelLogLoss": 0.6309,
         "baseLogLoss": 0.63157,
         "brierSkill": 0.0014,
-        "ci95Lower": -0.0049,
-        "ci95Upper": 0.0072,
-        "beatsBaseline": true,
-        "tierMode": "ENABLED"
+        "ci95Lower": -0.005,
+        "ci95Upper": 0.0073,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
       },
       "SP1": {
         "competitionCode": "SP1",
@@ -3478,7 +3478,7 @@
         "modelLogLoss": 0.62033,
         "baseLogLoss": 0.6287,
         "brierSkill": 0.0172,
-        "ci95Lower": 0.0118,
+        "ci95Lower": 0.012,
         "ci95Upper": 0.0224,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
@@ -3494,7 +3494,7 @@
         "baseLogLoss": 0.62821,
         "brierSkill": 0.0088,
         "ci95Lower": 0.0032,
-        "ci95Upper": 0.0141,
+        "ci95Upper": 0.014,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3509,7 +3509,7 @@
         "baseLogLoss": 0.63405,
         "brierSkill": 0.0079,
         "ci95Lower": 0.0027,
-        "ci95Upper": 0.0137,
+        "ci95Upper": 0.0133,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3523,8 +3523,8 @@
         "modelLogLoss": 0.62932,
         "baseLogLoss": 0.63233,
         "brierSkill": 0.0063,
-        "ci95Lower": 0.0005,
-        "ci95Upper": 0.0115,
+        "ci95Lower": 0.0011,
+        "ci95Upper": 0.0121,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
@@ -3538,22 +3538,22 @@
         "modelLogLoss": 0.63332,
         "baseLogLoss": 0.64064,
         "brierSkill": 0.0151,
-        "ci95Lower": 0.0101,
-        "ci95Upper": 0.0198,
+        "ci95Lower": 0.0104,
+        "ci95Upper": 0.0201,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       },
       "USA": {
         "competitionCode": "USA",
         "leagueGroup": "EXTRA_GOALS_ONLY",
-        "matches": 2656,
-        "samples": 53120,
-        "modelBrier": 0.2224,
-        "baseBrier": 0.22392,
-        "modelLogLoss": 0.63533,
-        "baseLogLoss": 0.63865,
+        "matches": 2654,
+        "samples": 53080,
+        "modelBrier": 0.22237,
+        "baseBrier": 0.2239,
+        "modelLogLoss": 0.63525,
+        "baseLogLoss": 0.63861,
         "brierSkill": 0.0068,
-        "ci95Lower": 0.0034,
+        "ci95Lower": 0.0033,
         "ci95Upper": 0.0103,
         "beatsBaseline": true,
         "tierMode": "ENABLED"

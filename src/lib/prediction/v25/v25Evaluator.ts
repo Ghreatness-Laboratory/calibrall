@@ -19,7 +19,8 @@ import { DixonColesV25Engine, V25ScorelineMatrix, COVARIATE_COEFFICIENTS } from 
 import { ConfidenceEngine } from './confidenceEngine';
 import { WhyPanelGenerator } from './whyPanel';
 import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
-import { formatSelectionName } from '../marketCatalog';
+import { formatSelectionName, isOptionTypeEnabled } from '../marketCatalog';
+import { isMultiGoalsEnabled } from './featureFlags';
 import { getMarketBaseline } from '../baselines';
 import { marketMonitor, getEquivalentCanonicalKey } from '../marketMonitor';
 import { getMarketFamily } from '../marketSelection';
@@ -968,7 +969,7 @@ export class DixonColesV25Evaluator {
         }
       }
     } else {
-      noRecommendationReason = cleanDisplayText(`No pick selected for ${displayName(context.homeTeamName)} (${homeSamples} matches stored) vs ${displayName(context.awayTeamName)} (${awaySamples} matches stored): no evaluated market cleared both the 70.0% calibrated probability hurdle and walk forward Brier skill validation.`);
+      noRecommendationReason = cleanDisplayText(`No pick selected for ${displayName(context.homeTeamName)} (${homeSamples} matches stored) vs ${displayName(context.awayTeamName)} (${awaySamples} matches stored): no evaluated market cleared the calibrated probability hurdles and walk forward Brier skill validation.`);
     }
 
     // Sort all processed predictions: eligible first in exact EV/edge rank, then remaining by calProb
@@ -1458,113 +1459,119 @@ export class DixonColesV25Evaluator {
     }
 
     // 11. MULTI GOALS (Full match 12 ranges, Team Home/Away 4 ranges each, optional 1st Half 2 ranges)
-    const fullMatchBands: [number, number][] = [
-      [1, 2], [1, 3], [1, 4], [1, 5],
-      [2, 3], [2, 4], [2, 5], [2, 6],
-      [3, 4], [3, 5], [3, 6], [4, 6],
-    ];
-    for (const [minG, maxG] of fullMatchBands) {
-      const bandKey = `${minG}-${maxG}`;
-      const rawP = matrix.multiGoals.fullMatch[bandKey] ?? 0;
-      const span = maxG - minG + 1;
-      list.push({
-        marketCode: `MULTI_GOALS_${minG}_${maxG}`,
-        optionType: 'multi_goals',
-        marketCategory: 'multi_goals',
-        marketName: 'Multi goals',
-        selection: `Multi goals ${minG} to ${maxG}`,
-        period: 'REGULAR_TIME',
-        settlementRule: `Regular time 90m total goals between ${minG} and ${maxG} inclusive excluding extra time.`,
-        rawProb: rawP,
-        marketOdds: undefined,
-        priceSource: 'model line - no market price',
-        multiGoalsMeta: {
-          scope: 'full_match',
-          minGoals: minG,
-          maxGoals: maxG,
-          span,
-          band: `${minG} to ${maxG}`,
-          expectedTotalGoals: Number((lambda + mu).toFixed(2)),
-        },
-      });
-    }
+    if (isMultiGoalsEnabled()) {
+      if (isOptionTypeEnabled('multi_goals')) {
+        const fullMatchBands: [number, number][] = [
+          [1, 2], [1, 3], [1, 4], [1, 5],
+          [2, 3], [2, 4], [2, 5], [2, 6],
+          [3, 4], [3, 5], [3, 6], [4, 6],
+        ];
+        for (const [minG, maxG] of fullMatchBands) {
+          const bandKey = `${minG}-${maxG}`;
+          const rawP = matrix.multiGoals.fullMatch[bandKey] ?? 0;
+          const span = maxG - minG + 1;
+          list.push({
+            marketCode: `MULTI_GOALS_${minG}_${maxG}`,
+            optionType: 'multi_goals',
+            marketCategory: 'multi_goals',
+            marketName: 'Multi goals',
+            selection: `Multi goals ${minG} to ${maxG}`,
+            period: 'REGULAR_TIME',
+            settlementRule: `Regular time 90m total goals between ${minG} and ${maxG} inclusive excluding extra time.`,
+            rawProb: rawP,
+            marketOdds: undefined,
+            priceSource: 'model line - no market price',
+            multiGoalsMeta: {
+              scope: 'full_match',
+              minGoals: minG,
+              maxGoals: maxG,
+              span,
+              band: `${minG} to ${maxG}`,
+              expectedTotalGoals: Number((lambda + mu).toFixed(2)),
+            },
+          });
+        }
+      }
 
-    const teamBands: [number, number][] = [[0, 1], [1, 2], [1, 3], [2, 3]];
-    for (const [minG, maxG] of teamBands) {
-      const bandKey = `${minG}-${maxG}`;
-      const span = maxG - minG + 1;
-      list.push({
-        marketCode: `TEAM_MULTI_GOALS_HOME_${minG}_${maxG}`,
-        optionType: 'team_multi_goals',
-        marketCategory: 'multi_goals',
-        marketName: `${home} multi goals`,
-        selection: `${home} multi goals ${minG} to ${maxG}`,
-        period: 'REGULAR_TIME',
-        settlementRule: `${home} 90m regular time goals between ${minG} and ${maxG} inclusive excluding extra time.`,
-        rawProb: matrix.multiGoals.home[bandKey] ?? 0,
-        marketOdds: undefined,
-        priceSource: 'model line - no market price',
-        multiGoalsMeta: {
-          scope: 'home',
-          minGoals: minG,
-          maxGoals: maxG,
-          span,
-          band: `${minG} to ${maxG}`,
-          expectedTotalGoals: Number(lambda.toFixed(2)),
-        },
-      });
-      list.push({
-        marketCode: `TEAM_MULTI_GOALS_AWAY_${minG}_${maxG}`,
-        optionType: 'team_multi_goals',
-        marketCategory: 'multi_goals',
-        marketName: `${away} multi goals`,
-        selection: `${away} multi goals ${minG} to ${maxG}`,
-        period: 'REGULAR_TIME',
-        settlementRule: `${away} 90m regular time goals between ${minG} and ${maxG} inclusive excluding extra time.`,
-        rawProb: matrix.multiGoals.away[bandKey] ?? 0,
-        marketOdds: undefined,
-        priceSource: 'model line - no market price',
-        multiGoalsMeta: {
-          scope: 'away',
-          minGoals: minG,
-          maxGoals: maxG,
-          span,
-          band: `${minG} to ${maxG}`,
-          expectedTotalGoals: Number(mu.toFixed(2)),
-        },
-      });
-    }
+      if (isOptionTypeEnabled('team_multi_goals')) {
+        const teamBands: [number, number][] = [[0, 1], [1, 2], [1, 3], [2, 3]];
+        for (const [minG, maxG] of teamBands) {
+          const bandKey = `${minG}-${maxG}`;
+          const span = maxG - minG + 1;
+          list.push({
+            marketCode: `TEAM_MULTI_GOALS_HOME_${minG}_${maxG}`,
+            optionType: 'team_multi_goals',
+            marketCategory: 'multi_goals',
+            marketName: `${home} multi goals`,
+            selection: `${home} multi goals ${minG} to ${maxG}`,
+            period: 'REGULAR_TIME',
+            settlementRule: `${home} 90m regular time goals between ${minG} and ${maxG} inclusive excluding extra time.`,
+            rawProb: matrix.multiGoals.home[bandKey] ?? 0,
+            marketOdds: undefined,
+            priceSource: 'model line - no market price',
+            multiGoalsMeta: {
+              scope: 'home',
+              minGoals: minG,
+              maxGoals: maxG,
+              span,
+              band: `${minG} to ${maxG}`,
+              expectedTotalGoals: Number(lambda.toFixed(2)),
+            },
+          });
+          list.push({
+            marketCode: `TEAM_MULTI_GOALS_AWAY_${minG}_${maxG}`,
+            optionType: 'team_multi_goals',
+            marketCategory: 'multi_goals',
+            marketName: `${away} multi goals`,
+            selection: `${away} multi goals ${minG} to ${maxG}`,
+            period: 'REGULAR_TIME',
+            settlementRule: `${away} 90m regular time goals between ${minG} and ${maxG} inclusive excluding extra time.`,
+            rawProb: matrix.multiGoals.away[bandKey] ?? 0,
+            marketOdds: undefined,
+            priceSource: 'model line - no market price',
+            multiGoalsMeta: {
+              scope: 'away',
+              minGoals: minG,
+              maxGoals: maxG,
+              span,
+              band: `${minG} to ${maxG}`,
+              expectedTotalGoals: Number(mu.toFixed(2)),
+            },
+          });
+        }
+      }
 
-    const hasExplicitHalfSample =
-      cap.hasHalfTimeGoals &&
-      (context.halfTimeSampleCount === undefined || context.halfTimeSampleCount >= 6);
-    if (hasExplicitHalfSample) {
-      const halfBands: [number, number][] = [[0, 1], [1, 2]];
-      const leagueHalvesShare = getLeagueCalibratedConfig(context.competitionCode)?.halves?.firstHalfGoalShare ?? 0.439;
-      const expectedFirstHalfGoals = Number(((lambda + mu) * leagueHalvesShare).toFixed(2));
-      for (const [minG, maxG] of halfBands) {
-        const bandKey = `${minG}-${maxG}`;
-        const span = maxG - minG + 1;
-        list.push({
-          marketCode: `FH_MULTI_GOALS_${minG}_${maxG}`,
-          optionType: 'first_half_multi_goals',
-          marketCategory: 'multi_goals',
-          marketName: '1st half multi goals',
-          selection: `1st half multi goals ${minG} to ${maxG}`,
-          period: 'FIRST_HALF',
-          settlementRule: `First half goals between ${minG} and ${maxG} inclusive.`,
-          rawProb: matrix.multiGoals.firstHalf[bandKey] ?? 0,
-          marketOdds: undefined,
-          priceSource: 'model line - no market price',
-          multiGoalsMeta: {
-            scope: 'first_half',
-            minGoals: minG,
-            maxGoals: maxG,
-            span,
-            band: `${minG} to ${maxG}`,
-            expectedTotalGoals: expectedFirstHalfGoals,
-          },
-        });
+      const hasExplicitHalfSample =
+        cap.hasHalfTimeGoals &&
+        (context.halfTimeSampleCount === undefined || context.halfTimeSampleCount >= 6);
+      if (isOptionTypeEnabled('first_half_multi_goals') && hasExplicitHalfSample) {
+        const halfBands: [number, number][] = [[0, 1], [1, 2]];
+        const leagueHalvesShare = getLeagueCalibratedConfig(context.competitionCode)?.halves?.firstHalfGoalShare ?? 0.439;
+        const expectedFirstHalfGoals = Number(((lambda + mu) * leagueHalvesShare).toFixed(2));
+        for (const [minG, maxG] of halfBands) {
+          const bandKey = `${minG}-${maxG}`;
+          const span = maxG - minG + 1;
+          list.push({
+            marketCode: `FH_MULTI_GOALS_${minG}_${maxG}`,
+            optionType: 'first_half_multi_goals',
+            marketCategory: 'multi_goals',
+            marketName: '1st half multi goals',
+            selection: `1st half multi goals ${minG} to ${maxG}`,
+            period: 'FIRST_HALF',
+            settlementRule: `First half goals between ${minG} and ${maxG} inclusive.`,
+            rawProb: matrix.multiGoals.firstHalf[bandKey] ?? 0,
+            marketOdds: undefined,
+            priceSource: 'model line - no market price',
+            multiGoalsMeta: {
+              scope: 'first_half',
+              minGoals: minG,
+              maxGoals: maxG,
+              span,
+              band: `${minG} to ${maxG}`,
+              expectedTotalGoals: expectedFirstHalfGoals,
+            },
+          });
+        }
       }
     }
 

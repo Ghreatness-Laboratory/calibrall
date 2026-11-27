@@ -124,6 +124,27 @@ export default function MarketComparisonTable({
     [goalBoundsPredictions]
   );
 
+  const multiGoalsPredictions = useMemo(
+    () => predictions.filter((p) => p.marketCategory === 'multi_goals'),
+    [predictions]
+  );
+
+  const topFullMatchMultiGoals = useMemo(
+    () =>
+      multiGoalsPredictions
+        .filter((p) => p.multiGoalsMeta?.scope === 'full_match' && ((p.multiGoalsMeta?.span ?? 5) <= 3 || ((p.multiGoalsMeta?.span ?? 5) === 4 && (p.calibratedProbability ?? p.modelProbability) > 0.80)))
+        .sort((a, b) => (b.calibratedProbability ?? b.modelProbability) - (a.calibratedProbability ?? a.modelProbability))[0],
+    [multiGoalsPredictions]
+  );
+
+  const topTeamMultiGoals = useMemo(
+    () =>
+      multiGoalsPredictions
+        .filter((p) => p.multiGoalsMeta?.scope === 'home' || p.multiGoalsMeta?.scope === 'away')
+        .sort((a, b) => (b.calibratedProbability ?? b.modelProbability) - (a.calibratedProbability ?? a.modelProbability))[0],
+    [multiGoalsPredictions]
+  );
+
   const halfPredictions = useMemo(
     () => predictions.filter((p) => p.marketCategory === 'half_time'),
     [predictions]
@@ -209,7 +230,7 @@ export default function MarketComparisonTable({
               ) : (
                 <>
                   <span>·</span>
-                  <span>Probability only</span>
+                  <span>{pred.priceSource ? cleanDisplayText(pred.priceSource) : 'Probability only'}</span>
                 </>
               )}
             </div>
@@ -583,7 +604,67 @@ export default function MarketComparisonTable({
             </div>
           </div>
 
+          {/* Multi goals */}
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-[var(--line)] pb-2.5">
+              <div className="flex items-center gap-2">
+                <Gauge className="w-4 h-4 text-[var(--accent)]" />
+                <h4 className="font-display text-[14px] font-semibold text-[var(--text)]">
+                  Multi goals
+                </h4>
+              </div>
+              <span className="text-[11px] text-[var(--text-2)]">Model line, no market price</span>
+            </div>
+
+            {(topFullMatchMultiGoals || topTeamMultiGoals) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {topFullMatchMultiGoals && (
+                  <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] space-y-1">
+                    <div className="text-[11px] text-[var(--text-2)]">
+                      Top full match band (width {topFullMatchMultiGoals.multiGoalsMeta?.span ?? 3})
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-semibold text-[var(--text)]">
+                        {cleanDisplayText(topFullMatchMultiGoals.selection)}
+                      </span>
+                      <span className="font-display text-[14px] text-[var(--accent)] font-bold tabular-nums">
+                        {((topFullMatchMultiGoals.calibratedProbability ?? topFullMatchMultiGoals.modelProbability) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {topTeamMultiGoals && (
+                  <div className="p-3 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] space-y-1">
+                    <div className="text-[11px] text-[var(--text-2)]">
+                      Top team band (width {topTeamMultiGoals.multiGoalsMeta?.span ?? 2})
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-semibold text-[var(--text)]">
+                        {cleanDisplayText(topTeamMultiGoals.selection)}
+                      </span>
+                      <span className="font-display text-[14px] text-[var(--accent)] font-bold tabular-nums">
+                        {((topTeamMultiGoals.calibratedProbability ?? topTeamMultiGoals.modelProbability) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="border border-[var(--line)] rounded-[12px] overflow-hidden">
+              {multiGoalsPredictions.length > 0 ? (
+                multiGoalsPredictions.map(renderPredictionRow)
+              ) : (
+                <div className="p-4 text-center text-[12px] text-[var(--text-3)]">
+                  No multi goals bands evaluated.
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Goal bounds */}
+          {goalBoundsPredictions.length > 0 && (
           <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-[var(--line)] pb-2.5">
               <div className="flex items-center gap-2">
@@ -628,15 +709,10 @@ export default function MarketComparisonTable({
             )}
 
             <div className="border border-[var(--line)] rounded-[12px] overflow-hidden">
-              {goalBoundsPredictions.length > 0 ? (
-                goalBoundsPredictions.map(renderPredictionRow)
-              ) : (
-                <div className="p-4 text-center text-[12px] text-[var(--text-3)]">
-                  No goal bound lines evaluated.
-                </div>
-              )}
+              {goalBoundsPredictions.map(renderPredictionRow)}
             </div>
           </div>
+          )}
 
           {/* Halves analysis */}
           <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
@@ -680,7 +756,7 @@ export default function MarketComparisonTable({
                 'double_chance',
                 'handicap',
                 'total_goals',
-                'goal_bounds',
+                'multi_goals',
                 'half_time',
                 'total_corners',
                 'bookings',

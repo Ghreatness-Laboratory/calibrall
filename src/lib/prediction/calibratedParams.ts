@@ -168,9 +168,10 @@ export interface CalibratedParamsData {
   >;
   multiGoalsValidation?: {
     generatedAt?: string;
-    heldOutMatches?: number;
     overall?: {
-      samples: number;
+      heldOutMatches?: number;
+      totalRangeEvaluations?: number;
+      samples?: number;
       modelBrier: number;
       naiveBrier: number;
       brierSkill: number;
@@ -184,6 +185,13 @@ export interface CalibratedParamsData {
       team: MultiGoalsPlattParams;
       firstHalf: MultiGoalsPlattParams;
     };
+    byTier?: Record<string, {
+      matches: number;
+      meanPred: number;
+      hitRate: number;
+      modelBrier: number;
+      baseBrier: number;
+    }>;
     perLeague?: Record<string, MultiGoalsLeagueValidation>;
   };
   leagues: Record<string, CalibratedLeagueConfig>;

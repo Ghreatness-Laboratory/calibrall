@@ -36,9 +36,17 @@ export class WhyPanelGenerator {
     const isBtts = selection.toLowerCase().includes('btts');
     const isCorners = optionType === 'corners';
     const isCards = optionType === 'bookings';
+    const isMultiGoals =
+      optionType === 'multi_goals' ||
+      optionType === 'team_multi_goals' ||
+      optionType === 'first_half_multi_goals';
 
     // 1. Build Factors FOR
-    if (isCorners) {
+    if (isMultiGoals) {
+      factorsFor.push(`Dixon Coles bivariate scoreline matrix concentrates ${(calibratedProb * 100).toFixed(1)}% calibrated mass inside ${cleanDisplayText(selection)}`);
+      factorsFor.push(`Band tightness keeps range width constrained around expected scoring tempo without defaulting to wide bands`);
+      factorsFor.push(`Historical team attack and defense rates support consistent scoring concentration across trailing matches`);
+    } else if (isCorners) {
       factorsFor.push(`Tactical crossing rate and field tilt driving corner expectation to ${features.weather.cornerMultiplier > 1 ? 'elevated' : 'strong'} volumes`);
       factorsFor.push(`Opposition defensive structure deep block clearances`);
       factorsFor.push(`Pre match corner generation baseline established across trailing 10 matches`);
