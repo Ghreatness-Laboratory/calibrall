@@ -43,7 +43,13 @@ export default function FixtureCard({
   writtenExplanation,
   isSavedInitial,
 }: Props) {
-  const activeExplanation = writtenExplanation || fixture.writtenExplanation;
+  const candidateExplanation = writtenExplanation || fixture.writtenExplanation;
+  const activeExplanation =
+    !topPrediction ||
+    !candidateExplanation?.activePickMarketCode ||
+    candidateExplanation.activePickMarketCode === topPrediction.marketCode
+      ? candidateExplanation
+      : undefined;
   const [isSaved, setIsSaved] = useState<boolean>(isSavedInitial ?? false);
   const [expandedRationale, setExpandedRationale] = useState<boolean>(false);
   const [whySheetOpen, setWhySheetOpen] = useState<boolean>(false);
@@ -105,7 +111,11 @@ export default function FixtureCard({
   const staleDaysMatch = noRecommendationReason?.match(/last match (\d+) days ago/);
   const staleDays = staleDaysMatch ? staleDaysMatch[1] : null;
 
-  const tierInfo = topPrediction ? getRiskTierBadge(topPrediction.confidenceTier || topPrediction.riskTier) : null;
+  const tierInfo = topPrediction
+    ? getRiskTierBadge(topPrediction.confidenceTier || topPrediction.riskTier, {
+        isSpeculative: topPrediction.isSpeculative,
+      })
+    : null;
 
   const hasRealOdds = Boolean(
     topPrediction?.marketOdds && topPrediction.expectedValue !== null && topPrediction.expectedValue !== undefined
@@ -292,7 +302,7 @@ export default function FixtureCard({
             <div className="flex items-center gap-1.5 flex-wrap">
               {tierInfo && (
                 <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${tierInfo.badgeClass}`}>
-                  {tierInfo.label} confidence
+                  {tierInfo.label === 'Speculative' ? 'Speculative' : `${tierInfo.label} confidence`}
                 </span>
               )}
               {!isFinished && <LineupChip lineupState={lineupState} isPastKickoff={isPastKickoff} />}
@@ -312,7 +322,7 @@ export default function FixtureCard({
 
           {/* Pick title + probability ± interval */}
           <div className="flex items-baseline justify-between gap-2">
-            <span className="font-display text-[18px] font-bold text-[var(--text)] leading-snug truncate">
+            <span className="font-display text-[17px] sm:text-[18px] font-bold text-[var(--text)] leading-snug break-words min-w-0">
               {cleanDisplayText(formatSelectionName(topPrediction.selection))}
             </span>
             {probPercent && (

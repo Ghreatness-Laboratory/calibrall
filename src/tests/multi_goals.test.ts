@@ -87,11 +87,17 @@ function assertNoHyphensOrUnderscores(value: string | undefined, label: string) 
 function runMultiGoalsTests() {
   console.log('--- RUNNING MULTI GOALS COMPREHENSIVE UNIT & INTEGRATION TESTS ---');
 
-  // 1. Default Pre-Live Gate: held off (false) until backtest review
-  assert.equal(isMultiGoalsEnabled(), false, 'Multi goals must default to disabled before live review');
-  const offEval = DixonColesV25Evaluator.evaluateFixture(makeBaseContext());
-  const offMg = offEval.predictions.filter(p => p.marketCategory === 'multi_goals');
-  assert.equal(offMg.length, 0, 'Zero Multi goals picks emitted while multi_goals_enabled is false');
+  // 1. Default Live Gate: enabled after walk-forward backtest review, with clean off-switch verified
+  assert.equal(isMultiGoalsEnabled(), true, 'Multi goals defaults to enabled after walk-forward backtest validation');
+  const prevDefaultMg = isMultiGoalsEnabled();
+  try {
+    setMultiGoalsEnabled(false);
+    const offEval = DixonColesV25Evaluator.evaluateFixture(makeBaseContext());
+    const offMg = offEval.predictions.filter(p => p.marketCategory === 'multi_goals');
+    assert.equal(offMg.length, 0, 'Zero Multi goals picks emitted while multi_goals_enabled is false');
+  } finally {
+    setMultiGoalsEnabled(prevDefaultMg);
+  }
 
   // 2. Threshold constants
   assert.equal(MULTI_GOALS_HIGH_THRESHOLD, 0.60, 'Multi goals High threshold is 60%');
@@ -125,6 +131,7 @@ function runMultiGoalsTests() {
     const plEval = DixonColesV25Evaluator.evaluateFixture(makeBaseContext());
     const plMg = plEval.predictions.filter(p => p.marketCategory === 'multi_goals');
     assert.equal(plMg.length, 22, 'PL emits 12 full + 4 home + 4 away + 2 first-half = 22 Multi goals lines');
+    assert.ok(plMg.every(p => p.isSpeculative === false), 'Passing league PL Multi goals lines are not speculative');
 
     // Verify zero bookmaker price / EV on Multi goals
     for (const p of plMg) {
@@ -220,6 +227,8 @@ function runMultiGoalsTests() {
     assert.ok(d2Mg.length > 0);
     for (const p of d2Mg) {
       assert.equal(p.confidenceTier, 'LOW', `${p.marketCode} in SPECULATIVE_ONLY league D2 must be LOW/Speculative`);
+      assert.equal(p.isSpeculative, true, `${p.marketCode} in SPECULATIVE_ONLY league D2 must have isSpeculative=true`);
+      assert.equal(p.evidenceTier, 'Speculative (Backtest Unvalidated)', `${p.marketCode} must surface Speculative evidenceTier`);
       assert.ok(
         p.qualificationStatus === 'PROBABILITY_ANALYSIS_ONLY' || p.qualificationStatus === 'UNQUALIFIED_MARGINAL',
         `Speculative league ${p.marketCode} cannot emit qualified Multi goals pick (got ${p.qualificationStatus})`

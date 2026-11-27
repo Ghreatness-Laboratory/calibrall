@@ -431,6 +431,12 @@ export default function PredictionsPage() {
         if (selectedMarketGroup !== 'ALL' && !matchesMarketGroup(p, selectedMarketGroup)) {
           return false;
         }
+        if (
+          p.marketCategory === 'multi_goals' &&
+          (p.isSpeculative || !p.isValidated || (p.rankingScore ?? 0) <= 0)
+        ) {
+          return false;
+        }
         if (onlyValuePicks && (!p.expectedValue || p.expectedValue <= 0)) {
           return false;
         }
@@ -993,7 +999,9 @@ export default function PredictionsPage() {
 
                 <div className="space-y-2">
                   {group.picks.map((p, pIdx) => {
-                    const badge = getRiskTierBadge(p.confidenceTier || p.riskTier);
+                    const badge = getRiskTierBadge(p.confidenceTier || p.riskTier, {
+                      isSpeculative: p.isSpeculative,
+                    });
                     const probVal = p.calibratedProbability ?? p.modelProbability;
                     const hasRealOdds = Boolean(
                       p.marketOdds && p.expectedValue !== null && p.expectedValue !== undefined
@@ -1036,7 +1044,7 @@ export default function PredictionsPage() {
                           />
                           <span
                             className="absolute top-0 bottom-0 w-0.5 bg-[var(--text)]/40"
-                            style={{ left: '70%' }}
+                            style={{ left: p.marketCategory === 'multi_goals' ? '60%' : '70%' }}
                           />
                         </div>
 

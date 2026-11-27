@@ -115,6 +115,8 @@ export function selectTopFootballAlternates(
   for (const p of sorted) {
     if (out.length >= 2) break;
     if (seenCodes.has(p.marketCode)) continue;
+    if (p.isSpeculative) continue;
+    if (p.marketCategory === 'multi_goals' && (p.rankingScore ?? 0) <= 0) continue;
 
     const selClean = cleanDisplayText(p.selection);
     const selLower = selClean.toLowerCase();

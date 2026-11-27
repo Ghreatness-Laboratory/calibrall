@@ -587,6 +587,7 @@ export interface MarketPrediction {
   edgeOverBaseline?: number;
   isFamilyWinner?: boolean;
   isValidated?: boolean;
+  isSpeculative?: boolean;
   validationStatus?: 'validated' | 'unvalidated' | 'insufficient_sample';
   brierSkillScore?: number;
   alternativesRejected?: {

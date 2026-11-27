@@ -384,9 +384,16 @@ function MatchesPageInner() {
         return false;
       }
       if (selectedFootballGroup !== 'ALL') {
-        const hasMatchingMarket = predictions.some((p) =>
-          matchesFootballMarketGroup(p, selectedFootballGroup)
-        );
+        const hasMatchingMarket =
+          selectedFootballGroup === 'multi_goals'
+            ? predictions.some(
+                (p) =>
+                  matchesFootballMarketGroup(p, 'multi_goals') &&
+                  !p.isSpeculative &&
+                  Boolean(p.isValidated) &&
+                  (p.rankingScore ?? 0) > 0
+              )
+            : predictions.some((p) => matchesFootballMarketGroup(p, selectedFootballGroup));
         if (!hasMatchingMarket) return false;
       }
       return true;
@@ -994,15 +1001,33 @@ function MatchesPageInner() {
         )
       ) : filteredFootball.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {filteredFootball.map(({ fixture, topPick, noRecommendationReason, writtenExplanation }) => (
-            <FixtureCard
-              key={fixture.id}
-              fixture={fixture}
-              topPrediction={topPick}
-              noRecommendationReason={noRecommendationReason}
-              writtenExplanation={writtenExplanation}
-            />
-          ))}
+          {filteredFootball.map(({ fixture, topPick, predictions, noRecommendationReason, writtenExplanation }) => {
+            const focusedMultiGoalsPick =
+              selectedFootballGroup === 'multi_goals' && topPick?.marketCategory !== 'multi_goals'
+                ? predictions.find(
+                    (p) =>
+                      matchesFootballMarketGroup(p, 'multi_goals') &&
+                      !p.isSpeculative &&
+                      Boolean(p.isValidated) &&
+                      (p.rankingScore ?? 0) > 0
+                  ) || topPick
+                : topPick;
+            const syncedWrittenExplanation =
+              focusedMultiGoalsPick &&
+              writtenExplanation?.activePickMarketCode &&
+              writtenExplanation.activePickMarketCode !== focusedMultiGoalsPick.marketCode
+                ? undefined
+                : writtenExplanation;
+            return (
+              <FixtureCard
+                key={fixture.id}
+                fixture={fixture}
+                topPrediction={focusedMultiGoalsPick}
+                noRecommendationReason={noRecommendationReason}
+                writtenExplanation={syncedWrittenExplanation}
+              />
+            );
+          })}
         </div>
       ) : !storedHistoryMode && (error || !liveDataAvailable) && fixtures.length === 0 ? (
         <div className="border border-[var(--danger)]/30 bg-[var(--danger-soft)] rounded-[18px] p-6 text-center space-y-3">

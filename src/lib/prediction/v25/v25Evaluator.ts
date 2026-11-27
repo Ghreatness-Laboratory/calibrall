@@ -708,7 +708,9 @@ export class DixonColesV25Evaluator {
         rankingScore,
         isTopPick: false,
         settlementStatus: 'PENDING',
-        evidenceTier: confAssessment.confidenceTier === 'HIGH'
+        evidenceTier: isSpeculativeOnlyLeague
+          ? 'Speculative (Backtest Unvalidated)'
+          : confAssessment.confidenceTier === 'HIGH'
           ? 'High Confidence Projection'
           : confAssessment.confidenceTier === 'MEDIUM'
           ? 'Medium Confidence Projection'
@@ -744,6 +746,7 @@ export class DixonColesV25Evaluator {
         edgeOverBaseline,
         isGenericPick,
         isValidated: gate.isAllowed && !isSpeculativeOnlyLeague,
+        isSpeculative: isSpeculativeOnlyLeague,
         validationStatus: gate.isAllowed && !isSpeculativeOnlyLeague ? 'validated' : 'unvalidated',
         brierSkillScore: gate.bss,
         sanityTripwire,

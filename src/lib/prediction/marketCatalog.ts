@@ -695,7 +695,16 @@ export function groupPredictionsByConfidenceTier(predictions: MarketPrediction[]
   };
 }
 
-export function getRiskTierBadge(tier?: RiskTier | string): { label: string; badgeClass: string } {
+export function getRiskTierBadge(
+  tier?: RiskTier | string,
+  options?: { isSpeculative?: boolean }
+): { label: string; badgeClass: string } {
+  if (options?.isSpeculative) {
+    return {
+      label: 'Speculative',
+      badgeClass: 'bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30',
+    };
+  }
   const normalized = (tier || '').toUpperCase();
   switch (normalized) {
     case 'HIGH':
@@ -725,8 +734,11 @@ export function getRiskTierBadge(tier?: RiskTier | string): { label: string; bad
   }
 }
 
-export function getConfidenceTierBadge(tier?: string): { label: string; badgeClass: string } {
-  return getRiskTierBadge(tier);
+export function getConfidenceTierBadge(
+  tier?: string,
+  options?: { isSpeculative?: boolean }
+): { label: string; badgeClass: string } {
+  return getRiskTierBadge(tier, options);
 }
 
 /**

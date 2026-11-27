@@ -130,6 +130,7 @@ export const TIER_RULES: Record<AccountTierId, TierRuleConfig> = {
       'Unlimited daily match explanations',
       '5 Slip Builder runs per day (Safest style, targets up to 10.0)',
       'All football & basketball markets',
+      'Multi goals ranges (full match, team and 1st half)',
       'Model drivers & 2 alternate picks delivered by API',
       'Referee & situational context factors',
     ],

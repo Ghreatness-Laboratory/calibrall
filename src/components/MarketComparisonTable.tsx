@@ -211,6 +211,11 @@ export default function MarketComparisonTable({
               >
                 {cleanDisplayText(pred.selection)}
               </span>
+              {pred.isSpeculative && (
+                <span className="text-[10.5px] px-1.5 py-0.5 bg-[var(--medium-soft)] text-[var(--medium)] rounded-full border border-[var(--medium)]/30 shrink-0 font-semibold">
+                  Speculative
+                </span>
+              )}
               {pred.handicapLine !== undefined && (
                 <span className="text-[10.5px] px-1.5 py-0.5 bg-[var(--surface-2)] text-[var(--text-2)] rounded-full border border-[var(--line)] tabular-nums shrink-0">
                   {cleanDisplayText(pred.handicapLine > 0 ? `+${pred.handicapLine}` : `${pred.handicapLine}`)}
@@ -613,7 +618,11 @@ export default function MarketComparisonTable({
                   Multi goals
                 </h4>
               </div>
-              <span className="text-[11px] text-[var(--text-2)]">Model line, no market price</span>
+              <span className="text-[11px] text-[var(--text-2)]">
+                {multiGoalsPredictions.some((p) => p.isSpeculative)
+                  ? 'Speculative · Unvalidated league'
+                  : 'Model line, no market price'}
+              </span>
             </div>
 
             {(topFullMatchMultiGoals || topTeamMultiGoals) && (

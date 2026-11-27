@@ -1,8 +1,8 @@
 // Calibrall Service Worker
-// Version: 1.0.5
+// Version: 1.0.7
 // Brand: Every call, on record.
 
-const CACHE_VERSION = 'calibrall-v1.0.6';
+const CACHE_VERSION = 'calibrall-v1.0.7';
 const PRECACHE_NAME = `calibrall-precache-${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `calibrall-static-${CACHE_VERSION}`;
 const DATA_CACHE_NAME = `calibrall-data-${CACHE_VERSION}`;

@@ -16,8 +16,8 @@ export const FEATURE_FLAGS: PlatformFeatureFlags = {
   // - Confidence tier is capped: NO HIGH TIER ALLOWED without team news.
   team_news_enabled: false,
   dixon_coles_v25: true,
-  // Held false until walk-forward backtest results are reviewed before enabling live.
-  multi_goals_enabled: false,
+  // Walk-forward backtest validated (BSS +0.0103, 31 passing leagues enabled; 7 failing leagues gated SPECULATIVE_ONLY).
+  multi_goals_enabled: true,
 };
 
 export const isTeamNewsEnabled = (): boolean => FEATURE_FLAGS.team_news_enabled;

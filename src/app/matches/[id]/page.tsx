@@ -705,7 +705,11 @@ export default function MatchAnalysisPage() {
       : null;
 
   const topPickProb = topPick ? (topPick.calibratedProbability ?? topPick.modelProbability) * 100 : null;
-  const topPickTier = topPick ? getRiskTierBadge(topPick.confidenceTier || topPick.riskTier) : null;
+  const topPickTier = topPick
+    ? getRiskTierBadge(topPick.confidenceTier || topPick.riskTier, {
+        isSpeculative: topPick.isSpeculative,
+      })
+    : null;
   const topPickExplanation = topPick
     ? cleanDisplayText(topPick.plainEnglishReason || topPick.evidence?.whyLineChosen || '')
     : '';

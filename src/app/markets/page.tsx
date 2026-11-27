@@ -454,12 +454,16 @@ export default function MarketExplorerPage() {
                         <td className="py-3 px-3.5 text-[11px]">
                           <span
                             className={
-                              prediction.confidenceTier === 'HIGH'
+                              prediction.isSpeculative
+                                ? 'text-[var(--medium)] font-semibold'
+                                : prediction.confidenceTier === 'HIGH'
                                 ? 'text-[var(--accent)] font-semibold'
                                 : 'text-[var(--text-2)]'
                             }
                           >
-                            {prediction.confidenceTier === 'HIGH'
+                            {prediction.isSpeculative
+                              ? 'Speculative'
+                              : prediction.confidenceTier === 'HIGH'
                               ? 'High'
                               : prediction.confidenceTier === 'MEDIUM'
                               ? 'Medium'
