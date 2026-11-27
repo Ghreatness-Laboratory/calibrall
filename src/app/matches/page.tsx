@@ -28,7 +28,7 @@ import Link from 'next/link';
 import { RotateCw, Info, Search, Calendar, X, AlertCircle, AlertTriangle, Layers } from 'lucide-react';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 
-type FootballMarketGroup = 'ALL' | 'results' | 'goals' | 'multi_goals' | 'corners' | 'cards';
+type FootballMarketGroup = 'ALL' | 'results' | 'goals' | 'multi_goals' | 'goal_runs' | 'corners' | 'cards';
 type BasketballMarketFilter = BasketballMarketGroupFilter;
 
 const COMP_STORAGE_PREFIX = 'calibrall_selected_competitions_v1:';
@@ -307,6 +307,9 @@ function MatchesPageInner() {
         p.marketCategory === 'multi_goals'
       );
     }
+    if (group === 'goal_runs') {
+      return p.optionType === 'goal_runs' || p.marketCategory === 'goal_runs';
+    }
     if (group === 'corners') {
       return (
         p.optionType === 'corners' ||
@@ -508,6 +511,7 @@ function MatchesPageInner() {
     { id: 'results', label: 'Results' },
     { id: 'goals', label: 'Goals' },
     { id: 'multi_goals', label: 'Multi goals' },
+    { id: 'goal_runs', label: 'Goal runs' },
     { id: 'corners', label: 'Corners' },
     { id: 'cards', label: 'Cards' },
   ];
@@ -1005,7 +1009,7 @@ function MatchesPageInner() {
       ) : filteredFootball.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {filteredFootball.map(({ fixture, context, topPick, predictions, noRecommendationReason, writtenExplanation }) => {
-            const focusedMultiGoalsPick =
+            const focusedPick =
               selectedFootballGroup === 'multi_goals' && topPick?.marketCategory !== 'multi_goals'
                 ? predictions.find(
                     (p) =>
@@ -1014,15 +1018,23 @@ function MatchesPageInner() {
                       Boolean(p.isValidated) &&
                       (p.rankingScore ?? 0) > 0
                   ) || topPick
+                : selectedFootballGroup === 'goal_runs' && topPick?.marketCategory !== 'goal_runs'
+                ? predictions
+                    .filter((p) => matchesFootballMarketGroup(p, 'goal_runs'))
+                    .sort(
+                      (a, b) =>
+                        (b.calibratedProbability ?? b.modelProbability) -
+                        (a.calibratedProbability ?? a.modelProbability)
+                    )[0] || topPick
                 : topPick;
             const syncedWrittenExplanation =
-              focusedMultiGoalsPick &&
-              topPick?.marketCode !== focusedMultiGoalsPick.marketCode
+              focusedPick &&
+              topPick?.marketCode !== focusedPick.marketCode
                 ? (() => {
                     const regenerated = generateFootballExplanation({
                       fixture,
                       evaluation: {
-                        topPick: focusedMultiGoalsPick,
+                        topPick: focusedPick,
                         predictions,
                         noRecommendationReason,
                       },
@@ -1035,6 +1047,7 @@ function MatchesPageInner() {
                         driverTiles: [],
                         reasoning: {},
                         alternates: [],
+                        marketBoard: [],
                         tierLocked: true,
                         dailySummaryLimitReached: Boolean(writtenExplanation.dailySummaryLimitReached),
                       };
@@ -1052,7 +1065,7 @@ function MatchesPageInner() {
               <FixtureCard
                 key={fixture.id}
                 fixture={fixture}
-                topPrediction={focusedMultiGoalsPick}
+                topPrediction={focusedPick}
                 noRecommendationReason={noRecommendationReason}
                 writtenExplanation={syncedWrittenExplanation}
               />

@@ -11,6 +11,7 @@ export type SlipMarketGroupKey =
   | 'btts'
   | 'handicap'
   | 'multi_goals'
+  | 'goal_runs'
   | 'corners'
   | 'cards'
   | 'halves'
@@ -29,6 +30,7 @@ export const SLIP_MARKET_OPTIONS: SlipMarketOptionMeta[] = [
   { key: 'btts', label: 'Both teams to score', sport: 'football' },
   { key: 'handicap', label: 'Handicap', sport: 'football' },
   { key: 'multi_goals', label: 'Multi goals', sport: 'football' },
+  { key: 'goal_runs', label: 'Goal runs (Experimental)', sport: 'football' },
   { key: 'corners', label: 'Corners', sport: 'football' },
   { key: 'cards', label: 'Cards', sport: 'football' },
   { key: 'halves', label: 'Halves', sport: 'football' },
@@ -72,6 +74,7 @@ export interface SlipCandidateLeg {
   marketEdge: number | null;
   expectedValue: number | null;
   confidenceTier: 'HIGH' | 'MEDIUM';
+  isExperimental?: boolean;
   teamNewsLowered: boolean;
   teamNewsNote: string | null;
   oneLineWhy: string;
@@ -174,6 +177,7 @@ export interface DailySlipLegRecord {
   priceAgeLabel: string;
   calibratedProbability: number;
   confidenceTier: 'HIGH' | 'MEDIUM';
+  isExperimental?: boolean;
   oneLineWhy: string;
   legStatus: 'PENDING' | 'WON' | 'LOST' | 'VOID' | 'PUSH';
   settledScore?: string | null;

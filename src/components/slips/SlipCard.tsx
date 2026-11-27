@@ -63,8 +63,8 @@ export function formatSlipAsPlainText(slip: BuiltSlip): string {
       )}, ${cleanDisplayText(leg.priceAgeLabel)}) | Prob: ${(
         leg.calibratedProbability * 100
       ).toFixed(1)}% | Tier: ${leg.confidenceTier === 'HIGH' ? 'High' : 'Medium'}${
-        isWeakest ? ' [Weakest leg]' : ''
-      }`
+        leg.isExperimental ? ' [Experimental]' : ''
+      }${isWeakest ? ' [Weakest leg]' : ''}`
     );
     lines.push(`   Why: ${cleanDisplayText(leg.oneLineWhy)}`);
   });
@@ -249,7 +249,12 @@ export default function SlipCard({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                  {leg.isExperimental && (
+                    <span className="px-2 py-0.5 rounded-[6px] text-[10px] font-bold bg-[var(--medium-soft)] border border-[var(--medium)]/40 text-[var(--medium)]">
+                      Experimental
+                    </span>
+                  )}
                   {isWeakest && (
                     <span className="px-2 py-0.5 rounded-[6px] text-[10px] font-bold bg-[var(--medium-soft)] border border-[var(--medium)]/40 text-[var(--medium)]">
                       Weakest leg

@@ -83,6 +83,17 @@ export function extractMatchStats(fixture: Fixture): MatchStatsSummary {
   const awayRc = fixture.awayRedCards ?? 0;
   const totalCardPoints = (homeYc + awayYc) + ((homeRc + awayRc) * 2);
 
+  const realGoalEvents: GoalEvent[] = Array.isArray(fixture.goalEvents)
+    ? fixture.goalEvents
+        .slice()
+        .sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0))
+        .map((g, idx) => ({
+          scorer: g.scorer || `Goal ${idx + 1}`,
+          minute: Number.isFinite(g.minute) ? g.minute : 0,
+          team: g.team,
+        }))
+    : [];
+
   return {
     status: fixture.status,
     minute: fixture.status === 'FINISHED' ? 90 : (fixture.status === 'PAUSED' ? 45 : 72),
@@ -99,10 +110,121 @@ export function extractMatchStats(fixture: Fixture): MatchStatsSummary {
     homeRedCards: homeRc,
     awayRedCards: awayRc,
     totalCardPoints,
-    goalEvents: [
-      { scorer: 'Forward', minute: 28, team: 'home' },
-      { scorer: 'Striker', minute: 64, team: 'away' },
-    ],
+    goalEvents: realGoalEvents,
+  };
+}
+
+export interface GoalRunSettlementOutcome {
+  settlementStatus: SettlementStatus;
+  actualStatValue: string;
+  lineComparisonText: string;
+  settlementRuleApplied: string;
+  settlementSource: 'provider_goal_order' | 'deterministic_score' | 'awaiting_goal_data' | 'non_final';
+}
+
+export function settleGoalRunMarket(params: {
+  marketCode: string;
+  status: Fixture['status'];
+  homeScore: number;
+  awayScore: number;
+  goalEvents?: Array<{ minute: number; team: 'home' | 'away'; scorer?: string }>;
+}): GoalRunSettlementOutcome {
+  const code = params.marketCode.toUpperCase();
+  const k = code.includes('GOAL_RUN_3_') ? 3 : 2;
+  const isYes = code.endsWith('_YES');
+
+  if (params.status === 'POSTPONED' || params.status === 'CANCELED') {
+    return {
+      settlementStatus: 'VOID',
+      actualStatValue: 'Match not played',
+      lineComparisonText: 'Fixture postponed or cancelled; selection voided.',
+      settlementRuleApplied: 'Official postponement or cancellation void rule.',
+      settlementSource: 'non_final',
+    };
+  }
+
+  if (params.status !== 'FINISHED') {
+    return {
+      settlementStatus: 'PENDING',
+      actualStatValue: `${params.homeScore} to ${params.awayScore}`,
+      lineComparisonText: `In play or pending (${params.homeScore} to ${params.awayScore})`,
+      settlementRuleApplied: 'Awaiting full time conclusion.',
+      settlementSource: 'non_final',
+    };
+  }
+
+  const h = Math.max(0, Math.floor(params.homeScore));
+  const a = Math.max(0, Math.floor(params.awayScore));
+  const total = h + a;
+
+  // 1. Provider goal sequence with minute and team
+  if (Array.isArray(params.goalEvents) && total > 0 && params.goalEvents.length === total) {
+    const sorted = params.goalEvents
+      .map((g, idx) => ({ ...g, idx }))
+      .sort((x, y) => (x.minute - y.minute) || (x.idx - y.idx));
+    const hCount = sorted.filter((g) => g.team === 'home').length;
+    const aCount = sorted.filter((g) => g.team === 'away').length;
+    if (hCount === h && aCount === a && sorted.every((g) => Number.isFinite(g.minute))) {
+      let maxRun = 0;
+      let curRun = 0;
+      let curTeam: 'home' | 'away' | null = null;
+      for (const g of sorted) {
+        if (g.team === curTeam) {
+          curRun += 1;
+        } else {
+          curTeam = g.team;
+          curRun = 1;
+        }
+        if (curRun > maxRun) maxRun = curRun;
+      }
+      const streakHit = maxRun >= k;
+      const won = isYes ? streakHit : !streakHit;
+      return {
+        settlementStatus: won ? 'WON' : 'LOST',
+        actualStatValue: `Max run ${maxRun} (${h} to ${a})`,
+        lineComparisonText: `Verified goal order (${h} to ${a}): max streak ${maxRun} vs ${k} in a row`,
+        settlementRuleApplied: 'Settled from chronological provider goal events.',
+        settlementSource: 'provider_goal_order',
+      };
+    }
+  }
+
+  // 2. Deterministic final score guarantees
+  let certainStreakHit: boolean | null = null;
+  if (h === 0 && a === 0) {
+    certainStreakHit = false;
+  } else if (k === 2) {
+    if (Math.abs(h - a) >= 2) {
+      certainStreakHit = true;
+    } else if (h < 2 && a < 2) {
+      certainStreakHit = false;
+    }
+  } else if (k === 3) {
+    if (Math.max(h, a) > 2 * (Math.min(h, a) + 1)) {
+      certainStreakHit = true;
+    } else if (h < 3 && a < 3) {
+      certainStreakHit = false;
+    }
+  }
+
+  if (certainStreakHit !== null) {
+    const won = isYes ? certainStreakHit : !certainStreakHit;
+    return {
+      settlementStatus: won ? 'WON' : 'LOST',
+      actualStatValue: `${h} to ${a}`,
+      lineComparisonText: `Final score ${h} to ${a} mathematically decides ${k} in a row as ${certainStreakHit ? 'Yes' : 'No'}`,
+      settlementRuleApplied: 'Settled from deterministic final score bounds.',
+      settlementSource: 'deterministic_score',
+    };
+  }
+
+  // 3. Ambiguous goal order without verified events -> never guess
+  return {
+    settlementStatus: 'AWAITING_GOAL_DATA',
+    actualStatValue: 'Awaiting goal data',
+    lineComparisonText: 'Awaiting goal data',
+    settlementRuleApplied: 'Requires chronological goal order; never settled by guessing.',
+    settlementSource: 'awaiting_goal_data',
   };
 }
 
@@ -291,6 +413,27 @@ export function settleMarketPrediction(
       status = totalG >= minG && totalG <= maxG ? 'WON' : 'LOST';
       comparisonText = `90m total goals: ${totalG} vs band ${minG} to ${maxG} (${status === 'WON' ? 'Hit' : 'Miss'})`;
     }
+  }
+
+  // 6c. GOAL RUNS (Unanswered consecutive goals)
+  else if (code.startsWith('GOAL_RUN_')) {
+    const runSettlement = settleGoalRunMarket({
+      marketCode: code,
+      status: stats.status,
+      homeScore: homeG,
+      awayScore: awayG,
+      goalEvents: stats.goalEvents,
+    });
+    return {
+      marketCode: prediction.marketCode,
+      selection: prediction.selection,
+      line: prediction.line,
+      settlementStatus: runSettlement.settlementStatus,
+      actualStatValue: runSettlement.actualStatValue,
+      lineComparisonText: runSettlement.lineComparisonText,
+      settledAt: now,
+      settlementRuleApplied: runSettlement.settlementRuleApplied,
+    };
   }
 
   // 7. HALF TIME MARKETS

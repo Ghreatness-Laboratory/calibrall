@@ -68,6 +68,7 @@ export type MarketEvidenceFamily =
   | 'cards'
   | 'corners'
   | 'multi_goals'
+  | 'goal_runs'
   | 'goals'
   | 'btts'
   | 'handicap'
@@ -113,6 +114,7 @@ export type AllowedEvidenceField =
   | 'awayAvgConceded'
   | 'lowScoringTendency'
   | 'multiGoalsMeta'
+  | 'goalRunsMeta'
   | 'h2hMeetingsCount'
   | 'h2hAvgTotalGoals'
   | 'homeProjected'
@@ -191,6 +193,16 @@ export const MARKET_EVIDENCE_FIELDS: Record<MarketEvidenceFamily, ReadonlySet<Al
     'squadAbsences',
     'lineupConfirmed',
     'marketPriceAndEv',
+  ]),
+  goal_runs: new Set<AllowedEvidenceField>([
+    'homeXg',
+    'awayXg',
+    'totalXg',
+    'goalRunsMeta',
+    'sampleDepth',
+    'scheduleFatigue',
+    'squadAbsences',
+    'lineupConfirmed',
   ]),
   goals: new Set<AllowedEvidenceField>([
     'homeXg',
@@ -326,6 +338,14 @@ export function getMarketEvidenceFamily(pick?: {
     code.includes('CORNER')
   ) {
     return 'corners';
+  }
+  if (
+    opt === 'goal_runs' ||
+    cat === 'goal_runs' ||
+    fam === 'goal_runs' ||
+    code.startsWith('GOAL_RUN_')
+  ) {
+    return 'goal_runs';
   }
   if (
     opt === 'multi_goals' ||

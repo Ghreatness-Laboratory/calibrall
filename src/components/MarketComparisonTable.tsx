@@ -171,6 +171,14 @@ export default function MarketComparisonTable({
     [visiblePredictions]
   );
 
+  const goalRunsPredictions = useMemo(
+    () =>
+      visiblePredictions.filter(
+        (p) => p.marketCategory === 'goal_runs' || p.optionType === 'goal_runs'
+      ),
+    [visiblePredictions]
+  );
+
   const hasHalfData = halfPredictions.length > 0;
 
   const filteredList = useMemo(() => {
@@ -253,11 +261,15 @@ export default function MarketComparisonTable({
               >
                 {cleanDisplayText(pred.selection)}
               </span>
-              {pred.isSpeculative && (
+              {(pred.experimentalLabel || pred.optionType === 'goal_runs') ? (
+                <span className="text-[10.5px] px-1.5 py-0.5 bg-[var(--medium-soft)] text-[var(--medium)] rounded-full border border-[var(--medium)]/30 shrink-0 font-semibold">
+                  Experimental
+                </span>
+              ) : pred.isSpeculative ? (
                 <span className="text-[10.5px] px-1.5 py-0.5 bg-[var(--medium-soft)] text-[var(--medium)] rounded-full border border-[var(--medium)]/30 shrink-0 font-semibold">
                   Speculative
                 </span>
-              )}
+              ) : null}
               {pred.handicapLine !== undefined && (
                 <span className="text-[10.5px] px-1.5 py-0.5 bg-[var(--surface-2)] text-[var(--text-2)] rounded-full border border-[var(--line)] tabular-nums shrink-0">
                   {cleanDisplayText(pred.handicapLine > 0 ? `+${pred.handicapLine}` : `${pred.handicapLine}`)}
@@ -322,7 +334,12 @@ export default function MarketComparisonTable({
                       : 'text-[var(--medium)]'
                   }`}
                 >
-                  {cleanDisplayText(pred.lineComparisonText || pred.settlementStatus)}
+                  {cleanDisplayText(
+                    pred.lineComparisonText ||
+                      (pred.settlementStatus === 'AWAITING_GOAL_DATA'
+                        ? 'Awaiting goal data'
+                        : pred.settlementStatus)
+                  )}
                 </span>
               </div>
             )}
@@ -806,6 +823,34 @@ export default function MarketComparisonTable({
             )}
           </div>
 
+          {/* Goal runs (Experimental) */}
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-[var(--line)] pb-2.5 gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Gauge className="w-4 h-4 text-[var(--accent)]" />
+                <h4 className="font-display text-[14px] font-semibold text-[var(--text)]">
+                  Goal runs
+                </h4>
+                <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30 font-semibold">
+                  Experimental
+                </span>
+              </div>
+              <span className="text-[11px] text-[var(--text-2)]">
+                Probability only, no EV · Assumes no in game score effects
+              </span>
+            </div>
+
+            <div className="border border-[var(--line)] rounded-[12px] overflow-hidden">
+              {goalRunsPredictions.length > 0 ? (
+                goalRunsPredictions.map(renderPredictionRow)
+              ) : (
+                <div className="p-4 text-center text-[12px] text-[var(--text-3)]">
+                  No goal runs probabilities evaluated for this fixture.
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Bookings / cards */}
           <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-[var(--line)] pb-2.5">
@@ -838,6 +883,7 @@ export default function MarketComparisonTable({
                 'handicap',
                 'total_goals',
                 'multi_goals',
+                'goal_runs',
                 'half_time',
                 'total_corners',
                 'bookings',
@@ -852,7 +898,13 @@ export default function MarketComparisonTable({
                       : 'bg-[var(--surface)] text-[var(--text-2)] border-[var(--line)]'
                   }`}
                 >
-                  {cat === 'ALL' ? 'All' : cat === 'bookings' ? 'Cards' : cleanDisplayText(cat)}
+                  {cat === 'ALL'
+                    ? 'All'
+                    : cat === 'bookings'
+                    ? 'Cards'
+                    : cat === 'goal_runs'
+                    ? 'Goal runs'
+                    : cleanDisplayText(cat)}
                 </button>
               ))}
             </div>

@@ -67,6 +67,10 @@ const FOOTBALL_MARKET_OPTIONS: {
   { code: 'TEAM_MULTI_GOALS_AWAY_2_3', label: '11. Away multi goals: 2 to 3', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
   { code: 'FH_MULTI_GOALS_0_1', label: '11. 1st half multi goals: 0 to 1', optionType: 'first_half_multi_goals', category: 'multi_goals', period: '1st half' },
   { code: 'FH_MULTI_GOALS_1_2', label: '11. 1st half multi goals: 1 to 2', optionType: 'first_half_multi_goals', category: 'multi_goals', period: '1st half' },
+  { code: 'GOAL_RUN_2_YES', label: '12. Any team scores 2 goals in a row: Yes', optionType: 'goal_runs', category: 'goal_runs', period: 'Regular time' },
+  { code: 'GOAL_RUN_2_NO', label: '12. Any team scores 2 goals in a row: No', optionType: 'goal_runs', category: 'goal_runs', period: 'Regular time' },
+  { code: 'GOAL_RUN_3_YES', label: '12. Any team scores 3 goals in a row: Yes', optionType: 'goal_runs', category: 'goal_runs', period: 'Regular time' },
+  { code: 'GOAL_RUN_3_NO', label: '12. Any team scores 3 goals in a row: No', optionType: 'goal_runs', category: 'goal_runs', period: 'Regular time' },
 ];
 
 const BASKETBALL_MARKET_OPTIONS: {
@@ -239,6 +243,7 @@ export default function MarketExplorerPage() {
     { id: 'first_half_goals', label: '9. 1st half goals' },
     { id: 'second_half_result', label: '10. 2nd half result' },
     { id: 'multi_goals', label: 'Multi goals' },
+    { id: 'goal_runs', label: 'Goal runs' },
   ];
 
   const basketballOptionTabs = [
@@ -504,7 +509,7 @@ export default function MarketExplorerPage() {
                         <td className="py-3 px-3.5 text-[11px]">
                           <span
                             className={
-                              prediction.isSpeculative
+                              prediction.experimentalLabel || prediction.optionType === 'goal_runs' || prediction.isSpeculative
                                 ? 'text-[var(--medium)] font-semibold'
                                 : !prediction.isValidated
                                 ? 'text-[var(--text-3)]'
@@ -513,7 +518,9 @@ export default function MarketExplorerPage() {
                                 : 'text-[var(--text-2)]'
                             }
                           >
-                            {prediction.isSpeculative
+                            {prediction.experimentalLabel || prediction.optionType === 'goal_runs'
+                              ? 'Experimental'
+                              : prediction.isSpeculative
                               ? 'Speculative'
                               : !prediction.isValidated
                               ? 'Unvalidated'

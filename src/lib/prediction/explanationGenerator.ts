@@ -8,12 +8,15 @@ import {
   ExplanationDriverTile,
   Fixture,
   FixtureContext,
+  MarketBoardEntry,
+  MarketBoardReason,
   MarketPrediction,
   WrittenMatchAlternate,
   WrittenMatchExplanation,
 } from '@/types';
 import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
 import { getEquivalentCanonicalKey } from './marketMonitor';
+import { getLeagueCapabilities } from './calibratedParams';
 import {
   compareFootballPicksByRank,
   getMarketEvidenceFamily,
@@ -52,6 +55,394 @@ function splitFirstSentence(fullSummary: string): string {
 
 function getEffectiveFootballProb(p: MarketPrediction): number {
   return isFiniteNum(p.calibratedProbability) ? p.calibratedProbability : p.modelProbability;
+}
+
+function resolveThresholdForPrediction(p: MarketPrediction): number {
+  if (
+    p.optionType === 'multi_goals' ||
+    p.optionType === 'team_multi_goals' ||
+    p.optionType === 'first_half_multi_goals' ||
+    p.optionType === 'goal_runs'
+  ) {
+    return 0.60;
+  }
+  return 0.70;
+}
+
+function classifyPredictionBoardReason(
+  p: MarketPrediction,
+  isTopPick: boolean,
+  isThinHistory: boolean
+): {
+  recommended: boolean;
+  isTopPick: boolean;
+  isExperimental: boolean;
+  experimentalLabel?: string;
+  reasonNotRecommended?: MarketBoardReason;
+} {
+  if (isDisabledRecommendationMarket(p)) {
+    return {
+      recommended: false,
+      isTopPick: false,
+      isExperimental: false,
+      reasonNotRecommended: 'disabled by policy',
+    };
+  }
+
+  if (isThinHistory) {
+    const isExp = p.optionType === 'goal_runs' || Boolean(p.experimentalLabel);
+    return {
+      recommended: false,
+      isTopPick: false,
+      isExperimental: isExp,
+      experimentalLabel: isExp ? (p.experimentalLabel || 'Experimental') : undefined,
+      reasonNotRecommended: 'not enough history',
+    };
+  }
+
+  const calProb = getEffectiveFootballProb(p);
+  const threshold = resolveThresholdForPrediction(p);
+
+  if (p.optionType === 'goal_runs' || p.marketCategory === 'goal_runs') {
+    return {
+      recommended: false,
+      isTopPick: false,
+      isExperimental: true,
+      experimentalLabel: p.experimentalLabel || 'Experimental',
+      reasonNotRecommended: calProb < threshold ? 'below the confidence threshold' : 'not enough history',
+    };
+  }
+
+  if (isTopPick) {
+    return {
+      recommended: true,
+      isTopPick: true,
+      isExperimental: false,
+    };
+  }
+
+  const isQualifiedAlt =
+    p.isValidated &&
+    !p.isSpeculative &&
+    !p.sanityTripwire &&
+    (p.rankingScore ?? 0) > 0 &&
+    (p.qualificationStatus === 'QUALIFIED_VALUE' || p.qualificationStatus === 'QUALIFIED_PROBABILITY');
+
+  if (isQualifiedAlt) {
+    return {
+      recommended: true,
+      isTopPick: false,
+      isExperimental: false,
+    };
+  }
+
+  if (p.abstainReason && /no data|missing/i.test(p.abstainReason)) {
+    return {
+      recommended: false,
+      isTopPick: false,
+      isExperimental: false,
+      reasonNotRecommended: 'no data for this market',
+    };
+  }
+
+  if (p.isSpeculative) {
+    return {
+      recommended: false,
+      isTopPick: false,
+      isExperimental: Boolean(p.experimentalLabel),
+      experimentalLabel: p.experimentalLabel,
+      reasonNotRecommended: calProb < threshold ? 'below the confidence threshold' : 'not enough history',
+    };
+  }
+
+  if (!p.isValidated) {
+    const wfMatches = p.evidence?.walkForwardValidation?.matches ?? 30;
+    return {
+      recommended: false,
+      isTopPick: false,
+      isExperimental: false,
+      reasonNotRecommended: wfMatches < 30 ? 'not enough history' : 'disabled by policy',
+    };
+  }
+
+  return {
+    recommended: false,
+    isTopPick: false,
+    isExperimental: false,
+    reasonNotRecommended: 'below the confidence threshold',
+  };
+}
+
+export function buildFootballMarketBoard(params: {
+  fixture?: Fixture;
+  predictions: MarketPrediction[];
+  topPick: MarketPrediction | null;
+  context?: FixtureContext;
+  isThinHistory?: boolean;
+}): MarketBoardEntry[] {
+  const { fixture, predictions, topPick, context, isThinHistory = false } = params;
+  const compCode = fixture?.competition?.code || context?.competitionCode || 'PL';
+  const cap = context?.leagueCapabilities || getLeagueCapabilities(compCode);
+  const home = cleanDisplayText(
+    (fixture ? displayName(fixture.homeTeam) || fixture.homeTeam.name : context?.homeTeamName) || 'Home'
+  );
+  const away = cleanDisplayText(
+    (fixture ? displayName(fixture.awayTeam) || fixture.awayTeam.name : context?.awayTeamName) || 'Away'
+  );
+
+  const entries: MarketBoardEntry[] = [];
+  const seenCodes = new Set<string>();
+
+  const orderedPredictions = [...predictions].sort((a, b) => {
+    const aIsTop = topPick && a.marketCode === topPick.marketCode ? 1 : 0;
+    const bIsTop = topPick && b.marketCode === topPick.marketCode ? 1 : 0;
+    if (bIsTop !== aIsTop) return bIsTop - aIsTop;
+    return compareFootballPicksByRank(a, b);
+  });
+
+  for (const p of orderedPredictions) {
+    if (seenCodes.has(p.marketCode)) continue;
+    seenCodes.add(p.marketCode);
+    const calProb = getEffectiveFootballProb(p);
+    const isTop = Boolean(topPick && p.marketCode === topPick.marketCode);
+    const classification = classifyPredictionBoardReason(p, isTop, isThinHistory);
+    entries.push({
+      marketCode: p.marketCode,
+      marketName: cleanDisplayText(p.marketName),
+      optionType: p.optionType,
+      marketCategory: p.marketCategory,
+      selection: cleanDisplayText(p.selection),
+      calibratedProbability: isFiniteNum(calProb) ? Number(calProb.toFixed(4)) : null,
+      recommended: classification.recommended,
+      isTopPick: classification.isTopPick,
+      isExperimental: classification.isExperimental,
+      experimentalLabel: classification.experimentalLabel,
+      reasonNotRecommended: classification.reasonNotRecommended,
+    });
+  }
+
+  // Always disclose disabled-by-policy Under cards market
+  if (!seenCodes.has('CARDS_UNDER')) {
+    seenCodes.add('CARDS_UNDER');
+    entries.push({
+      marketCode: 'CARDS_UNDER',
+      marketName: 'Cards (Under)',
+      optionType: 'bookings',
+      marketCategory: 'bookings',
+      selection: 'Under cards',
+      calibratedProbability: null,
+      recommended: false,
+      isTopPick: false,
+      isExperimental: false,
+      reasonNotRecommended: 'disabled by policy',
+    });
+  }
+
+  // Ensure every supported market family appears even if omitted due to thin history or league capability gaps
+  const ensureFallbackMarket = (
+    predicate: (p: MarketPrediction) => boolean,
+    fallback: Omit<MarketBoardEntry, 'recommended' | 'isExperimental' | 'isTopPick'> & {
+      reasonWhenNoData: MarketBoardReason;
+      isExperimental?: boolean;
+      experimentalLabel?: string;
+    }
+  ) => {
+    if (predictions.some(predicate) || seenCodes.has(fallback.marketCode)) return;
+    seenCodes.add(fallback.marketCode);
+    entries.push({
+      marketCode: fallback.marketCode,
+      marketName: cleanDisplayText(fallback.marketName),
+      optionType: fallback.optionType,
+      marketCategory: fallback.marketCategory,
+      selection: cleanDisplayText(fallback.selection),
+      calibratedProbability: null,
+      recommended: false,
+      isTopPick: false,
+      isExperimental: Boolean(fallback.isExperimental),
+      experimentalLabel: fallback.isExperimental ? (fallback.experimentalLabel || 'Experimental') : undefined,
+      reasonNotRecommended: isThinHistory ? 'not enough history' : fallback.reasonWhenNoData,
+    });
+  };
+
+  ensureFallbackMarket((p) => p.optionType === 'win', {
+    marketCode: '1X2_HOME',
+    marketName: 'Match result',
+    optionType: 'win',
+    selection: `${home} win`,
+    marketCategory: 'match_result',
+    calibratedProbability: null,
+    reasonWhenNoData: 'not enough history',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'draw', {
+    marketCode: '1X2_DRAW',
+    marketName: 'Match result',
+    optionType: 'draw',
+    selection: 'Draw',
+    marketCategory: 'match_result',
+    calibratedProbability: null,
+    reasonWhenNoData: 'not enough history',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'double_chance', {
+    marketCode: 'DC_1X',
+    marketName: 'Double chance',
+    optionType: 'double_chance',
+    selection: `${home} or draw`,
+    marketCategory: 'double_chance',
+    calibratedProbability: null,
+    reasonWhenNoData: 'not enough history',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'over_under_goals' && p.marketCategory === 'total_goals', {
+    marketCode: 'TOTAL_GOALS_O25',
+    marketName: 'Over / under goals',
+    optionType: 'over_under_goals',
+    selection: 'Over 2.5 goals',
+    marketCategory: 'total_goals',
+    calibratedProbability: null,
+    reasonWhenNoData: 'not enough history',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'both_teams_to_score', {
+    marketCode: 'BTTS_YES',
+    marketName: 'Both teams to score',
+    optionType: 'both_teams_to_score',
+    selection: 'BTTS: yes',
+    marketCategory: 'btts',
+    calibratedProbability: null,
+    reasonWhenNoData: 'not enough history',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'asian_handicap', {
+    marketCode: 'AH_HOME_0',
+    marketName: 'Asian handicap',
+    optionType: 'asian_handicap',
+    selection: `${home} 0`,
+    marketCategory: 'handicap',
+    calibratedProbability: null,
+    reasonWhenNoData: 'not enough history',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'corners', {
+    marketCode: 'CORNERS_O95',
+    marketName: 'Corners',
+    optionType: 'corners',
+    selection: 'Over 9.5 corners',
+    marketCategory: 'total_corners',
+    calibratedProbability: null,
+    reasonWhenNoData: cap.hasCorners ? 'not enough history' : 'no data for this market',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'bookings', {
+    marketCode: 'CARDS_O45',
+    marketName: 'Cards (Over)',
+    optionType: 'bookings',
+    selection: 'Over 4.5 cards',
+    marketCategory: 'bookings',
+    calibratedProbability: null,
+    reasonWhenNoData: cap.hasCards ? 'not enough history' : 'no data for this market',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'highest_scoring_half', {
+    marketCode: 'HSH_2ND',
+    marketName: 'Highest scoring half',
+    optionType: 'highest_scoring_half',
+    selection: 'Highest scoring half: 2nd half',
+    marketCategory: 'half_time',
+    calibratedProbability: null,
+    reasonWhenNoData: cap.hasHalfTimeGoals ? 'not enough history' : 'no data for this market',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'first_half_goals', {
+    marketCode: 'FH_GOALS_O05',
+    marketName: '1st half goals',
+    optionType: 'first_half_goals',
+    selection: '1st half over 0.5 goals',
+    marketCategory: 'half_time',
+    calibratedProbability: null,
+    reasonWhenNoData: cap.hasHalfTimeGoals ? 'not enough history' : 'no data for this market',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'second_half_result', {
+    marketCode: '2H_RESULT_HOME',
+    marketName: '2nd half result',
+    optionType: 'second_half_result',
+    selection: `2nd half: ${home} win`,
+    marketCategory: 'half_time',
+    calibratedProbability: null,
+    reasonWhenNoData: cap.hasHalfTimeGoals ? 'not enough history' : 'no data for this market',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'multi_goals', {
+    marketCode: 'MULTI_GOALS_1_3',
+    marketName: 'Multi goals',
+    optionType: 'multi_goals',
+    selection: 'Multi goals 1 to 3',
+    marketCategory: 'multi_goals',
+    calibratedProbability: null,
+    reasonWhenNoData: 'not enough history',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'first_half_multi_goals', {
+    marketCode: 'FH_MULTI_GOALS_0_1',
+    marketName: '1st half multi goals',
+    optionType: 'first_half_multi_goals',
+    selection: '1st half multi goals 0 to 1',
+    marketCategory: 'multi_goals',
+    calibratedProbability: null,
+    reasonWhenNoData: cap.hasHalfTimeGoals ? 'not enough history' : 'no data for this market',
+  });
+  ensureFallbackMarket((p) => p.optionType === 'goal_runs', {
+    marketCode: 'GOAL_RUN_2_YES',
+    marketName: 'Any team scores 2 goals in a row',
+    optionType: 'goal_runs',
+    selection: 'Any team scores 2 goals in a row: Yes',
+    marketCategory: 'goal_runs',
+    calibratedProbability: null,
+    isExperimental: true,
+    experimentalLabel: 'Experimental',
+    reasonWhenNoData: 'not enough history',
+  });
+
+  return entries;
+}
+
+function buildBasketballMarketBoard(params: {
+  evaluation: BasketballGameEvaluation;
+  topPick: BasketballPickCandidate | null;
+}): MarketBoardEntry[] {
+  const { evaluation, topPick } = params;
+  const picks = evaluation.picks || [];
+  const entries: MarketBoardEntry[] = [];
+  const seenCodes = new Set<string>();
+
+  const ordered = [...picks].sort((a, b) => {
+    const aTop = topPick && a.marketCode === topPick.marketCode ? 1 : 0;
+    const bTop = topPick && b.marketCode === topPick.marketCode ? 1 : 0;
+    if (bTop !== aTop) return bTop - aTop;
+    return b.calibratedProbability - a.calibratedProbability;
+  });
+
+  for (const p of ordered) {
+    if (seenCodes.has(p.marketCode)) continue;
+    seenCodes.add(p.marketCode);
+    const isTop = Boolean(topPick && p.marketCode === topPick.marketCode);
+    const isQual = p.tier !== 'ABSTAIN' && p.tier !== 'SPECULATIVE';
+    const isRecommended = isTop || isQual;
+    let reason: MarketBoardReason | undefined = undefined;
+    if (!isRecommended) {
+      if (evaluation.needsHistory) {
+        reason = 'not enough history';
+      } else {
+        reason = 'below the confidence threshold';
+      }
+    }
+    entries.push({
+      marketCode: p.marketCode,
+      marketName: cleanDisplayText(p.marketCategory),
+      optionType: p.marketCategory,
+      marketCategory: p.marketCategory,
+      selection: cleanDisplayText(p.selection),
+      calibratedProbability: isFiniteNum(p.calibratedProbability)
+        ? Number(p.calibratedProbability.toFixed(4))
+        : null,
+      recommended: isRecommended,
+      isTopPick: isTop,
+      isExperimental: false,
+      reasonNotRecommended: reason,
+    });
+  }
+
+  return entries;
 }
 
 function deriveFootballHeadlineReason(
@@ -277,6 +668,34 @@ function buildFootballDriverTiles(params: {
     return tiles.slice(0, 4);
   }
 
+  // Goal runs: expected goals for each team, total expected goals, streak probability
+  if (family === 'goal_runs') {
+    if (homeXg !== null && awayXg !== null && totalXg !== null) {
+      tiles.push({
+        label: 'Expected goals',
+        value: `${homeXg.toFixed(2)} + ${awayXg.toFixed(2)} (${totalXg.toFixed(2)})`,
+      });
+    }
+    const streakProbVal =
+      topPick?.goalRunsMeta?.streakProb ??
+      (topPick ? getEffectiveFootballProb(topPick) : null);
+    const streakLen = topPick?.goalRunsMeta?.streakLength ?? 2;
+    if (streakProbVal !== null && isFiniteNum(streakProbVal)) {
+      tiles.push({
+        label: `${streakLen} in a row streak prob`,
+        value: `${(streakProbVal * 100).toFixed(1)}%`,
+      });
+    }
+    tiles.push({
+      label: 'Model assumption',
+      value: 'No in game score effects',
+    });
+    if (sampleLabel) {
+      tiles.push({ label: 'Sample depth', value: sampleLabel });
+    }
+    return tiles.slice(0, 4);
+  }
+
   // Goals, multi_goals, btts, handicap, result, half_time
   if (homeXg !== null && awayXg !== null && totalXg !== null) {
     tiles.push({
@@ -376,10 +795,18 @@ export function generateFootballExplanation(params: {
         value: `${homeSamples}H / ${awaySamples}A (min 10 required)`,
       });
     }
+    const thinMarketBoard = buildFootballMarketBoard({
+      fixture,
+      predictions: evaluation.predictions || [],
+      topPick: null,
+      context,
+      isThinHistory: true,
+    });
     return {
       oneLineSummary: s1,
       fullSummary,
       driverTiles: thinTiles,
+      marketBoard: thinMarketBoard,
       validationPassed: true,
       fallbackApplied: false,
       reasoning: {
@@ -626,6 +1053,23 @@ export function generateFootballExplanation(params: {
         'head to head meetings'
       )} averaged ${h2hAvgTotalCards.toFixed(2)} cards`;
     }
+  } else if (family === 'goal_runs') {
+    const grHomeXg = topPick?.goalRunsMeta?.homeXg ?? homeXg;
+    const grAwayXg = topPick?.goalRunsMeta?.awayXg ?? awayXg;
+    const grTotalXg = topPick?.goalRunsMeta?.totalXg ?? totalXg;
+    const streakLen = topPick?.goalRunsMeta?.streakLength ?? 2;
+    const streakProbVal = topPick?.goalRunsMeta?.streakProb ?? calProb;
+    if (grHomeXg !== null && grAwayXg !== null && grTotalXg !== null && isFiniteNum(streakProbVal)) {
+      sentence2Body = `Expected goals are ${grHomeXg.toFixed(2)} for ${home} and ${grAwayXg.toFixed(
+        2
+      )} for ${away} (${grTotalXg.toFixed(2)} total xG), giving ${(streakProbVal * 100).toFixed(
+        1
+      )}% streak probability for ${streakLen} consecutive unanswered goals assuming Poisson totals with no in game score effects`;
+    } else if (homeXg !== null && awayXg !== null && totalXg !== null) {
+      sentence2Body = `Expected goals are ${homeXg.toFixed(2)} for ${home} and ${awayXg.toFixed(
+        2
+      )} for ${away} (${totalXg.toFixed(2)} total xG), assuming Poisson totals with no in game score effects`;
+    }
   } else {
     // Goals / Multi-goals / BTTS / AH / Result / Half-time
     if (allow('homeAvgScored') && hasTeamAverages) {
@@ -773,7 +1217,9 @@ export function generateFootballExplanation(params: {
     const thresholdPct = isMultiGoalsPick ? '60.0%' : '70.0%';
 
     let marketBody = '';
-    if (isFiniteNum(topPick.marketOdds) && topPick.marketOdds > 1 && isFiniteNum(topPick.expectedValue)) {
+    if (topPick.optionType === 'goal_runs' || topPick.marketCategory === 'goal_runs') {
+      marketBody = `Experimental speculative market (probability only, no bookmaker price or EV, no in game score effects assumed) until 100 picks settle with real goal order data`;
+    } else if (isFiniteNum(topPick.marketOdds) && topPick.marketOdds > 1 && isFiniteNum(topPick.expectedValue)) {
       const evPct = (topPick.expectedValue * 100).toFixed(1);
       const evSign = topPick.expectedValue >= 0 ? '+' : '\u2212';
       marketBody = `Backed by ${topPick.marketOdds.toFixed(2)} market odds (${evSign}${Math.abs(
@@ -868,6 +1314,7 @@ export function generateFootballExplanation(params: {
           marketOdds: topPick.marketOdds ?? null,
           expectedValue: topPick.expectedValue ?? null,
           ...(allow('multiGoalsMeta') ? { multiGoalsMeta: topPick.multiGoalsMeta ?? null } : {}),
+          ...(allow('goalRunsMeta') ? { goalRunsMeta: topPick.goalRunsMeta ?? null } : {}),
         }
       : null,
   };
@@ -905,6 +1352,11 @@ export function generateFootballExplanation(params: {
       : null;
     reasoning.h2hCornersMeetingsCount = h2hCornersMeetingsCount >= 3 ? h2hCornersMeetingsCount : 0;
     reasoning.h2hAvgTotalCorners = h2hCornersMeetingsCount >= 3 ? h2hAvgTotalCorners : null;
+  } else if (family === 'goal_runs') {
+    reasoning.homeXg = topPick?.goalRunsMeta?.homeXg ?? (homeXg !== null ? Number(homeXg.toFixed(2)) : null);
+    reasoning.awayXg = topPick?.goalRunsMeta?.awayXg ?? (awayXg !== null ? Number(awayXg.toFixed(2)) : null);
+    reasoning.totalXg = topPick?.goalRunsMeta?.totalXg ?? totalXg;
+    reasoning.goalRunsMeta = topPick?.goalRunsMeta ?? null;
   } else {
     reasoning.homeXg = homeXg !== null ? Number(homeXg.toFixed(2)) : null;
     reasoning.awayXg = awayXg !== null ? Number(awayXg.toFixed(2)) : null;
@@ -918,10 +1370,19 @@ export function generateFootballExplanation(params: {
     reasoning.h2hAvgTotalGoals = h2hMeetingsCount >= 3 ? h2hAvgTotalGoals : null;
   }
 
+  const marketBoard = buildFootballMarketBoard({
+    fixture,
+    predictions: evaluation.predictions || [],
+    topPick,
+    context,
+    isThinHistory: false,
+  });
+
   let output: WrittenMatchExplanation = {
     oneLineSummary: splitFirstSentence(sentence1) || sentence1,
     fullSummary,
     driverTiles,
+    marketBoard,
     headlineSelectionReason: headlineReason,
     activePickMarketCode: topPick?.marketCode,
     activePickSelection: cleanTopSel || undefined,
@@ -1010,6 +1471,7 @@ export function syncSlateExplanations<
             : regenerated.oneLineSummary,
           fullSummary: '',
           driverTiles: [],
+          marketBoard: [],
           reasoning: {},
           alternates: [],
           tierLocked: true,
@@ -1157,6 +1619,7 @@ export function generateBasketballExplanation(params: {
       oneLineSummary: s1,
       fullSummary: `${s1} ${s2}`,
       driverTiles: thinTiles,
+      marketBoard: buildBasketballMarketBoard({ evaluation, topPick: null }),
       validationPassed: true,
       fallbackApplied: false,
       reasoning: {
@@ -1338,6 +1801,7 @@ export function generateBasketballExplanation(params: {
     oneLineSummary: splitFirstSentence(sentence1) || sentence1,
     fullSummary,
     driverTiles: bbTiles.slice(0, 4),
+    marketBoard: buildBasketballMarketBoard({ evaluation, topPick }),
     headlineSelectionReason: bbHeadlineReason,
     activePickMarketCode: topPick?.marketCode,
     activePickSelection: cleanTopSel || undefined,

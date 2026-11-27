@@ -20,6 +20,7 @@ export type MarketCategory =
   | 'handicap'
   | 'goal_bounds'
   | 'multi_goals'
+  | 'goal_runs'
   | 'combos'
   | 'moneyline'
   | 'spread'
@@ -45,6 +46,7 @@ export type SupportedOptionType =
   | 'multi_goals'
   | 'team_multi_goals'
   | 'first_half_multi_goals'
+  | 'goal_runs'
   | 'corner_handicap'
   | 'team_bookings'
   | 'booking_points'
@@ -84,7 +86,17 @@ export type QualificationStatus =
   | 'UNQUALIFIED_HIGH_UNCERTAINTY' 
   | 'NO_RECOMMENDATION';
 
-export type SettlementStatus = 'PENDING' | 'WON' | 'LOST' | 'PUSH' | 'VOID';
+export type SettlementStatus = 'PENDING' | 'WON' | 'LOST' | 'PUSH' | 'VOID' | 'AWAITING_GOAL_DATA';
+
+export interface ProviderGoalEvent {
+  minute: number;
+  injuryTime?: number | null;
+  team: 'home' | 'away';
+  type?: string;
+  scorer?: string;
+  isPenalty?: boolean;
+  isOwnGoal?: boolean;
+}
 
 export type StateTag = 
   | 'high-stakes' 
@@ -257,6 +269,7 @@ export interface FixtureContext {
   awayAvgFoulsDrawn?: number | null;
   foulsSampleCount?: number | null;
   halfTimeSampleCount?: number;
+  goalEvents?: ProviderGoalEvent[];
 }
 
 export interface WrittenMatchAlternate {
@@ -272,11 +285,44 @@ export interface ExplanationDriverTile {
   value: string;
 }
 
+export type MarketBoardReason =
+  | 'below the confidence threshold'
+  | 'not enough history'
+  | 'no data for this market'
+  | 'disabled by policy';
+
+export interface MarketBoardEntry {
+  marketCode: string;
+  marketName: string;
+  optionType: SupportedOptionType | string;
+  marketCategory: MarketCategory | string;
+  selection: string;
+  calibratedProbability: number | null;
+  recommended: boolean;
+  isTopPick?: boolean;
+  isExperimental?: boolean;
+  experimentalLabel?: string;
+  reasonNotRecommended?: MarketBoardReason;
+}
+
+export interface GoalRunsMeta {
+  streakLength: 2 | 3;
+  outcome: 'YES' | 'NO';
+  homeXg: number;
+  awayXg: number;
+  totalXg: number;
+  pHomeGoal: number;
+  streakProb: number;
+  calibratedProb: number;
+  assumptionNote: string;
+}
+
 export interface WrittenMatchExplanation {
   oneLineSummary: string;
   fullSummary: string;
   reasoning: Record<string, any>;
   alternates: WrittenMatchAlternate[];
+  marketBoard?: MarketBoardEntry[];
   driverTiles?: ExplanationDriverTile[];
   headlineSelectionReason?: string;
   activePickMarketCode?: string;
@@ -469,6 +515,7 @@ export interface Fixture {
     h2hAvgTotalGoals?: number;
   };
   verifiedOdds?: VerifiedMatchOdds;
+  goalEvents?: ProviderGoalEvent[];
   writtenExplanation?: WrittenMatchExplanation;
   hasCoachChange?: boolean;
   coachChangeNote?: string;
@@ -642,6 +689,9 @@ export interface MarketPrediction {
   equivalentCanonicalKey?: string;
   evidence?: PickEvidence;
   multiGoalsMeta?: MultiGoalsMeta;
+  goalRunsMeta?: GoalRunsMeta;
+  experimentalLabel?: string;
+  marketBoardReason?: MarketBoardReason;
   priceSource?: string;
   writtenExplanation?: WrittenMatchExplanation;
   driverTiles?: ExplanationDriverTile[];

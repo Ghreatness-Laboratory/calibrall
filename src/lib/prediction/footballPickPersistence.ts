@@ -6,6 +6,7 @@ import {
   ExplanationDriverTile,
   Fixture,
   FixtureContext,
+  MarketBoardEntry,
   WrittenMatchAlternate,
   WrittenMatchExplanation,
 } from '@/types';
@@ -93,7 +94,7 @@ export async function loadFootballPickModerationMap(
   return result;
 }
 
-const CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION = 'v2.5.3';
+const CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION = 'v2.5.4';
 
 export function loadStoredFootballExplanation(
   fixtureId: string,
@@ -172,6 +173,7 @@ export function loadStoredFootballExplanation(
       | {
           driverTiles?: ExplanationDriverTile[];
           headlineSelectionReason?: string;
+          marketBoard?: MarketBoardEntry[];
         }
       | undefined;
     const storedTier = (storedTopPick?.confidenceTier || row.confidence_tier || undefined) as
@@ -196,6 +198,7 @@ export function loadStoredFootballExplanation(
       oneLineSummary: firstSentence(fullSummary),
       fullSummary,
       driverTiles: Array.isArray(meta?.driverTiles) ? meta!.driverTiles : undefined,
+      marketBoard: Array.isArray(meta?.marketBoard) ? meta!.marketBoard : undefined,
       headlineSelectionReason: meta?.headlineSelectionReason,
       activePickMarketCode: activeCode,
       activePickSelection: activeSel,
@@ -329,6 +332,7 @@ export function persistOrLoadImmutableFootballExplanation(
               ...(generated.reasoning || {}),
               _meta: {
                 driverTiles: generated.driverTiles || [],
+                marketBoard: generated.marketBoard || [],
                 headlineSelectionReason: generated.headlineSelectionReason || undefined,
               },
             }),

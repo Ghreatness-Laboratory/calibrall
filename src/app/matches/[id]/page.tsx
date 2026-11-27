@@ -708,6 +708,7 @@ export default function MatchAnalysisPage() {
   const topPickTier = topPick
     ? getRiskTierBadge(topPick.confidenceTier || topPick.riskTier, {
         isSpeculative: topPick.isSpeculative,
+        isExperimental: Boolean(topPick.experimentalLabel || topPick.optionType === 'goal_runs'),
       })
     : null;
   const topPickExplanation = topPick
@@ -1002,7 +1003,7 @@ export default function MatchAnalysisPage() {
                     Full model reasoning locked
                   </div>
                   <p className="text-[12px] text-[var(--text-2)]">
-                    Pro ({formatMonthlyPrice('pro')}) unlocks model drivers and the next 2 alternate picks.
+                    Pro ({formatMonthlyPrice('pro')}) unlocks model drivers, the full market board, and the next 2 alternate picks.
                   </p>
                 </div>
                 <Link
@@ -1068,6 +1069,65 @@ export default function MatchAnalysisPage() {
                           <span className="font-display text-[13.5px] font-bold text-[var(--accent)] tabular-nums shrink-0">
                             {(alt.probability * 100).toFixed(1)}%
                           </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {Array.isArray(syncedFootballExplanation.marketBoard) &&
+                syncedFootballExplanation.marketBoard.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-[var(--line)]" data-testid="detail-market-board">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[11.5px] font-semibold text-[var(--text-2)]">
+                        Market board
+                      </div>
+                      <span className="text-[11px] text-[var(--text-3)] tabular-nums">
+                        {syncedFootballExplanation.marketBoard.length} markets
+                      </span>
+                    </div>
+                    <div className="max-h-[280px] overflow-y-auto border border-[var(--line)] rounded-[12px] divide-y divide-[var(--line)] bg-[var(--surface-2)]">
+                      {syncedFootballExplanation.marketBoard.map((entry) => (
+                        <div
+                          key={entry.marketCode}
+                          className="px-3 py-2 flex items-start justify-between gap-2.5"
+                        >
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[12px] font-semibold text-[var(--text)] break-words leading-snug">
+                                {cleanDisplayText(entry.selection)}
+                              </span>
+                              {entry.isExperimental && (
+                                <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-semibold bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30">
+                                  Experimental
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10.5px] text-[var(--text-3)] leading-snug">
+                              {cleanDisplayText(entry.marketName)}
+                            </div>
+                            {!entry.recommended && entry.reasonNotRecommended && (
+                              <div className="text-[10.5px] text-[var(--text-2)] leading-snug">
+                                {cleanDisplayText(entry.reasonNotRecommended)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0 space-y-0.5">
+                            <div className="font-display text-[12.5px] font-bold text-[var(--accent)] tabular-nums">
+                              {entry.calibratedProbability !== null && entry.calibratedProbability !== undefined
+                                ? `${(entry.calibratedProbability * 100).toFixed(1)}%`
+                                : '—'}
+                            </div>
+                            <span
+                              className={`inline-block px-1.5 py-0.5 rounded-full text-[9.5px] font-semibold border ${
+                                entry.recommended
+                                  ? 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30'
+                                  : 'bg-[var(--surface)] text-[var(--text-3)] border-[var(--line)]'
+                              }`}
+                            >
+                              {entry.recommended ? 'Recommended' : 'Not recommended'}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -840,3 +840,84 @@ export function calculateRiskTier(probability: number, confidenceScore: number =
   return calculateConfidenceTier(probability, confidenceScore, edge);
 }
 
+/**
+ * Exact DP probability of at least `k` consecutive identical outcomes (either all Home with prob p
+ * or all Away with prob 1 - p) within `n` independent Bernoulli(p) goal trials.
+ */
+export function probRunAtLeastK(n: number, pHomeGoal: number, k: number): number {
+  if (n <= 0 || k <= 0) return 0;
+  if (k === 1) return n >= 1 ? 1 : 0;
+  if (n < k) return 0;
+
+  const p = Math.max(0, Math.min(1, pHomeGoal));
+  const q = 1 - p;
+
+  let hStreak = new Array<number>(k).fill(0);
+  let aStreak = new Array<number>(k).fill(0);
+  hStreak[1] = p;
+  aStreak[1] = q;
+  let hit = 0;
+
+  for (let step = 2; step <= n; step++) {
+    const nextH = new Array<number>(k).fill(0);
+    const nextA = new Array<number>(k).fill(0);
+
+    let sumH = 0;
+    let sumA = 0;
+    for (let j = 1; j < k; j++) {
+      sumH += hStreak[j];
+      sumA += aStreak[j];
+    }
+
+    const nextHit = hit + hStreak[k - 1] * p + aStreak[k - 1] * q;
+    nextH[1] = sumA * p;
+    nextA[1] = sumH * q;
+    for (let j = 2; j < k; j++) {
+      nextH[j] = hStreak[j - 1] * p;
+      nextA[j] = aStreak[j - 1] * q;
+    }
+
+    hStreak = nextH;
+    aStreak = nextA;
+    hit = nextHit;
+  }
+
+  return Math.max(0, Math.min(1, hit));
+}
+
+/**
+ * Computes P(any team scores >= k unanswered consecutive goals in regular time)
+ * under N ~ Poisson(lambdaH + lambdaA) and independent Bernoulli(p = lambdaH / (lambdaH + lambdaA))
+ * goal assignment with no in-game score effects.
+ */
+export function calculateGoalRunProbability(
+  lambdaH: number,
+  lambdaA: number,
+  k: 2 | 3
+): {
+  yesProb: number;
+  noProb: number;
+  totalLambda: number;
+  pHomeGoal: number;
+} {
+  const safeH = Math.max(0.01, Number.isFinite(lambdaH) ? lambdaH : 1.35);
+  const safeA = Math.max(0.01, Number.isFinite(lambdaA) ? lambdaA : 1.15);
+  const totalLambda = safeH + safeA;
+  const pHomeGoal = safeH / totalLambda;
+
+  const nMax = Math.max(25, Math.ceil(totalLambda + 10 * Math.sqrt(Math.max(1, totalLambda))));
+  let yesProb = 0;
+  for (let n = k; n <= nMax; n++) {
+    yesProb += poissonProb(totalLambda, n) * probRunAtLeastK(n, pHomeGoal, k);
+  }
+
+  yesProb = Math.max(0.001, Math.min(0.999, yesProb));
+  return {
+    yesProb,
+    noProb: Math.max(0.001, Math.min(0.999, 1 - yesProb)),
+    totalLambda,
+    pHomeGoal,
+  };
+}
+
+

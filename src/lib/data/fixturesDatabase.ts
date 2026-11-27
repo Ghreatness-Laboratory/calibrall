@@ -271,6 +271,7 @@ export function mapDbRowToFixture(row: any): Fixture | null {
     referee: row.referee || undefined,
     dataFreshness: row.updated_at || new Date().toISOString(),
     verifiedOdds: payload?.verifiedOdds,
+    goalEvents: Array.isArray(payload?.goalEvents) ? payload.goalEvents : undefined,
   };
 }
 
@@ -377,6 +378,7 @@ export async function syncFootballFixturesToDatabase(
         homeProviderTeamId: f.homeTeam.providerTeamId || undefined,
         awayProviderTeamId: f.awayTeam.providerTeamId || undefined,
         verifiedOdds: f.verifiedOdds,
+        goalEvents: f.goalEvents && f.goalEvents.length > 0 ? f.goalEvents : undefined,
       };
 
       rowsToUpsert.push({

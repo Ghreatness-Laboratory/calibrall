@@ -115,6 +115,9 @@ export default function FixtureCard({
   const tierInfo = topPrediction
     ? getRiskTierBadge(topPrediction.confidenceTier || topPrediction.riskTier, {
         isSpeculative: topPrediction.isSpeculative,
+        isExperimental: Boolean(
+          topPrediction.experimentalLabel || topPrediction.optionType === 'goal_runs'
+        ),
       })
     : null;
 
@@ -303,7 +306,9 @@ export default function FixtureCard({
             <div className="flex items-center gap-1.5 flex-wrap">
               {tierInfo && (
                 <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${tierInfo.badgeClass}`}>
-                  {tierInfo.label === 'Speculative' ? 'Speculative' : `${tierInfo.label} confidence`}
+                  {tierInfo.label === 'Speculative' || tierInfo.label === 'Experimental'
+                    ? tierInfo.label
+                    : `${tierInfo.label} confidence`}
                 </span>
               )}
               {!isFinished && <LineupChip lineupState={lineupState} isPastKickoff={isPastKickoff} />}
@@ -379,7 +384,8 @@ export default function FixtureCard({
               className={`px-2.5 py-1.5 rounded-[8px] flex items-center justify-between gap-2 text-[11px] border ${
                 settledTopPrediction.settlementStatus === 'WON'
                   ? 'bg-[var(--accent-soft)] border-[var(--accent)]/30 text-[var(--accent)]'
-                  : settledTopPrediction.settlementStatus === 'PUSH'
+                  : settledTopPrediction.settlementStatus === 'PUSH' ||
+                    settledTopPrediction.settlementStatus === 'AWAITING_GOAL_DATA'
                   ? 'bg-[var(--medium-soft)] border-[var(--medium)]/30 text-[var(--medium)]'
                   : 'bg-[var(--danger-soft)] border-[var(--danger)]/30 text-[var(--danger)]'
               }`}
@@ -387,10 +393,17 @@ export default function FixtureCard({
               <div className="flex items-center gap-1.5 min-w-0">
                 {settledTopPrediction.settlementStatus === 'WON' && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
                 {settledTopPrediction.settlementStatus === 'LOST' && <XCircle className="w-3.5 h-3.5 shrink-0" />}
-                {settledTopPrediction.settlementStatus === 'PUSH' && <MinusCircle className="w-3.5 h-3.5 shrink-0" />}
+                {(settledTopPrediction.settlementStatus === 'PUSH' ||
+                  settledTopPrediction.settlementStatus === 'AWAITING_GOAL_DATA') && (
+                  <MinusCircle className="w-3.5 h-3.5 shrink-0" />
+                )}
                 <span className="truncate">{cleanDisplayText(settledTopPrediction.lineComparisonText)}</span>
               </div>
-              <span className="font-semibold shrink-0">{settledTopPrediction.settlementStatus}</span>
+              <span className="font-semibold shrink-0">
+                {settledTopPrediction.settlementStatus === 'AWAITING_GOAL_DATA'
+                  ? 'Awaiting goal data'
+                  : settledTopPrediction.settlementStatus}
+              </span>
             </div>
           )}
 

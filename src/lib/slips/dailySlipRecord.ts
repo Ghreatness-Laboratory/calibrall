@@ -1,4 +1,5 @@
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { settleGoalRunMarket } from '@/lib/prediction/settlementEngine';
 import { loadAndBuildSlipCandidates } from './candidateBuilder';
 import { searchSlips } from './slipSearch';
 import {
@@ -189,6 +190,20 @@ export function settleSingleLeg(
     }
   }
 
+  if (code.startsWith('GOAL_RUN_')) {
+    const runOutcome = settleGoalRunMarket({
+      marketCode: code,
+      status: 'FINISHED',
+      homeScore: h,
+      awayScore: a,
+      goalEvents: score.goalEvents,
+    });
+    if (runOutcome.settlementStatus === 'WON') return { legStatus: 'WON', settledScore: scoreLabel };
+    if (runOutcome.settlementStatus === 'LOST') return { legStatus: 'LOST', settledScore: scoreLabel };
+    if (runOutcome.settlementStatus === 'VOID') return { legStatus: 'VOID', settledScore: scoreLabel };
+    return { legStatus: 'PENDING', settledScore: 'Awaiting goal data' };
+  }
+
   return { legStatus: 'VOID', settledScore: scoreLabel };
 }
 
@@ -286,6 +301,7 @@ function builtSlipToRecordRow(
     priceAgeLabel: l.priceAgeLabel,
     calibratedProbability: l.calibratedProbability,
     confidenceTier: l.confidenceTier,
+    isExperimental: l.isExperimental,
     oneLineWhy: l.oneLineWhy,
     legStatus: 'PENDING',
     settledScore: null,

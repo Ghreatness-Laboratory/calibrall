@@ -270,6 +270,35 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
   else if (m.status === 'CANCELLED') status = 'CANCELED';
   else if (m.status === 'SCHEDULED' || m.status === 'TIMED') status = 'TIMED';
 
+  const parsedGoals = Array.isArray(m.goals)
+    ? m.goals
+        .map((g: any) => {
+          const minute = Number(g?.minute);
+          if (!Number.isFinite(minute)) return null;
+          const gTeamId = g?.team?.id !== undefined && g?.team?.id !== null ? String(g.team.id) : undefined;
+          const gTeamName = String(g?.team?.name || '').toLowerCase();
+          let team: 'home' | 'away' | null = null;
+          if (gTeamId && homeProviderId && gTeamId === homeProviderId) team = 'home';
+          else if (gTeamId && awayProviderId && gTeamId === awayProviderId) team = 'away';
+          else if (gTeamName && String(m.homeTeam?.name || '').toLowerCase() === gTeamName) team = 'home';
+          else if (gTeamName && String(m.awayTeam?.name || '').toLowerCase() === gTeamName) team = 'away';
+          if (!team) return null;
+          const rawType = String(g?.type || '').toUpperCase();
+          // football-data.org assigns own goals to the scoring (benefiting) team; keep REGULAR/PENALTY/OWN_GOAL note
+          return {
+            minute,
+            injuryTime: g?.injuryTime !== undefined && g?.injuryTime !== null ? Number(g.injuryTime) : null,
+            team,
+            type: rawType || 'REGULAR',
+            scorer: g?.scorer?.name ? String(g.scorer.name) : undefined,
+            isPenalty: rawType === 'PENALTY',
+            isOwnGoal: rawType === 'OWN_GOAL',
+          };
+        })
+        .filter((x: any): x is NonNullable<typeof x> => x !== null)
+        .sort((a: any, b: any) => a.minute - b.minute || (a.injuryTime ?? 0) - (b.injuryTime ?? 0))
+    : undefined;
+
   return {
     id: `fix_${m.id}`,
     providerId: String(m.id),
@@ -290,6 +319,7 @@ function parseFootballDataMatch(m: any, fetchTime: string): Fixture | null {
     awayHalfTimeScore: m.score?.halfTime?.away ?? null,
     venue: m.venue || 'Stadium',
     referee: m.referees?.[0]?.name,
+    goalEvents: parsedGoals && parsedGoals.length > 0 ? parsedGoals : undefined,
     dataFreshness: fetchTime,
   };
 }
@@ -1015,7 +1045,10 @@ export class LiveFootballDataProvider implements FootballDataProvider {
           fdCalls++;
           totalCallsMade++;
           const res = await loggedProviderFetch('football-data', url, {
-            headers: { 'X-Auth-Token': footballDataKey },
+            headers: {
+              'X-Auth-Token': footballDataKey,
+              'X-Unfold-Goals': 'true',
+            },
             syncMode: mode,
             timeoutMs: 10000,
           });

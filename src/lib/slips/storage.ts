@@ -375,6 +375,7 @@ export interface SettlementMatchScore {
   awayYellowCards?: number | null;
   homeRedCards?: number | null;
   awayRedCards?: number | null;
+  goalEvents?: Array<{ minute: number; team: 'home' | 'away'; scorer?: string }>;
 }
 
 export async function loadSettlementScoresForMatchIds(
@@ -415,6 +416,7 @@ export async function loadSettlementScoresForMatchIds(
       awayYellowCards: row.away_yellow_cards ?? null,
       homeRedCards: row.home_red_cards ?? null,
       awayRedCards: row.away_red_cards ?? null,
+      goalEvents: Array.isArray(payload?.goalEvents) ? payload.goalEvents : undefined,
     };
   };
 
@@ -440,7 +442,11 @@ export async function loadSettlementScoresForMatchIds(
         for (const r of matchRows || []) {
           const parsed = parseFootballPayload(r);
           if (parsed && (!scores.has(parsed.id) || parsed.status === 'FINISHED')) {
-            scores.set(parsed.id, parsed);
+            const prev = scores.get(parsed.id);
+            scores.set(parsed.id, {
+              ...parsed,
+              goalEvents: parsed.goalEvents ?? prev?.goalEvents,
+            });
           }
         }
       }
@@ -485,7 +491,11 @@ export async function loadSettlementScoresForMatchIds(
           for (const r of matchRows || []) {
             const parsed = parseFootballPayload(r);
             if (parsed && (!scores.has(parsed.id) || parsed.status === 'FINISHED')) {
-              scores.set(parsed.id, parsed);
+              const prev = scores.get(parsed.id);
+              scores.set(parsed.id, {
+                ...parsed,
+                goalEvents: parsed.goalEvents ?? prev?.goalEvents,
+              });
             }
           }
         }

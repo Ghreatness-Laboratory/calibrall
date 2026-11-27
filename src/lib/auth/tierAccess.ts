@@ -55,6 +55,7 @@ export function redactExplanationForTier(
     activePickTier: explanation.activePickTier,
     reasoning: {},
     alternates: [],
+    marketBoard: [],
     generatedAt: explanation.generatedAt,
     confidenceTier: explanation.confidenceTier,
     confidenceReason: explanation.confidenceReason,

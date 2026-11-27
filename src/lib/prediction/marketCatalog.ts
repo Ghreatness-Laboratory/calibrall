@@ -490,6 +490,31 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
     },
     isEnabled: true,
   },
+  goal_runs: {
+    type: 'goal_runs',
+    title: 'Goal runs (Experimental)',
+    category: 'goal_runs',
+    period: 'REGULAR_TIME',
+    description: 'Any team scores 2 or 3 consecutive unanswered goals in regular time. Derived from Dixon Coles goal rates assuming independent goals with no in game score effects.',
+    defaultSelections: [
+      'Any team scores 2 goals in a row: Yes',
+      'Any team scores 2 goals in a row: No',
+      'Any team scores 3 goals in a row: Yes',
+      'Any team scores 3 goals in a row: No',
+    ],
+    settlementRule: 'Regular time only. Settled from chronological goal events with minute and team, deterministic final score bounds when conclusive, or Awaiting goal data otherwise.',
+    dataRequirements: {
+      minSampleSizeMatches: 10,
+      minDataCoverageScore: 0.80,
+      maxUncertaintyScore: 0.22,
+    },
+    qualificationCriteria: {
+      minProbability: 0.60,
+      minEv: 0.00,
+      minEdge: 0.01,
+    },
+    isEnabled: true,
+  },
   moneyline: {
     type: 'moneyline',
     title: 'Moneyline (Winner)',
@@ -642,6 +667,8 @@ export function getOptionTypeLabel(type: SupportedOptionType | string): string {
       return 'Team multi goals';
     case 'first_half_multi_goals':
       return '1st half multi goals';
+    case 'goal_runs':
+      return 'Goal runs';
     default:
       return type ? type.replace(/_/g, ' ') : '';
   }
@@ -697,8 +724,14 @@ export function groupPredictionsByConfidenceTier(predictions: MarketPrediction[]
 
 export function getRiskTierBadge(
   tier?: RiskTier | string,
-  options?: { isSpeculative?: boolean }
+  options?: { isSpeculative?: boolean; isExperimental?: boolean }
 ): { label: string; badgeClass: string } {
+  if (options?.isExperimental) {
+    return {
+      label: 'Experimental',
+      badgeClass: 'bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30',
+    };
+  }
   if (options?.isSpeculative) {
     return {
       label: 'Speculative',
@@ -736,7 +769,7 @@ export function getRiskTierBadge(
 
 export function getConfidenceTierBadge(
   tier?: string,
-  options?: { isSpeculative?: boolean }
+  options?: { isSpeculative?: boolean; isExperimental?: boolean }
 ): { label: string; badgeClass: string } {
   return getRiskTierBadge(tier, options);
 }

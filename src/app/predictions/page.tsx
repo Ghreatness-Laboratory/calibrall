@@ -38,6 +38,7 @@ type MarketGroupFilter =
   | 'ALL'
   | 'goals'
   | 'multi_goals'
+  | 'goal_runs'
   | 'corners'
   | 'cards'
   | 'handicap'
@@ -408,6 +409,9 @@ export default function PredictionsPage() {
         p.optionType === 'first_half_multi_goals'
       );
     }
+    if (group === 'goal_runs') {
+      return p.marketCategory === 'goal_runs' || p.optionType === 'goal_runs';
+    }
     return true;
   };
 
@@ -434,6 +438,13 @@ export default function PredictionsPage() {
         if (
           p.marketCategory === 'multi_goals' &&
           (p.isSpeculative || !p.isValidated || (p.rankingScore ?? 0) <= 0)
+        ) {
+          return false;
+        }
+        if (
+          (p.marketCategory === 'goal_runs' || p.optionType === 'goal_runs') &&
+          selectedMarketGroup !== 'goal_runs' &&
+          p.isSpeculative
         ) {
           return false;
         }
@@ -507,6 +518,7 @@ export default function PredictionsPage() {
     { id: 'ALL', label: 'All markets' },
     { id: 'goals', label: 'Goals' },
     { id: 'multi_goals', label: 'Multi goals' },
+    { id: 'goal_runs', label: 'Goal runs' },
     { id: 'results', label: 'Results' },
     { id: 'corners', label: 'Corners' },
     { id: 'cards', label: 'Cards' },
@@ -1001,6 +1013,7 @@ export default function PredictionsPage() {
                   {group.picks.map((p, pIdx) => {
                     const badge = getRiskTierBadge(p.confidenceTier || p.riskTier, {
                       isSpeculative: p.isSpeculative,
+                      isExperimental: Boolean(p.experimentalLabel || p.optionType === 'goal_runs'),
                     });
                     const probVal = p.calibratedProbability ?? p.modelProbability;
                     const hasRealOdds = Boolean(

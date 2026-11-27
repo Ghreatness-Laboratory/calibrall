@@ -128,6 +128,7 @@ export function getMarketFamily(optionType: SupportedOptionType, marketCode: str
   if (optionType === 'highest_scoring_half' || marketCode.startsWith('HSH_')) return 'highest_scoring_half';
   if (optionType === 'corners' || optionType === 'corner_handicap' || marketCode.includes('CORNER')) return 'corners';
   if (optionType === 'bookings' || optionType === 'team_bookings' || optionType === 'booking_points' || marketCode.includes('CARD') || marketCode.includes('BOOKING')) return 'bookings';
+  if (optionType === 'goal_runs' || marketCategory === 'goal_runs' || marketCode.startsWith('GOAL_RUN_')) return 'goal_runs';
   if (optionType === 'over_under_goals' || optionType === 'goal_bounds' || optionType === 'team_goal_bounds' || marketCode.includes('GOAL') || marketCode.includes('GB_') || marketCode.includes('TGB_')) return 'goals_over_under';
   return 'goals_over_under';
 }
@@ -2075,7 +2076,7 @@ export function selectDiversifiedSlatePicks<T extends SlatePickCandidate>(
 
   const isEligibleAlternative = (p: MarketPrediction): boolean => {
     if (isDisabledRecommendationMarket(p)) return false;
-    if (!p.isValidated || p.sanityTripwire) return false;
+    if (!p.isValidated || p.isSpeculative || p.sanityTripwire) return false;
     if (p.optionType === 'asian_handicap' && (p.handicapLine ?? 0) >= 1.5) return false;
     if ((p.rankingScore ?? 0) <= 0) return false;
     const prob = p.calibratedProbability ?? p.modelProbability;

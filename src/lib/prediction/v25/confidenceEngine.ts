@@ -217,10 +217,12 @@ export class ConfidenceEngine {
       if (riskEvaluation.hasAdverseFormGap) confidenceReasons.push('adverse recent form gap');
     }
 
-    // MANDATORY CAP: No High tier allowed when team news is absent
-    if (!isTeamNewsEnabled() && tier === 'HIGH') {
+    // MANDATORY CAP: No High tier allowed when team news is absent or on experimental goal_runs market
+    if ((!isTeamNewsEnabled() || optionType === 'goal_runs') && tier === 'HIGH') {
       tier = 'MEDIUM';
-      if (!confidenceReasons.some((r) => r.includes('team news'))) {
+      if (optionType === 'goal_runs') {
+        confidenceReasons.push('experimental market capped below High tier');
+      } else if (!confidenceReasons.some((r) => r.includes('team news'))) {
         confidenceReasons.push('capped at Medium without confirmed team news');
       }
     }

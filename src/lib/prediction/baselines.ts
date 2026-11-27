@@ -3,7 +3,7 @@
 // Used to compute true skill, edge-over-baseline, and prevent bias toward trivially high raw probabilities.
 
 import { getLeagueCalibratedConfig, resolveLeagueGoalMeans } from './calibratedParams';
-import { poissonProb } from './math';
+import { poissonProb, calculateGoalRunProbability } from './math';
 
 export type MarketFamily = 
   | 'result' 
@@ -17,7 +17,8 @@ export type MarketFamily =
   | 'corners' 
   | 'bookings'
   | 'handicap'
-  | 'multi_goals';
+  | 'multi_goals'
+  | 'goal_runs';
 
 export const MARKET_FAMILIES: MarketFamily[] = [
   'result',
@@ -32,6 +33,7 @@ export const MARKET_FAMILIES: MarketFamily[] = [
   'bookings',
   'handicap',
   'multi_goals',
+  'goal_runs',
 ];
 
 export interface TeamHistoricalStats {
@@ -563,6 +565,17 @@ export function getMarketBaseline(
       sumP += poissonProb(lambda, g);
     }
     compRate = Number(Math.min(0.95, Math.max(0.05, sumP)).toFixed(4));
+    teamRate = compRate;
+  }
+
+  // 12. Goal Runs (Unanswered consecutive goals by the same team)
+  else if (marketCode.startsWith('GOAL_RUN_')) {
+    marketFamily = 'goal_runs';
+    const k = marketCode.includes('GOAL_RUN_3_') ? 3 : 2;
+    const isYes = marketCode.endsWith('_YES');
+    const runResult = calculateGoalRunProbability(comp.avgHomeGoals, comp.avgAwayGoals, k);
+    const pYes = runResult.yesProb;
+    compRate = Number((isYes ? pYes : 1 - pYes).toFixed(4));
     teamRate = compRate;
   }
 

@@ -177,6 +177,20 @@ export function checkMarketGating(
     ? competitionCodeOrMinSample
     : minSample;
 
+  if (family === 'goal_runs') {
+    return {
+      isAllowed: true,
+      leagueGroup,
+      matches: 0,
+      bss: 0,
+      ciLower: -1,
+      ciUpper: 1,
+      statusText: 'Experimental (Goal runs): speculative only until 100 picks settle with real goal order data',
+      cannotBeTopPick: true,
+      tierMode: 'SPECULATIVE_ONLY',
+    };
+  }
+
   const entry = getCalibratedParams().walkForwardMarketValidation?.[leagueGroup]?.[family];
   const reg = buildStatusFromEntry(family, entry);
 

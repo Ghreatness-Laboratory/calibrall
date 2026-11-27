@@ -6,7 +6,8 @@ import {
   poissonProb, 
   negBinomialProb,
   dixonColesTau, 
-  generateHalfByHalfGoalDistribution
+  generateHalfByHalfGoalDistribution,
+  calculateGoalRunProbability,
 } from '../math';
 import { V25FixtureFeatures } from './featureLayer';
 import {
@@ -85,6 +86,10 @@ export interface V25ScorelineMatrix {
     away: Record<string, number>;
     firstHalf: Record<string, number>;
   };
+  goalRuns: {
+    run2: { yes: number; no: number; pHomeGoal: number; totalLambda: number };
+    run3: { yes: number; no: number; pHomeGoal: number; totalLambda: number };
+  };
 }
 
 export interface V25CornerDistribution {
@@ -146,6 +151,11 @@ export const PLATT_CALIBRATION_PARAMS: Record<MarketCategory, { a: number; b: nu
   multi_goals: {
     a: getMultiGoalsPlattParams().global.a,
     b: getMultiGoalsPlattParams().global.b,
+    marketBlendWeight: 0.0,
+  },
+  goal_runs: {
+    a: 1.0,
+    b: 0.0,
     marketBlendWeight: 0.0,
   },
   moneyline: { a: 0.950, b: 0.0, marketBlendWeight: 0.55 },
@@ -430,6 +440,9 @@ export class DixonColesV25Engine {
     multiGoals.firstHalf['0-1'] = halfDist.firstHalf.multiGoals['0-1'];
     multiGoals.firstHalf['1-2'] = halfDist.firstHalf.multiGoals['1-2'];
 
+    const run2Res = calculateGoalRunProbability(lambda, mu, 2);
+    const run3Res = calculateGoalRunProbability(lambda, mu, 3);
+
     return {
       matrix,
       lambda,
@@ -458,6 +471,20 @@ export class DixonColesV25Engine {
       },
       goalBounds,
       multiGoals,
+      goalRuns: {
+        run2: {
+          yes: run2Res.yesProb,
+          no: run2Res.noProb,
+          pHomeGoal: run2Res.pHomeGoal,
+          totalLambda: run2Res.totalLambda,
+        },
+        run3: {
+          yes: run3Res.yesProb,
+          no: run3Res.noProb,
+          pHomeGoal: run3Res.pHomeGoal,
+          totalLambda: run3Res.totalLambda,
+        },
+      },
     };
   }
 

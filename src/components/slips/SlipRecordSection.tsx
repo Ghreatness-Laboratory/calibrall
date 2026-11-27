@@ -166,13 +166,22 @@ export default function SlipRecordSection() {
                             className="flex items-center justify-between gap-2 text-[11.5px] py-1"
                           >
                             <div className="min-w-0">
-                              <div className="font-medium text-[var(--text)] truncate">
-                                {cleanDisplayText(leg.matchLabel)}
+                              <div className="font-medium text-[var(--text)] truncate flex items-center gap-1.5">
+                                <span className="truncate">{cleanDisplayText(leg.matchLabel)}</span>
+                                {leg.isExperimental && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-[var(--medium-soft)] text-[var(--medium)] shrink-0">
+                                    Experimental
+                                  </span>
+                                )}
                               </div>
                               <div className="text-[10.5px] text-[var(--text-2)]">
                                 {cleanDisplayText(leg.selection)} · {leg.decimalOdds.toFixed(2)} (
                                 {cleanDisplayText(leg.bookmakerName)})
-                                {leg.settledScore ? ` · FT ${leg.settledScore}` : ''}
+                                {leg.settledScore
+                                  ? leg.settledScore === 'Awaiting goal data'
+                                    ? ' · Awaiting goal data'
+                                    : ` · FT ${leg.settledScore}`
+                                  : ''}
                               </div>
                             </div>
                             <span className="text-[10.5px] font-bold text-[var(--text-2)] shrink-0">

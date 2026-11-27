@@ -69,6 +69,15 @@ interface OverviewResponse {
     manualGrantsCount: number;
     successfulPaymentsCount: number;
   };
+  goalRunsCalibration?: {
+    realGoalOrderSettled: number;
+    deterministicScoreSettled: number;
+    awaitingGoalData: number;
+    totalFinishedEvaluated: number;
+    targetSampleSize: number;
+    calibrationReady: boolean;
+    promotionEligible: boolean;
+  };
 }
 
 export default function AdminOverviewSection() {
@@ -292,6 +301,73 @@ export default function AdminOverviewSection() {
           </div>
         </div>
       </div>
+
+      {/* Goal runs Experimental Calibration Sample Counter */}
+      {data.goalRunsCalibration && (
+        <div
+          className="p-4 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] space-y-3"
+          data-testid="admin-goal-runs-calibration"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-[13.5px] font-semibold text-[var(--text)]">
+                Goal runs calibration sample
+              </h3>
+              <p className="text-[12px] text-[var(--text-2)]">
+                Ships as Experimental (Speculative only, no High tier) until at least {data.goalRunsCalibration.targetSampleSize} picks settle with real goal order data and calibration is checked.
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30">
+              {data.goalRunsCalibration.promotionEligible
+                ? 'Ready for review'
+                : 'Experimental · Speculative only'}
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[12px] tabular-nums">
+              <span className="text-[var(--text-2)]">Settled with real goal order data</span>
+              <span className="font-bold text-[var(--text)]">
+                {data.goalRunsCalibration.realGoalOrderSettled} / {data.goalRunsCalibration.targetSampleSize}
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-[var(--surface-2)] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[var(--accent)]"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (data.goalRunsCalibration.realGoalOrderSettled /
+                      Math.max(1, data.goalRunsCalibration.targetSampleSize)) *
+                      100
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 text-[12px]">
+            <div className="p-2.5 rounded-[8px] bg-[var(--surface-2)] border border-[var(--border)]">
+              <div className="text-[10.5px] text-[var(--text-3)]">Real goal order</div>
+              <div className="text-[15px] font-semibold text-[var(--accent)] tabular-nums mt-0.5">
+                {data.goalRunsCalibration.realGoalOrderSettled}
+              </div>
+            </div>
+            <div className="p-2.5 rounded-[8px] bg-[var(--surface-2)] border border-[var(--border)]">
+              <div className="text-[10.5px] text-[var(--text-3)]">Score decided</div>
+              <div className="text-[15px] font-semibold text-[var(--text)] tabular-nums mt-0.5">
+                {data.goalRunsCalibration.deterministicScoreSettled}
+              </div>
+            </div>
+            <div className="p-2.5 rounded-[8px] bg-[var(--surface-2)] border border-[var(--border)]">
+              <div className="text-[10.5px] text-[var(--text-3)]">Awaiting goal data</div>
+              <div className="text-[15px] font-semibold text-[var(--medium)] tabular-nums mt-0.5">
+                {data.goalRunsCalibration.awaitingGoalData}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Matches per League Data Status */}
       <div className="p-4 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] space-y-3">

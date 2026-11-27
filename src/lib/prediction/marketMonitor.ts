@@ -46,6 +46,7 @@ const FAMILY_DISPLAY_NAMES: Record<MarketFamily, string> = {
   bookings: 'Cards (Total & Team)',
   handicap: 'Handicap (Asian & European)',
   multi_goals: 'Multi Goals',
+  goal_runs: 'Goal Runs (Experimental)',
 };
 
 class MarketMonitor {
@@ -73,6 +74,7 @@ class MarketMonitor {
       second_half_result: 3,
       draw: 2,
       multi_goals: 0,
+      goal_runs: 0,
     };
 
     let id = 1;
@@ -149,6 +151,7 @@ class MarketMonitor {
       bookings: 0,
       handicap: 0,
       multi_goals: 0,
+      goal_runs: 0,
     };
 
     const dailyBreakdown: Record<string, Record<MarketFamily, number>> = {};
@@ -171,6 +174,7 @@ class MarketMonitor {
           bookings: 0,
           handicap: 0,
           multi_goals: 0,
+          goal_runs: 0,
         };
       }
       if (dailyBreakdown[entry.dateStr][entry.marketFamily] !== undefined) {
@@ -307,7 +311,7 @@ export function getEquivalentCanonicalKey(marketCode?: string, selection?: strin
   if (marketCode === 'DC_1X' || marketCode === 'AH_HOME_P0_5' || marketCode === 'AH_HOME_P0.5') {
     return 'EQUIV_HOME_OR_DRAW';
   }
-  if (marketCode && (marketCode.startsWith('MULTI_GOALS_') || marketCode.startsWith('TEAM_MULTI_GOALS_') || marketCode.startsWith('FH_MULTI_GOALS_'))) {
+  if (marketCode && (marketCode.startsWith('MULTI_GOALS_') || marketCode.startsWith('TEAM_MULTI_GOALS_') || marketCode.startsWith('FH_MULTI_GOALS_') || marketCode.startsWith('GOAL_RUN_'))) {
     return marketCode;
   }
   const s = (selection || '').trim();

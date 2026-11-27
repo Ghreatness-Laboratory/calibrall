@@ -13,6 +13,7 @@ import {
   PickEvidence,
   VerifiedMatchOdds,
   MultiGoalsMeta,
+  GoalRunsMeta,
 } from '@/types';
 import { FeatureLayerEngine, V25FixtureFeatures } from './featureLayer';
 import { DixonColesV25Engine, V25ScorelineMatrix, COVARIATE_COEFFICIENTS } from './dixonColesV25';
@@ -38,7 +39,8 @@ export function getConfidenceThresholdForOption(optionType: SupportedOptionType)
   if (
     optionType === 'multi_goals' ||
     optionType === 'team_multi_goals' ||
-    optionType === 'first_half_multi_goals'
+    optionType === 'first_half_multi_goals' ||
+    optionType === 'goal_runs'
   ) {
     return MULTI_GOALS_HIGH_THRESHOLD;
   }
@@ -79,6 +81,7 @@ interface RawOptionCandidate {
   handicapType?: 'asian' | 'european';
   plainEnglishReason?: string;
   multiGoalsMeta?: MultiGoalsMeta;
+  goalRunsMeta?: GoalRunsMeta;
   priceSource?: string;
 }
 
@@ -333,6 +336,7 @@ export class DixonColesV25Evaluator {
         case 'total_corners':
         case 'team_corners': categoryMultiplier = 1.40; break;
         case 'bookings': categoryMultiplier = 1.55; break;
+        case 'goal_runs': categoryMultiplier = 1.15; break;
         default: categoryMultiplier = 1.05; break;
       }
       const baseMarketSpread = (baseUncertainty * 0.32 * categoryMultiplier) + 0.012;
@@ -445,16 +449,23 @@ export class DixonColesV25Evaluator {
         cand.optionType
       );
 
-      // Multi goals league-level speculative override & span tightness rule
+      // Multi goals & Goal runs league/experimental speculative overrides
       const candThreshold = getConfidenceThresholdForOption(cand.optionType);
       const isMultiGoalsCand = cand.marketCategory === 'multi_goals' && Boolean(cand.multiGoalsMeta);
+      const isGoalRunsCand = cand.marketCategory === 'goal_runs' && Boolean(cand.goalRunsMeta);
       const mgSpan = cand.multiGoalsMeta?.span ?? 0;
       const passesMultiGoalsTightness = !isMultiGoalsCand || (mgSpan <= 3 || (mgSpan === 4 && calProb > 0.80));
       const isSpeculativeOnlyLeague = isMultiGoalsCand && gate.tierMode === 'SPECULATIVE_ONLY';
+      const isSpeculativeOnlyGoalRuns = isGoalRunsCand && gate.tierMode === 'SPECULATIVE_ONLY';
 
       if (isSpeculativeOnlyLeague) {
         confAssessment.confidenceTier = 'LOW';
         confAssessment.confidenceReasons.unshift(`speculative only league gate in ${gate.leagueGroup}`);
+      } else if (isSpeculativeOnlyGoalRuns) {
+        if (confAssessment.confidenceTier === 'HIGH') {
+          confAssessment.confidenceTier = 'MEDIUM';
+        }
+        confAssessment.confidenceReasons.unshift('experimental until 100 picks settle with real goal order data');
       }
 
       const homeCleanName = displayName(context.homeTeamName);
@@ -482,7 +493,7 @@ export class DixonColesV25Evaluator {
         qualStatus = 'NO_RECOMMENDATION';
       } else if (sanityTripwire || !passesMultiGoalsTightness) {
         qualStatus = 'UNQUALIFIED_MARGINAL';
-      } else if (isSpeculativeOnlyLeague) {
+      } else if (isSpeculativeOnlyLeague || isSpeculativeOnlyGoalRuns) {
         qualStatus = 'PROBABILITY_ANALYSIS_ONLY';
       } else if (hasNonPositiveSkillVsMarket || (cand.marketOdds && (ev ?? 0) <= 0)) {
         qualStatus = 'PROBABILITY_ANALYSIS_ONLY';
@@ -498,7 +509,7 @@ export class DixonColesV25Evaluator {
 
       // Ranking score (used for ordering; actual topPick prioritizes real-odds +EV first, then unpriced edge)
       let rankingScore = 0;
-      if (!gate.isAllowed || sanityTripwire || hasNonPositiveSkillVsMarket || calProb < candThreshold || !passesMultiGoalsTightness || isSpeculativeOnlyLeague) {
+      if (!gate.isAllowed || sanityTripwire || hasNonPositiveSkillVsMarket || calProb < candThreshold || !passesMultiGoalsTightness || isSpeculativeOnlyLeague || isSpeculativeOnlyGoalRuns) {
         rankingScore = 0;
       } else if (cand.marketOdds && (ev ?? 0) > 0) {
         // Real odds present: EV dominates ranking!
@@ -598,11 +609,23 @@ export class DixonColesV25Evaluator {
         multiGoalsEvidenceStr = `${scopeLabel}. P(${bandText}) = ${pPct}% (${spanLabel}). Home averages ${hAvg} scored, away concedes ${aCon}.${recentClause} Model line, no market price.`;
       }
 
+      let goalRunsMetaUpdated = cand.goalRunsMeta ? { ...cand.goalRunsMeta, calibratedProb: Number(calProb.toFixed(4)) } : undefined;
+      let goalRunsEvidenceStr: string | undefined;
+      if (isGoalRunsCand && goalRunsMetaUpdated) {
+        goalRunsEvidenceStr = cleanDisplayText(
+          `Expected goals: ${goalRunsMetaUpdated.homeXg.toFixed(2)} home and ${goalRunsMetaUpdated.awayXg.toFixed(2)} away (${goalRunsMetaUpdated.totalXg.toFixed(2)} total). ` +
+          `Streak probability for ${goalRunsMetaUpdated.streakLength} in a row is ${(goalRunsMetaUpdated.streakProb * 100).toFixed(1)}% (${(calProb * 100).toFixed(1)}% for ${goalRunsMetaUpdated.outcome}). ` +
+          `Assumes Poisson totals with constant team share and no in game score effects. Probability only, no market price.`
+        );
+      }
+
       const whyLineDefault = cleanDisplayText(
         !gate.isAllowed
           ? `Rejected: ${fam} failed walk forward Brier skill gate in ${gate.leagueGroup} (BSS ${gate.bss >= 0 ? '+' : ''}${gate.bss.toFixed(4)}, 95% CI [${gate.ciLower.toFixed(4)}, ${gate.ciUpper.toFixed(4)}]).`
           : !passesMultiGoalsTightness
           ? `Rejected: range width ${mgSpan} fails tightness rule (max width 3, or width 4 above 80.0% calibrated).`
+          : goalRunsEvidenceStr
+          ? goalRunsEvidenceStr
           : multiGoalsEvidenceStr
           ? multiGoalsEvidenceStr
           : calProb < candThreshold
@@ -712,7 +735,9 @@ export class DixonColesV25Evaluator {
         rankingScore,
         isTopPick: false,
         settlementStatus: 'PENDING',
-        evidenceTier: isSpeculativeOnlyLeague
+        evidenceTier: isSpeculativeOnlyGoalRuns
+          ? 'Experimental (Speculative)'
+          : isSpeculativeOnlyLeague
           ? 'Speculative (Backtest Unvalidated)'
           : confAssessment.confidenceTier === 'HIGH'
           ? 'High Confidence Projection'
@@ -726,7 +751,9 @@ export class DixonColesV25Evaluator {
         winProb: cand.winProb,
         pushProb: cand.pushProb,
         lossProb: cand.lossProb,
-        plainEnglishReason: multiGoalsEvidenceStr
+        plainEnglishReason: goalRunsEvidenceStr
+          ? goalRunsEvidenceStr
+          : multiGoalsEvidenceStr
           ? cleanDisplayText(multiGoalsEvidenceStr)
           : (cand.plainEnglishReason ? cleanDisplayText(cand.plainEnglishReason) : undefined),
         stateTags: context.stateTags || [],
@@ -749,9 +776,10 @@ export class DixonColesV25Evaluator {
         baselineProbability: baseRate,
         edgeOverBaseline,
         isGenericPick,
-        isValidated: gate.isAllowed && !isSpeculativeOnlyLeague,
-        isSpeculative: isSpeculativeOnlyLeague,
-        validationStatus: gate.isAllowed && !isSpeculativeOnlyLeague ? 'validated' : 'unvalidated',
+        isValidated: gate.isAllowed && !isSpeculativeOnlyLeague && !isSpeculativeOnlyGoalRuns,
+        isSpeculative: isSpeculativeOnlyLeague || isSpeculativeOnlyGoalRuns,
+        experimentalLabel: isGoalRunsCand ? 'Experimental' : undefined,
+        validationStatus: gate.isAllowed && !isSpeculativeOnlyLeague && !isSpeculativeOnlyGoalRuns ? 'validated' : 'unvalidated',
         brierSkillScore: gate.bss,
         sanityTripwire,
         tripwireReason: tripwireReason ? cleanDisplayText(tripwireReason) : undefined,
@@ -762,6 +790,7 @@ export class DixonColesV25Evaluator {
         equivalentCanonicalKey: getEquivalentCanonicalKey(cand.marketCode, cand.selection),
         evidence,
         multiGoalsMeta: multiGoalsMetaWithHits,
+        goalRunsMeta: goalRunsMetaUpdated,
         priceSource: cand.priceSource,
       };
 
@@ -1580,6 +1609,63 @@ export class DixonColesV25Evaluator {
             },
           });
         }
+      }
+    }
+
+    // 12. GOAL RUNS (Speculative Experimental, probability only, no bookmaker odds or EV)
+    if (isOptionTypeEnabled('goal_runs') && matrix.goalRuns) {
+      const runSpecs: Array<{ k: 2 | 3; data: { yes: number; no: number; pHomeGoal: number; totalLambda: number } }> = [
+        { k: 2, data: matrix.goalRuns.run2 },
+        { k: 3, data: matrix.goalRuns.run3 },
+      ];
+      const assumptionNote = 'Assumes Poisson goal totals with constant team share and no in game score effects.';
+      for (const spec of runSpecs) {
+        list.push({
+          marketCode: `GOAL_RUN_${spec.k}_YES`,
+          optionType: 'goal_runs',
+          marketCategory: 'goal_runs',
+          marketName: `Any team scores ${spec.k} goals in a row`,
+          selection: `Any team scores ${spec.k} goals in a row: Yes`,
+          period: 'REGULAR_TIME',
+          settlementRule: `Regular time 90m only. Wins if either team scores ${spec.k} or more consecutive unanswered goals.`,
+          rawProb: spec.data.yes,
+          marketOdds: undefined,
+          priceSource: 'Probability only, no market price',
+          goalRunsMeta: {
+            streakLength: spec.k,
+            outcome: 'YES',
+            homeXg: Number(lambda.toFixed(2)),
+            awayXg: Number(mu.toFixed(2)),
+            totalXg: Number((lambda + mu).toFixed(2)),
+            pHomeGoal: Number(spec.data.pHomeGoal.toFixed(4)),
+            streakProb: Number(spec.data.yes.toFixed(4)),
+            calibratedProb: Number(spec.data.yes.toFixed(4)),
+            assumptionNote,
+          },
+        });
+        list.push({
+          marketCode: `GOAL_RUN_${spec.k}_NO`,
+          optionType: 'goal_runs',
+          marketCategory: 'goal_runs',
+          marketName: `Any team scores ${spec.k} goals in a row`,
+          selection: `Any team scores ${spec.k} goals in a row: No`,
+          period: 'REGULAR_TIME',
+          settlementRule: `Regular time 90m only. Wins if neither team scores ${spec.k} consecutive unanswered goals.`,
+          rawProb: spec.data.no,
+          marketOdds: undefined,
+          priceSource: 'Probability only, no market price',
+          goalRunsMeta: {
+            streakLength: spec.k,
+            outcome: 'NO',
+            homeXg: Number(lambda.toFixed(2)),
+            awayXg: Number(mu.toFixed(2)),
+            totalXg: Number((lambda + mu).toFixed(2)),
+            pHomeGoal: Number(spec.data.pHomeGoal.toFixed(4)),
+            streakProb: Number(spec.data.yes.toFixed(4)),
+            calibratedProb: Number(spec.data.no.toFixed(4)),
+            assumptionNote,
+          },
+        });
       }
     }
 

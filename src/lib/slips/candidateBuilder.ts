@@ -82,6 +82,9 @@ const NON_UPCOMING_STATUSES = new Set([
 ]);
 
 export function mapFootballMarketGroup(pred: MarketPrediction): SlipMarketGroupKey {
+  if (pred.optionType === 'goal_runs' || pred.marketCategory === 'goal_runs') {
+    return 'goal_runs';
+  }
   if (
     pred.optionType === 'multi_goals' ||
     pred.optionType === 'team_multi_goals' ||
@@ -524,7 +527,11 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
 
       for (const pick of poolPicks) {
         if (isDisabledRecommendationMarket(pick)) continue;
-        if (pick.abstainReason || pick.sanityTripwire || pick.isSpeculative) continue;
+        if (pick.abstainReason || pick.sanityTripwire) continue;
+        const isGoalRuns =
+          pick.optionType === 'goal_runs' || pick.marketCategory === 'goal_runs';
+        if (isGoalRuns && input.oddsBasis !== 'model_fair') continue;
+        if (!isGoalRuns && pick.isSpeculative) continue;
         if (
           pick.marketCategory === 'multi_goals' &&
           (!pick.isValidated || (pick.rankingScore ?? 0) <= 0)
@@ -551,6 +558,9 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
           pick.calibratedProbability ?? pick.modelProbability
         );
         if (!Number.isFinite(calibratedProbability) || calibratedProbability <= 0.02 || calibratedProbability >= 0.985) {
+          continue;
+        }
+        if (isGoalRuns && calibratedProbability < 0.58) {
           continue;
         }
 
@@ -681,6 +691,7 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
           marketEdge,
           expectedValue,
           confidenceTier: effectiveTier,
+          isExperimental: isGoalRuns,
           teamNewsLowered: lowered,
           teamNewsNote: teamNewsNote ? cleanDisplayText(teamNewsNote) : null,
           oneLineWhy: cleanDisplayText(expl.oneLineSummary),

@@ -33,6 +33,17 @@ import { bustBasketballSlateCache } from '@/lib/basketball/readService';
 import { getFootballDataProvider } from '@/lib/data/provider';
 import { syncBasketballLivePipeline } from '@/lib/basketball/liveSync';
 import { fetchAllRows } from '@/lib/supabase/pagination';
+import { settleGoalRunMarket } from '@/lib/prediction/settlementEngine';
+
+export interface GoalRunsCalibrationSummary {
+  realGoalOrderSettled: number;
+  deterministicScoreSettled: number;
+  awaitingGoalData: number;
+  totalFinishedEvaluated: number;
+  targetSampleSize: number;
+  calibrationReady: boolean;
+  promotionEligible: boolean;
+}
 
 export interface AdminUserRecord {
   id: string;
@@ -416,6 +427,49 @@ export async function getAdminOverview() {
     manualGrantsCount: 0,
     successfulPaymentsCount: 0,
   };
+  const goalRunsCalibration: GoalRunsCalibrationSummary = {
+    realGoalOrderSettled: 0,
+    deterministicScoreSettled: 0,
+    awaitingGoalData: 0,
+    totalFinishedEvaluated: 0,
+    targetSampleSize: 100,
+    calibrationReady: false,
+    promotionEligible: false,
+  };
+
+  const evaluateFinishedFixtureForGoalRuns = (payloadRaw: string | Record<string, any> | null | undefined, rowStatus?: string, rowHome?: number | null, rowAway?: number | null) => {
+    let payload: Record<string, any> = {};
+    if (typeof payloadRaw === 'string') {
+      try {
+        payload = JSON.parse(payloadRaw);
+      } catch {
+        payload = {};
+      }
+    } else if (payloadRaw && typeof payloadRaw === 'object') {
+      payload = payloadRaw;
+    }
+    const status = String(rowStatus || payload?.status || '').toUpperCase();
+    if (status !== 'FINISHED') return;
+    const h = rowHome ?? payload?.score?.home ?? payload?.homeScore ?? null;
+    const a = rowAway ?? payload?.score?.away ?? payload?.awayScore ?? null;
+    if (h === null || h === undefined || a === null || a === undefined) return;
+    const goalEvents = Array.isArray(payload?.goalEvents) ? payload.goalEvents : undefined;
+    const outcome = settleGoalRunMarket({
+      marketCode: 'GOAL_RUN_2_YES',
+      status: 'FINISHED',
+      homeScore: Number(h),
+      awayScore: Number(a),
+      goalEvents,
+    });
+    goalRunsCalibration.totalFinishedEvaluated += 1;
+    if (outcome.settlementSource === 'provider_goal_order') {
+      goalRunsCalibration.realGoalOrderSettled += 1;
+    } else if (outcome.settlementSource === 'deterministic_score') {
+      goalRunsCalibration.deterministicScoreSettled += 1;
+    } else if (outcome.settlementSource === 'awaiting_goal_data') {
+      goalRunsCalibration.awaitingGoalData += 1;
+    }
+  };
 
   if (serviceClient) {
     const [
@@ -545,6 +599,19 @@ export async function getAdminOverview() {
         successfulPaymentsCount: Number(paySuccessRes.count) || 0,
       };
     }
+
+    try {
+      const { data: finishedFixtures } = await serviceClient
+        .from('fixtures')
+        .select('id, status, payload_json')
+        .eq('status', 'FINISHED')
+        .limit(2000);
+      for (const row of finishedFixtures || []) {
+        evaluateFinishedFixtureForGoalRuns((row as any).payload_json, (row as any).status);
+      }
+    } catch {
+      // Non-fatal
+    }
   } else {
     const db = requireLocalDb();
     const row = db
@@ -665,7 +732,22 @@ export async function getAdminOverview() {
       manualGrantsCount: Number(payRow?.manualCount) || 0,
       successfulPaymentsCount: Number(payRow?.successCount) || 0,
     };
+
+    try {
+      const fixRows = db
+        .prepare(`SELECT id, status, payload_json FROM fixtures WHERE status = 'FINISHED' LIMIT 2000`)
+        .all() as Array<{ id: string; status: string; payload_json: string }>;
+      for (const row of fixRows) {
+        evaluateFinishedFixtureForGoalRuns(row.payload_json, row.status);
+      }
+    } catch {
+      // Non-fatal
+    }
   }
+
+  goalRunsCalibration.calibrationReady =
+    goalRunsCalibration.realGoalOrderSettled >= goalRunsCalibration.targetSampleSize;
+  goalRunsCalibration.promotionEligible = false;
 
   const [footballStatus, basketballStatus, syncStates, footballFreshness, basketballFreshness] =
     await Promise.all([
@@ -756,6 +838,7 @@ export async function getAdminOverview() {
       providers: providerBudgets,
     },
     payments: paymentsSummary,
+    goalRunsCalibration,
   };
 }
 
