@@ -1,6 +1,6 @@
 -- ====================================================================
 -- CALIBRALL: Canonical Competitions Table, Aliases, Sort Order & Fixture Integrity
--- Migration: 20261127000000_canonical_competitions_table.sql
+-- Migration: 20261127000000_canonical_competitions_table.sql (Idempotent)
 -- ====================================================================
 
 BEGIN;
@@ -11,7 +11,12 @@ DECLARE
     comp_id_type TEXT;
     seasons_comp_type TEXT;
     teams_comp_type TEXT;
+    fixtures_comp_type TEXT;
 BEGIN
+    IF to_regclass('public.competitions') IS NULL THEN
+        RAISE EXCEPTION 'public.competitions table does not exist';
+    END IF;
+
     SELECT data_type INTO comp_id_type
     FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'competitions' AND column_name = 'id';
@@ -23,6 +28,10 @@ BEGIN
     SELECT data_type INTO teams_comp_type
     FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'teams' AND column_name = 'competition_id';
+
+    SELECT data_type INTO fixtures_comp_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'fixtures' AND column_name = 'competition_id';
 
     IF to_regclass('public.seasons') IS NOT NULL THEN
         ALTER TABLE public.seasons DROP CONSTRAINT IF EXISTS seasons_competition_id_fkey;
@@ -41,16 +50,60 @@ BEGIN
         IF teams_comp_type = 'uuid' THEN
             ALTER TABLE public.teams ALTER COLUMN competition_id TYPE TEXT USING competition_id::TEXT;
         END IF;
+        IF fixtures_comp_type = 'uuid' THEN
+            ALTER TABLE public.fixtures ALTER COLUMN competition_id TYPE TEXT USING competition_id::TEXT;
+        END IF;
         ALTER TABLE public.competitions ALTER COLUMN id DROP DEFAULT;
         ALTER TABLE public.competitions ALTER COLUMN id TYPE TEXT USING id::TEXT;
+    ELSE
+        IF seasons_comp_type = 'uuid' THEN
+            ALTER TABLE public.seasons ALTER COLUMN competition_id TYPE TEXT USING competition_id::TEXT;
+        END IF;
+        IF teams_comp_type = 'uuid' THEN
+            ALTER TABLE public.teams ALTER COLUMN competition_id TYPE TEXT USING competition_id::TEXT;
+        END IF;
+        IF fixtures_comp_type = 'uuid' THEN
+            ALTER TABLE public.fixtures ALTER COLUMN competition_id TYPE TEXT USING competition_id::TEXT;
+        END IF;
     END IF;
 END $$;
 
--- 2. Add canonical schema columns: competitions(id, code, name, country, sport, aliases, sort_order)
+-- 2. Add canonical schema columns and widen per-game averages BEFORE upsert
+--    (Basketball totals like NBA 226.40, NCAAB 149.80, EuroLeague 172.80 overflow NUMERIC(4,2))
 ALTER TABLE public.competitions
     ADD COLUMN IF NOT EXISTS sport TEXT NOT NULL DEFAULT 'football',
     ADD COLUMN IF NOT EXISTS aliases TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 100;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'competitions' AND column_name = 'avg_goals_per_game'
+    ) THEN
+        ALTER TABLE public.competitions ALTER COLUMN avg_goals_per_game TYPE NUMERIC(10, 4);
+    ELSE
+        ALTER TABLE public.competitions ADD COLUMN avg_goals_per_game NUMERIC(10, 4) DEFAULT 2.75;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'competitions' AND column_name = 'avg_corners_per_game'
+    ) THEN
+        ALTER TABLE public.competitions ALTER COLUMN avg_corners_per_game TYPE NUMERIC(10, 4);
+    ELSE
+        ALTER TABLE public.competitions ADD COLUMN avg_corners_per_game NUMERIC(10, 4) DEFAULT 10.20;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'competitions' AND column_name = 'avg_cards_per_game'
+    ) THEN
+        ALTER TABLE public.competitions ALTER COLUMN avg_cards_per_game TYPE NUMERIC(10, 4);
+    ELSE
+        ALTER TABLE public.competitions ADD COLUMN avg_cards_per_game NUMERIC(10, 4) DEFAULT 4.10;
+    END IF;
+END $$;
 
 UPDATE public.competitions
 SET sport = 'football'
@@ -59,17 +112,129 @@ WHERE sport IS NULL OR sport NOT IN ('football', 'basketball');
 ALTER TABLE public.competitions DROP CONSTRAINT IF EXISTS competitions_sport_check;
 ALTER TABLE public.competitions ADD CONSTRAINT competitions_sport_check CHECK (sport IN ('football', 'basketball'));
 
--- Remove stale non-canonical duplicate rows whose code collides with canonical entries
-DELETE FROM public.competitions
-WHERE id NOT LIKE 'comp_%'
-  AND UPPER(code) IN (
-    'PL', 'CL', 'PD', 'BL1', 'SA', 'FL1', 'ELC', 'DED', 'PPL', 'BSA', 'CLI',
-    'SC0', 'DNK', 'TSL', 'B1', 'AUT', 'D2', 'SP2', 'I2', 'F2', 'E2', 'E3', 'EC',
-    'G1', 'NOR', 'SWE', 'SWZ', 'POL', 'ROU', 'RUS', 'SC1', 'SC2', 'SC3', 'IRL',
-    'FIN', 'USA', 'MEX', 'ARG', 'JPN', 'CHN', 'EURO', 'WC', 'NBA', 'NCAAB', 'EUROLEAGUE'
-  );
+-- Safely remap any colliding non-canonical competition IDs (including legacy comp_ec or UUID rows)
+-- before deleting stale duplicates so unique(code) and references never conflict on re-runs.
+DO $$
+DECLARE
+    rec RECORD;
+    colliding_ids TEXT[];
+    has_seasons BOOLEAN := to_regclass('public.seasons') IS NOT NULL;
+    has_teams_comp BOOLEAN := EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'teams' AND column_name = 'competition_id'
+    );
+    has_fixtures_comp BOOLEAN := EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'fixtures' AND column_name = 'competition_id'
+    );
+    has_fixtures_source BOOLEAN := EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'fixtures' AND column_name = 'source'
+    );
+BEGIN
+    FOR rec IN
+        SELECT * FROM (VALUES
+            ('comp_pl', 'PL'),
+            ('comp_cl', 'CL'),
+            ('comp_pd', 'PD'),
+            ('comp_bl1', 'BL1'),
+            ('comp_sa', 'SA'),
+            ('comp_fl1', 'FL1'),
+            ('comp_elc', 'ELC'),
+            ('comp_ded', 'DED'),
+            ('comp_ppl', 'PPL'),
+            ('comp_bsa', 'BSA'),
+            ('comp_cli', 'CLI'),
+            ('comp_sc0', 'SC0'),
+            ('comp_dnk', 'DNK'),
+            ('comp_tsl', 'TSL'),
+            ('comp_b1', 'B1'),
+            ('comp_aut', 'AUT'),
+            ('comp_d2', 'D2'),
+            ('comp_sp2', 'SP2'),
+            ('comp_i2', 'I2'),
+            ('comp_f2', 'F2'),
+            ('comp_e2', 'E2'),
+            ('comp_e3', 'E3'),
+            ('comp_eng_national_league', 'EC'),
+            ('comp_g1', 'G1'),
+            ('comp_nor', 'NOR'),
+            ('comp_swe', 'SWE'),
+            ('comp_swz', 'SWZ'),
+            ('comp_pol', 'POL'),
+            ('comp_rou', 'ROU'),
+            ('comp_rus', 'RUS'),
+            ('comp_sc1', 'SC1'),
+            ('comp_sc2', 'SC2'),
+            ('comp_sc3', 'SC3'),
+            ('comp_irl', 'IRL'),
+            ('comp_fin', 'FIN'),
+            ('comp_usa', 'USA'),
+            ('comp_mex', 'MEX'),
+            ('comp_arg', 'ARG'),
+            ('comp_jpn', 'JPN'),
+            ('comp_chn', 'CHN'),
+            ('comp_euro', 'EURO'),
+            ('comp_wc', 'WC'),
+            ('comp_nba', 'NBA'),
+            ('comp_ncaab', 'NCAAB'),
+            ('comp_euroleague', 'EUROLEAGUE')
+        ) AS m(canon_id, canon_code)
+    LOOP
+        SELECT COALESCE(array_agg(id), ARRAY[]::TEXT[])
+        INTO colliding_ids
+        FROM public.competitions
+        WHERE id <> rec.canon_id
+          AND UPPER(code) = rec.canon_code;
 
--- 3. Upsert full canonical Football + Basketball competition registry
+        IF array_length(colliding_ids, 1) IS NOT NULL THEN
+            IF has_seasons THEN
+                -- Drop seasons from colliding rows if canonical competition_id already owns that year
+                DELETE FROM public.seasons s
+                WHERE s.competition_id = ANY(colliding_ids)
+                  AND EXISTS (
+                      SELECT 1 FROM public.seasons s2
+                      WHERE s2.competition_id = rec.canon_id AND s2.year = s.year
+                  );
+                -- Also deduplicate across multiple colliding IDs sharing the same year
+                DELETE FROM public.seasons s
+                USING public.seasons s_dup
+                WHERE s.competition_id = ANY(colliding_ids)
+                  AND s_dup.competition_id = ANY(colliding_ids)
+                  AND s.year = s_dup.year
+                  AND s.ctid > s_dup.ctid;
+
+                UPDATE public.seasons
+                SET competition_id = rec.canon_id
+                WHERE competition_id = ANY(colliding_ids);
+            END IF;
+
+            IF has_teams_comp THEN
+                UPDATE public.teams
+                SET competition_id = rec.canon_id
+                WHERE competition_id = ANY(colliding_ids);
+            END IF;
+
+            IF has_fixtures_comp THEN
+                IF rec.canon_code = 'EC' AND has_fixtures_source THEN
+                    UPDATE public.fixtures
+                    SET competition_id = 'comp_euro'
+                    WHERE competition_id = ANY(colliding_ids)
+                      AND LOWER(COALESCE(source, '')) LIKE '%football-data.org%';
+                END IF;
+
+                UPDATE public.fixtures
+                SET competition_id = rec.canon_id
+                WHERE competition_id = ANY(colliding_ids);
+            END IF;
+
+            DELETE FROM public.competitions
+            WHERE id = ANY(colliding_ids);
+        END IF;
+    END LOOP;
+END $$;
+
+-- 3. Upsert full canonical Football + Basketball competition registry (45 rows)
 INSERT INTO public.competitions (
     id, code, name, country, sport, aliases, sort_order, emblem_url, tier, avg_goals_per_game, avg_corners_per_game, avg_cards_per_game, is_active
 )
@@ -135,29 +300,45 @@ SET code = EXCLUDED.code,
 
 -- 4. Indexes for fast competition catalog & fixture filtering
 CREATE INDEX IF NOT EXISTS idx_competitions_sport_sort ON public.competitions (sport, sort_order, name);
-CREATE INDEX IF NOT EXISTS idx_fixtures_comp_kickoff ON public.fixtures (competition_id, kickoff_time);
 
--- 5. Backfill unambiguous fixtures.competition_id from canonical competition_code only where missing/non-canonical
-UPDATE public.fixtures f
-SET competition_id = c.id
-FROM public.competitions c
-WHERE (f.competition_id IS NULL OR f.competition_id NOT LIKE 'comp_%')
-  AND f.competition_code IS NOT NULL
-  AND UPPER(TRIM(f.competition_code)) = UPPER(c.code)
-  AND UPPER(TRIM(f.competition_code)) <> 'EC';
+DO $$
+BEGIN
+    IF to_regclass('public.fixtures') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_fixtures_comp_kickoff ON public.fixtures (competition_id, kickoff_time);
 
--- Disambiguate 'EC' safely based on source provider when missing canonical competition_id
-UPDATE public.fixtures
-SET competition_id = 'comp_euro'
-WHERE (competition_id IS NULL OR competition_id NOT LIKE 'comp_%')
-  AND UPPER(TRIM(COALESCE(competition_code, ''))) = 'EC'
-  AND LOWER(COALESCE(source, '')) LIKE '%football-data.org%';
+        -- 5. Backfill unambiguous fixtures.competition_id from canonical competition_code only where missing/non-canonical
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'fixtures' AND column_name = 'competition_code'
+        ) THEN
+            UPDATE public.fixtures f
+            SET competition_id = c.id
+            FROM public.competitions c
+            WHERE (f.competition_id IS NULL OR f.competition_id NOT LIKE 'comp_%')
+              AND f.competition_code IS NOT NULL
+              AND UPPER(TRIM(f.competition_code)) = UPPER(c.code)
+              AND UPPER(TRIM(f.competition_code)) <> 'EC';
 
-UPDATE public.fixtures
-SET competition_id = 'comp_eng_national_league'
-WHERE (competition_id IS NULL OR competition_id NOT LIKE 'comp_%')
-  AND UPPER(TRIM(COALESCE(competition_code, ''))) = 'EC'
-  AND LOWER(COALESCE(source, '')) LIKE '%co.uk%';
+            -- Disambiguate 'EC' safely based on source provider when missing canonical competition_id
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'fixtures' AND column_name = 'source'
+            ) THEN
+                UPDATE public.fixtures
+                SET competition_id = 'comp_euro'
+                WHERE (competition_id IS NULL OR competition_id NOT LIKE 'comp_%')
+                  AND UPPER(TRIM(COALESCE(competition_code, ''))) = 'EC'
+                  AND LOWER(COALESCE(source, '')) LIKE '%football-data.org%';
+
+                UPDATE public.fixtures
+                SET competition_id = 'comp_eng_national_league'
+                WHERE (competition_id IS NULL OR competition_id NOT LIKE 'comp_%')
+                  AND UPPER(TRIM(COALESCE(competition_code, ''))) = 'EC'
+                  AND LOWER(COALESCE(source, '')) LIKE '%co.uk%';
+            END IF;
+        END IF;
+    END IF;
+END $$;
 
 -- 6. Hardened RLS & Privileges: only service_role reads/writes server-side competition catalog
 ALTER TABLE public.competitions ENABLE ROW LEVEL SECURITY;

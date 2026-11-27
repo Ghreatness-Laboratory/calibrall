@@ -1637,7 +1637,7 @@ export function evaluateFixtureMarkets(
       isValidated: gating.isAllowed,
       validationStatus: gating.isAllowed ? 'validated' : 'unvalidated',
       brierSkillScore: gating.bss,
-      marketOdds: odds ? Number(odds.toFixed(2)) : undefined,
+      marketOdds: odds ? Number(odds.toFixed(3)) : undefined,
       impliedProbability: implied ? Number(implied.toFixed(4)) : undefined,
       expectedValue: ev !== null && ev !== undefined ? Number(ev.toFixed(4)) : null,
       edge: edge ? Number(edge.toFixed(4)) : undefined,

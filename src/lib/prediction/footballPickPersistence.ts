@@ -305,7 +305,7 @@ export function persistOrLoadImmutableFootballExplanation(
             top?.marketCode || null,
             top ? cleanDisplayText(top.marketName) : null,
             top ? cleanDisplayText(top.selection) : null,
-            top ? Number((top.calibratedProbability ?? top.modelProbability).toFixed(4)) : null,
+            top ? Number(Math.max(0, Math.min(1, top.calibratedProbability ?? top.modelProbability)).toFixed(6)) : null,
             top?.confidenceTier || null,
             top ? cleanDisplayText(top.priceSource || (top.marketOdds ? 'Verified Odds' : 'Model line, no market price')) : null,
             generated.fullSummary,

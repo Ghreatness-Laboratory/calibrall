@@ -12,8 +12,8 @@ BEGIN;
 
 -- 1. Extend bb_picks with calibration metadata, model-line flag, and evidence payload
 ALTER TABLE public.bb_picks
-    ADD COLUMN IF NOT EXISTS raw_probability NUMERIC(5, 4),
-    ADD COLUMN IF NOT EXISTS projected_std NUMERIC(6, 2),
+    ADD COLUMN IF NOT EXISTS raw_probability NUMERIC(7, 6),
+    ADD COLUMN IF NOT EXISTS projected_std NUMERIC(10, 4),
     ADD COLUMN IF NOT EXISTS confidence_tier TEXT CHECK (confidence_tier IN ('HIGH', 'MEDIUM', 'SPECULATIVE', 'ABSTAIN')),
     ADD COLUMN IF NOT EXISTS is_model_line BOOLEAN NOT NULL DEFAULT TRUE,
     ADD COLUMN IF NOT EXISTS price_source TEXT,
@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS public.bb_odds_snapshots (
         market_category IN ('game_total', 'home_total', 'away_total', 'h1_game_total', 'h1_team_total')
     ),
     side TEXT NOT NULL DEFAULT 'game' CHECK (side IN ('game', 'home', 'away')),
-    line NUMERIC(5, 1) NOT NULL,
-    over_odds NUMERIC(8, 4),
-    under_odds NUMERIC(8, 4),
+    line NUMERIC(10, 4) NOT NULL,
+    over_odds NUMERIC(10, 3),
+    under_odds NUMERIC(10, 3),
     bookmaker TEXT NOT NULL,
     observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

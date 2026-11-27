@@ -19,34 +19,34 @@ CREATE TABLE IF NOT EXISTS dixon_coles_v25_features (
   h2h_venue_record_home_wins INT DEFAULT 0,
   h2h_venue_record_draws INT DEFAULT 0,
   h2h_venue_record_away_wins INT DEFAULT 0,
-  h2h_shrunk_goal_diff NUMERIC(5,3) DEFAULT 0.0,
+  h2h_shrunk_goal_diff NUMERIC(10,4) DEFAULT 0.0,
   
-  home_specific_advantage NUMERIC(5,3) DEFAULT 1.24,
-  away_specific_resistance NUMERIC(5,3) DEFAULT 1.00,
+  home_specific_advantage NUMERIC(10,4) DEFAULT 1.24,
+  away_specific_resistance NUMERIC(10,4) DEFAULT 1.00,
   
-  home_form_xg_per90 NUMERIC(5,3) NOT NULL,
-  away_form_xg_per90 NUMERIC(5,3) NOT NULL,
-  home_form_goals_conceded_per90 NUMERIC(5,3) NOT NULL,
-  away_form_goals_conceded_per90 NUMERIC(5,3) NOT NULL,
-  home_form_momentum NUMERIC(5,3) DEFAULT 0.0,
-  away_form_momentum NUMERIC(5,3) DEFAULT 0.0,
+  home_form_xg_per90 NUMERIC(10,4) NOT NULL,
+  away_form_xg_per90 NUMERIC(10,4) NOT NULL,
+  home_form_goals_conceded_per90 NUMERIC(10,4) NOT NULL,
+  away_form_goals_conceded_per90 NUMERIC(10,4) NOT NULL,
+  home_form_momentum NUMERIC(10,4) DEFAULT 0.0,
+  away_form_momentum NUMERIC(10,4) DEFAULT 0.0,
   
   home_rest_days INT DEFAULT 7,
   away_rest_days INT DEFAULT 7,
   home_midweek_european BOOLEAN DEFAULT FALSE,
   away_midweek_european BOOLEAN DEFAULT FALSE,
-  home_fatigue_index NUMERIC(4,3) DEFAULT 0.20,
-  away_fatigue_index NUMERIC(4,3) DEFAULT 0.20,
+  home_fatigue_index NUMERIC(7,6) DEFAULT 0.20,
+  away_fatigue_index NUMERIC(7,6) DEFAULT 0.20,
   
-  home_missing_xg_share NUMERIC(4,3) DEFAULT 0.0,
-  away_missing_xg_share NUMERIC(4,3) DEFAULT 0.0,
+  home_missing_xg_share NUMERIC(7,6) DEFAULT 0.0,
+  away_missing_xg_share NUMERIC(7,6) DEFAULT 0.0,
   home_key_cb_absent BOOLEAN DEFAULT FALSE,
   away_key_cb_absent BOOLEAN DEFAULT FALSE,
   home_key_gk_absent BOOLEAN DEFAULT FALSE,
   away_key_gk_absent BOOLEAN DEFAULT FALSE,
   
-  home_finisher_conversion_rate NUMERIC(4,3) DEFAULT 1.00,
-  away_finisher_conversion_rate NUMERIC(4,3) DEFAULT 1.00,
+  home_finisher_conversion_rate NUMERIC(10,4) DEFAULT 1.00,
+  away_finisher_conversion_rate NUMERIC(10,4) DEFAULT 1.00,
   
   home_coach_matches INT DEFAULT 20,
   away_coach_matches INT DEFAULT 20,
@@ -56,16 +56,16 @@ CREATE TABLE IF NOT EXISTS dixon_coles_v25_features (
   is_derby BOOLEAN DEFAULT FALSE,
   derby_name TEXT,
   
-  weather_temp_celsius NUMERIC(4,1),
-  weather_precipitation_mm NUMERIC(4,1),
-  weather_wind_kmh NUMERIC(4,1),
+  weather_temp_celsius NUMERIC(10,4),
+  weather_precipitation_mm NUMERIC(10,4),
+  weather_wind_kmh NUMERIC(10,4),
   weather_pitch_condition TEXT DEFAULT 'good',
   
   referee_name TEXT,
-  referee_avg_yellows NUMERIC(4,2) DEFAULT 3.80,
-  referee_avg_reds NUMERIC(4,2) DEFAULT 0.15,
+  referee_avg_yellows NUMERIC(10,4) DEFAULT 3.80,
+  referee_avg_reds NUMERIC(10,4) DEFAULT 0.15,
   
-  data_completeness_score NUMERIC(4,3) NOT NULL DEFAULT 1.0,
+  data_completeness_score NUMERIC(7,6) NOT NULL DEFAULT 1.0,
   raw_features_json JSONB,
   
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -82,21 +82,21 @@ CREATE TABLE IF NOT EXISTS dixon_coles_v25_predictions (
   option_type TEXT NOT NULL,
   market_category TEXT NOT NULL,
   selection TEXT NOT NULL,
-  handicap_line NUMERIC(4,2),
+  handicap_line NUMERIC(10,4),
   
   -- Model outputs
-  raw_model_prob NUMERIC(5,4) NOT NULL,
-  market_devigged_prob NUMERIC(5,4),
-  blended_prob NUMERIC(5,4) NOT NULL,
-  calibrated_prob NUMERIC(5,4) NOT NULL,
-  uncertainty_spread NUMERIC(5,4) NOT NULL,
-  ci_lower_90 NUMERIC(5,4) NOT NULL,
-  ci_upper_90 NUMERIC(5,4) NOT NULL,
+  raw_model_prob NUMERIC(7,6) NOT NULL,
+  market_devigged_prob NUMERIC(7,6),
+  blended_prob NUMERIC(7,6) NOT NULL,
+  calibrated_prob NUMERIC(7,6) NOT NULL,
+  uncertainty_spread NUMERIC(7,6) NOT NULL,
+  ci_lower_90 NUMERIC(7,6) NOT NULL,
+  ci_upper_90 NUMERIC(7,6) NOT NULL,
   
   -- Market odds & Value
-  decimal_odds NUMERIC(6,3),
-  expected_value NUMERIC(6,4),
-  edge_over_market NUMERIC(6,4),
+  decimal_odds NUMERIC(10,3),
+  expected_value NUMERIC(10,4),
+  edge_over_market NUMERIC(10,4),
   
   -- Confidence & Gating (Honest tiering: HIGH / MEDIUM / LOW, never "SAFE")
   confidence_tier TEXT NOT NULL CHECK (confidence_tier IN ('HIGH', 'MEDIUM', 'LOW')),
@@ -125,11 +125,11 @@ CREATE INDEX IF NOT EXISTS idx_dc_v25_preds_tier ON dixon_coles_v25_predictions(
 CREATE TABLE IF NOT EXISTS dixon_coles_v25_parameters (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   market_category TEXT NOT NULL UNIQUE,
-  platt_a NUMERIC(6,4) NOT NULL DEFAULT 1.0,
-  platt_b NUMERIC(6,4) NOT NULL DEFAULT 0.0,
-  market_blend_weight NUMERIC(4,3) NOT NULL DEFAULT 0.65,
-  brier_score_val NUMERIC(6,4) NOT NULL,
-  log_loss_val NUMERIC(6,4) NOT NULL,
+  platt_a NUMERIC(10,4) NOT NULL DEFAULT 1.0,
+  platt_b NUMERIC(10,4) NOT NULL DEFAULT 0.0,
+  market_blend_weight NUMERIC(7,6) NOT NULL DEFAULT 0.65,
+  brier_score_val NUMERIC(10,4) NOT NULL,
+  log_loss_val NUMERIC(10,4) NOT NULL,
   last_trained_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

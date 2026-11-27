@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS public.football_picks (
     market_code TEXT,
     market_name TEXT,
     selection TEXT,
-    calibrated_probability NUMERIC(6, 4),
+    calibrated_probability NUMERIC(7, 6),
     confidence_tier TEXT,
     price_source TEXT,
     summary TEXT NOT NULL DEFAULT '',

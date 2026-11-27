@@ -639,7 +639,7 @@ async function handleSync(request: Request) {
               }
 
               const avg = (arr: number[]) =>
-                arr.length > 0 ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : undefined;
+                arr.length > 0 ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 1000) / 1000 : undefined;
 
               const homeWin = avg(homePrices);
               const draw = avg(drawPrices);

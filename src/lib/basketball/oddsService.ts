@@ -242,8 +242,9 @@ function extractIndividualBookmakerTotalsQuotes(
       const sideLabel = String(outcome?.name || '').toLowerCase();
       if (!Number.isFinite(line) || !Number.isFinite(price) || price <= 1.01) continue;
       if (Math.abs(Math.round(line * 2) / 2 - targetLine) > 0.01) continue;
-      if (sideLabel === 'over') overOdds = price;
-      else if (sideLabel === 'under') underOdds = price;
+      const roundedPrice = Math.round(price * 1000) / 1000;
+      if (sideLabel === 'over') overOdds = roundedPrice;
+      else if (sideLabel === 'under') underOdds = roundedPrice;
     }
     if (overOdds !== null || underOdds !== null) {
       const slug = bkName.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 24);

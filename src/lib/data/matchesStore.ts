@@ -1088,10 +1088,20 @@ class MatchesStore {
       inserted++;
     }
 
+    const normalizedOddsSnapshots: StoredOddsSnapshot[] = [];
     if (oddsSnapshots && oddsSnapshots.length > 0) {
       for (const o of oddsSnapshots) {
-        const uniqueKey = `${o.match_id}:${o.bookmaker}:${o.market_code}:${o.source}`;
-        this.inMemoryOdds.set(uniqueKey, o);
+        const decOdds = Number(o.decimal_odds);
+        if (!o.match_id || !o.bookmaker || !o.market_code || !Number.isFinite(decOdds) || decOdds < 1.01) {
+          continue;
+        }
+        const normalizedSnap: StoredOddsSnapshot = {
+          ...o,
+          decimal_odds: Math.round(decOdds * 1000) / 1000,
+        };
+        normalizedOddsSnapshots.push(normalizedSnap);
+        const uniqueKey = `${normalizedSnap.match_id}:${normalizedSnap.bookmaker}:${normalizedSnap.market_code}:${normalizedSnap.source}`;
+        this.inMemoryOdds.set(uniqueKey, normalizedSnap);
       }
       this.rebuildOddsIndex();
     }
@@ -1190,9 +1200,9 @@ class MatchesStore {
         }
 
         // Step 3c: Upsert odds snapshots with unique constraint on (match_id, bookmaker, market_code, source)
-        if (oddsSnapshots && oddsSnapshots.length > 0) {
-          for (let i = 0; i < oddsSnapshots.length; i += chunkSize) {
-            const chunk = oddsSnapshots.slice(i, i + chunkSize);
+        if (normalizedOddsSnapshots.length > 0) {
+          for (let i = 0; i < normalizedOddsSnapshots.length; i += chunkSize) {
+            const chunk = normalizedOddsSnapshots.slice(i, i + chunkSize);
             const { error: oddsErr } = await supabase.from('odds_snapshots').upsert(chunk, {
               onConflict: 'match_id,bookmaker,market_code,source',
             });

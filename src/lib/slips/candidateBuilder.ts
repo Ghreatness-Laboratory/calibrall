@@ -238,7 +238,7 @@ function getFallbackVerifiedOddsPrice(
   }
   if (!price || !Number.isFinite(price) || price <= 1.01) return null;
   return {
-    price: Math.round(price * 100) / 100,
+    price: Math.round(price * 1000) / 1000,
     bookmaker: cleanDisplayText(vo.bookmakerName || 'EU Bookmaker Consensus'),
     observedAt: vo.observedAt || null,
   };
@@ -295,7 +295,7 @@ function resolveFootballRealQuotes(params: {
     const ageInfo = formatPriceAgeLabel(snap.observed_at || null, nowMs);
     const quote: SlipBookmakerQuote = {
       bookmaker: cleanBk,
-      decimalOdds: Math.round(oddsVal * 100) / 100,
+      decimalOdds: Math.round(oddsVal * 1000) / 1000,
       observedAt: snap.observed_at || null,
       ageMinutes: ageInfo.ageMinutes,
       ageLabel: ageInfo.label,
@@ -373,7 +373,7 @@ function resolveBasketballRealQuotes(params: {
     const ageInfo = formatPriceAgeLabel(q.observed_at, nowMs);
     const quote: SlipBookmakerQuote = {
       bookmaker: cleanBk,
-      decimalOdds: Math.round(rawOdds * 100) / 100,
+      decimalOdds: Math.round(rawOdds * 1000) / 1000,
       observedAt: q.observed_at,
       ageMinutes: ageInfo.ageMinutes,
       ageLabel: ageInfo.label,
@@ -605,7 +605,7 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
           bestQuoteApplied = pickedQuote.bestApplied;
         } else {
           // Model-fair odds ONLY when input.oddsBasis === 'model_fair'
-          decimalOdds = Math.max(1.02, Math.round((1 / calibratedProbability) * 100) / 100);
+          decimalOdds = Math.max(1.02, Math.round((1 / calibratedProbability) * 1000) / 1000);
           oddsSourceType = 'model_fair';
           bookmakerName = 'Model fair price';
           observedAt = null;
@@ -809,7 +809,7 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
           bookmakerQuotes = pickedQuote.exposedQuotes;
           bestQuoteApplied = pickedQuote.bestApplied;
         } else {
-          decimalOdds = Math.max(1.02, Math.round((1 / calibratedProbability) * 100) / 100);
+          decimalOdds = Math.max(1.02, Math.round((1 / calibratedProbability) * 1000) / 1000);
           oddsSourceType = 'model_fair';
           bookmakerName = 'Model fair price';
           observedAt = null;

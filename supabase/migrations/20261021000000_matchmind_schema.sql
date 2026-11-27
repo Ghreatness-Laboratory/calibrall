@@ -25,8 +25,8 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
     preferred_competitions TEXT[] DEFAULT ARRAY['PL', 'CL', 'PD', 'SA', 'BL1'],
     favorite_teams UUID[] DEFAULT ARRAY[]::UUID[],
     preferred_markets TEXT[] DEFAULT ARRAY['total_goals', 'btts', 'match_result', 'corners'],
-    min_probability_threshold NUMERIC(5, 4) NOT NULL DEFAULT 0.5500,
-    min_edge_threshold NUMERIC(5, 4) NOT NULL DEFAULT 0.0300,
+    min_probability_threshold NUMERIC(7, 6) NOT NULL DEFAULT 0.550000,
+    min_edge_threshold NUMERIC(7, 6) NOT NULL DEFAULT 0.030000,
     email_notifications_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -42,9 +42,9 @@ CREATE TABLE IF NOT EXISTS public.competitions (
     country TEXT NOT NULL,
     emblem_url TEXT,
     tier INTEGER NOT NULL DEFAULT 1,
-    avg_goals_per_game NUMERIC(4, 2) DEFAULT 2.75,
-    avg_corners_per_game NUMERIC(4, 2) DEFAULT 10.20,
-    avg_cards_per_game NUMERIC(4, 2) DEFAULT 4.10,
+    avg_goals_per_game NUMERIC(10, 4) DEFAULT 2.7500,
+    avg_corners_per_game NUMERIC(10, 4) DEFAULT 10.2000,
+    avg_cards_per_game NUMERIC(10, 4) DEFAULT 4.1000,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -67,10 +67,10 @@ CREATE TABLE IF NOT EXISTS public.teams (
     crest_url TEXT,
     venue TEXT,
     competition_id UUID REFERENCES public.competitions(id) ON DELETE SET NULL,
-    attack_rating NUMERIC(5, 3) DEFAULT 1.000,
-    defense_rating NUMERIC(5, 3) DEFAULT 1.000,
-    corner_attack_rating NUMERIC(5, 3) DEFAULT 1.000,
-    discipline_rating NUMERIC(5, 3) DEFAULT 1.000,
+    attack_rating NUMERIC(10, 4) DEFAULT 1.0000,
+    defense_rating NUMERIC(10, 4) DEFAULT 1.0000,
+    corner_attack_rating NUMERIC(10, 4) DEFAULT 1.0000,
+    discipline_rating NUMERIC(10, 4) DEFAULT 1.0000,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -121,12 +121,12 @@ CREATE TABLE IF NOT EXISTS public.market_definitions (
     category TEXT NOT NULL CHECK (category IN ('match_result', 'total_goals', 'team_goals', 'btts', 'total_corners', 'team_corners', 'bookings', 'half_time', 'double_chance')),
     name TEXT NOT NULL,
     selection TEXT NOT NULL,
-    line NUMERIC(4, 1),
+    line NUMERIC(10, 4),
     period TEXT NOT NULL CHECK (period IN ('REGULAR_TIME', 'FIRST_HALF', 'SECOND_HALF', 'FULL_TIME')),
     settlement_rule TEXT NOT NULL,
     is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    min_probability NUMERIC(4, 3) DEFAULT 0.500,
-    max_uncertainty NUMERIC(4, 3) DEFAULT 0.200,
+    min_probability NUMERIC(7, 6) DEFAULT 0.500000,
+    max_uncertainty NUMERIC(7, 6) DEFAULT 0.200000,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -136,8 +136,8 @@ CREATE TABLE IF NOT EXISTS public.bookmaker_odds (
     bookmaker TEXT NOT NULL,
     market_code TEXT NOT NULL REFERENCES public.market_definitions(code),
     selection TEXT NOT NULL,
-    decimal_odds NUMERIC(8, 4) NOT NULL CHECK (decimal_odds >= 1.01),
-    implied_probability NUMERIC(5, 4) GENERATED ALWAYS AS (ROUND((1.0 / decimal_odds), 4)) STORED,
+    decimal_odds NUMERIC(10, 3) NOT NULL CHECK (decimal_odds >= 1.01),
+    implied_probability NUMERIC(7, 6) GENERATED ALWAYS AS (ROUND((1.0 / decimal_odds), 6)) STORED,
     is_live BOOLEAN NOT NULL DEFAULT FALSE,
     observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -154,10 +154,10 @@ CREATE TABLE IF NOT EXISTS public.prediction_models (
     version TEXT UNIQUE NOT NULL,
     model_type TEXT NOT NULL CHECK (model_type IN ('dixon_coles_poisson', 'bivariate_poisson', 'negative_binomial_corners', 'ordinal_logistic_bookings')),
     description TEXT,
-    brier_score NUMERIC(6, 4),
-    log_loss NUMERIC(6, 4),
-    hit_rate NUMERIC(5, 4),
-    calibration_slope NUMERIC(5, 4),
+    brier_score NUMERIC(10, 4),
+    log_loss NUMERIC(10, 4),
+    hit_rate NUMERIC(7, 6),
+    calibration_slope NUMERIC(10, 4),
     trained_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
@@ -167,13 +167,13 @@ CREATE TABLE IF NOT EXISTS public.prediction_runs (
     fixture_id UUID NOT NULL REFERENCES public.fixtures(id) ON DELETE CASCADE,
     model_id UUID NOT NULL REFERENCES public.prediction_models(id),
     run_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    home_xg NUMERIC(4, 2) NOT NULL,
-    away_xg NUMERIC(4, 2) NOT NULL,
-    expected_corners_home NUMERIC(4, 2) NOT NULL,
-    expected_corners_away NUMERIC(4, 2) NOT NULL,
-    expected_cards_total NUMERIC(4, 2) NOT NULL,
-    model_uncertainty_score NUMERIC(4, 3) NOT NULL DEFAULT 0.050,
-    data_coverage_score NUMERIC(4, 3) NOT NULL DEFAULT 0.950,
+    home_xg NUMERIC(10, 4) NOT NULL,
+    away_xg NUMERIC(10, 4) NOT NULL,
+    expected_corners_home NUMERIC(10, 4) NOT NULL,
+    expected_corners_away NUMERIC(10, 4) NOT NULL,
+    expected_cards_total NUMERIC(10, 4) NOT NULL,
+    model_uncertainty_score NUMERIC(7, 6) NOT NULL DEFAULT 0.050000,
+    data_coverage_score NUMERIC(7, 6) NOT NULL DEFAULT 0.950000,
     status TEXT NOT NULL DEFAULT 'completed'
 );
 
@@ -185,14 +185,14 @@ CREATE TABLE IF NOT EXISTS public.market_predictions (
     market_code TEXT NOT NULL REFERENCES public.market_definitions(code),
     market_category TEXT NOT NULL,
     selection TEXT NOT NULL,
-    line NUMERIC(4, 1),
-    model_probability NUMERIC(5, 4) NOT NULL CHECK (model_probability >= 0 AND model_probability <= 1),
-    market_odds NUMERIC(8, 4),
-    implied_probability NUMERIC(5, 4),
-    expected_value NUMERIC(6, 4),
+    line NUMERIC(10, 4),
+    model_probability NUMERIC(7, 6) NOT NULL CHECK (model_probability >= 0 AND model_probability <= 1),
+    market_odds NUMERIC(10, 3),
+    implied_probability NUMERIC(7, 6),
+    expected_value NUMERIC(10, 4),
     model_confidence TEXT NOT NULL CHECK (model_confidence IN ('VERY_HIGH', 'HIGH', 'MODERATE', 'LOW')),
     qualification_status TEXT NOT NULL CHECK (qualification_status IN ('QUALIFIED_VALUE', 'QUALIFIED_PROBABILITY', 'UNQUALIFIED_MARGINAL', 'UNQUALIFIED_HIGH_UNCERTAINTY', 'NO_RECOMMENDATION')),
-    ranking_score NUMERIC(6, 4),
+    ranking_score NUMERIC(10, 4),
     is_top_pick BOOLEAN NOT NULL DEFAULT FALSE,
     settlement_status TEXT NOT NULL DEFAULT 'PENDING' CHECK (settlement_status IN ('PENDING', 'WON', 'LOST', 'PUSH', 'VOID')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -223,8 +223,8 @@ CREATE TABLE IF NOT EXISTS public.factor_definitions (
     name TEXT NOT NULL,
     category TEXT NOT NULL CHECK (category IN ('form', 'squad', 'stakes', 'fatigue', 'tactics', 'referee', 'environment', 'h2h', 'management', 'market')),
     description TEXT NOT NULL,
-    default_shrinkage NUMERIC(4, 3) NOT NULL DEFAULT 0.100,
-    ablation_gain_brier NUMERIC(6, 4) NOT NULL DEFAULT 0.0100,
+    default_shrinkage NUMERIC(7, 6) NOT NULL DEFAULT 0.100000,
+    ablation_gain_brier NUMERIC(10, 4) NOT NULL DEFAULT 0.0100,
     market_weights JSONB NOT NULL DEFAULT '{}'::JSONB,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -235,8 +235,8 @@ CREATE TABLE IF NOT EXISTS public.match_state_tags (
     fixture_id UUID NOT NULL REFERENCES public.fixtures(id) ON DELETE CASCADE,
     tag TEXT NOT NULL CHECK (tag IN ('high-stakes', 'derby', 'dead-rubber', 'fixture-congested', 'key-absences', 'new-manager', 'low-sample', 'lineup-unconfirmed')),
     source TEXT NOT NULL DEFAULT 'pre_match_verified',
-    uncertainty_multiplier NUMERIC(4, 2) NOT NULL DEFAULT 1.00,
-    confidence NUMERIC(4, 3) NOT NULL DEFAULT 0.950,
+    uncertainty_multiplier NUMERIC(10, 4) NOT NULL DEFAULT 1.0000,
+    confidence NUMERIC(7, 6) NOT NULL DEFAULT 0.950000,
     metadata JSONB DEFAULT '{}'::JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(fixture_id, tag)
@@ -246,10 +246,10 @@ CREATE TABLE IF NOT EXISTS public.prediction_factor_contributions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     prediction_id UUID NOT NULL REFERENCES public.market_predictions(id) ON DELETE CASCADE,
     factor_code TEXT NOT NULL REFERENCES public.factor_definitions(code),
-    weight NUMERIC(5, 4) NOT NULL,
+    weight NUMERIC(10, 4) NOT NULL,
     direction TEXT NOT NULL CHECK (direction IN ('positive', 'negative', 'neutral')),
     impact_description TEXT NOT NULL,
-    magnitude NUMERIC(5, 4) NOT NULL,
+    magnitude NUMERIC(10, 4) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

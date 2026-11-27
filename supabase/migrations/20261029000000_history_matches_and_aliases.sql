@@ -14,10 +14,10 @@ CREATE TABLE IF NOT EXISTS public.teams (
     tla VARCHAR(4),
     crest_url TEXT,
     competition_code TEXT NOT NULL,
-    attack_rating NUMERIC(5, 3) DEFAULT 1.000,
-    defense_rating NUMERIC(5, 3) DEFAULT 1.000,
-    corner_attack_rating NUMERIC(5, 3) DEFAULT 1.000,
-    discipline_rating NUMERIC(5, 3) DEFAULT 1.000,
+    attack_rating NUMERIC(10, 4) DEFAULT 1.0000,
+    defense_rating NUMERIC(10, 4) DEFAULT 1.0000,
+    corner_attack_rating NUMERIC(10, 4) DEFAULT 1.0000,
+    discipline_rating NUMERIC(10, 4) DEFAULT 1.0000,
     sample_matches INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -84,8 +84,8 @@ CREATE TABLE IF NOT EXISTS public.odds_snapshots (
     bookmaker TEXT NOT NULL, -- e.g. 'Bet365', 'Pinnacle', 'MarketAvg'
     market_code TEXT NOT NULL, -- e.g. '1X2_HOME', '1X2_DRAW', '1X2_AWAY', 'TOTAL_GOALS_O25', 'TOTAL_GOALS_U25'
     selection TEXT NOT NULL,
-    decimal_odds NUMERIC(8, 4) NOT NULL CHECK (decimal_odds >= 1.01),
-    implied_probability NUMERIC(5, 4) GENERATED ALWAYS AS (ROUND((1.0 / decimal_odds), 4)) STORED,
+    decimal_odds NUMERIC(10, 3) NOT NULL CHECK (decimal_odds >= 1.01),
+    implied_probability NUMERIC(7, 6) GENERATED ALWAYS AS (ROUND((1.0 / decimal_odds), 6)) STORED,
     observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     source TEXT DEFAULT 'football-data.co.uk'
 );
