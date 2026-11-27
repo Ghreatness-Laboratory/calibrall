@@ -194,11 +194,24 @@ export function mapDbRowToFixture(row: any): Fixture | null {
   const homeLookup = lookupTeamStrength(row.home_team_name || row.home_team_id);
   const awayLookup = lookupTeamStrength(row.away_team_name || row.away_team_id);
 
+  const homeShort = cleanDisplayText(
+    displayName({
+      shortName: homeCanon?.shortName || homeLookup.data?.shortName,
+      name: homeCanon?.canonicalName || row.home_team_name || homeLookup.data?.name || 'Home Team',
+    }) || 'Home Team'
+  );
+  const awayShort = cleanDisplayText(
+    displayName({
+      shortName: awayCanon?.shortName || awayLookup.data?.shortName,
+      name: awayCanon?.canonicalName || row.away_team_name || awayLookup.data?.name || 'Away Team',
+    }) || 'Away Team'
+  );
+
   const homeTeam = {
     id: homeCanon?.canonicalId || homeLookup.data?.id || row.home_team_id || `team_${(row.home_team_name || 'home').toLowerCase().replace(/\s+/g, '_')}`,
     providerTeamId: payload?.homeProviderTeamId ? String(payload.homeProviderTeamId) : undefined,
-    name: row.home_team_name || homeCanon?.canonicalName || homeLookup.data?.name || 'Home Team',
-    shortName: cleanDisplayText(displayName({ name: homeCanon?.shortName || homeLookup.data?.shortName || row.home_team_name || 'Home' })),
+    name: homeShort,
+    shortName: homeShort,
     tla: homeCanon?.tla || homeLookup.data?.tla || (row.home_team_name || 'HOM').slice(0, 3).toUpperCase(),
     crestUrl: payload?.homeCrestUrl || homeCanon?.crestUrl || homeLookup.data?.crestUrl || '',
     attackRating: homeLookup.data?.attackRating,
@@ -212,8 +225,8 @@ export function mapDbRowToFixture(row: any): Fixture | null {
   const awayTeam = {
     id: awayCanon?.canonicalId || awayLookup.data?.id || row.away_team_id || `team_${(row.away_team_name || 'away').toLowerCase().replace(/\s+/g, '_')}`,
     providerTeamId: payload?.awayProviderTeamId ? String(payload.awayProviderTeamId) : undefined,
-    name: row.away_team_name || awayCanon?.canonicalName || awayLookup.data?.name || 'Away Team',
-    shortName: cleanDisplayText(displayName({ name: awayCanon?.shortName || awayLookup.data?.shortName || row.away_team_name || 'Away' })),
+    name: awayShort,
+    shortName: awayShort,
     tla: awayCanon?.tla || awayLookup.data?.tla || (row.away_team_name || 'AWY').slice(0, 3).toUpperCase(),
     crestUrl: payload?.awayCrestUrl || awayCanon?.crestUrl || awayLookup.data?.crestUrl || '',
     attackRating: awayLookup.data?.attackRating,

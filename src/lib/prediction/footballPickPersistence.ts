@@ -2,10 +2,17 @@
 // Stores deterministic model summaries & reasoning in `football_picks` strictly pre-kickoff.
 // Never overwrites existing rows after kickoff or final score.
 
-import { Fixture, FixtureContext, WrittenMatchAlternate, WrittenMatchExplanation } from '@/types';
+import {
+  ExplanationDriverTile,
+  Fixture,
+  FixtureContext,
+  WrittenMatchAlternate,
+  WrittenMatchExplanation,
+} from '@/types';
 import { getLocalDatabase, isProductionRuntime } from '@/lib/supabase/client';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import { generateFootballExplanation } from './explanationGenerator';
+import { validateExplanationConsistency } from './explanationValidator';
 import type { EvaluatedFixtureResult } from './marketSelection';
 
 function firstSentence(text: string): string {
@@ -85,7 +92,7 @@ export async function loadFootballPickModerationMap(
   return result;
 }
 
-const CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION = 'v2.5.1';
+const CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION = 'v2.5.2';
 
 export function loadStoredFootballExplanation(
   fixtureId: string,
@@ -99,6 +106,8 @@ export function loadStoredFootballExplanation(
 
     let row:
       | {
+          market_code?: string | null;
+          selection?: string | null;
           summary?: string;
           reasoning_json?: string;
           alternates_json?: string;
@@ -114,7 +123,7 @@ export function loadStoredFootballExplanation(
     try {
       row = db
         .prepare(
-          `SELECT summary, reasoning_json, alternates_json, recorded_at, model_version, confidence_tier, calibrated_probability, is_hidden, voided_reason
+          `SELECT market_code, selection, summary, reasoning_json, alternates_json, recorded_at, model_version, confidence_tier, calibrated_probability, is_hidden, voided_reason
            FROM football_picks
            WHERE fixture_id = ?
            LIMIT 1`
@@ -158,6 +167,12 @@ export function loadStoredFootballExplanation(
 
     const fullSummary = cleanDisplayText(row.summary);
     const storedTopPick = reasoning?.topPick;
+    const meta = reasoning?._meta as
+      | {
+          driverTiles?: ExplanationDriverTile[];
+          headlineSelectionReason?: string;
+        }
+      | undefined;
     const storedTier = (storedTopPick?.confidenceTier || row.confidence_tier || undefined) as
       | WrittenMatchExplanation['confidenceTier']
       | undefined;
@@ -169,10 +184,22 @@ export function loadStoredFootballExplanation(
         : typeof row.calibrated_probability === 'number'
         ? row.calibrated_probability
         : undefined;
+    const activeCode = storedTopPick?.marketCode || row.market_code || undefined;
+    const activeSel = storedTopPick?.selection
+      ? cleanDisplayText(storedTopPick.selection)
+      : row.selection
+      ? cleanDisplayText(row.selection)
+      : undefined;
 
-    return {
+    let loaded: WrittenMatchExplanation = {
       oneLineSummary: firstSentence(fullSummary),
       fullSummary,
+      driverTiles: Array.isArray(meta?.driverTiles) ? meta!.driverTiles : undefined,
+      headlineSelectionReason: meta?.headlineSelectionReason,
+      activePickMarketCode: activeCode,
+      activePickSelection: activeSel,
+      activePickProbability: storedCalProb,
+      activePickTier: storedTier,
       reasoning,
       alternates,
       confidenceTier: storedTier,
@@ -184,6 +211,41 @@ export function loadStoredFootballExplanation(
       calibratedProbability: storedCalProb,
       generatedAt: String(row.recorded_at || new Date().toISOString()),
     };
+
+    const homeName = cleanDisplayText(String(reasoning?.homeTeam || 'Home team'));
+    const awayName = cleanDisplayText(String(reasoning?.awayTeam || 'Away team'));
+    const validation = validateExplanationConsistency({
+      sport: 'football',
+      homeTeam: homeName,
+      awayTeam: awayName,
+      activePick:
+        activeCode && activeSel && typeof storedCalProb === 'number'
+          ? {
+              marketCode: activeCode,
+              selection: activeSel,
+              probability: storedCalProb,
+              confidenceTier: storedTier,
+            }
+          : null,
+      explanation: loaded,
+      isThinHistory: reasoning?.status === 'thin_history',
+    });
+
+    if (!validation.valid && validation.safeFallbackOneLine && validation.safeFallbackFull) {
+      loaded = {
+        ...loaded,
+        oneLineSummary: validation.safeFallbackOneLine,
+        fullSummary: validation.safeFallbackFull,
+        validationPassed: false,
+        validationIssues: validation.issues.map((i) => i.code),
+        fallbackApplied: true,
+      };
+    } else {
+      loaded.validationPassed = true;
+      loaded.fallbackApplied = false;
+    }
+
+    return loaded;
   } catch {
     return null;
   }
@@ -247,7 +309,13 @@ export function persistOrLoadImmutableFootballExplanation(
             top?.confidenceTier || null,
             top ? cleanDisplayText(top.priceSource || (top.marketOdds ? 'Verified Odds' : 'Model line, no market price')) : null,
             generated.fullSummary,
-            JSON.stringify(generated.reasoning || {}),
+            JSON.stringify({
+              ...(generated.reasoning || {}),
+              _meta: {
+                driverTiles: generated.driverTiles || [],
+                headlineSelectionReason: generated.headlineSelectionReason || undefined,
+              },
+            }),
             JSON.stringify(generated.alternates || []),
             CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION,
             generated.generatedAt

@@ -43,7 +43,7 @@ const FAMILY_DISPLAY_NAMES: Record<MarketFamily, string> = {
   first_half_goals: '1st Half Goals',
   second_half_result: '2nd Half Result',
   corners: 'Corners (Total & Team)',
-  bookings: 'Disciplinary Bookings',
+  bookings: 'Cards (Total & Team)',
   handicap: 'Handicap (Asian & European)',
   multi_goals: 'Multi Goals',
 };

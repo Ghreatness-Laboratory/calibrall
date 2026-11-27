@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CountryCompetitionGroup,
   CompetitionWithCount,
@@ -30,11 +31,16 @@ export default function CompetitionFilter({
   showSportBadge = false,
 }: CompetitionFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showZeroFixtures, setShowZeroFixtures] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const activeSelectedIds = useMemo(() => {
     if (Array.isArray(selectedCompetitionIds)) {
@@ -404,91 +410,99 @@ export default function CompetitionFilter({
         />
       </button>
 
-      {isOpen && isMobile && (
-        <div
-          className="fixed inset-0 z-[70] bg-black/65 backdrop-blur-sm flex flex-col justify-end"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Select competitions"
-          data-testid="competition-bottom-sheet"
-        >
+      {mounted &&
+        isOpen &&
+        isMobile &&
+        createPortal(
           <div
-            className="w-full h-[100dvh] max-h-[100dvh] bg-[var(--surface)] flex flex-col overflow-hidden"
-            style={{
-              paddingTop: 'env(safe-area-inset-top, 0px)',
-              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-            }}
+            className="fixed inset-0 z-[120] bg-black/65 backdrop-blur-sm flex flex-col justify-end"
+            style={{ zIndex: 120 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Select competitions"
+            data-testid="competition-bottom-sheet"
           >
-            {/* Sticky Mobile Sheet Header + Search */}
-            <div className="shrink-0 bg-[var(--surface)] border-b border-[var(--line)] px-4 pt-3 pb-3 space-y-2.5 z-10">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <h2 className="font-display text-[17px] font-bold text-[var(--text)] leading-tight">
-                    Select competitions
-                  </h2>
-                  <p className="text-[11.5px] text-[var(--text-2)] mt-0.5">
-                    {draftSelectedIds.length === 0
-                      ? `All competitions (${totalFixturesCount} fixtures)`
-                      : `${draftSelectedIds.length} selected`}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="min-w-[44px] min-h-[44px] rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--text)] flex items-center justify-center shrink-0 touch-press"
-                  aria-label="Close competition picker"
-                >
-                  <X className="w-5 h-5" strokeWidth={2} />
-                </button>
-              </div>
-
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-3)] pointer-events-none" />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search league, country, or alias"
-                  data-testid="competition-search-input"
-                  className="w-full min-h-[44px] pl-10 pr-11 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] text-[14px] text-[var(--text)] placeholder:text-[var(--text-3)] focus:outline-none focus:border-[var(--accent)]"
-                />
-                {searchQuery && (
+            <div
+              className="w-full h-[100dvh] max-h-[100dvh] bg-[var(--surface)] flex flex-col overflow-hidden"
+              style={{
+                paddingTop: 'env(safe-area-inset-top, 0px)',
+                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+              }}
+            >
+              {/* Sticky Mobile Sheet Header + Search */}
+              <div className="shrink-0 bg-[var(--surface)] border-b border-[var(--line)] px-4 pt-3 pb-3 space-y-2.5 z-10">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="font-display text-[17px] font-bold text-[var(--text)] leading-tight">
+                      Select competitions
+                    </h2>
+                    <p className="text-[11.5px] text-[var(--text-2)] mt-0.5">
+                      {draftSelectedIds.length === 0
+                        ? `All competitions (${totalFixturesCount} fixtures)`
+                        : `${draftSelectedIds.length} selected`}
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-0 top-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--text-2)] hover:text-[var(--text)]"
-                    aria-label="Clear competition search"
+                    onClick={() => setIsOpen(false)}
+                    className="min-w-[44px] min-h-[44px] rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--text)] flex items-center justify-center shrink-0 touch-press"
+                    aria-label="Close competition picker"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-5 h-5" strokeWidth={2} />
                   </button>
-                )}
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-3)] pointer-events-none" />
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search league, country, or alias"
+                    data-testid="competition-search-input"
+                    className="w-full min-h-[44px] pl-10 pr-11 bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] text-[14px] text-[var(--text)] placeholder:text-[var(--text-3)] focus:outline-none focus:border-[var(--accent)]"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-0 top-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--text-2)] hover:text-[var(--text)]"
+                      aria-label="Clear competition search"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {renderCompetitionList(true)}
+
+              {/* Sticky Mobile Sheet Footer with Apply */}
+              <div
+                className="shrink-0 bg-[var(--surface)] border-t border-[var(--line)] px-4 pt-3 flex items-center gap-2.5 z-10"
+                style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setDraftSelectedIds([])}
+                  className="min-h-[44px] px-4 rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] text-[13px] font-medium text-[var(--text-2)] hover:text-[var(--text)] touch-press"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => commitSelection(draftSelectedIds)}
+                  data-testid="competition-apply-button"
+                  className="flex-1 min-h-[44px] px-4 rounded-[12px] bg-[var(--accent-fill)] text-[var(--accent-ink)] text-[13.5px] font-bold touch-press"
+                >
+                  {draftSelectedIds.length > 0 ? `Apply (${draftSelectedIds.length})` : 'Apply'}
+                </button>
               </div>
             </div>
-
-            {renderCompetitionList(true)}
-
-            {/* Sticky Mobile Sheet Footer with Apply */}
-            <div className="shrink-0 bg-[var(--surface)] border-t border-[var(--line)] px-4 py-3 flex items-center gap-2.5 z-10">
-              <button
-                type="button"
-                onClick={() => setDraftSelectedIds([])}
-                className="min-h-[44px] px-4 rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] text-[13px] font-medium text-[var(--text-2)] hover:text-[var(--text)] touch-press"
-              >
-                Reset
-              </button>
-              <button
-                type="button"
-                onClick={() => commitSelection(draftSelectedIds)}
-                data-testid="competition-apply-button"
-                className="flex-1 min-h-[44px] px-4 rounded-[12px] bg-[var(--accent-fill)] text-[var(--accent-ink)] text-[13.5px] font-bold touch-press"
-              >
-                {draftSelectedIds.length > 0 ? `Apply (${draftSelectedIds.length})` : 'Apply'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {isOpen && !isMobile && (
         <div

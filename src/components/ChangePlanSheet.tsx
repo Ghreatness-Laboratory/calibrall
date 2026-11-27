@@ -198,7 +198,8 @@ export default function ChangePlanSheet({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/75 p-0 md:p-4"
+      className="fixed inset-0 z-[120] flex items-end md:items-center justify-center bg-black/75 p-0 md:p-4"
+      style={{ zIndex: 120 }}
       role="dialog"
       aria-modal="true"
       aria-label="Change plan"

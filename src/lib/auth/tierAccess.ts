@@ -47,6 +47,12 @@ export function redactExplanationForTier(
       ? cleanDisplayText(explanation.oneLineSummary)
       : 'Daily free summary limit reached (3 per day). Upgrade for full match analysis.',
     fullSummary: '',
+    driverTiles: [],
+    headlineSelectionReason: explanation.headlineSelectionReason,
+    activePickMarketCode: explanation.activePickMarketCode,
+    activePickSelection: explanation.activePickSelection,
+    activePickProbability: explanation.activePickProbability,
+    activePickTier: explanation.activePickTier,
     reasoning: {},
     alternates: [],
     generatedAt: explanation.generatedAt,
@@ -54,6 +60,9 @@ export function redactExplanationForTier(
     confidenceReason: explanation.confidenceReason,
     rawProbability: explanation.rawProbability,
     calibratedProbability: explanation.calibratedProbability,
+    validationPassed: explanation.validationPassed,
+    validationIssues: explanation.validationIssues,
+    fallbackApplied: explanation.fallbackApplied,
     tierLocked: true,
     dailySummaryLimitReached: !withinDailyCap,
   };

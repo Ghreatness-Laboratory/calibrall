@@ -6,9 +6,10 @@ import { Fixture } from '@/types';
 import { Bookmark, ChevronRight } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/storage/userStorage';
 import TeamCrest from '../TeamCrest';
-import { cleanDisplayText } from '@/lib/utils/formatText';
+import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
 import type { BasketballGameEvaluation, BasketballPickCandidate } from '@/lib/basketball/picker';
 import type { BasketballMarketCategory } from '@/lib/basketball/markets';
+import { generateBasketballExplanationForPick } from '@/lib/prediction/explanationGenerator';
 import WhyThisPickSheet from '../WhyThisPickSheet';
 
 export type BasketballMarketGroupFilter = 'ALL' | 'game_total' | 'team_total' | 'h1_total';
@@ -64,7 +65,7 @@ export default function NBAGameCard({
 }: NBAGameCardProps) {
   const [isSaved, setIsSaved] = useState<boolean>(isSavedInitial ?? false);
   const [whySheetOpen, setWhySheetOpen] = useState<boolean>(false);
-  const writtenExplanation = fixture.writtenExplanation || evaluation?.writtenExplanation;
+  const baseWrittenExplanation = fixture.writtenExplanation || evaluation?.writtenExplanation;
 
   useEffect(() => {
     if (isSavedInitial === undefined) {
@@ -115,8 +116,8 @@ export default function NBAGameCard({
     ? 'Needs history: 1st half box score history unavailable'
     : evaluation?.abstentionReason || stats?.abstentionReason || 'Needs history';
 
-  const homeName = fixture.homeTeam.shortName || fixture.homeTeam.name;
-  const awayName = fixture.awayTeam.shortName || fixture.awayTeam.name;
+  const homeName = displayName(fixture.homeTeam) || fixture.homeTeam.shortName || fixture.homeTeam.name;
+  const awayName = displayName(fixture.awayTeam) || fixture.awayTeam.shortName || fixture.awayTeam.name;
 
   const hasFinalScores =
     (isFinished || isLive) &&
@@ -159,6 +160,49 @@ export default function NBAGameCard({
       : 'Needs history';
 
   const displayPick = selectPickForFilter(evaluation, marketGroupFilter);
+  const writtenExplanation = (() => {
+    if (!baseWrittenExplanation) return undefined;
+    if (baseWrittenExplanation.tierLocked) {
+      if (
+        !baseWrittenExplanation.dailySummaryLimitReached &&
+        displayPick &&
+        evaluation &&
+        baseWrittenExplanation.activePickMarketCode &&
+        baseWrittenExplanation.activePickMarketCode !== displayPick.marketCode
+      ) {
+        const regen = generateBasketballExplanationForPick({
+          fixture,
+          evaluation,
+          activePick: displayPick,
+        });
+        return regen
+          ? {
+              ...baseWrittenExplanation,
+              oneLineSummary: regen.oneLineSummary,
+              activePickMarketCode: regen.activePickMarketCode,
+              activePickSelection: regen.activePickSelection,
+              activePickProbability: regen.activePickProbability,
+              activePickTier: regen.activePickTier,
+            }
+          : baseWrittenExplanation;
+      }
+      return baseWrittenExplanation;
+    }
+    if (
+      displayPick &&
+      evaluation &&
+      baseWrittenExplanation.activePickMarketCode !== displayPick.marketCode
+    ) {
+      return (
+        generateBasketballExplanationForPick({
+          fixture,
+          evaluation,
+          activePick: displayPick,
+        }) || baseWrittenExplanation
+      );
+    }
+    return baseWrittenExplanation;
+  })();
   const projTotalStr =
     !baseNeedsHistory && stats?.projectedTotal ? stats.projectedTotal.toFixed(1) : '—';
   const h1ProjStr =
@@ -185,7 +229,7 @@ export default function NBAGameCard({
       ? 'High'
       : displayPick?.tier === 'MEDIUM'
       ? 'Medium'
-      : 'Speculative';
+      : 'Low';
 
   const probPct = displayPick ? (displayPick.calibratedProbability * 100).toFixed(1) : null;
   const probProgress = probPct ? Math.min(100, Math.max(0, parseFloat(probPct))) : 0;

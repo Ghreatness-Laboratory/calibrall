@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
+import { syncSlateExplanations } from '@/lib/prediction/explanationGenerator';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import { useSport } from '@/lib/context/SportContext';
@@ -34,17 +35,20 @@ export default function SavedMatchesPage() {
       .filter((f) => f.sport !== 'basketball' && savedIds.includes(f.id))
       .map((fixture) => {
         const stats = getFixtureStatistics(fixture);
-        const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
+        const context = buildFixtureContextFromStats(fixture, stats);
+        const evalResult = evaluateFixtureMarkets(context);
 
         return {
           fixtureId: fixture.id,
           fixture,
+          context,
           topPick: evalResult.topPick,
           predictions: evalResult.predictions,
           noRecommendationReason: evalResult.noRecommendationReason || stats.noRecommendationReason,
+          writtenExplanation: fixture.writtenExplanation,
         };
       });
-    return selectDiversifiedSlatePicks(raw, 0.4);
+    return syncSlateExplanations(selectDiversifiedSlatePicks(raw, 0.4));
   }, [fixtures, savedIds, sport]);
 
   const handleClearAll = () => {
@@ -98,12 +102,13 @@ export default function SavedMatchesPage() {
               isSavedInitial={true}
             />
           ))}
-          {savedFixtures.map(({ fixture, topPick, noRecommendationReason }) => (
+          {savedFixtures.map(({ fixture, topPick, noRecommendationReason, writtenExplanation }) => (
             <FixtureCard
               key={fixture.id}
               fixture={fixture}
               topPrediction={topPick}
               noRecommendationReason={noRecommendationReason}
+              writtenExplanation={writtenExplanation}
               isSavedInitial={true}
             />
           ))}

@@ -32,7 +32,7 @@ const FOOTBALL_MARKET_OPTIONS: {
   { code: 'BTTS_NO', label: '5. Both teams to score (No)', optionType: 'both_teams_to_score', category: 'btts', period: 'Regular time' },
   { code: 'TOTAL_CORNERS_O95', label: '6. Over 9.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
   { code: 'TEAM_CORNERS_HOME_O45', label: '6. Home over 4.5 corners', optionType: 'corners', category: 'team_corners', period: 'Regular time' },
-  { code: 'CARDS_O45', label: '7. Over 4.5 bookings', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
+  { code: 'CARDS_O45', label: '7. Over 4.5 cards', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
   { code: 'HSH_2ND', label: '8. Highest scoring half: 2nd half', optionType: 'highest_scoring_half', category: 'half_time', period: 'Full time' },
   { code: 'FH_GOALS_O05', label: '9. 1st half over 0.5 goals', optionType: 'first_half_goals', category: 'half_time', period: '1st half' },
   { code: '2H_RESULT_HOME', label: '10. 2nd half result: Home win', optionType: 'second_half_result', category: 'half_time', period: '2nd half' },
@@ -199,7 +199,7 @@ export default function MarketExplorerPage() {
     { id: 'over_under_goals', label: '4. Over or under' },
     { id: 'both_teams_to_score', label: '5. BTTS' },
     { id: 'corners', label: '6. Corners' },
-    { id: 'bookings', label: '7. Bookings' },
+    { id: 'bookings', label: '7. Cards' },
     { id: 'highest_scoring_half', label: '8. Highest half' },
     { id: 'first_half_goals', label: '9. 1st half goals' },
     { id: 'second_half_result', label: '10. 2nd half result' },
@@ -411,7 +411,7 @@ export default function MarketExplorerPage() {
                             <span className="text-[var(--medium)]">Abstained</span>
                           ) : (
                             <span className={pick.tier === 'HIGH' ? 'text-[var(--accent)] font-semibold' : 'text-[var(--text-2)]'}>
-                              {pick.tier === 'HIGH' ? 'High' : pick.tier === 'MEDIUM' ? 'Medium' : 'Speculative'}
+                              {pick.tier === 'HIGH' ? 'High' : pick.tier === 'MEDIUM' ? 'Medium' : 'Low'}
                             </span>
                           )}
                         </td>
@@ -434,7 +434,7 @@ export default function MarketExplorerPage() {
                       <tr key={fixture.id} className="hover:bg-[var(--surface-2)]/50 transition-colors">
                         <td className="py-3 px-3.5">
                           <div className="font-medium text-[var(--text)]">
-                            {fixture.homeTeam.name} vs {fixture.awayTeam.name}
+                            {fixture.homeTeam.shortName || fixture.homeTeam.name} vs {fixture.awayTeam.shortName || fixture.awayTeam.name}
                           </div>
                           <div className="text-[11px] text-[var(--text-2)]">{fixture.competition.name}</div>
                         </td>
@@ -442,7 +442,7 @@ export default function MarketExplorerPage() {
                           {cleanDisplayText(prediction.selection)}
                         </td>
                         <td className="py-3 px-3.5 font-display font-bold text-[var(--accent)] tabular-nums">
-                          {(prediction.modelProbability * 100).toFixed(1)}%
+                          {((prediction.calibratedProbability ?? prediction.modelProbability) * 100).toFixed(1)}%
                         </td>
                         <td className="py-3 px-3.5 text-[var(--text)] tabular-nums text-[11.5px]">
                           {prediction.marketOdds
@@ -464,7 +464,7 @@ export default function MarketExplorerPage() {
                               : prediction.confidenceTier === 'MEDIUM'
                               ? 'Medium'
                               : prediction.marketCategory === 'multi_goals'
-                              ? 'Speculative'
+                              ? 'Low'
                               : 'Analysis only'}
                           </span>
                         </td>

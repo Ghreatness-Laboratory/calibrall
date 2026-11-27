@@ -5,6 +5,7 @@ import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/s
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
+import { syncSlateExplanations } from '@/lib/prediction/explanationGenerator';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
 import NBAScoreProjectionTool from '@/components/nba/NBAScoreProjectionTool';
@@ -100,17 +101,20 @@ export default function DashboardPage() {
       .filter((f) => f.sport !== 'basketball')
       .map((fixture) => {
         const stats = getFixtureStatistics(fixture);
-        const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
+        const context = buildFixtureContextFromStats(fixture, stats);
+        const evalResult = evaluateFixtureMarkets(context);
 
         return {
           fixtureId: fixture.id,
           fixture,
+          context,
           predictions: evalResult.predictions,
           topPick: evalResult.topPick,
           noRecommendationReason: evalResult.noRecommendationReason || stats.noRecommendationReason,
+          writtenExplanation: fixture.writtenExplanation,
         };
       });
-    return selectDiversifiedSlatePicks(raw, 0.4);
+    return syncSlateExplanations(selectDiversifiedSlatePicks(raw, 0.4));
   }, [fixtures, isBasketball]);
 
   const footballEvalById = useMemo(() => {
@@ -137,7 +141,7 @@ export default function DashboardPage() {
       }
       return fixture.status !== 'FINISHED';
     });
-    return selectDiversifiedSlatePicks(subset, 0.4);
+    return syncSlateExplanations(selectDiversifiedSlatePicks(subset, 0.4));
   }, [evaluatedFixtures, selectedCompSet, debouncedSearchQuery, activeTab, isBasketball, isMultiSport]);
 
   const filteredBasketball = useMemo(() => {
@@ -284,7 +288,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between text-[12px]">
               <span className="font-semibold text-[var(--text)] flex items-center gap-1.5">
                 <AlertCircle className="w-4 h-4 text-[var(--medium)]" strokeWidth={1.75} />
-                <span>Disciplinary bookings</span>
+                <span>Disciplinary cards</span>
               </span>
               <span className="text-[var(--text-3)] text-[11px] tabular-nums">Line 4.5</span>
             </div>
@@ -346,6 +350,7 @@ export default function DashboardPage() {
                   fixture={f}
                   topPrediction={ev?.topPick}
                   noRecommendationReason={ev?.noRecommendationReason}
+                  writtenExplanation={ev?.writtenExplanation}
                 />
               );
             })}
@@ -383,12 +388,13 @@ export default function DashboardPage() {
         )
       ) : filteredList.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filteredList.map(({ fixture, topPick, noRecommendationReason }) => (
+          {filteredList.map(({ fixture, topPick, noRecommendationReason, writtenExplanation }) => (
             <FixtureCard
               key={fixture.id}
               fixture={fixture}
               topPrediction={topPick}
               noRecommendationReason={noRecommendationReason}
+              writtenExplanation={writtenExplanation}
             />
           ))}
         </div>

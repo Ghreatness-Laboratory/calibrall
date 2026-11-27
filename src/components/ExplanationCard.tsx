@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { MarketPrediction } from '@/types';
 import { Check, ShieldCheck, AlertCircle, TrendingUp, X } from 'lucide-react';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { getMarketEvidenceFamily } from '@/lib/prediction/explanationValidator';
 
 interface Props {
   prediction: MarketPrediction | null;
@@ -61,11 +62,15 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
   const tierLabel =
     confidenceTier === 'HIGH' ? 'High' : confidenceTier === 'MEDIUM' ? 'Medium' : 'Low';
 
+  const marketFamily = getMarketEvidenceFamily(prediction, 'football');
+  const h2hMeetings = prediction.evidence?.sampleSizes?.h2hMeetings ?? 0;
+
   const refereeLine = (() => {
+    if (marketFamily !== 'cards') return null;
     const ref = prediction.evidence?.referee;
     if (!ref) return null;
     if (!ref.leagueBaseline || ref.leagueBaseline <= 0) {
-      return ref.announced && ref.name ? `Referee ${ref.name}` : 'Referee unannounced';
+      return ref.announced && ref.name ? `Referee ${cleanDisplayText(ref.name)}` : 'Referee unannounced';
     }
     return cleanDisplayText(ref.explanation);
   })();
@@ -162,24 +167,38 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
 
             <div className="grid grid-cols-1 gap-1.5 text-[var(--text-2)] tabular-nums">
               <div className="bg-[var(--surface)] px-2.5 py-2 rounded-[10px] border border-[var(--line)]">
-                <span className="text-[var(--text)] font-medium">Fitted strengths: </span>
-                {cleanDisplayText(
-                  `Home Att ${prediction.evidence.fittedStrengths.homeAttack.toFixed(2)} / Def ${prediction.evidence.fittedStrengths.homeDefense.toFixed(2)} (${prediction.evidence.fittedStrengths.homeXg.toFixed(2)} xG) | Away Att ${prediction.evidence.fittedStrengths.awayAttack.toFixed(2)} / Def ${prediction.evidence.fittedStrengths.awayDefense.toFixed(2)} (${prediction.evidence.fittedStrengths.awayXg.toFixed(2)} xG)`
+                <span className="text-[var(--text)] font-medium">
+                  {marketFamily === 'cards'
+                    ? 'Cards model inputs: '
+                    : marketFamily === 'corners'
+                    ? 'Corners model inputs: '
+                    : 'Fitted strengths: '}
+                </span>
+                {marketFamily === 'cards' ? (
+                  <span>
+                    {prediction.evidence.fittedStrengths.expectedCards !== undefined &&
+                    prediction.evidence.fittedStrengths.expectedCards > 0
+                      ? cleanDisplayText(
+                          `Projected total ${prediction.evidence.fittedStrengths.expectedCards.toFixed(2)} cards`
+                        )
+                      : 'Disciplinary rate estimates applied'}
+                  </span>
+                ) : marketFamily === 'corners' ? (
+                  <span>
+                    {prediction.evidence.fittedStrengths.expectedCornersHome !== undefined &&
+                    prediction.evidence.fittedStrengths.expectedCornersHome > 0
+                      ? cleanDisplayText(
+                          `Home ${(prediction.evidence.fittedStrengths.expectedCornersHome).toFixed(1)} + Away ${(prediction.evidence.fittedStrengths.expectedCornersAway ?? 0).toFixed(1)} expected corners`
+                        )
+                      : 'Corner volume estimates applied'}
+                  </span>
+                ) : (
+                  <span>
+                    {cleanDisplayText(
+                      `Home Att ${prediction.evidence.fittedStrengths.homeAttack.toFixed(2)} / Def ${prediction.evidence.fittedStrengths.homeDefense.toFixed(2)} (${prediction.evidence.fittedStrengths.homeXg.toFixed(2)} xG) | Away Att ${prediction.evidence.fittedStrengths.awayAttack.toFixed(2)} / Def ${prediction.evidence.fittedStrengths.awayDefense.toFixed(2)} (${prediction.evidence.fittedStrengths.awayXg.toFixed(2)} xG)`
+                    )}
+                  </span>
                 )}
-                {prediction.evidence.fittedStrengths.expectedCornersHome !== undefined &&
-                  prediction.evidence.fittedStrengths.expectedCornersHome > 0 && (
-                    <span>
-                      {cleanDisplayText(
-                        ` | Corners ${prediction.evidence.fittedStrengths.expectedCornersHome.toFixed(1)} + ${(prediction.evidence.fittedStrengths.expectedCornersAway ?? 0).toFixed(1)}`
-                      )}
-                    </span>
-                  )}
-                {prediction.evidence.fittedStrengths.expectedCards !== undefined &&
-                  prediction.evidence.fittedStrengths.expectedCards > 0 && (
-                    <span>
-                      {cleanDisplayText(` | Cards ${prediction.evidence.fittedStrengths.expectedCards.toFixed(2)}`)}
-                    </span>
-                  )}
               </div>
 
               <div className="bg-[var(--surface)] px-2.5 py-2 rounded-[10px] border border-[var(--line)]">
@@ -200,7 +219,9 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
               <div className="bg-[var(--surface)] px-2.5 py-2 rounded-[10px] border border-[var(--line)]">
                 <span className="text-[var(--text)] font-medium">Sample sizes: </span>
                 {cleanDisplayText(
-                  `Home ${prediction.evidence.sampleSizes.homeMatches} · Away ${prediction.evidence.sampleSizes.awayMatches} · League ${prediction.evidence.sampleSizes.leagueMatches} · Walk forward ${prediction.evidence.sampleSizes.walkForwardMatches} · H2H ${prediction.evidence.sampleSizes.h2hMeetings}`
+                  `Home ${prediction.evidence.sampleSizes.homeMatches} · Away ${prediction.evidence.sampleSizes.awayMatches} · League ${prediction.evidence.sampleSizes.leagueMatches} · Walk forward ${prediction.evidence.sampleSizes.walkForwardMatches}${
+                    h2hMeetings >= 3 ? ` · H2H ${h2hMeetings}` : ''
+                  }`
                 )}
               </div>
 
@@ -211,16 +232,29 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
                 </div>
               )}
 
-              <div className="bg-[var(--surface)] px-2.5 py-2 rounded-[10px] border border-[var(--line)]">
-                <span className="text-[var(--text)] font-medium">H2H &amp; Derby: </span>
-                {cleanDisplayText(
-                  `${prediction.evidence.h2h.summary} (weight ${prediction.evidence.h2h.weightApplied.toFixed(2)}) | ${
-                    prediction.evidence.derby.isDerby
-                      ? `Derby: ${prediction.evidence.derby.name || 'Rivalry'} (cards x${prediction.evidence.derby.cardsMultiplierApplied.toFixed(2)})`
-                      : 'Non derby match'
-                  }`
-                )}
-              </div>
+              {(h2hMeetings >= 3 || (marketFamily === 'cards' && prediction.evidence.derby.isDerby)) && (
+                <div className="bg-[var(--surface)] px-2.5 py-2 rounded-[10px] border border-[var(--line)]">
+                  <span className="text-[var(--text)] font-medium">
+                    {h2hMeetings >= 3 && marketFamily === 'cards' && prediction.evidence.derby.isDerby
+                      ? 'H2H & Derby: '
+                      : h2hMeetings >= 3
+                      ? 'Head to head: '
+                      : 'Rivalry context: '}
+                  </span>
+                  {cleanDisplayText(
+                    [
+                      h2hMeetings >= 3
+                        ? `${prediction.evidence.h2h.summary} (${h2hMeetings} meetings, weight ${prediction.evidence.h2h.weightApplied.toFixed(2)})`
+                        : null,
+                      marketFamily === 'cards' && prediction.evidence.derby.isDerby
+                        ? `Derby: ${prediction.evidence.derby.name || 'Rivalry'} (cards x${prediction.evidence.derby.cardsMultiplierApplied.toFixed(2)})`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' | ')
+                  )}
+                </div>
+              )}
 
               <div className="bg-[var(--surface)] px-2.5 py-2 rounded-[10px] border border-[var(--line)]">
                 <span className="text-[var(--text)] font-medium">Walk forward CI: </span>

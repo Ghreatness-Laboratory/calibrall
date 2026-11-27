@@ -3,7 +3,7 @@
 // Fallback fixtures and schedules when primary feeds are unavailable.
 
 import { canonicalMatchStore, CanonicalMatch } from '../canonicalMatches';
-import { lookupCanonicalTeam, resolveFixtureTeamCanonical } from '../canonicalTeams';
+import { lookupCanonicalTeam } from '../canonicalTeams';
 import { getCanonicalCompetition, isCanonicalCompetitionId } from '../canonicalCompetitions';
 import { lookupTeamStrength } from '../teamDatabase';
 import { displayName, getTeamAbbreviation } from '../../utils/formatText';
@@ -106,16 +106,8 @@ export class OpenFootballService {
             const rawAway = String(m.team2 || '').trim();
             if (!rawHome || !rawAway) continue;
 
-            const homeCanon = resolveFixtureTeamCanonical({
-              provider: 'openfootball',
-              name: rawHome,
-              competitionCode: comp.code,
-            });
-            const awayCanon = resolveFixtureTeamCanonical({
-              provider: 'openfootball',
-              name: rawAway,
-              competitionCode: comp.code,
-            });
+            const homeCanon = lookupCanonicalTeam(rawHome, comp.code);
+            const awayCanon = lookupCanonicalTeam(rawAway, comp.code);
             const homeLookup = lookupTeamStrength(rawHome);
             const awayLookup = lookupTeamStrength(rawAway);
 

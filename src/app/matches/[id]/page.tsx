@@ -5,6 +5,10 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import {
+  generateFootballExplanation,
+  generateBasketballExplanationForPick,
+} from '@/lib/prediction/explanationGenerator';
 import MarketComparisonTable from '@/components/MarketComparisonTable';
 import ExplanationCard from '@/components/ExplanationCard';
 import ScorelineMatrix from '@/components/ScorelineMatrix';
@@ -148,10 +152,15 @@ export default function MatchAnalysisPage() {
     return getFixtureStatistics(fixture);
   }, [fixture, isBasketball]);
 
-  const footballEvaluation = useMemo(() => {
+  const footballContext = useMemo(() => {
     if (!fixture || isBasketball || !stats) return null;
-    return evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
+    return buildFixtureContextFromStats(fixture, stats);
   }, [fixture, isBasketball, stats]);
+
+  const footballEvaluation = useMemo(() => {
+    if (!footballContext) return null;
+    return evaluateFixtureMarkets(footballContext);
+  }, [footballContext]);
 
   const matchStats = useMemo(() => {
     if (!fixture || isBasketball || fixture.status !== 'FINISHED') return null;
@@ -179,6 +188,18 @@ export default function MatchAnalysisPage() {
       (footballEvaluation?.noRecommendationReason ? null : predictions[0]) ||
       null;
   const noRecommendationReason = isBasketball ? undefined : footballEvaluation?.noRecommendationReason;
+
+  const syncedFootballExplanation = useMemo(() => {
+    if (!fixture || isBasketball || !footballEvaluation || !footballContext) return null;
+    const existing = fixture.writtenExplanation;
+    if (existing?.tierLocked) return existing;
+    return generateFootballExplanation({
+      fixture,
+      evaluation: footballEvaluation,
+      context: footballContext,
+      headlineSelectionReason: topPick?.headlineSelectionReason,
+    });
+  }, [fixture, isBasketball, footballEvaluation, footballContext, topPick]);
 
   const liveState = useMemo(() => {
     if (!fixture) return undefined;
@@ -460,7 +481,7 @@ export default function MatchAnalysisPage() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-display text-[14px] font-semibold text-[var(--text)]">Model pick</span>
                   <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${tierStyle(bbTopPick.tier)}`}>
-                    {bbTopPick.tier === 'HIGH' ? 'High' : bbTopPick.tier === 'MEDIUM' ? 'Medium' : 'Speculative'}
+                    {bbTopPick.tier === 'HIGH' ? 'High' : bbTopPick.tier === 'MEDIUM' ? 'Medium' : 'Low'}
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between gap-2">
@@ -477,8 +498,20 @@ export default function MatchAnalysisPage() {
               </div>
             )}
 
-            {(fixture.writtenExplanation || bbEvaluation?.writtenExplanation) && (() => {
-              const expl: WrittenMatchExplanation = (fixture.writtenExplanation || bbEvaluation?.writtenExplanation)!;
+            {(() => {
+              const baseExpl: WrittenMatchExplanation | undefined =
+                fixture.writtenExplanation || bbEvaluation?.writtenExplanation;
+              const expl: WrittenMatchExplanation | undefined =
+                baseExpl?.tierLocked
+                  ? baseExpl
+                  : activeBbPick && bbEvaluation
+                  ? generateBasketballExplanationForPick({
+                      fixture,
+                      evaluation: bbEvaluation,
+                      activePick: activeBbPick,
+                    }) || baseExpl
+                  : baseExpl;
+              if (!expl) return null;
               return (
                 <section className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
                   <div className="flex items-center justify-between gap-2">
@@ -522,6 +555,21 @@ export default function MatchAnalysisPage() {
                       <p className="text-[13px] text-[var(--text)] leading-[1.55]">
                         {cleanDisplayText(expl.fullSummary || expl.oneLineSummary)}
                       </p>
+                      {expl.driverTiles && expl.driverTiles.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {expl.driverTiles.map((tile) => (
+                            <div
+                              key={tile.label}
+                              className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-2.5"
+                            >
+                              <div className="text-[10.5px] text-[var(--text-3)]">{cleanDisplayText(tile.label)}</div>
+                              <div className="text-[13px] font-bold text-[var(--text)] tabular-nums mt-0.5">
+                                {cleanDisplayText(tile.value)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {expl.alternates && expl.alternates.length > 0 && (
                         <div className="space-y-1.5 pt-2 border-t border-[var(--line)]">
                           <div className="text-[11.5px] font-semibold text-[var(--text-2)]">
@@ -577,7 +625,15 @@ export default function MatchAnalysisPage() {
                       >
                         <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--text-2)]">
                           <span>{BB_CAT_TITLES[p.marketCategory]}</span>
-                          <span>{isFinished ? sett.status : p.tier}</span>
+                          <span>
+                            {isFinished
+                              ? sett.status
+                              : p.tier === 'HIGH'
+                              ? 'High'
+                              : p.tier === 'MEDIUM'
+                              ? 'Medium'
+                              : 'Low'}
+                          </span>
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-display text-[14px] font-semibold text-[var(--text)]">
@@ -914,14 +970,14 @@ export default function MatchAnalysisPage() {
       )}
 
       {/* 2b. Written Match Explanation & Next 2 Best Alternates */}
-      {fixture.writtenExplanation && (
+      {syncedFootballExplanation && (
         <section className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-[14px] font-display font-semibold text-[var(--text)]">
               <Sparkles className="w-4 h-4 text-[var(--accent)] shrink-0" />
               <span>Model explanation</span>
             </div>
-            {fixture.writtenExplanation.tierLocked && (
+            {syncedFootballExplanation.tierLocked && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30">
                 <Lock className="w-3 h-3" />
                 <span>Pro feature</span>
@@ -929,10 +985,10 @@ export default function MatchAnalysisPage() {
             )}
           </div>
 
-          {fixture.writtenExplanation.tierLocked ? (
+          {syncedFootballExplanation.tierLocked ? (
             <div className="space-y-2.5">
               <p className="text-[12.5px] text-[var(--text)] leading-[1.5]">
-                {cleanDisplayText(fixture.writtenExplanation.oneLineSummary)}
+                {cleanDisplayText(syncedFootballExplanation.oneLineSummary)}
               </p>
               <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div className="space-y-0.5">
@@ -954,20 +1010,43 @@ export default function MatchAnalysisPage() {
             </div>
           ) : (
             <div className="space-y-3">
+              {syncedFootballExplanation.headlineSelectionReason && (
+                <div className="rounded-[10px] border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-[11.5px] text-[var(--text-2)] leading-[1.45]">
+                  {cleanDisplayText(syncedFootballExplanation.headlineSelectionReason)}
+                </div>
+              )}
+
               <p className="text-[13px] text-[var(--text)] leading-[1.55]">
                 {cleanDisplayText(
-                  fixture.writtenExplanation.fullSummary || fixture.writtenExplanation.oneLineSummary
+                  syncedFootballExplanation.fullSummary || syncedFootballExplanation.oneLineSummary
                 )}
               </p>
 
-              {fixture.writtenExplanation.alternates &&
-                fixture.writtenExplanation.alternates.length > 0 && (
+              {syncedFootballExplanation.driverTiles &&
+                syncedFootballExplanation.driverTiles.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {syncedFootballExplanation.driverTiles.map((tile) => (
+                      <div
+                        key={tile.label}
+                        className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-2.5"
+                      >
+                        <div className="text-[10.5px] text-[var(--text-3)]">{cleanDisplayText(tile.label)}</div>
+                        <div className="text-[13px] font-bold text-[var(--text)] tabular-nums mt-0.5">
+                          {cleanDisplayText(tile.value)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              {syncedFootballExplanation.alternates &&
+                syncedFootballExplanation.alternates.length > 0 && (
                   <div className="space-y-1.5 pt-2 border-t border-[var(--line)]">
                     <div className="text-[11.5px] font-semibold text-[var(--text-2)]">
                       Next 2 best alternates
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {fixture.writtenExplanation.alternates.slice(0, 2).map((alt) => (
+                      {syncedFootballExplanation.alternates.slice(0, 2).map((alt) => (
                         <div
                           key={alt.marketCode}
                           className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-2.5 flex items-center justify-between gap-2"
@@ -1046,8 +1125,8 @@ export default function MatchAnalysisPage() {
                 predictions={predictions}
                 selectedPredictionId={selectedPrediction?.id}
                 onSelectPrediction={(p) => setSelectedPrediction(p)}
-                homeTeamName={fixture.homeTeam.name}
-                awayTeamName={fixture.awayTeam.name}
+                homeTeamName={homeName}
+                awayTeamName={awayName}
               />
             </div>
 
@@ -1094,8 +1173,8 @@ export default function MatchAnalysisPage() {
         ) : (
           <div className="space-y-3">
             <ScorelineMatrix
-              homeTeamName={fixture.homeTeam.name}
-              awayTeamName={fixture.awayTeam.name}
+              homeTeamName={homeName}
+              awayTeamName={awayName}
               homeXg={stats.homeXg}
               awayXg={stats.awayXg}
             />
@@ -1112,8 +1191,8 @@ export default function MatchAnalysisPage() {
       {/* TAB 4: Form (with Coaches & Weather switcher inside QuantitativeFactorsAuditPanel) */}
       {activeAnalysisTab === 'form' && (
         <QuantitativeFactorsAuditPanel
-          homeTeamName={fixture.homeTeam.name}
-          awayTeamName={fixture.awayTeam.name}
+          homeTeamName={homeName}
+          awayTeamName={awayName}
           venueName={fixture.venue}
           kickoffTime={fixture.kickoffTime}
           topPickOdds={topPick?.marketOdds || 1.95}

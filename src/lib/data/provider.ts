@@ -803,10 +803,14 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     const homeStats = matchesStore.getTeamStatsSync(fixture.homeTeam, fixture.kickoffTime, compCode);
     const awayStats = matchesStore.getTeamStatsSync(fixture.awayTeam, fixture.kickoffTime, compCode);
 
+    const canonicalHomeName = displayName(fixture.homeTeam) || fixture.homeTeam.shortName || fixture.homeTeam.name;
+    const canonicalAwayName = displayName(fixture.awayTeam) || fixture.awayTeam.shortName || fixture.awayTeam.name;
+
     const enrichedHome: Team = {
       ...fixture.homeTeam,
       id: homeStats.teamId || fixture.homeTeam.id,
-      shortName: displayName(fixture.homeTeam) || fixture.homeTeam.shortName,
+      name: canonicalHomeName,
+      shortName: canonicalHomeName,
       storedMatchCount: homeStats.storedMatchCount,
       lastMatchDate: homeStats.lastMatchDate,
       daysSinceLastMatch: homeStats.daysSinceLastMatch,
@@ -823,7 +827,8 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     const enrichedAway: Team = {
       ...fixture.awayTeam,
       id: awayStats.teamId || fixture.awayTeam.id,
-      shortName: displayName(fixture.awayTeam) || fixture.awayTeam.shortName,
+      name: canonicalAwayName,
+      shortName: canonicalAwayName,
       storedMatchCount: awayStats.storedMatchCount,
       lastMatchDate: awayStats.lastMatchDate,
       daysSinceLastMatch: awayStats.daysSinceLastMatch,

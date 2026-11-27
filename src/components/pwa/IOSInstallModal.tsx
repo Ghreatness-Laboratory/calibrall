@@ -1,20 +1,28 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { useInstallPrompt } from './InstallPromptProvider';
 import { Share, PlusSquare, X } from 'lucide-react';
 
 export default function IOSInstallModal() {
   const { showIOSSheet, setShowIOSSheet } = useInstallPrompt();
+  const [mounted, setMounted] = useState(false);
 
-  if (!showIOSSheet) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  return (
+  if (!mounted || !showIOSSheet) return null;
+
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label="Add Calibrall to Home Screen"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
+      style={{ zIndex: 120 }}
       onClick={() => setShowIOSSheet(false)}
     >
       <div
@@ -97,6 +105,7 @@ export default function IOSInstallModal() {
           Got it
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

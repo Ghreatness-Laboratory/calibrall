@@ -1351,6 +1351,13 @@ for (const [id, team] of Object.entries(EXPANDED_CANONICAL_TEAMS)) {
 }
 
 for (const rec of Object.values(TEAM_STRENGTH_DATABASE)) {
+  const aliasedPrimaryId = CANONICAL_ID_ALIASES[rec.id];
+  if (aliasedPrimaryId && CANONICAL_TEAMS[aliasedPrimaryId]) {
+    const target = CANONICAL_TEAMS[aliasedPrimaryId];
+    const mergedAliases = new Set([...(target.aliases || []), ...(rec.aliases || []), rec.id]);
+    target.aliases = Array.from(mergedAliases);
+    continue;
+  }
   if (!CANONICAL_TEAMS[rec.id]) {
     const fdOrgMatch = (rec.crestUrl || '').match(/crests\.football-data\.org\/(\d+)\.png/i);
     CANONICAL_TEAMS[rec.id] = {

@@ -431,6 +431,7 @@ export function getMarketBaseline(
     if (l <= 8.5) cOver = 0.68;
     else if (l <= 9.5) cOver = comp.cornersO95Rate;
     else if (l <= 10.5) cOver = 0.42;
+    else if (l <= 11.5) cOver = 0.32;
 
     let tOver = cOver;
     if (teamStats?.homeTeamHomeCornersAvg && teamStats?.awayTeamAwayCornersAvg) {
@@ -443,14 +444,15 @@ export function getMarketBaseline(
     teamRate = isOver ? Number(tOver.toFixed(3)) : Number((1 - tOver).toFixed(3));
   }
 
-  // 9. Bookings
+  // 9. Cards
   else if (marketCode.includes('CARD') || marketCode.includes('BOOKING')) {
     marketFamily = 'bookings';
     const isOver = marketCode.includes('_O');
     const l = line ?? 4.5;
 
     let cOver = comp.cardsO45Rate;
-    if (l <= 3.5) cOver = 0.65;
+    if (l <= 2.5) cOver = 0.78;
+    else if (l <= 3.5) cOver = 0.65;
     else if (l <= 4.5) cOver = comp.cardsO45Rate;
     else if (l <= 5.5) cOver = 0.28;
 

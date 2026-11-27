@@ -41,6 +41,8 @@ import {
   isSubstituteOnly
 } from './marketCatalog';
 import { displayName } from '@/lib/utils/formatText';
+import { compareFootballPicksByRank, computeFootballPickRankScore } from './explanationValidator';
+export { compareFootballPicksByRank, computeFootballPickRankScore };
 import { 
   getMarketBaseline, 
   MarketFamily, 
@@ -1228,7 +1230,7 @@ export function evaluateFixtureMarkets(
           optionType: 'bookings',
           marketCategory: 'bookings',
           marketName: meta.title,
-          selection: `Over ${line} Bookings`,
+          selection: `Over ${line} cards`,
           line,
           period: 'REGULAR_TIME',
           settlementRule: meta.settlementRule,
@@ -1249,7 +1251,7 @@ export function evaluateFixtureMarkets(
         optionType: 'bookings',
         marketCategory: 'bookings',
         marketName: meta.title,
-        selection: 'Under 4.5 Bookings',
+        selection: 'Under 4.5 cards',
         line: 4.5,
         period: 'REGULAR_TIME',
         settlementRule: meta.settlementRule,
@@ -1262,14 +1264,14 @@ export function evaluateFixtureMarkets(
       });
     }
 
-    // Team bookings
+    // Team cards
     if (cardDist.team.home[1.5]) {
       rawCandidates.push({
         marketCode: 'TEAM_CARDS_HOME_O15',
         optionType: 'team_bookings',
         marketCategory: 'bookings',
         marketName: `${context.homeTeamName} Cards`,
-        selection: `${context.homeTeamName} Over 1.5 Cards`,
+        selection: `${context.homeTeamName} Over 1.5 cards`,
         line: 1.5,
         period: 'REGULAR_TIME',
         settlementRule: 'Regular time yellow/red cards shown to home team.',
@@ -1287,14 +1289,14 @@ export function evaluateFixtureMarkets(
         optionType: 'team_bookings',
         marketCategory: 'bookings',
         marketName: `${context.awayTeamName} Cards`,
-        selection: `${context.awayTeamName} Over 1.5 Cards`,
+        selection: `${context.awayTeamName} Over 1.5 cards`,
         line: 1.5,
         period: 'REGULAR_TIME',
         settlementRule: 'Regular time yellow/red cards shown to away team.',
         modelProbability: cardDist.team.away[1.5].over,
         confidence: baseConfidence,
         requiresDisciplinaryData: true,
-        plainEnglishReason: `${context.awayTeamName} away discipline index projects ${(cardDist.team.away[1.5].over * 100).toFixed(0)}% chance of 2+ bookings.`,
+        plainEnglishReason: `${context.awayTeamName} away discipline index projects ${(cardDist.team.away[1.5].over * 100).toFixed(0)}% chance of 2+ cards.`,
         dataPoints: [{ metricName: 'Away Exp Cards', value: (effectiveCards * 0.52).toFixed(1) }]
       });
     }
@@ -2039,13 +2041,7 @@ export function selectDiversifiedSlatePicks<T extends SlatePickCandidate>(
   const getFamily = (p: MarketPrediction): MarketFamily =>
     (p.marketFamily as MarketFamily) || getMarketFamily(p.optionType, p.marketCode, p.marketCategory);
 
-  const pickStrength = (p: MarketPrediction): number => {
-    const hasOddsEv = Boolean(p.marketOdds && p.expectedValue !== null && p.expectedValue !== undefined && p.expectedValue > 0);
-    if (hasOddsEv) {
-      return 1000 + (p.expectedValue ?? 0) * 1000 + (p.edgeOverBaseline ?? 0) * 10;
-    }
-    return (p.edgeOverBaseline ?? 0) * 100 + (p.calibratedProbability ?? p.modelProbability);
-  };
+  const pickStrength = (p: MarketPrediction): number => computeFootballPickRankScore(p);
 
   const isEligibleAlternative = (p: MarketPrediction): boolean => {
     if (!p.isValidated || p.sanityTripwire) return false;
@@ -2102,15 +2098,21 @@ export function selectDiversifiedSlatePicks<T extends SlatePickCandidate>(
           const altFam = getFamily(p);
           return (counts.get(altFam) || 0) < cap;
         })
-        .sort((a, b) => pickStrength(b) - pickStrength(a));
+        .sort(compareFootballPicksByRank);
 
       if (alternatives.length > 0) {
         const chosen = alternatives[0];
+        const diversityReason = `Promoted by the ${Math.round(maxFamilyShare * 100)}% slate market diversity cap so no single market family dominates today's recommendations.`;
         holder.predictions = holder.predictions.map(p => ({
           ...p,
           isTopPick: p.marketCode === chosen.marketCode,
+          ...(p.marketCode === chosen.marketCode ? { headlineSelectionReason: diversityReason } : {}),
         }));
-        holder.topPick = holder.predictions.find(p => p.marketCode === chosen.marketCode) || chosen;
+        holder.topPick = holder.predictions.find(p => p.marketCode === chosen.marketCode) || {
+          ...chosen,
+          isTopPick: true,
+          headlineSelectionReason: diversityReason,
+        };
         swapped = true;
         break;
       }

@@ -279,6 +279,13 @@ export interface WrittenMatchExplanation {
   alternates: WrittenMatchAlternate[];
   driverTiles?: ExplanationDriverTile[];
   headlineSelectionReason?: string;
+  activePickMarketCode?: string;
+  activePickSelection?: string;
+  activePickProbability?: number;
+  activePickTier?: ConfidenceTier;
+  validationPassed?: boolean;
+  validationIssues?: string[];
+  fallbackApplied?: boolean;
   generatedAt: string;
   confidenceTier?: ConfidenceTier;
   confidenceReason?: string;
@@ -390,6 +397,8 @@ export interface Fixture {
   awayShotsOnTarget?: number | null;
   venue?: string;
   referee?: string;
+  homeLineup?: LineupPlayer[];
+  awayLineup?: LineupPlayer[];
   dataFreshness: string;
   isDemo?: boolean;
   sport?: Sport;

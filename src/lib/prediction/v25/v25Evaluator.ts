@@ -24,6 +24,7 @@ import { isMultiGoalsEnabled } from './featureFlags';
 import { getMarketBaseline } from '../baselines';
 import { marketMonitor, getEquivalentCanonicalKey } from '../marketMonitor';
 import { getMarketFamily } from '../marketSelection';
+import { compareFootballPicksByRank } from '../explanationValidator';
 import { calculateFragilityScore } from '../fragilityAndSubstitutes';
 import { getCalibratedParams, getLeagueCalibratedConfig, getLeagueCapabilities } from '../calibratedParams';
 import { checkMarketGating } from '../marketGating';
@@ -711,7 +712,7 @@ export class DixonColesV25Evaluator {
           ? 'High Confidence Projection'
           : confAssessment.confidenceTier === 'MEDIUM'
           ? 'Medium Confidence Projection'
-          : 'Low Confidence / Speculative',
+          : 'Low Confidence Projection',
         dataQualityScore: predCompleteness,
         dataCompletenessScore: predCompleteness,
         isProbabilityBasedAnalysis: !cand.marketOdds,
@@ -935,20 +936,9 @@ export class DixonColesV25Evaluator {
       }
     }
 
-    // 8. Rank surviving picks: real-odds +EV picks rank strictly first by EV descending; unpriced picks rank by edgeOverBaseline descending
-    const eligibleTopPicks = [...ladderWinners.values(), ...nonLadderEligible].sort((a, b) => {
-      const aHasOdds = Boolean(a.marketOdds && a.expectedValue !== null && a.expectedValue !== undefined && a.expectedValue > 0);
-      const bHasOdds = Boolean(b.marketOdds && b.expectedValue !== null && b.expectedValue !== undefined && b.expectedValue > 0);
-      if (aHasOdds && !bHasOdds) return -1;
-      if (!aHasOdds && bHasOdds) return 1;
-      if (aHasOdds && bHasOdds) {
-        const evDiff = (b.expectedValue ?? 0) - (a.expectedValue ?? 0);
-        if (Math.abs(evDiff) > 1e-6) return evDiff;
-      }
-      const edgeDiff = (b.edgeOverBaseline ?? 0) - (a.edgeOverBaseline ?? 0);
-      if (Math.abs(edgeDiff) > 1e-6) return edgeDiff;
-      return b.rankingScore - a.rankingScore;
-    });
+    // 8. Rank surviving picks using the unified comparator shared with alternates & slate diversity:
+    // qualified real-odds +EV picks rank first by EV descending; unpriced picks rank by calibratedProbability descending.
+    const eligibleTopPicks = [...ladderWinners.values(), ...nonLadderEligible].sort(compareFootballPicksByRank);
 
     // Zero rankingScore on non-eligible or defeated ladder rungs, then assign strictly ordered rankingScore to eligible winners
     processed.forEach(p => { p.rankingScore = 0; });
@@ -963,6 +953,13 @@ export class DixonColesV25Evaluator {
     if (eligibleTopPicks.length > 0) {
       topPick = eligibleTopPicks[0];
       topPick.isTopPick = true;
+      const topProb = topPick.calibratedProbability ?? topPick.modelProbability;
+      const higherProbAlt = eligibleTopPicks.slice(1).find(
+        (alt) => (alt.calibratedProbability ?? alt.modelProbability) > topProb + 0.0025
+      );
+      if (higherProbAlt && topPick.marketOdds && (topPick.expectedValue ?? 0) > 0) {
+        topPick.headlineSelectionReason = `Selected ahead of higher probability alternates because verified bookmaker odds (${topPick.marketOdds.toFixed(2)}) yield +${((topPick.expectedValue ?? 0) * 100).toFixed(1)}% expected value.`;
+      }
 
       const fam = getMarketFamily(topPick.optionType, topPick.marketCode, topPick.marketCategory);
       marketMonitor.recordRecommendation(
@@ -1332,7 +1329,7 @@ export class DixonColesV25Evaluator {
       });
     }
 
-    // 8. Bookings / Disciplinary Cards (Negative Binomial across [2.5, 3.5, 4.5, 5.5])
+    // 8. Total & Disciplinary Cards (Negative Binomial across [2.5, 3.5, 4.5, 5.5])
     if (cap.hasCards && features.discipline.expectedTotalBookings > 0) {
       const cards = DixonColesV25Engine.calculateCards(features);
       const refReason = features.discipline.refereeExplanation;
@@ -1345,26 +1342,26 @@ export class DixonColesV25Evaluator {
             optionType: 'bookings',
             marketCategory: 'bookings',
             marketName: `Total Cards Over ${kLine}`,
-            selection: `Over ${kLine} bookings`,
+            selection: `Over ${kLine} cards`,
             line: kLine,
             period: 'REGULAR_TIME',
-            settlementRule: `Yellow card = 1, Red card = 2. Total bookings > ${kLine}.`,
+            settlementRule: `Yellow card = 1, Red card = 2. Total cards > ${kLine}.`,
             rawProb: dist.over,
             marketOdds: kLine === 4.5 ? odds.over45Cards : undefined,
-            plainEnglishReason: `Negative Binomial bookings model expects ${cards.expectedCards.toFixed(2)} cards. ${refReason}`,
+            plainEnglishReason: `Negative Binomial cards model expects ${cards.expectedCards.toFixed(2)} cards. ${refReason}`,
           });
           list.push({
             marketCode: `CARDS_U${codeSuf}`,
             optionType: 'bookings',
             marketCategory: 'bookings',
             marketName: `Total Cards Under ${kLine}`,
-            selection: `Under ${kLine} bookings`,
+            selection: `Under ${kLine} cards`,
             line: kLine,
             period: 'REGULAR_TIME',
-            settlementRule: `Yellow card = 1, Red card = 2. Total bookings < ${kLine}.`,
+            settlementRule: `Yellow card = 1, Red card = 2. Total cards < ${kLine}.`,
             rawProb: dist.under,
             marketOdds: kLine === 4.5 ? odds.under45Cards : undefined,
-            plainEnglishReason: `Negative Binomial bookings model expects ${cards.expectedCards.toFixed(2)} cards. ${refReason}`,
+            plainEnglishReason: `Negative Binomial cards model expects ${cards.expectedCards.toFixed(2)} cards. ${refReason}`,
           });
         }
       });

@@ -157,11 +157,11 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
   },
   bookings: {
     type: 'bookings',
-    title: 'Bookings & Cards (Total & Team)',
+    title: 'Cards (Total & Team)',
     category: 'bookings',
     period: 'REGULAR_TIME',
-    description: 'Total bookings over/under and team bookings. Uses dedicated disciplinary model incorporating referee card averages, derby tension factor, and team historical cards. Requires verified card data, else abstains.',
-    defaultSelections: ['Total Bookings Over', 'Total Bookings Under', 'Team Cards Over'],
+    description: 'Total cards over/under and team cards. Uses dedicated disciplinary model incorporating referee card averages, derby tension factor, and team historical cards. Requires verified card data, else abstains.',
+    defaultSelections: ['Total Cards Over', 'Total Cards Under', 'Team Cards Over'],
     supportedLines: [3.5, 4.5, 5.5, 2.5],
     settlementRule: 'Regular time only. Yellow card = 1 card; direct red = 2 cards; yellow-to-red = 2 cards (max 3 cards per player). Cards to coaching staff or bench do not count.',
     dataRequirements: {
@@ -367,10 +367,10 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
   },
   team_bookings: {
     type: 'team_bookings',
-    title: 'Team Bookings',
+    title: 'Team Cards',
     category: 'bookings',
     period: 'REGULAR_TIME',
-    description: 'Over/under disciplinary bookings on specific teams.',
+    description: 'Over/under disciplinary cards on specific teams.',
     defaultSelections: ['Home Over 1.5 Cards', 'Away Over 1.5 Cards'],
     supportedLines: [1.5, 2.5],
     settlementRule: 'Regular time cards shown to active players on pitch.',
@@ -611,7 +611,7 @@ export function getOptionTypeLabel(type: SupportedOptionType | string): string {
     case 'corners':
       return 'Corners';
     case 'bookings':
-      return 'Bookings';
+      return 'Cards';
     case 'highest_scoring_half':
       return 'Highest scoring half';
     case 'first_half_goals':
@@ -631,9 +631,9 @@ export function getOptionTypeLabel(type: SupportedOptionType | string): string {
     case 'corner_handicap':
       return 'Corner handicap';
     case 'team_bookings':
-      return 'Team bookings';
+      return 'Team cards';
     case 'booking_points':
-      return 'Booking points';
+      return 'Card points';
     case 'win_draw_combo':
       return 'Win & goal combos';
     case 'multi_goals':
@@ -785,14 +785,14 @@ export function formatSelectionName(name: string): string {
     cleaned = 'BTTS: no';
   }
 
-  // Total lines: lowercase "goals", "corners", "bookings"
+  // Total lines: lowercase "goals", "corners", "cards"
   cleaned = cleaned
     .replace(/Over ([0-9.]+) Goals/gi, 'Over $1 goals')
     .replace(/Under ([0-9.]+) Goals/gi, 'Under $1 goals')
     .replace(/Over ([0-9.]+) Corners/gi, 'Over $1 corners')
     .replace(/Under ([0-9.]+) Corners/gi, 'Under $1 corners')
-    .replace(/Over ([0-9.]+) Bookings/gi, 'Over $1 bookings')
-    .replace(/Under ([0-9.]+) Bookings/gi, 'Under $1 bookings')
+    .replace(/Over ([0-9.]+) (?:Bookings|Cards)/gi, 'Over $1 cards')
+    .replace(/Under ([0-9.]+) (?:Bookings|Cards)/gi, 'Under $1 cards')
     .replace(/Highest Scoring Half: 2nd Half/gi, 'Highest scoring half: 2nd half')
     .replace(/Highest Scoring Half: 1st Half/gi, 'Highest scoring half: 1st half')
     .replace(/1st Half Over ([0-9.]+) Goals/gi, '1st half over $1 goals')

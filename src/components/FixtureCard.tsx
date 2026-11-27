@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Fixture, MarketPrediction } from '@/types';
+import { Fixture, MarketPrediction, WrittenMatchExplanation } from '@/types';
 import { Bookmark, ChevronRight, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
 import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/storage/userStorage';
 import TeamCrest from '@/components/TeamCrest';
@@ -11,12 +11,14 @@ import { getFixtureLineupState } from '@/lib/data/lineupsService';
 import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText, displayName, formatMatchTime } from '@/lib/utils/formatText';
 import { settleMarketPrediction, extractMatchStats } from '@/lib/prediction/settlementEngine';
+import { getMarketEvidenceFamily } from '@/lib/prediction/explanationValidator';
 import WhyThisPickSheet from '@/components/WhyThisPickSheet';
 
 interface Props {
   fixture: Fixture;
   topPrediction?: MarketPrediction | null;
   noRecommendationReason?: string;
+  writtenExplanation?: WrittenMatchExplanation;
   isSavedInitial?: boolean;
 }
 
@@ -38,8 +40,10 @@ export default function FixtureCard({
   fixture,
   topPrediction,
   noRecommendationReason,
+  writtenExplanation,
   isSavedInitial,
 }: Props) {
+  const activeExplanation = writtenExplanation || fixture.writtenExplanation;
   const [isSaved, setIsSaved] = useState<boolean>(isSavedInitial ?? false);
   const [expandedRationale, setExpandedRationale] = useState<boolean>(false);
   const [whySheetOpen, setWhySheetOpen] = useState<boolean>(false);
@@ -146,7 +150,10 @@ export default function FixtureCard({
   );
 
   const refBaselineText = useMemo(() => {
-    const ref = topPrediction?.evidence?.referee;
+    if (!topPrediction || getMarketEvidenceFamily(topPrediction, 'football') !== 'cards') {
+      return null;
+    }
+    const ref = topPrediction.evidence?.referee;
     if (!ref) return null;
     const hasPositiveBaseline = typeof ref.leagueBaseline === 'number' && ref.leagueBaseline > 0;
     if (ref.announced && ref.name) {
@@ -154,7 +161,7 @@ export default function FixtureCard({
         ref.shrunkCardsPerMatch !== undefined ? `${ref.shrunkCardsPerMatch.toFixed(2)} cards/m` : null;
       const basePart = hasPositiveBaseline ? `vs ${ref.leagueBaseline!.toFixed(2)} baseline` : null;
       const detail = [ratePart, basePart].filter(Boolean).join(' ');
-      return detail ? `${ref.name} (${detail})` : ref.name;
+      return detail ? `${cleanDisplayText(ref.name)} (${detail})` : cleanDisplayText(ref.name);
     }
     if (hasPositiveBaseline) {
       return `Referee unannounced · ${ref.leagueBaseline!.toFixed(2)} league avg`;
@@ -377,10 +384,10 @@ export default function FixtureCard({
           )}
 
           {/* Written 1-line explanation + Why this pick sheet */}
-          {fixture.writtenExplanation?.oneLineSummary ? (
+          {activeExplanation?.oneLineSummary ? (
             <div className="pt-2 border-t border-[var(--line)] space-y-1">
               <p className="text-[12.5px] leading-[1.5] text-[var(--text-2)]">
-                {cleanDisplayText(fixture.writtenExplanation.oneLineSummary)}
+                {cleanDisplayText(activeExplanation.oneLineSummary)}
               </p>
               <button
                 type="button"
@@ -417,13 +424,13 @@ export default function FixtureCard({
           </div>
           <p className="text-[12.5px] leading-[1.5] text-[var(--text-2)]">
             {cleanDisplayText(
-              fixture.writtenExplanation?.oneLineSummary ||
+              activeExplanation?.oneLineSummary ||
                 (noRecommendationReason && noRecommendationReason !== 'Not enough data'
                   ? noRecommendationReason
                   : `${homeName} and ${awayName} lack qualifying predictive edge above the 70.0% calibration threshold.`)
             )}
           </p>
-          {fixture.writtenExplanation && (
+          {activeExplanation && (
             <button
               type="button"
               onClick={() => setWhySheetOpen(true)}
@@ -448,8 +455,8 @@ export default function FixtureCard({
         open={whySheetOpen}
         onClose={() => setWhySheetOpen(false)}
         matchTitle={`${homeName} vs ${awayName}`}
-        pickLabel={topPrediction ? formatSelectionName(topPrediction.selection) : undefined}
-        explanation={fixture.writtenExplanation}
+        pickLabel={topPrediction ? cleanDisplayText(formatSelectionName(topPrediction.selection)) : undefined}
+        explanation={activeExplanation}
       />
     </article>
   );

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
 import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
+import { syncSlateExplanations } from '@/lib/prediction/explanationGenerator';
 import { MarketPrediction, Team } from '@/types';
 import CompetitionFilter from '@/components/CompetitionFilter';
 import {
@@ -189,9 +190,10 @@ export default function PredictionsPage() {
       const derbyInfo =
         fixture.isDerby && fixture.derbyName
           ? { name: fixture.derbyName }
-          : checkDerby(fixture.homeTeam.name, fixture.awayTeam.name);
+          : checkDerby(displayName(fixture.homeTeam), displayName(fixture.awayTeam));
 
-      const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
+      const context = buildFixtureContextFromStats(fixture, stats);
+      const evalResult = evaluateFixtureMarkets(context);
 
       footballEvaluations.push({
         fixtureId: fixture.id,
@@ -647,7 +649,7 @@ export default function PredictionsPage() {
               <option value="ALL">All</option>
               <option value="HIGH">High (≥70%)</option>
               <option value="MEDIUM">Medium</option>
-              <option value="LOW">{isBasketball ? 'Speculative' : 'Low'}</option>
+              <option value="LOW">Low</option>
             </select>
           </div>
         </div>

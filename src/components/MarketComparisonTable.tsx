@@ -350,12 +350,12 @@ export default function MarketComparisonTable({
     },
     {
       key: 'low' as const,
-      title: 'Low / Speculative',
+      title: 'Low confidence',
       description: 'Higher variance, longshots, or active risk flags',
       dotColor: 'bg-[var(--muted)]',
       titleColor: 'text-[var(--text)]',
       items: tierGroups.low,
-      emptyText: 'No speculative or low confidence lines.',
+      emptyText: 'No low confidence lines.',
     },
   ];
 
@@ -771,7 +771,7 @@ export default function MarketComparisonTable({
                       : 'bg-[var(--surface)] text-[var(--text-2)] border-[var(--line)]'
                   }`}
                 >
-                  {cat === 'ALL' ? 'All' : cleanDisplayText(cat)}
+                  {cat === 'ALL' ? 'All' : cat === 'bookings' ? 'Cards' : cleanDisplayText(cat)}
                 </button>
               ))}
             </div>

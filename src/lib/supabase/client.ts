@@ -738,7 +738,22 @@ export function getLocalDatabase(): any {
           started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
           completed_at TEXT
         );
+        CREATE TABLE IF NOT EXISTS explanation_issues (
+          id TEXT PRIMARY KEY,
+          sport TEXT NOT NULL DEFAULT 'football',
+          fixture_id TEXT NOT NULL,
+          match_title TEXT NOT NULL,
+          market_code TEXT,
+          selection TEXT,
+          issue_code TEXT NOT NULL,
+          issue_detail TEXT NOT NULL,
+          severity TEXT NOT NULL DEFAULT 'error',
+          fallback_applied INTEGER NOT NULL DEFAULT 0,
+          detected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
       `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_explanation_issues_detected ON explanation_issues(detected_at DESC);'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_explanation_issues_fixture ON explanation_issues(fixture_id);'); } catch (_) {}
 
       // Ensure columns exist on older tables
       try { db.exec('ALTER TABLE profiles ADD COLUMN pending_tier TEXT;'); } catch (_) {}

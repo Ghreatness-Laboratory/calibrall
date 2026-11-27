@@ -6,9 +6,11 @@ import {
   persistOrLoadImmutableFootballExplanation,
   loadFootballPickModerationMap,
 } from '@/lib/prediction/footballPickPersistence';
+import { syncSlateExplanations } from '@/lib/prediction/explanationGenerator';
 import { getBasketballFixturesAndEvaluations } from '@/lib/basketball/readService';
 import { resolveTierFromSession, redactExplanationForTier } from '@/lib/auth/tierAccess';
 import { requireApiUser } from '@/lib/supabase/serverAuth';
+import { displayName } from '@/lib/utils/formatText';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -39,7 +41,7 @@ export async function GET(request: Request) {
       .map((item, idx) => ({
         fixtureId: item.fixture.id,
         league: item.evaluation.league,
-        match: `${item.fixture.homeTeam.name} vs ${item.fixture.awayTeam.name}`,
+        match: `${displayName(item.fixture.homeTeam)} vs ${displayName(item.fixture.awayTeam)}`,
         competition: item.fixture.competition.name,
         kickoff: item.fixture.kickoffTime,
         topPick: item.evaluation.topPick,
@@ -109,6 +111,7 @@ export async function GET(request: Request) {
       return {
         fixtureId: fixture.id,
         fixture,
+        context,
         topPick: evalResult.topPick,
         predictions: evalResult.predictions,
         noRecommendationReason: evalResult.noRecommendationReason,
@@ -116,12 +119,12 @@ export async function GET(request: Request) {
       };
     });
 
-  const diversified = selectDiversifiedSlatePicks(evaluated, 0.40);
+  const diversified = syncSlateExplanations(selectDiversifiedSlatePicks(evaluated, 0.40));
   const qualified = diversified
     .filter(item => item.topPick !== null)
     .map((item, idx) => ({
       fixtureId: item.fixture.id,
-      match: `${item.fixture.homeTeam.name} vs ${item.fixture.awayTeam.name}`,
+      match: `${displayName(item.fixture.homeTeam)} vs ${displayName(item.fixture.awayTeam)}`,
       competition: item.fixture.competition.name,
       kickoff: item.fixture.kickoffTime,
       topPick: item.topPick,
