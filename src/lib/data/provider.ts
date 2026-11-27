@@ -879,7 +879,11 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       const storedExpl = loadStoredFootballExplanation(updatedFixture.id, {
         requireCurrentVersion: isPreKickoff,
       });
-      if (storedExpl) {
+      const isStaleThinHistory =
+        isPreKickoff &&
+        storedExpl?.reasoning?.status === 'thin_history' &&
+        !stats.insufficientData;
+      if (storedExpl && !isStaleThinHistory) {
         updatedFixture.writtenExplanation = storedExpl;
       } else {
         const ctx = buildFixtureContextFromStats(updatedFixture, stats);

@@ -522,7 +522,13 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
       let matchAddedLeg = false;
 
       for (const pick of poolPicks) {
-        if (pick.abstainReason || pick.sanityTripwire) continue;
+        if (pick.abstainReason || pick.sanityTripwire || pick.isSpeculative) continue;
+        if (
+          pick.marketCategory === 'multi_goals' &&
+          (!pick.isValidated || (pick.rankingScore ?? 0) <= 0)
+        ) {
+          continue;
+        }
         if (
           pick.qualificationStatus === 'NO_RECOMMENDATION' ||
           pick.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY' ||
