@@ -27,7 +27,7 @@ import {
   resolveAndVerifyFixtureCompetition,
 } from './canonicalCompetitions';
 import { matchesDayFilter, DayFilterType } from '@/lib/utils/dateWindow';
-import { cleanDisplayText } from '@/lib/utils/formatText';
+import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
 import { isPlaceholderTeamName } from './fixtureIntegrity';
 import {
   NBA_TEAMS_CATALOG,
@@ -198,7 +198,7 @@ export function mapDbRowToFixture(row: any): Fixture | null {
     id: homeCanon?.canonicalId || homeLookup.data?.id || row.home_team_id || `team_${(row.home_team_name || 'home').toLowerCase().replace(/\s+/g, '_')}`,
     providerTeamId: payload?.homeProviderTeamId ? String(payload.homeProviderTeamId) : undefined,
     name: row.home_team_name || homeCanon?.canonicalName || homeLookup.data?.name || 'Home Team',
-    shortName: homeCanon?.shortName || homeLookup.data?.shortName || cleanDisplayText(row.home_team_name || 'Home'),
+    shortName: cleanDisplayText(displayName({ name: homeCanon?.shortName || homeLookup.data?.shortName || row.home_team_name || 'Home' })),
     tla: homeCanon?.tla || homeLookup.data?.tla || (row.home_team_name || 'HOM').slice(0, 3).toUpperCase(),
     crestUrl: payload?.homeCrestUrl || homeCanon?.crestUrl || homeLookup.data?.crestUrl || '',
     attackRating: homeLookup.data?.attackRating,
@@ -213,7 +213,7 @@ export function mapDbRowToFixture(row: any): Fixture | null {
     id: awayCanon?.canonicalId || awayLookup.data?.id || row.away_team_id || `team_${(row.away_team_name || 'away').toLowerCase().replace(/\s+/g, '_')}`,
     providerTeamId: payload?.awayProviderTeamId ? String(payload.awayProviderTeamId) : undefined,
     name: row.away_team_name || awayCanon?.canonicalName || awayLookup.data?.name || 'Away Team',
-    shortName: awayCanon?.shortName || awayLookup.data?.shortName || cleanDisplayText(row.away_team_name || 'Away'),
+    shortName: cleanDisplayText(displayName({ name: awayCanon?.shortName || awayLookup.data?.shortName || row.away_team_name || 'Away' })),
     tla: awayCanon?.tla || awayLookup.data?.tla || (row.away_team_name || 'AWY').slice(0, 3).toUpperCase(),
     crestUrl: payload?.awayCrestUrl || awayCanon?.crestUrl || awayLookup.data?.crestUrl || '',
     attackRating: awayLookup.data?.attackRating,
@@ -235,6 +235,8 @@ export function mapDbRowToFixture(row: any): Fixture | null {
         ? 'Football-Data.org'
         : row.source === 'provider:sportmonks'
         ? 'Sportmonks'
+        : row.source === 'provider:openfootball'
+        ? 'OpenFootball CC0'
         : 'ESPN Live Scoreboard'),
     fetchTime: row.updated_at || new Date().toISOString(),
     source: row.source || 'db:fixtures',

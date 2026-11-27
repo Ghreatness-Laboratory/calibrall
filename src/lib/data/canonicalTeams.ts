@@ -192,12 +192,12 @@ export const CANONICAL_TEAMS: Record<string, CanonicalTeam> = {
   team_nottingham_forest: {
     canonicalId: 'team_nottingham_forest',
     canonicalName: 'Nottingham Forest FC',
-    shortName: 'Nott\'m Forest',
+    shortName: 'Nottingham Forest',
     tla: 'NFO',
     competitionCode: 'PL',
     crestUrl: 'https://crests.football-data.org/351.png',
     venueName: 'The City Ground',
-    aliases: ["nott'm forest", 'nottingham forest', 'nottingham forest fc', 'forest', 'nffc'],
+    aliases: ["nott'm forest", 'nottm forest', 'nottingham forest', 'nottingham forest fc', 'forest', 'nffc'],
     providerIds: { footballDataCoUk: "Nott'm Forest", footballDataOrg: '351', espn: '393', theSportsDb: '133624', elvidge: 'Nottingham Forest' }
   },
   team_southampton: {

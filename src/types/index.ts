@@ -231,6 +231,31 @@ export interface FixtureContext {
   awayRecentGoals?: number[];
   h2hMeetingsCount?: number;
   h2hAvgTotalGoals?: number;
+  h2hCardsMeetingsCount?: number;
+  h2hAvgTotalCards?: number;
+  h2hCornersMeetingsCount?: number;
+  h2hAvgTotalCorners?: number;
+  homeAvgYellowCards?: number | null;
+  homeAvgRedCards?: number | null;
+  homeAvgCardsFor?: number | null;
+  homeAvgCardsAgainst?: number | null;
+  homeCardsWindow?: number;
+  awayAvgYellowCards?: number | null;
+  awayAvgRedCards?: number | null;
+  awayAvgCardsFor?: number | null;
+  awayAvgCardsAgainst?: number | null;
+  awayCardsWindow?: number;
+  homeAvgCornersFor?: number | null;
+  homeAvgCornersAgainst?: number | null;
+  homeCornersWindow?: number;
+  awayAvgCornersFor?: number | null;
+  awayAvgCornersAgainst?: number | null;
+  awayCornersWindow?: number;
+  homeAvgFoulsCommitted?: number | null;
+  homeAvgFoulsDrawn?: number | null;
+  awayAvgFoulsCommitted?: number | null;
+  awayAvgFoulsDrawn?: number | null;
+  foulsSampleCount?: number | null;
   halfTimeSampleCount?: number;
 }
 
@@ -242,11 +267,18 @@ export interface WrittenMatchAlternate {
   confidenceTier?: ConfidenceTier;
 }
 
+export interface ExplanationDriverTile {
+  label: string;
+  value: string;
+}
+
 export interface WrittenMatchExplanation {
   oneLineSummary: string;
   fullSummary: string;
   reasoning: Record<string, any>;
   alternates: WrittenMatchAlternate[];
+  driverTiles?: ExplanationDriverTile[];
+  headlineSelectionReason?: string;
   generatedAt: string;
   confidenceTier?: ConfidenceTier;
   confidenceReason?: string;
@@ -596,6 +628,8 @@ export interface MarketPrediction {
   multiGoalsMeta?: MultiGoalsMeta;
   priceSource?: string;
   writtenExplanation?: WrittenMatchExplanation;
+  driverTiles?: ExplanationDriverTile[];
+  headlineSelectionReason?: string;
 }
 
 export interface PickEvidence {

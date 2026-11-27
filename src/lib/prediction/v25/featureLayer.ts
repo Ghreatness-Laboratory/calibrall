@@ -728,6 +728,25 @@ export class FeatureLayerEngine {
       ? `No referee announced; using league baseline of ${refereeLeagueBaseline.toFixed(2)} cards per fixture.`
       : 'Referee unannounced.';
 
+    const hasMeasuredTeamCards =
+      typeof context.homeAvgCardsFor === 'number' &&
+      typeof context.awayAvgCardsFor === 'number';
+    const teamCardsPerMatch = hasMeasuredTeamCards
+      ? Number((((context.homeAvgCardsFor as number) + (context.awayAvgCardsFor as number)) / 2).toFixed(2))
+      : Number((computedBookings / 2).toFixed(2));
+
+    const hasMeasuredFouls =
+      typeof context.foulsSampleCount === 'number' &&
+      context.foulsSampleCount >= 6 &&
+      typeof context.homeAvgFoulsCommitted === 'number' &&
+      typeof context.awayAvgFoulsCommitted === 'number';
+    const avgTeamFouls = hasMeasuredFouls
+      ? Number((((context.homeAvgFoulsCommitted as number) + (context.awayAvgFoulsCommitted as number)) / 2).toFixed(2))
+      : 0;
+    const avgFoulsPerCard = hasMeasuredFouls && computedBookings > 0
+      ? Number(((avgTeamFouls * 2) / computedBookings).toFixed(2))
+      : 0;
+
     return {
       refereeName,
       refereeAnnounced,
@@ -735,9 +754,9 @@ export class FeatureLayerEngine {
       refereeCardsPerMatch: Number(refereeShrunkRate.toFixed(2)),
       refereeLeagueBaseline: Number(refereeLeagueBaseline.toFixed(2)),
       refereeExplanation,
-      refereeFoulsPerCard: 4.8,
-      teamFoulsPerMatch: 11.8,
-      teamCardsPerMatch: Number((computedBookings / 2).toFixed(2)),
+      refereeFoulsPerCard: avgFoulsPerCard,
+      teamFoulsPerMatch: avgTeamFouls,
+      teamCardsPerMatch,
       derbyCardMultiplier,
       expectedTotalBookings: Number(computedBookings.toFixed(2)),
     };

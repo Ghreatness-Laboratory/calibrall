@@ -22,6 +22,7 @@ import { lookupTeamStrength } from './teamDatabase';
 import { displayName, getTeamAbbreviation } from '../utils/formatText';
 import { supabase, isSupabaseConfigured, isProductionRuntime } from '@/lib/supabase/client';
 import { matchesStore } from './matchesStore';
+import { openFootballService } from './sources/openFootball';
 import {
   CANONICAL_COMPETITIONS,
   getCompetitionsFromDatabase,
@@ -805,6 +806,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     const enrichedHome: Team = {
       ...fixture.homeTeam,
       id: homeStats.teamId || fixture.homeTeam.id,
+      shortName: displayName(fixture.homeTeam) || fixture.homeTeam.shortName,
       storedMatchCount: homeStats.storedMatchCount,
       lastMatchDate: homeStats.lastMatchDate,
       daysSinceLastMatch: homeStats.daysSinceLastMatch,
@@ -821,6 +823,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     const enrichedAway: Team = {
       ...fixture.awayTeam,
       id: awayStats.teamId || fixture.awayTeam.id,
+      shortName: displayName(fixture.awayTeam) || fixture.awayTeam.shortName,
       storedMatchCount: awayStats.storedMatchCount,
       lastMatchDate: awayStats.lastMatchDate,
       daysSinceLastMatch: awayStats.daysSinceLastMatch,
@@ -865,7 +868,12 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     }
 
     try {
-      const storedExpl = loadStoredFootballExplanation(updatedFixture.id);
+      const isUpcoming = updatedFixture.status === 'TIMED' || updatedFixture.status === 'SCHEDULED';
+      const kickoffMs = Date.parse(updatedFixture.kickoffTime);
+      const isPreKickoff = isUpcoming && Number.isFinite(kickoffMs) && kickoffMs > Date.now();
+      const storedExpl = loadStoredFootballExplanation(updatedFixture.id, {
+        requireCurrentVersion: isPreKickoff,
+      });
       if (storedExpl) {
         updatedFixture.writtenExplanation = storedExpl;
       } else {
@@ -1145,6 +1153,19 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         callsUsedLastRun: 0,
         callsToday: 0,
       });
+
+      // 2b. Free public-domain fallback (OpenFootball CC0 2026-27) when primary feeds yield 0 fixtures
+      if (ingestedFixtures.length === 0) {
+        const ofFixtures = await openFootballService.fetchUpcomingFixturesFallback({
+          dateFrom,
+          dateTo,
+          fetchTime,
+        });
+        if (ofFixtures.length > 0) {
+          ingestedFixtures.push(...ofFixtures);
+          providerNameUsed = 'OpenFootball CC0';
+        }
+      }
 
       // 3. Validate Integrity, Persist Fixtures to `fixtures`, and Persist Finished Results to `matches`
       if (ingestedFixtures.length > 0) {

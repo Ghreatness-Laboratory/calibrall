@@ -198,6 +198,17 @@ export interface DbTeamStatsSummary {
   avgGoalsConceded: number;
   recentMatchTotals: number[];
   recentTeamGoals: number[];
+  avgYellowCards: number | null;
+  avgRedCards: number | null;
+  avgCardsFor: number | null;
+  avgCardsAgainst: number | null;
+  cardsWindowCount: number;
+  avgCornersFor: number | null;
+  avgCornersAgainst: number | null;
+  cornersWindowCount: number;
+  avgFoulsCommitted: number | null;
+  avgFoulsDrawn: number | null;
+  foulsWindowCount: number;
 }
 
 export interface ShrunkRefereeProfile {
@@ -1613,7 +1624,7 @@ class MatchesStore {
     if (storedMatchCount === 0) {
       const emptyResult: DbTeamStatsSummary = {
         teamId: canonicalId,
-        teamName,
+        teamName: displayName({ name: teamName }) || teamName,
         competitionCode: inferredCompCode,
         storedMatchCount: 0,
         lastMatchDate: null,
@@ -1642,6 +1653,17 @@ class MatchesStore {
         avgGoalsConceded: 0,
         recentMatchTotals: [],
         recentTeamGoals: [],
+        avgYellowCards: null,
+        avgRedCards: null,
+        avgCardsFor: null,
+        avgCardsAgainst: null,
+        cardsWindowCount: 0,
+        avgCornersFor: null,
+        avgCornersAgainst: null,
+        cornersWindowCount: 0,
+        avgFoulsCommitted: null,
+        avgFoulsDrawn: null,
+        foulsWindowCount: 0,
       };
       this.teamStatsMemo.set(memoKey, { stats: emptyResult, computedAt: Date.now() });
       return emptyResult;
@@ -1679,10 +1701,75 @@ class MatchesStore {
     const rawAvgScored = recent10Slice.length > 0 ? Number((rawTotalFor / recent10Slice.length).toFixed(2)) : 0;
     const rawAvgConceded = recent10Slice.length > 0 ? Number((rawTotalAg / recent10Slice.length).toFixed(2)) : 0;
 
+    // Unweighted last-10 real per-match averages for cards, corners, and fouls
+    let recentYellowSum = 0;
+    let recentRedSum = 0;
+    let recentCardsForSum = 0;
+    let recentCardsAgSum = 0;
+    let recentCardsCount = 0;
+    for (const m of matchesSorted) {
+      if (recentCardsCount >= 10) break;
+      const hy = m.home_yellow_cards;
+      const ay = m.away_yellow_cards;
+      if (typeof hy === 'number' && typeof ay === 'number' && !isNaN(hy) && !isNaN(ay)) {
+        const isHome = this.matchSideForTeam(m, idVariants, normName) === 'home';
+        const hr = typeof m.home_red_cards === 'number' && !isNaN(m.home_red_cards) ? m.home_red_cards : 0;
+        const ar = typeof m.away_red_cards === 'number' && !isNaN(m.away_red_cards) ? m.away_red_cards : 0;
+        const ty = isHome ? hy : ay;
+        const tr = isHome ? hr : ar;
+        const oy = isHome ? ay : hy;
+        const or = isHome ? ar : hr;
+        recentYellowSum += ty;
+        recentRedSum += tr;
+        recentCardsForSum += ty + tr;
+        recentCardsAgSum += oy + or;
+        recentCardsCount++;
+      }
+    }
+
+    let recentCornersForSum = 0;
+    let recentCornersAgSum = 0;
+    let recentCornersCount = 0;
+    for (const m of matchesSorted) {
+      if (recentCornersCount >= 10) break;
+      const hc = m.home_corners;
+      const ac = m.away_corners;
+      if (typeof hc === 'number' && typeof ac === 'number' && !isNaN(hc) && !isNaN(ac)) {
+        const isHome = this.matchSideForTeam(m, idVariants, normName) === 'home';
+        recentCornersForSum += isHome ? hc : ac;
+        recentCornersAgSum += isHome ? ac : hc;
+        recentCornersCount++;
+      }
+    }
+
+    let recentFoulsForSum = 0;
+    let recentFoulsAgSum = 0;
+    let recentFoulsCount = 0;
+    for (const m of matchesSorted) {
+      if (recentFoulsCount >= 10) break;
+      const hf = m.home_fouls;
+      const af = m.away_fouls;
+      if (typeof hf === 'number' && typeof af === 'number' && !isNaN(hf) && !isNaN(af)) {
+        const isHome = this.matchSideForTeam(m, idVariants, normName) === 'home';
+        recentFoulsForSum += isHome ? hf : af;
+        recentFoulsAgSum += isHome ? af : hf;
+        recentFoulsCount++;
+      }
+    }
+
+    const avgYellowCards = recentCardsCount > 0 ? Number((recentYellowSum / recentCardsCount).toFixed(2)) : null;
+    const avgRedCards = recentCardsCount > 0 ? Number((recentRedSum / recentCardsCount).toFixed(2)) : null;
+    const avgCardsFor = recentCardsCount > 0 ? Number((recentCardsForSum / recentCardsCount).toFixed(2)) : null;
+    const avgCardsAgainst = recentCardsCount > 0 ? Number((recentCardsAgSum / recentCardsCount).toFixed(2)) : null;
+    const avgCornersFor = recentCornersCount > 0 ? Number((recentCornersForSum / recentCornersCount).toFixed(2)) : null;
+    const avgCornersAgainst = recentCornersCount > 0 ? Number((recentCornersAgSum / recentCornersCount).toFixed(2)) : null;
+    const avgFoulsCommitted = recentFoulsCount > 0 ? Number((recentFoulsForSum / recentFoulsCount).toFixed(2)) : null;
+    const avgFoulsDrawn = recentFoulsCount > 0 ? Number((recentFoulsAgSum / recentFoulsCount).toFixed(2)) : null;
+
     if (storedMatchCount < 10) {
       const lowSampleResult: DbTeamStatsSummary = {
         teamId: canonicalId,
-        teamName,
+        teamName: displayName({ name: teamName }) || teamName,
         competitionCode: inferredCompCode,
         storedMatchCount,
         lastMatchDate,
@@ -1701,16 +1788,27 @@ class MatchesStore {
         cornerAttackRating: 1.00,
         cornerForRating: 1.00,
         cornerAgainstRating: 1.00,
-        cornersSampleCount: 0,
+        cornersSampleCount: recentCornersCount,
         disciplineRating: 1.00,
         cardForRating: 1.00,
         cardAgainstRating: 1.00,
-        cardsSampleCount: 0,
+        cardsSampleCount: recentCardsCount,
         recentForm,
         avgGoalsScored: rawAvgScored,
         avgGoalsConceded: rawAvgConceded,
         recentMatchTotals,
         recentTeamGoals,
+        avgYellowCards,
+        avgRedCards,
+        avgCardsFor,
+        avgCardsAgainst,
+        cardsWindowCount: recentCardsCount,
+        avgCornersFor,
+        avgCornersAgainst,
+        cornersWindowCount: recentCornersCount,
+        avgFoulsCommitted,
+        avgFoulsDrawn,
+        foulsWindowCount: recentFoulsCount,
       };
       this.teamStatsMemo.set(memoKey, { stats: lowSampleResult, computedAt: Date.now() });
       return lowSampleResult;
@@ -1870,7 +1968,7 @@ class MatchesStore {
 
     const summaryResult: DbTeamStatsSummary = {
       teamId: canonicalId,
-      teamName,
+      teamName: displayName({ name: teamName }) || teamName,
       competitionCode: inferredCompCode,
       storedMatchCount,
       lastMatchDate,
@@ -1899,9 +1997,42 @@ class MatchesStore {
       avgGoalsConceded: rawAvgConceded,
       recentMatchTotals,
       recentTeamGoals,
+      avgYellowCards,
+      avgRedCards,
+      avgCardsFor,
+      avgCardsAgainst,
+      cardsWindowCount: recentCardsCount,
+      avgCornersFor,
+      avgCornersAgainst,
+      cornersWindowCount: recentCornersCount,
+      avgFoulsCommitted,
+      avgFoulsDrawn,
+      foulsWindowCount: recentFoulsCount,
     };
     this.teamStatsMemo.set(memoKey, { stats: summaryResult, computedAt: Date.now() });
     return summaryResult;
+  }
+
+  hasConfirmedLineupSync(fixtureId: string): boolean {
+    if (typeof window !== 'undefined' || isProductionRuntime() || !fixtureId) return false;
+    try {
+      const db = getLocalDatabase();
+      if (!db) return false;
+      const row = db
+        .prepare(
+          `SELECT home_lineup, away_lineup
+           FROM lineups
+           WHERE fixture_id = ?
+           LIMIT 1`
+        )
+        .get(fixtureId) as { home_lineup?: string | null; away_lineup?: string | null } | undefined;
+      if (!row) return false;
+      const h = (row.home_lineup || '').trim();
+      const a = (row.away_lineup || '').trim();
+      return Boolean(h && a && h !== '[]' && a !== '[]');
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -2275,7 +2406,9 @@ class MatchesStore {
       avgGoalDifference: avgGoalDiff,
       avgTotalGoals,
       avgTotalCorners,
+      cornerMatchesCount,
       avgTotalCards,
+      cardMatchesCount,
       avgTotalShots,
       avgTotalShotsOnTarget,
       bttsHitCount,

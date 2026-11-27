@@ -390,6 +390,31 @@ export interface FixtureStatisticalContext {
   awayRecentGoals?: number[];
   h2hMeetingsCount?: number;
   h2hAvgTotalGoals?: number;
+  h2hCardsMeetingsCount?: number;
+  h2hAvgTotalCards?: number;
+  h2hCornersMeetingsCount?: number;
+  h2hAvgTotalCorners?: number;
+  homeAvgYellowCards?: number | null;
+  homeAvgRedCards?: number | null;
+  homeAvgCardsFor?: number | null;
+  homeAvgCardsAgainst?: number | null;
+  homeCardsWindow?: number;
+  awayAvgYellowCards?: number | null;
+  awayAvgRedCards?: number | null;
+  awayAvgCardsFor?: number | null;
+  awayAvgCardsAgainst?: number | null;
+  awayCardsWindow?: number;
+  homeAvgCornersFor?: number | null;
+  homeAvgCornersAgainst?: number | null;
+  homeCornersWindow?: number;
+  awayAvgCornersFor?: number | null;
+  awayAvgCornersAgainst?: number | null;
+  awayCornersWindow?: number;
+  homeAvgFoulsCommitted?: number | null;
+  homeAvgFoulsDrawn?: number | null;
+  awayAvgFoulsCommitted?: number | null;
+  awayAvgFoulsDrawn?: number | null;
+  foulsSampleCount?: number | null;
 }
 
 import { cleanDisplayText, displayName } from '../utils/formatText';
@@ -560,10 +585,15 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
 
   const sampleMatches = homeStoredCount + awayStoredCount;
 
+  const lineupConfirmed = Boolean(
+    (fixture.homeLineup?.length && fixture.awayLineup?.length) ||
+      matchesStore.hasConfirmedLineupSync(fixture.id)
+  );
+
   // Computed (non-constant) data coverage score
   const sampleCoverage = Math.min(0.78, (sampleMatches / 44) * 0.78);
   const refereeBonus = refProfile.announced ? 0.07 : 0.02;
-  const lineupBonus = fixture.status !== 'POSTPONED' && fixture.status !== 'CANCELED' ? 0.08 : 0.02;
+  const lineupBonus = lineupConfirmed ? 0.08 : 0.02;
   const statusBonus = fixture.status === 'FINISHED' ? 0.05 : 0.01;
   const oddsBonus = fixture.verifiedOdds ? 0.04 : 0.0;
   const dataCoverage = Number(Math.min(0.96, Math.max(0.68, sampleCoverage + refereeBonus + lineupBonus + statusBonus + oddsBonus)).toFixed(2));
@@ -577,6 +607,9 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const stateTags: StateTag[] = [];
   if (isLowSample) {
     stateTags.push('low-sample');
+  }
+  if (!lineupConfirmed) {
+    stateTags.push('lineup-unconfirmed');
   }
   if (derbyInfo.isDerby) {
     stateTags.push('derby');
@@ -592,6 +625,13 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const h2hAvgTotalGoals = h2hMeetingsCount > 0
     ? Number((h2hMeetings.reduce((acc, m) => acc + (m.homeGoals + m.awayGoals), 0) / h2hMeetingsCount).toFixed(2))
     : undefined;
+  const h2hCardsMeetingsCount = h2hResult.cardMatchesCount ?? 0;
+  const h2hAvgTotalCards = h2hResult.avgTotalCards ?? undefined;
+  const h2hCornersMeetingsCount = h2hResult.cornerMatchesCount ?? 0;
+  const h2hAvgTotalCorners = h2hResult.avgTotalCorners ?? undefined;
+  const foulsSampleCount = Math.min(homeDb.foulsWindowCount, awayDb.foulsWindowCount) > 0
+    ? Math.min(homeDb.foulsWindowCount, awayDb.foulsWindowCount)
+    : null;
 
   return {
     homeXg,
@@ -607,7 +647,7 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     hasRealTeamStrength: true,
     insufficientData: false,
     stateTags,
-    lineupConfirmed: fixture.status !== 'POSTPONED' && fixture.status !== 'CANCELED',
+    lineupConfirmed,
     verifiedOdds: fixture.verifiedOdds,
     home1HAttackRating: homeDb.h1AttackRating,
     home1HDefenseRating: homeDb.h1DefenseRating,
@@ -647,6 +687,31 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
     awayRecentGoals: awayDb.recentTeamGoals,
     h2hMeetingsCount,
     h2hAvgTotalGoals,
+    h2hCardsMeetingsCount,
+    h2hAvgTotalCards,
+    h2hCornersMeetingsCount,
+    h2hAvgTotalCorners,
+    homeAvgYellowCards: homeDb.avgYellowCards,
+    homeAvgRedCards: homeDb.avgRedCards,
+    homeAvgCardsFor: homeDb.avgCardsFor,
+    homeAvgCardsAgainst: homeDb.avgCardsAgainst,
+    homeCardsWindow: homeDb.cardsWindowCount,
+    awayAvgYellowCards: awayDb.avgYellowCards,
+    awayAvgRedCards: awayDb.avgRedCards,
+    awayAvgCardsFor: awayDb.avgCardsFor,
+    awayAvgCardsAgainst: awayDb.avgCardsAgainst,
+    awayCardsWindow: awayDb.cardsWindowCount,
+    homeAvgCornersFor: homeDb.avgCornersFor,
+    homeAvgCornersAgainst: homeDb.avgCornersAgainst,
+    homeCornersWindow: homeDb.cornersWindowCount,
+    awayAvgCornersFor: awayDb.avgCornersFor,
+    awayAvgCornersAgainst: awayDb.avgCornersAgainst,
+    awayCornersWindow: awayDb.cornersWindowCount,
+    homeAvgFoulsCommitted: homeDb.avgFoulsCommitted,
+    homeAvgFoulsDrawn: homeDb.avgFoulsDrawn,
+    awayAvgFoulsCommitted: awayDb.avgFoulsCommitted,
+    awayAvgFoulsDrawn: awayDb.avgFoulsDrawn,
+    foulsSampleCount,
   };
 }
 
@@ -656,8 +721,8 @@ export function buildFixtureContextFromStats(
 ): FixtureContext {
   return {
     fixtureId: fixture.id,
-    homeTeamName: fixture.homeTeam.name,
-    awayTeamName: fixture.awayTeam.name,
+    homeTeamName: displayName(fixture.homeTeam) || fixture.homeTeam.name,
+    awayTeamName: displayName(fixture.awayTeam) || fixture.awayTeam.name,
     competitionCode: fixture.competition.code,
     competitionName: fixture.competition.name,
     kickoffTime: fixture.kickoffTime,
@@ -718,6 +783,31 @@ export function buildFixtureContextFromStats(
     awayRecentGoals: stats.awayRecentGoals,
     h2hMeetingsCount: stats.h2hMeetingsCount,
     h2hAvgTotalGoals: stats.h2hAvgTotalGoals,
+    h2hCardsMeetingsCount: stats.h2hCardsMeetingsCount,
+    h2hAvgTotalCards: stats.h2hAvgTotalCards,
+    h2hCornersMeetingsCount: stats.h2hCornersMeetingsCount,
+    h2hAvgTotalCorners: stats.h2hAvgTotalCorners,
+    homeAvgYellowCards: stats.homeAvgYellowCards,
+    homeAvgRedCards: stats.homeAvgRedCards,
+    homeAvgCardsFor: stats.homeAvgCardsFor,
+    homeAvgCardsAgainst: stats.homeAvgCardsAgainst,
+    homeCardsWindow: stats.homeCardsWindow,
+    awayAvgYellowCards: stats.awayAvgYellowCards,
+    awayAvgRedCards: stats.awayAvgRedCards,
+    awayAvgCardsFor: stats.awayAvgCardsFor,
+    awayAvgCardsAgainst: stats.awayAvgCardsAgainst,
+    awayCardsWindow: stats.awayCardsWindow,
+    homeAvgCornersFor: stats.homeAvgCornersFor,
+    homeAvgCornersAgainst: stats.homeAvgCornersAgainst,
+    homeCornersWindow: stats.homeCornersWindow,
+    awayAvgCornersFor: stats.awayAvgCornersFor,
+    awayAvgCornersAgainst: stats.awayAvgCornersAgainst,
+    awayCornersWindow: stats.awayCornersWindow,
+    homeAvgFoulsCommitted: stats.homeAvgFoulsCommitted,
+    homeAvgFoulsDrawn: stats.homeAvgFoulsDrawn,
+    awayAvgFoulsCommitted: stats.awayAvgFoulsCommitted,
+    awayAvgFoulsDrawn: stats.awayAvgFoulsDrawn,
+    foulsSampleCount: stats.foulsSampleCount,
     halfTimeSampleCount: stats.halfTimeSampleCount,
   };
 }

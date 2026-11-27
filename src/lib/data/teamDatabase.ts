@@ -241,7 +241,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
   m_gladbach: {
     id: 'team_m_gladbach',
     name: 'Borussia Mönchengladbach',
-    shortName: "M'gladbach",
+    shortName: 'Mönchengladbach',
     tla: 'BMG',
     crestUrl: 'https://crests.football-data.org/18.png',
     competitionCode: 'BL1',
@@ -1129,7 +1129,7 @@ export const TEAM_STRENGTH_DATABASE: Record<string, TeamStrengthRecord> = {
   nottingham_forest: {
     id: 'team_nottinghamforest',
     name: 'Nottingham Forest FC',
-    shortName: "Nott'm Forest",
+    shortName: 'Nottingham Forest',
     tla: 'NFO',
     crestUrl: 'https://crests.football-data.org/351.png',
     competitionCode: 'PL',
