@@ -274,7 +274,7 @@ export default function SettingsPage() {
               className="min-h-[44px] px-4 rounded-[12px] bg-[var(--accent-soft)] border border-[var(--accent)]/30 text-[13px] font-semibold text-[var(--accent)] flex items-center gap-1.5 touch-press"
             >
               <Lock className="w-4 h-4" />
-              <span>Open admin console</span>
+              <span>System admin</span>
             </Link>
           )}
         </div>

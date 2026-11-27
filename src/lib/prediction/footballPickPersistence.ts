@@ -15,6 +15,76 @@ function firstSentence(text: string): string {
   return match ? match[1].trim() : cleaned;
 }
 
+export interface PickModerationFlag {
+  isHidden: boolean;
+  voidedReason: string | null;
+}
+
+export async function loadFootballPickModerationMap(
+  fixtureIds: string[]
+): Promise<Map<string, PickModerationFlag>> {
+  const result = new Map<string, PickModerationFlag>();
+  if (typeof window !== 'undefined' || fixtureIds.length === 0) return result;
+
+  try {
+    const db = getLocalDatabase();
+    if (!isProductionRuntime() && db) {
+      const uniqueIds = Array.from(new Set(fixtureIds));
+      for (let i = 0; i < uniqueIds.length; i += 200) {
+        const chunk = uniqueIds.slice(i, i + 200);
+        const placeholders = chunk.map(() => '?').join(', ');
+        try {
+          const rows = db
+            .prepare(
+              `SELECT fixture_id, is_hidden, voided_reason
+               FROM football_picks
+               WHERE fixture_id IN (${placeholders})`
+            )
+            .all(...chunk) as Array<{
+              fixture_id: string;
+              is_hidden?: number | boolean | null;
+              voided_reason?: string | null;
+            }>;
+          for (const row of rows) {
+            result.set(String(row.fixture_id), {
+              isHidden: Boolean(row.is_hidden === 1 || row.is_hidden === true),
+              voidedReason: row.voided_reason ? String(row.voided_reason) : null,
+            });
+          }
+        } catch {
+          // Graceful fallback if moderation columns do not exist yet
+        }
+      }
+      return result;
+    }
+
+    const { getSupabaseServiceClient } = await import('@/lib/supabase/serverAuth');
+    const serviceClient = getSupabaseServiceClient();
+    if (serviceClient) {
+      const uniqueIds = Array.from(new Set(fixtureIds));
+      for (let i = 0; i < uniqueIds.length; i += 200) {
+        const chunk = uniqueIds.slice(i, i + 200);
+        const { data, error } = await serviceClient
+          .from('football_picks')
+          .select('fixture_id, is_hidden, voided_reason')
+          .in('fixture_id', chunk);
+        if (!error && Array.isArray(data)) {
+          for (const row of data) {
+            result.set(String(row.fixture_id), {
+              isHidden: Boolean(row.is_hidden === true || row.is_hidden === 1),
+              voidedReason: row.voided_reason ? String(row.voided_reason) : null,
+            });
+          }
+        }
+      }
+    }
+  } catch {
+    // Non-fatal moderation lookup
+  }
+
+  return result;
+}
+
 export function loadStoredFootballExplanation(fixtureId: string): WrittenMatchExplanation | null {
   if (typeof window !== 'undefined') return null;
   try {
@@ -22,23 +92,41 @@ export function loadStoredFootballExplanation(fixtureId: string): WrittenMatchEx
     const db = getLocalDatabase();
     if (!db) return null;
 
-    const row = db
-      .prepare(
-        `SELECT summary, reasoning_json, alternates_json, recorded_at
-         FROM football_picks
-         WHERE fixture_id = ?
-         LIMIT 1`
-      )
-      .get(fixtureId) as
+    let row:
       | {
           summary?: string;
           reasoning_json?: string;
           alternates_json?: string;
           recorded_at?: string;
+          is_hidden?: number | boolean | null;
+          voided_reason?: string | null;
         }
       | undefined;
 
+    try {
+      row = db
+        .prepare(
+          `SELECT summary, reasoning_json, alternates_json, recorded_at, is_hidden, voided_reason
+           FROM football_picks
+           WHERE fixture_id = ?
+           LIMIT 1`
+        )
+        .get(fixtureId) as typeof row;
+    } catch {
+      row = db
+        .prepare(
+          `SELECT summary, reasoning_json, alternates_json, recorded_at
+           FROM football_picks
+           WHERE fixture_id = ?
+           LIMIT 1`
+        )
+        .get(fixtureId) as typeof row;
+    }
+
     if (!row || !row.summary) return null;
+    if (row.is_hidden === 1 || row.is_hidden === true || Boolean(row.voided_reason)) {
+      return null;
+    }
 
     let reasoning: Record<string, any> = {};
     let alternates: WrittenMatchAlternate[] = [];

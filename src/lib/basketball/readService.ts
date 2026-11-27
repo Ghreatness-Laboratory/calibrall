@@ -475,14 +475,26 @@ export async function buildEvaluatedBasketballSlate(forceRefresh = false): Promi
   }
 
   const storedExplByGameId = new Map<string, WrittenMatchExplanation>();
+  const hiddenOrVoidedGameIds = new Set<string>();
   for (const idChunk of chunkArray(windowIds, 200)) {
     const { data: pickRows } = await supabase
       .from('bb_picks')
-      .select('game_id, summary, reasoning_json, alternates_json, recorded_at, is_top_pick')
+      .select('game_id, summary, reasoning_json, alternates_json, recorded_at, is_top_pick, is_hidden, voided_reason, qualification_status')
       .in('game_id', idChunk);
     for (const pr of pickRows || []) {
       const gid = String(pr.game_id || '');
       if (!gid) continue;
+      const isModeratedOut =
+        pr.is_hidden === 1 ||
+        pr.is_hidden === true ||
+        pr.qualification_status === 'VOID' ||
+        Boolean(pr.voided_reason);
+      if (isModeratedOut) {
+        if (pr.is_top_pick === 1 || pr.is_top_pick === true || pr.qualification_status === 'VOID') {
+          hiddenOrVoidedGameIds.add(gid);
+        }
+        continue;
+      }
       const parsed = parseStoredBasketballExplanation(pr);
       if (parsed && (!storedExplByGameId.has(gid) || pr.is_top_pick === 1 || pr.is_top_pick === true)) {
         storedExplByGameId.set(gid, parsed);
@@ -496,6 +508,10 @@ export async function buildEvaluatedBasketballSlate(forceRefresh = false): Promi
   for (const g of windowGames) {
     const ev = evalMap.get(g.id);
     if (!ev) continue;
+    if (hiddenOrVoidedGameIds.has(g.id)) {
+      ev.topPick = null;
+      ev.noRecommendationReason = 'Pick hidden or voided by system administration.';
+    }
     evaluationsById[g.id] = ev;
     emptyCounts[g.league].windowCount++;
     fixtures.push(
@@ -684,7 +700,7 @@ export async function getBasketballFixtureByIdFromDb(gameId: string): Promise<{
   const [{ data: teamRows }, { data: oddsRows }, { data: pickRows }, { data: priorRawGames }] = await Promise.all([
     supabase.from('bb_teams').select('id, league, name, aliases').in('id', [game.home_id, game.away_id]),
     supabase.from('bb_odds_snapshots').select('*').eq('game_id', game.id),
-    supabase.from('bb_picks').select('game_id, summary, reasoning_json, alternates_json, recorded_at, is_top_pick').eq('game_id', game.id),
+    supabase.from('bb_picks').select('game_id, summary, reasoning_json, alternates_json, recorded_at, is_top_pick, is_hidden, voided_reason, qualification_status').eq('game_id', game.id),
     fetchAllRows<any>((from, to) =>
       supabase
         .from('bb_games')
@@ -736,7 +752,20 @@ export async function getBasketballFixtureByIdFromDb(gameId: string): Promise<{
     oddsSnapshots: quotes,
   });
 
-  const topPickRow = (pickRows || []).find((pr: any) => pr.summary && (pr.is_top_pick === 1 || pr.is_top_pick === true)) || (pickRows || []).find((pr: any) => pr.summary);
+  const activePickRows = (pickRows || []).filter(
+    (pr: any) => !(pr.is_hidden === 1 || pr.is_hidden === true || pr.qualification_status === 'VOID' || Boolean(pr.voided_reason))
+  );
+  const hasModeratedVoid = (pickRows || []).some(
+    (pr: any) =>
+      (pr.is_top_pick === 1 || pr.is_top_pick === true || pr.qualification_status === 'VOID') &&
+      (pr.is_hidden === 1 || pr.is_hidden === true || pr.qualification_status === 'VOID' || Boolean(pr.voided_reason))
+  );
+  if (hasModeratedVoid) {
+    evaluation.topPick = null;
+    evaluation.noRecommendationReason = 'Pick hidden or voided by system administration.';
+  }
+
+  const topPickRow = activePickRows.find((pr: any) => pr.summary && (pr.is_top_pick === 1 || pr.is_top_pick === true)) || activePickRows.find((pr: any) => pr.summary);
   const storedExpl = parseStoredBasketballExplanation(topPickRow);
 
   return {

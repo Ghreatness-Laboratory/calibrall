@@ -281,7 +281,7 @@ export default function Navbar() {
                           className="min-h-[44px] flex items-center px-3.5 text-[var(--accent)] hover:bg-[var(--surface-2)] text-[12.5px] font-medium"
                         >
                           <Lock className="w-4 h-4 mr-2.5 text-[var(--accent)]" strokeWidth={2} />
-                          Admin console
+                          System admin
                         </Link>
                       )}
 

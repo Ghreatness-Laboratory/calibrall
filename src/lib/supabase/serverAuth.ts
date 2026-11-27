@@ -13,6 +13,9 @@ export interface ServerProfileRecord {
   role: AccountRole;
   tier: AccountTier;
   tierExpiresAt: string | null;
+  suspended?: boolean;
+  suspendedAt?: string | null;
+  suspendedReason?: string | null;
   createdAt: string;
 }
 
@@ -154,6 +157,9 @@ async function fetchOrProvisionProfile(
     role: 'user',
     tier: 'free',
     tierExpiresAt: null,
+    suspended: false,
+    suspendedAt: null,
+    suspendedReason: null,
     createdAt: new Date().toISOString(),
   };
 
@@ -162,11 +168,21 @@ async function fetchOrProvisionProfile(
     return fallbackProfile;
   }
 
-  const { data, error } = await serviceClient
+  let { data, error } = await serviceClient
     .from('profiles')
-    .select('id, email, display_name, role, tier, tier_expires_at, created_at')
+    .select('id, email, display_name, role, tier, tier_expires_at, suspended, suspended_at, suspended_reason, created_at')
     .eq('id', userId)
     .maybeSingle();
+
+  if (error && /suspended/i.test(error.message || '')) {
+    const legacy = await serviceClient
+      .from('profiles')
+      .select('id, email, display_name, role, tier, tier_expires_at, created_at')
+      .eq('id', userId)
+      .maybeSingle();
+    data = legacy.data ? { ...legacy.data, suspended: false, suspended_at: null, suspended_reason: null } : null;
+    error = legacy.error;
+  }
 
   if (!error && data) {
     return {
@@ -176,6 +192,9 @@ async function fetchOrProvisionProfile(
       role: normalizeRole(data.role),
       tier: normalizeTier(data.tier),
       tierExpiresAt: data.tier_expires_at ? String(data.tier_expires_at) : null,
+      suspended: Boolean(data.suspended === true || data.suspended === 1),
+      suspendedAt: data.suspended_at ? String(data.suspended_at) : null,
+      suspendedReason: data.suspended_reason ? String(data.suspended_reason) : null,
       createdAt: String(data.created_at || fallbackProfile.createdAt),
     };
   }
@@ -269,6 +288,9 @@ export async function getServerAuthSession(request?: Request): Promise<ServerAut
         (user.user_metadata?.name as string | undefined) ||
         null;
       const profile = await fetchOrProvisionProfile(user.id, user.email || '', fallbackName);
+      if (profile.suspended) {
+        return null;
+      }
       return buildServerAuthSessionFromUserAndProfile(user, profile);
     }
 
@@ -303,6 +325,9 @@ export async function getServerAuthSession(request?: Request): Promise<ServerAut
       (user.user_metadata?.name as string | undefined) ||
       null;
     const profile = await fetchOrProvisionProfile(user.id, user.email || '', fallbackName);
+    if (profile.suspended) {
+      return null;
+    }
     return buildServerAuthSessionFromUserAndProfile(user, profile);
   } catch {
     return null;
@@ -348,6 +373,9 @@ export async function getMiddlewareAuthSession(
       (user.user_metadata?.name as string | undefined) ||
       null;
     const profile = await fetchOrProvisionProfile(user.id, user.email || '', fallbackName);
+    if (profile.suspended) {
+      return null;
+    }
     return buildServerAuthSessionFromUserAndProfile(user, profile);
   } catch {
     return null;
@@ -373,6 +401,38 @@ export async function requireApiUser(request: Request): Promise<
         },
         {
           status: 401,
+          headers: {
+            'Cache-Control': 'no-store, max-age=0',
+          },
+        }
+      ),
+    };
+  }
+  return { authorized: true, session };
+}
+
+/**
+ * API route guard for Admin Panel endpoints (/api/admin/*).
+ * Enforces profiles.role === 'admin' from server-verified session.
+ * Returns HTTP 404 for both unauthenticated callers and non-admins.
+ */
+export async function requireAdminApiUser(request: Request): Promise<
+  | { authorized: true; session: ServerAuthSession; errorResponse?: never }
+  | { authorized: false; session?: never; errorResponse: NextResponse }
+> {
+  const session = await getServerAuthSession(request);
+  if (
+    !session ||
+    !session.isAdmin ||
+    session.profile.role !== 'admin' ||
+    session.profile.suspended
+  ) {
+    return {
+      authorized: false,
+      errorResponse: NextResponse.json(
+        { error: 'Not found', code: 'NOT_FOUND' },
+        {
+          status: 404,
           headers: {
             'Cache-Control': 'no-store, max-age=0',
           },

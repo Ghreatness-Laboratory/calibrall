@@ -4,6 +4,7 @@
 
 import { WrittenMatchExplanation } from '@/types';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { FREE_DAILY_SUMMARY_LIMIT } from '@/lib/tiers';
 import {
   getServerAuthSession,
   type ServerAuthSession,
@@ -11,7 +12,7 @@ import {
 } from '@/lib/supabase/serverAuth';
 
 export type ResolvedUserTier = AccountTier;
-export const FREE_DAILY_SUMMARY_LIMIT = 3;
+export { FREE_DAILY_SUMMARY_LIMIT };
 
 export function resolveTierFromSession(
   session: ServerAuthSession | null | undefined

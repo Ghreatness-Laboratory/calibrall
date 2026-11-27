@@ -33,6 +33,30 @@ import { GET as getNbaStats } from '../app/api/v1/nba/stats/route';
 import { POST as postLineupsSync } from '../app/api/v1/lineups/sync/route';
 import { POST as postSync } from '../app/api/v1/sync/route';
 
+import { GET as getAdminOverview } from '../app/api/admin/overview/route';
+import { GET as getAdminUsers } from '../app/api/admin/users/route';
+import { GET as getAdminUserDetailRoute, PATCH as patchAdminUserRoute } from '../app/api/admin/users/[id]/route';
+import { POST as postAdminPwReset } from '../app/api/admin/users/[id]/password-reset/route';
+import { GET as getAdminAuditLog } from '../app/api/admin/audit-log/route';
+import { GET as getAdminPayments, POST as postAdminPayments } from '../app/api/admin/payments/route';
+import { GET as getAdminPicks } from '../app/api/admin/picks/route';
+import { PATCH as patchAdminPick } from '../app/api/admin/picks/[id]/route';
+import { POST as postAdminSync } from '../app/api/admin/sync/route';
+import { GET as getAdminHealth } from '../app/api/admin/system-health/route';
+
+import { getLocalDatabase } from '../lib/supabase/client';
+import {
+  getAdminOverview as getAdminOverviewSvc,
+  listAdminUsers,
+  getAdminUserDetail,
+  updateAdminUser,
+  listAuditLogs,
+  listAdminPayments,
+  recordManualGrant,
+  getAdminSystemHealth,
+  AdminServiceError,
+} from '../lib/admin/adminService';
+
 function makeNextRequest(urlPath: string, headers?: Record<string, string>, method = 'GET'): NextRequest {
   const url = `http://localhost:3000${urlPath}`;
   return new NextRequest(url, {
@@ -112,8 +136,6 @@ async function runTests() {
     '/pricing',
     '/creators',
     '/methodology',
-    '/admin',
-    '/admin/backfill',
   ];
 
   for (const route of protectedRoutes) {
@@ -130,7 +152,17 @@ async function runTests() {
       `Visitor redirect for ${route} must preserve next param`
     );
   }
-  console.log(`  PASS: All ${protectedRoutes.length} protected routes redirect visitors to /login?next=...`);
+  console.log(`  PASS: All ${protectedRoutes.length} protected user routes redirect visitors to /login?next=...`);
+
+  // Visitors hitting /admin/* get 404 (not redirect)
+  for (const adminRoute of ['/admin', '/admin/backfill', '/admin/users/some-id']) {
+    assert.strictEqual(isAdminPagePath(adminRoute), true);
+    const res = await handleAuthMiddleware(makeNextRequest(adminRoute), {
+      getSession: async () => null,
+    });
+    assert.strictEqual(res.status, 404, `Visitor GET ${adminRoute} must return 404, got ${res.status}`);
+  }
+  console.log('  PASS: Visitors requesting /admin/* receive HTTP 404.');
 
   // Ensure API routes return 401 JSON for unauthenticated callers even with spoofed tier headers/cookies
   const spoofHeaders = {
@@ -187,15 +219,13 @@ async function runTests() {
     assert.strictEqual(res.status, 200, `Free user GET ${userRoute} must be allowed (200), got ${res.status}`);
   }
 
-  // Free user blocked from /admin/*
-  for (const adminRoute of ['/admin', '/admin/backfill']) {
+  // Free user blocked from /admin/* with HTTP 404
+  for (const adminRoute of ['/admin', '/admin/backfill', '/admin/users/test-id']) {
     assert.strictEqual(isAdminPagePath(adminRoute), true);
     const res = await handleAuthMiddleware(makeNextRequest(adminRoute), {
       getSession: async () => freeSession,
     });
-    assert.strictEqual(res.status, 307, `Free user GET ${adminRoute} must redirect (307), got ${res.status}`);
-    const locUrl = new URL(res.headers.get('location') || '');
-    assert.strictEqual(locUrl.pathname, '/fixtures', `Free user redirected off ${adminRoute} to /fixtures`);
+    assert.strictEqual(res.status, 404, `Free user GET ${adminRoute} must return 404, got ${res.status}`);
   }
 
   // Signed-in user visiting /login or /signup redirects to safe target
@@ -348,7 +378,149 @@ async function runTests() {
   scanForDemoCopy(path.join(process.cwd(), 'src'));
 
   console.log(`  PASS: All ${requiredTablesInRlsAudit.length} tables hardened in migration SQL; zero fake demo profile strings found.`);
-  console.log('\n--- ALL AUTH, RBAC & RLS HARDENING TESTS PASSED ---');
+
+  // -------------------------------------------------------------------------
+  // 5. ADMIN PANEL API ROUTES, 404 ENFORCEMENT & AUDIT LOGGING
+  // -------------------------------------------------------------------------
+  console.log('\n[5] Testing Admin Panel API 404 guards, tier updates, self-demotion guard & audit log...');
+
+  const adminApiChecks: Array<{ name: string; run: () => Promise<Response> }> = [
+    { name: 'GET /api/admin/overview', run: () => getAdminOverview(new Request('http://localhost:3000/api/admin/overview', { headers: spoofHeaders })) },
+    { name: 'GET /api/admin/users', run: () => getAdminUsers(new Request('http://localhost:3000/api/admin/users', { headers: spoofHeaders })) },
+    { name: 'GET /api/admin/users/[id]', run: () => getAdminUserDetailRoute(new Request('http://localhost:3000/api/admin/users/u1', { headers: spoofHeaders }), { params: { id: 'u1' } }) },
+    { name: 'PATCH /api/admin/users/[id]', run: () => patchAdminUserRoute(new Request('http://localhost:3000/api/admin/users/u1', { method: 'PATCH', headers: spoofHeaders, body: JSON.stringify({ action: 'change_tier', tier: 'pro' }) }), { params: { id: 'u1' } }) },
+    { name: 'POST /api/admin/users/[id]/password-reset', run: () => postAdminPwReset(new Request('http://localhost:3000/api/admin/users/u1/password-reset', { method: 'POST', headers: spoofHeaders }), { params: { id: 'u1' } }) },
+    { name: 'GET /api/admin/audit-log', run: () => getAdminAuditLog(new Request('http://localhost:3000/api/admin/audit-log', { headers: spoofHeaders })) },
+    { name: 'GET /api/admin/payments', run: () => getAdminPayments(new Request('http://localhost:3000/api/admin/payments', { headers: spoofHeaders })) },
+    { name: 'POST /api/admin/payments', run: () => postAdminPayments(new Request('http://localhost:3000/api/admin/payments', { method: 'POST', headers: spoofHeaders, body: JSON.stringify({ userIdOrEmail: 'u1', plan: 'pro', grantNote: 'test' }) })) },
+    { name: 'GET /api/admin/picks', run: () => getAdminPicks(new Request('http://localhost:3000/api/admin/picks', { headers: spoofHeaders })) },
+    { name: 'PATCH /api/admin/picks/[id]', run: () => patchAdminPick(new Request('http://localhost:3000/api/admin/picks/p1', { method: 'PATCH', headers: spoofHeaders, body: JSON.stringify({ sport: 'football', action: 'hide', reason: 'test' }) }), { params: { id: 'p1' } }) },
+    { name: 'POST /api/admin/sync', run: () => postAdminSync(new Request('http://localhost:3000/api/admin/sync', { method: 'POST', headers: spoofHeaders })) },
+    { name: 'GET /api/admin/system-health', run: () => getAdminHealth(new Request('http://localhost:3000/api/admin/system-health', { headers: spoofHeaders })) },
+  ];
+
+  for (const check of adminApiChecks) {
+    const res = await check.run();
+    assert.strictEqual(res.status, 404, `${check.name} must return 404 when caller is not a verified admin, got ${res.status}`);
+  }
+  console.log(`  PASS: All ${adminApiChecks.length} session-guarded /api/admin/* endpoints return HTTP 404 to non-admins.`);
+
+  // Verify admin migration file
+  const adminMigPath = path.join(process.cwd(), 'supabase/migrations/20261128000000_admin_panel_audit_payments.sql');
+  assert(fs.existsSync(adminMigPath), 'Admin panel migration SQL must exist');
+  const adminSql = fs.readFileSync(adminMigPath, 'utf8');
+  for (const sym of [
+    'admin_audit_log',
+    'paystack_payments',
+    'suspended',
+    'is_current_user_admin',
+    'get_admin_users_page',
+    'get_admin_user_detail',
+    'get_calibrall_database_size',
+  ]) {
+    assert(adminSql.includes(sym), `Admin migration SQL must define ${sym}`);
+  }
+
+  // Test real SQLite admin mutations, audit logging & self-demotion guard cleanly
+  const db = getLocalDatabase();
+  if (db) {
+    const testAdminId = 'test-admin-rbac-0001';
+    const testUserId = 'test-member-rbac-0002';
+    const nowIso = new Date().toISOString();
+    const svcAdminSession = makeFakeSession({
+      id: testAdminId,
+      email: 'admin-test@calibrall.app',
+      role: 'admin',
+      tier: 'premium',
+    });
+
+    try {
+      db.prepare(`DELETE FROM admin_audit_log WHERE target_user_id IN (?, ?) OR admin_id = ?`).run(
+        testAdminId,
+        testUserId,
+        testAdminId
+      );
+      db.prepare(`DELETE FROM paystack_payments WHERE user_id = ?`).run(testUserId);
+      db.prepare(`DELETE FROM profiles WHERE id IN (?, ?)`).run(testAdminId, testUserId);
+
+      db.prepare(
+        `INSERT INTO profiles (id, email, display_name, role, tier, created_at) VALUES (?, ?, ?, 'admin', 'premium', ?)`
+      ).run(testAdminId, 'admin-test@calibrall.app', 'Admin Owner', nowIso);
+      db.prepare(
+        `INSERT INTO profiles (id, email, display_name, role, tier, created_at) VALUES (?, ?, ?, 'user', 'free', ?)`
+      ).run(testUserId, 'member-test@calibrall.app', 'Test Member', nowIso);
+
+      // 1. Overview & User listing work against real DB
+      const overview = await getAdminOverviewSvc();
+      assert(overview.users.totalUsers >= 2, 'Overview must count persisted users');
+      const userList = await listAdminUsers({ search: 'member-test@calibrall.app' });
+      assert.strictEqual(userList.users.length, 1);
+      assert.strictEqual(userList.users[0].tier, 'free');
+
+      // 2. Admin changes test user tier -> takes effect immediately + writes audit log
+      const tierUpdate = await updateAdminUser(svcAdminSession, testUserId, {
+        action: 'change_tier',
+        tier: 'pro',
+        expiryDays: 30,
+        note: 'Automated verification upgrade',
+      });
+      assert.strictEqual(tierUpdate.user.tier, 'pro');
+      assert(tierUpdate.user.tierExpiresAt, 'Tier expiry must be set');
+      assert.strictEqual(tierUpdate.auditLog.action, 'USER_TIER_UPDATED');
+
+      const reloaded = await getAdminUserDetail(testUserId);
+      assert.strictEqual(reloaded.user.tier, 'pro');
+      const ent = computeEffectiveEntitlements({
+        role: reloaded.user.role,
+        tier: reloaded.user.tier,
+        tierExpiresAt: reloaded.user.tierExpiresAt,
+      });
+      assert.strictEqual(ent.effectiveTier, 'pro');
+
+      // 3. Self-demotion must be rejected
+      let selfDemoteFailed = false;
+      try {
+        await updateAdminUser(svcAdminSession, testAdminId, {
+          action: 'set_role',
+          role: 'user',
+          confirm: true,
+        });
+      } catch (err: any) {
+        selfDemoteFailed = err instanceof AdminServiceError && err.status === 400;
+      }
+      assert.strictEqual(selfDemoteFailed, true, 'Admin self-demotion must be rejected with HTTP 400');
+
+      // 4. Manual payment grant updates tier & writes payment + audit entry
+      const grant = await recordManualGrant(svcAdminSession, {
+        userIdOrEmail: testUserId,
+        plan: 'premium',
+        expiryDays: 90,
+        grantNote: 'Invoice comp grant',
+      });
+      assert.strictEqual(grant.payment.isManualGrant, true);
+      const paymentsPage = await listAdminPayments({ manualOnly: 'true', search: 'Invoice comp' });
+      assert(paymentsPage.payments.some((p) => p.reference === grant.payment.reference));
+
+      const auditPage = await listAuditLogs({ targetUserId: testUserId });
+      assert(auditPage.logs.some((l) => l.action === 'USER_TIER_UPDATED'));
+      assert(auditPage.logs.some((l) => l.action === 'MANUAL_PAYMENT_GRANTED'));
+
+      // 5. System health query works cleanly
+      const health = await getAdminSystemHealth({ page: 1, pageSize: 10 });
+      assert(typeof health.errorCount24h === 'number');
+    } finally {
+      db.prepare(`DELETE FROM admin_audit_log WHERE target_user_id IN (?, ?) OR admin_id = ?`).run(
+        testAdminId,
+        testUserId,
+        testAdminId
+      );
+      db.prepare(`DELETE FROM paystack_payments WHERE user_id = ?`).run(testUserId);
+      db.prepare(`DELETE FROM profiles WHERE id IN (?, ?)`).run(testAdminId, testUserId);
+    }
+    console.log('  PASS: Admin user tier mutation, audit log persistence, manual grant & self-demotion guard verified against DB.');
+  }
+
+  console.log('\n--- ALL AUTH, RBAC, ADMIN & RLS HARDENING TESTS PASSED ---');
 }
 
 runTests().catch((err) => {

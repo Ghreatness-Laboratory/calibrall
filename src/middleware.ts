@@ -63,20 +63,22 @@ export async function handleAuthMiddleware(
     return response;
   }
 
-  // All non-public routes require a valid signed-in session
+  // /admin and /admin/* routes strictly require role === 'admin'; non-admins and visitors get 404
+  if (isAdminPagePath(pathname)) {
+    if (!session || !session.isAdmin || session.profile.role !== 'admin' || session.profile.suspended) {
+      const notFoundRes = NextResponse.rewrite(new URL('/not-found', request.url), { status: 404 });
+      notFoundRes.headers.set('Cache-Control', 'no-store, max-age=0');
+      return notFoundRes;
+    }
+    return response;
+  }
+
+  // All other non-public routes require a valid signed-in session
   if (!session) {
     const loginUrl = new URL('/login', request.url);
     const fullTarget = `${pathname}${search || ''}`;
     loginUrl.searchParams.set('next', fullTarget);
     const redirectRes = NextResponse.redirect(loginUrl);
-    redirectRes.headers.set('Cache-Control', 'no-store, max-age=0');
-    return redirectRes;
-  }
-
-  // /admin/* routes require role === 'admin'
-  if (isAdminPagePath(pathname) && !session.isAdmin) {
-    const fixturesUrl = new URL('/fixtures', request.url);
-    const redirectRes = NextResponse.redirect(fixturesUrl);
     redirectRes.headers.set('Cache-Control', 'no-store, max-age=0');
     return redirectRes;
   }

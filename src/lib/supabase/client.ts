@@ -683,11 +683,69 @@ export function getLocalDatabase(): any {
           role TEXT NOT NULL DEFAULT 'user',
           tier TEXT NOT NULL DEFAULT 'free',
           tier_expires_at TEXT NULL,
+          suspended INTEGER NOT NULL DEFAULT 0,
+          suspended_at TEXT NULL,
+          suspended_reason TEXT NULL,
+          last_sign_in_at TEXT NULL,
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS admin_audit_log (
+          id TEXT PRIMARY KEY,
+          admin_id TEXT,
+          admin_email TEXT,
+          target_user_id TEXT,
+          action TEXT NOT NULL,
+          entity_type TEXT NOT NULL DEFAULT 'user',
+          entity_id TEXT,
+          before_state TEXT,
+          after_state TEXT,
+          note TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS paystack_payments (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          email TEXT,
+          reference TEXT UNIQUE NOT NULL,
+          plan TEXT NOT NULL,
+          amount_kobo INTEGER NOT NULL DEFAULT 0,
+          currency TEXT NOT NULL DEFAULT 'NGN',
+          status TEXT NOT NULL DEFAULT 'success',
+          channel TEXT,
+          is_manual_grant INTEGER NOT NULL DEFAULT 0,
+          granted_by TEXT,
+          grant_note TEXT,
+          paid_at TEXT,
+          metadata TEXT DEFAULT '{}',
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS provider_sync_jobs (
+          id TEXT PRIMARY KEY,
+          provider TEXT NOT NULL,
+          job_type TEXT NOT NULL,
+          status TEXT NOT NULL,
+          records_processed INTEGER DEFAULT 0,
+          error_message TEXT,
+          started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          completed_at TEXT
         );
       `);
 
       // Ensure columns exist on older tables
+      try { db.exec('ALTER TABLE profiles ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
+      try { db.exec('ALTER TABLE profiles ADD COLUMN suspended_at TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE profiles ADD COLUMN suspended_reason TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE profiles ADD COLUMN last_sign_in_at TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE football_picks ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
+      try { db.exec('ALTER TABLE football_picks ADD COLUMN voided_reason TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE football_picks ADD COLUMN moderated_by TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE football_picks ADD COLUMN moderated_at TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN voided_reason TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN moderated_by TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE bb_picks ADD COLUMN moderated_at TEXT;'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_admin_audit_log_created_at ON admin_audit_log(created_at DESC);'); } catch (_) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_paystack_payments_created_at ON paystack_payments(created_at DESC);'); } catch (_) {}
       try { db.exec('ALTER TABLE bb_picks ADD COLUMN raw_probability REAL;'); } catch (_) {}
       try { db.exec('ALTER TABLE bb_picks ADD COLUMN projected_std REAL;'); } catch (_) {}
       try { db.exec('ALTER TABLE bb_picks ADD COLUMN confidence_tier TEXT;'); } catch (_) {}

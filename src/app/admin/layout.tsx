@@ -1,5 +1,5 @@
 import React from 'react';
-import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { getServerAuthSession } from '@/lib/supabase/serverAuth';
 
 export const dynamic = 'force-dynamic';
@@ -11,12 +11,8 @@ export default async function AdminLayout({
 }) {
   const session = await getServerAuthSession();
 
-  if (!session) {
-    redirect('/login?next=/admin');
-  }
-
-  if (!session.isAdmin) {
-    redirect('/fixtures');
+  if (!session || !session.isAdmin || session.profile.role !== 'admin' || session.profile.suspended) {
+    notFound();
   }
 
   return <>{children}</>;

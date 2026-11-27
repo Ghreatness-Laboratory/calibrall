@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { getFootballDataProvider } from '@/lib/data/provider';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
-import { persistOrLoadImmutableFootballExplanation } from '@/lib/prediction/footballPickPersistence';
+import {
+  persistOrLoadImmutableFootballExplanation,
+  loadFootballPickModerationMap,
+} from '@/lib/prediction/footballPickPersistence';
 import { getBasketballFixturesAndEvaluations } from '@/lib/basketball/readService';
 import { resolveTierFromSession, redactExplanationForTier } from '@/lib/auth/tierAccess';
 import { requireApiUser } from '@/lib/supabase/serverAuth';
@@ -88,8 +91,14 @@ export async function GET(request: Request) {
     );
   }
 
-  const evaluated = liveResult.fixtures
-    .filter(f => f.status !== 'FINISHED')
+  const activeFixtures = liveResult.fixtures.filter(f => f.status !== 'FINISHED');
+  const moderationMap = await loadFootballPickModerationMap(activeFixtures.map(f => f.id));
+
+  const evaluated = activeFixtures
+    .filter(fixture => {
+      const mod = moderationMap.get(fixture.id);
+      return !mod?.isHidden && !mod?.voidedReason;
+    })
     .map(fixture => {
       const stats = getFixtureStatistics(fixture);
       const context = buildFixtureContextFromStats(fixture, stats);
