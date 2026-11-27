@@ -132,12 +132,15 @@ function getLadderInfo(p: Pick<MarketPrediction, 'marketCode' | 'marketCategory'
     const side = code.startsWith('AH_HOME_') ? 'home' : 'away';
     return { ladderKey: `ah_${side}`, kind: 'ah', numericValue: p.handicapLine };
   }
-  if (
-    p.optionType === 'multi_goals' ||
-    p.optionType === 'team_multi_goals' ||
-    p.optionType === 'first_half_multi_goals'
-  ) {
-    return { ladderKey: 'multi_goals', kind: 'over', numericValue: 0 };
+  if (p.optionType === 'multi_goals') {
+    return { ladderKey: 'multi_goals_full', kind: 'over', numericValue: 0 };
+  }
+  if (p.optionType === 'team_multi_goals') {
+    const side = code.startsWith('TEAM_MULTI_GOALS_HOME_') ? 'home' : 'away';
+    return { ladderKey: `multi_goals_${side}`, kind: 'over', numericValue: 0 };
+  }
+  if (p.optionType === 'first_half_multi_goals') {
+    return { ladderKey: 'multi_goals_first_half', kind: 'over', numericValue: 0 };
   }
   return null;
 }
@@ -428,9 +431,9 @@ export class DixonColesV25Evaluator {
       const edgeOverBaseline = Number((calProb - baseRate).toFixed(4));
       const isGenericPick = Math.abs(calProb - baseRate) <= 0.020;
 
-      // Walk-Forward Brier Skill Gate per (leagueGroup, marketFamily)
+      // Walk-Forward Brier Skill Gate per (leagueGroup, marketFamily) and Multi Goals scope
       const fam = getMarketFamily(cand.optionType, cand.marketCode, cand.marketCategory);
-      const gate = checkMarketGating(fam, context.competitionCode);
+      const gate = checkMarketGating(fam, context.competitionCode, 30, cand.multiGoalsMeta?.scope);
 
       // Confidence assessment
       const confAssessment = ConfidenceEngine.evaluateConfidence(
@@ -834,7 +837,7 @@ export class DixonColesV25Evaluator {
         ladderWinners.set(li.ladderKey, p);
         continue;
       }
-      if (li.ladderKey === 'multi_goals') {
+      if (li.ladderKey.startsWith('multi_goals_')) {
         if (scoreMultiGoalsCandidate(p) > scoreMultiGoalsCandidate(existing)) {
           ladderWinners.set(li.ladderKey, p);
         }
@@ -856,7 +859,7 @@ export class DixonColesV25Evaluator {
 
     // Annotate exact whyLineChosen on winning ladder picks showing rejected stricter & omitted easier lines
     for (const [ladderKey, winner] of ladderWinners.entries()) {
-      if (ladderKey === 'multi_goals') {
+      if (ladderKey.startsWith('multi_goals_')) {
         const meta = winner.multiGoalsMeta;
         const wProbPct = ((winner.calibratedProbability ?? winner.modelProbability) * 100).toFixed(1);
         const text = cleanDisplayText(
@@ -1291,7 +1294,7 @@ export class DixonColesV25Evaluator {
       }
     });
 
-    // 7. Corners (Full Match ONLY, Negative Binomial across [8.5, 9.5, 10.5, 11.5])
+    // 7. Corners (Full Match ONLY, Negative Binomial across [7.5, 8.5, 9.5, 10.5, 11.5])
     // NEVER builds first-half corners.
     const hasCornerSample =
       (context.homeCornerSampleCount === undefined || context.homeCornerSampleCount >= 6) &&
@@ -1300,7 +1303,7 @@ export class DixonColesV25Evaluator {
 
     if (cap.hasCorners && hasCornerSample && totalCornersExpected > 0) {
       const corners = DixonColesV25Engine.calculateCorners(context.expectedCornersHome, context.expectedCornersAway, features);
-      [8.5, 9.5, 10.5, 11.5].forEach(cLine => {
+      [7.5, 8.5, 9.5, 10.5, 11.5].forEach(cLine => {
         const dist = corners.overUnderLines[cLine];
         const codeSuf = String(cLine).replace('.', '');
         if (dist) {

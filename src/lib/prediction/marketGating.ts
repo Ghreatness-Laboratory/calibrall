@@ -9,6 +9,7 @@ import {
   getCalibratedParams,
   getLeagueCapabilities,
   getMultiGoalsLeagueValidation,
+  getTeamMultiGoalsLeagueValidation,
   WalkForwardMarketValidation,
 } from './calibratedParams';
 
@@ -155,7 +156,8 @@ export const FAMILY_VALIDATION_REGISTRY: Record<MarketFamily, FamilyValidationSt
 export function checkMarketGating(
   family: MarketFamily,
   competitionCodeOrMinSample?: string | number,
-  minSample: number = 30
+  minSample: number = 30,
+  multiGoalsScope?: 'full_match' | 'home' | 'away' | 'first_half'
 ): {
   isAllowed: boolean;
   leagueGroup: 'UK_WITH_REF' | 'EURO_NO_REF' | 'EXTRA_GOALS_ONLY';
@@ -207,7 +209,11 @@ export function checkMarketGating(
   }
 
   if (family === 'multi_goals' && compCode) {
-    const leagueMulti = getMultiGoalsLeagueValidation(compCode);
+    const isTeamScope = multiGoalsScope === 'home' || multiGoalsScope === 'away';
+    const leagueMulti = isTeamScope
+      ? getTeamMultiGoalsLeagueValidation(compCode)
+      : getMultiGoalsLeagueValidation(compCode);
+    const scopeLabel = isTeamScope ? 'Team multi goals' : 'Multi goals';
     if (leagueMulti && (!leagueMulti.beatsBaseline || leagueMulti.tierMode === 'SPECULATIVE_ONLY')) {
       return {
         isAllowed: true,
@@ -216,7 +222,7 @@ export function checkMarketGating(
         bss: leagueMulti.brierSkill,
         ciLower: leagueMulti.ci95Lower,
         ciUpper: leagueMulti.ci95Upper,
-        statusText: `Speculative (${leagueMulti.competitionCode}): Multi goals did not beat league naive baseline (BSS ${leagueMulti.brierSkill.toFixed(4)})`,
+        statusText: `Speculative (${leagueMulti.competitionCode}): ${scopeLabel} did not beat league naive baseline (BSS ${leagueMulti.brierSkill.toFixed(4)}, 95% CI [${leagueMulti.ci95Lower.toFixed(4)}, ${leagueMulti.ci95Upper.toFixed(4)}])`,
         cannotBeTopPick: true,
         tierMode: 'SPECULATIVE_ONLY',
       };
@@ -229,9 +235,22 @@ export function checkMarketGating(
         bss: leagueMulti.brierSkill,
         ciLower: leagueMulti.ci95Lower,
         ciUpper: leagueMulti.ci95Upper,
-        statusText: `Disabled (${leagueMulti.competitionCode}): Multi goals disabled in league backtest`,
+        statusText: `Disabled (${leagueMulti.competitionCode}): ${scopeLabel} disabled in league backtest`,
         cannotBeTopPick: true,
         tierMode: 'DISABLED',
+      };
+    }
+    if (leagueMulti) {
+      return {
+        isAllowed: true,
+        leagueGroup,
+        matches: leagueMulti.matches,
+        bss: leagueMulti.brierSkill,
+        ciLower: leagueMulti.ci95Lower,
+        ciUpper: leagueMulti.ci95Upper,
+        statusText: `Validated (${leagueMulti.competitionCode}): ${scopeLabel} BSS +${leagueMulti.brierSkill.toFixed(4)}, 95% CI [+${leagueMulti.ci95Lower.toFixed(4)}, +${leagueMulti.ci95Upper.toFixed(4)}] (${leagueMulti.matches} matches)`,
+        cannotBeTopPick: false,
+        tierMode: 'ENABLED',
       };
     }
   }

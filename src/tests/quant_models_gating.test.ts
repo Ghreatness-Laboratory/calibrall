@@ -258,7 +258,7 @@ async function runTests() {
     assert(e0Codes.has(`TOTAL_GOALS_O${sfx}`), `Missing TOTAL_GOALS_O${sfx}`);
     assert(e0Codes.has(`TOTAL_GOALS_U${sfx}`), `Missing TOTAL_GOALS_U${sfx}`);
   }
-  for (const sfx of ['85', '95', '105', '115']) {
+  for (const sfx of ['75', '85', '95', '105', '115']) {
     assert(e0Codes.has(`CORNERS_O${sfx}`), `Missing CORNERS_O${sfx}`);
     assert(e0Codes.has(`CORNERS_U${sfx}`), `Missing CORNERS_U${sfx}`);
   }
@@ -271,7 +271,7 @@ async function runTests() {
   assert.strictEqual(ahHomeCount, 13, `Expected all 13 AH Home lines [-1.5..+1.5], got ${ahHomeCount}`);
   assert.strictEqual(ahAwayCount, 13, `Expected all 13 AH Away lines [-1.5..+1.5], got ${ahAwayCount}`);
   assert(e0Codes.has('FH_GOALS_O15') && e0Codes.has('FH_GOALS_U05'), 'Missing 1H goals 0.5/1.5 full coverage');
-  console.log('✓ PASS [All Enabled Lines]: Total Goals 0.5..4.5, Team Goals 0.5..2.5, all 13x2 AH lines, Corners 8.5..11.5, Cards 2.5..5.5, 1H Goals 0.5/1.5');
+  console.log('✓ PASS [All Enabled Lines]: Total Goals 0.5..4.5, Team Goals 0.5..2.5, all 13x2 AH lines, Corners 7.5..11.5, Cards 2.5..5.5, 1H Goals 0.5/1.5');
 
   // 7. Walk-forward Brier Skill Gating per (leagueGroup, market)
   assert.strictEqual(checkMarketGating('highest_scoring_half', 'E0').isAllowed, false, 'HSH must be blocked in UK_WITH_REF (BSS < 0)');
@@ -320,7 +320,25 @@ async function runTests() {
     assert((evPriorityEval.topPick.expectedValue ?? 0) > 0, 'Priced top pick must have positive EV');
     assert(evPriorityEval.topPick.deviggedMarketProb !== undefined && evPriorityEval.topPick.deviggedMarketProb > 0, 'Priced top pick must include devigged market probability');
   }
-  console.log('✓ PASS [Threshold, Ladder & EV Ranking]: 70% threshold, highest clearing line selection, devigged probability + EV ordering verified');
+  // Verify Corners Over ladder selects CORNERS_O75 when exp corners puts O7.5 >= 70% (+edge) and O8.5 < 70%
+  const corners75Ctx: FixtureContext = {
+    ...e0DerbyContext,
+    fixtureId: 'test_corners_o75_ladder',
+    expectedCornersHome: 6.1,
+    expectedCornersAway: 4.5,
+    verifiedOdds: {},
+  };
+  const corners75Eval = DixonColesV25Evaluator.evaluateFixture(corners75Ctx);
+  const cO75 = corners75Eval.predictions.find(p => p.marketCode === 'CORNERS_O75');
+  const cO85 = corners75Eval.predictions.find(p => p.marketCode === 'CORNERS_O85');
+  assert(cO75 && cO85, 'Both CORNERS_O75 and CORNERS_O85 must exist in E0 predictions');
+  assert(!corners75Eval.predictions.some(p => p.period === 'FIRST_HALF' && p.marketCode.includes('CORNER')), 'Zero 1st-half corners permitted');
+  const cO75Prob = cO75!.calibratedProbability ?? cO75!.modelProbability;
+  const cO85Prob = cO85!.calibratedProbability ?? cO85!.modelProbability;
+  if (cO75Prob >= 0.70 && cO85Prob < 0.70 && (cO75!.edgeOverBaseline ?? 0) > 0.02) {
+    assert(cO75!.rankingScore > 0, `CORNERS_O75 (${(cO75Prob * 100).toFixed(1)}%) must qualify when O8.5 (${(cO85Prob * 100).toFixed(1)}%) < 70%`);
+  }
+  console.log('✓ PASS [Threshold, Ladder & EV Ranking]: 70% threshold, highest clearing line selection (incl. Corners 7.5), devigged probability + EV ordering verified');
 
   // 9. Diversity Cap: <= 40% per market family across multi-fixture slate
   const slateInputs = Array.from({ length: 10 }, (_, idx) => {

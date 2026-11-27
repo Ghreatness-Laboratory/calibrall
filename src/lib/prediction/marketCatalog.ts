@@ -138,9 +138,9 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
     title: 'Corners (Total & Team)',
     category: 'total_corners',
     period: 'REGULAR_TIME',
-    description: 'Total corners over/under on supported lines (8.5, 9.5, 10.5), plus team corners where data supports it. Requires verified corner statistics; engine abstains if corner data is sparse.',
-    defaultSelections: ['Total Corners Over', 'Total Corners Under', 'Home Team Corners Over', 'Away Team Corners Over'],
-    supportedLines: [8.5, 9.5, 10.5, 4.5, 5.5],
+    description: 'Total corners over/under on supported lines (7.5, 8.5, 9.5, 10.5, 11.5). Requires verified corner statistics; engine abstains with Needs history if corner data is sparse.',
+    defaultSelections: ['Total Corners Over', 'Total Corners Under'],
+    supportedLines: [7.5, 8.5, 9.5, 10.5, 11.5],
     settlementRule: 'Corners taken in regular time only. Awarded but unexecuted corners do not count toward settlement.',
     dataRequirements: {
       requiresCornerData: true,

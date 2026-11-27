@@ -93,7 +93,7 @@ export async function loadFootballPickModerationMap(
   return result;
 }
 
-const CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION = 'v2.5.2';
+const CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION = 'v2.5.3';
 
 export function loadStoredFootballExplanation(
   fixtureId: string,

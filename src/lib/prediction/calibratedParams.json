@@ -909,19 +909,21 @@
         "avgTotalCorners": 10.0689,
         "varTotalCorners": 11.5377,
         "overdispersionAlpha": 0.0145,
+        "o75Rate": 0.7708,
         "o85Rate": 0.6578,
-        "o95Rate": 0.5365,
-        "o105Rate": 0.426,
-        "o115Rate": 0.3155
+        "o95Rate": 0.5366,
+        "o105Rate": 0.4256,
+        "o115Rate": 0.3151
       },
       "cards": {
         "sampleSize": 1947,
         "avgTotalCards": 4.1351,
         "varTotalCards": 4.8456,
         "overdispersionAlpha": 0.0416,
-        "o35Rate": 0.5809,
-        "o45Rate": 0.4047,
-        "o55Rate": 0.2491
+        "o25Rate": 0.7577,
+        "o35Rate": 0.5818,
+        "o45Rate": 0.4064,
+        "o55Rate": 0.2505
       }
     },
     "BSA": {
@@ -1054,19 +1056,21 @@
         "avgTotalCorners": 9.6743,
         "varTotalCorners": 11.026,
         "overdispersionAlpha": 0.0144,
-        "o85Rate": 0.6059,
-        "o95Rate": 0.501,
-        "o105Rate": 0.3862,
-        "o115Rate": 0.2834
+        "o75Rate": 0.7294,
+        "o85Rate": 0.6062,
+        "o95Rate": 0.5008,
+        "o105Rate": 0.3865,
+        "o115Rate": 0.2836
       },
       "cards": {
         "sampleSize": 1916,
         "avgTotalCards": 3.9828,
         "varTotalCards": 4.8932,
         "overdispersionAlpha": 0.0574,
-        "o35Rate": 0.5485,
-        "o45Rate": 0.3773,
-        "o55Rate": 0.226
+        "o25Rate": 0.7335,
+        "o35Rate": 0.5481,
+        "o45Rate": 0.3766,
+        "o55Rate": 0.2255
       }
     },
     "D2": {
@@ -1125,19 +1129,21 @@
         "avgTotalCorners": 10.169,
         "varTotalCorners": 11.245,
         "overdispersionAlpha": 0.0104,
-        "o85Rate": 0.676,
-        "o95Rate": 0.5509,
-        "o105Rate": 0.4336,
-        "o115Rate": 0.3364
+        "o75Rate": 0.7767,
+        "o85Rate": 0.677,
+        "o95Rate": 0.5514,
+        "o105Rate": 0.4342,
+        "o115Rate": 0.3369
       },
       "cards": {
         "sampleSize": 1935,
         "avgTotalCards": 4.5328,
         "varTotalCards": 4.9326,
         "overdispersionAlpha": 0.0195,
+        "o25Rate": 0.8179,
         "o35Rate": 0.6682,
-        "o45Rate": 0.4879,
-        "o55Rate": 0.3065
+        "o45Rate": 0.4877,
+        "o55Rate": 0.3056
       }
     },
     "DNK": {
@@ -1233,18 +1239,20 @@
         "avgTotalCorners": 10.2739,
         "varTotalCorners": 11.4752,
         "overdispersionAlpha": 0.0114,
-        "o85Rate": 0.6853,
-        "o95Rate": 0.5718,
-        "o105Rate": 0.4542,
-        "o115Rate": 0.3357
+        "o75Rate": 0.7812,
+        "o85Rate": 0.6858,
+        "o95Rate": 0.5715,
+        "o105Rate": 0.4536,
+        "o115Rate": 0.3356
       },
       "cards": {
         "sampleSize": 2380,
         "avgTotalCards": 3.7773,
         "varTotalCards": 4.3245,
         "overdispersionAlpha": 0.0384,
-        "o35Rate": 0.5231,
-        "o45Rate": 0.3391,
+        "o25Rate": 0.7105,
+        "o35Rate": 0.5238,
+        "o45Rate": 0.3389,
         "o55Rate": 0.1937
       }
     },
@@ -1304,19 +1312,21 @@
         "avgTotalCorners": 10.0747,
         "varTotalCorners": 11.502,
         "overdispersionAlpha": 0.0141,
-        "o85Rate": 0.6604,
-        "o95Rate": 0.5395,
-        "o105Rate": 0.4233,
-        "o115Rate": 0.3245
+        "o75Rate": 0.7745,
+        "o85Rate": 0.6607,
+        "o95Rate": 0.5401,
+        "o105Rate": 0.4246,
+        "o115Rate": 0.3257
       },
       "cards": {
         "sampleSize": 3492,
         "avgTotalCards": 3.7271,
         "varTotalCards": 3.9865,
         "overdispersionAlpha": 0.0187,
-        "o35Rate": 0.5086,
-        "o45Rate": 0.3299,
-        "o55Rate": 0.1796
+        "o25Rate": 0.7159,
+        "o35Rate": 0.5094,
+        "o45Rate": 0.3308,
+        "o55Rate": 0.1806
       }
     },
     "E2": {
@@ -1375,9 +1385,10 @@
         "avgTotalCorners": 10.1256,
         "varTotalCorners": 12.0004,
         "overdispersionAlpha": 0.0183,
-        "o85Rate": 0.6614,
-        "o95Rate": 0.5476,
-        "o105Rate": 0.4326,
+        "o75Rate": 0.7657,
+        "o85Rate": 0.6623,
+        "o95Rate": 0.5483,
+        "o105Rate": 0.4325,
         "o115Rate": 0.3294
       },
       "cards": {
@@ -1385,9 +1396,10 @@
         "avgTotalCards": 3.7121,
         "varTotalCards": 3.9641,
         "overdispersionAlpha": 0.0183,
-        "o35Rate": 0.5167,
-        "o45Rate": 0.3133,
-        "o55Rate": 0.1741
+        "o25Rate": 0.717,
+        "o35Rate": 0.5168,
+        "o45Rate": 0.3134,
+        "o55Rate": 0.1742
       }
     },
     "E3": {
@@ -1446,19 +1458,21 @@
         "avgTotalCorners": 9.8038,
         "varTotalCorners": 11.0291,
         "overdispersionAlpha": 0.0127,
+        "o75Rate": 0.746,
         "o85Rate": 0.6369,
-        "o95Rate": 0.5178,
-        "o105Rate": 0.3867,
-        "o115Rate": 0.2839
+        "o95Rate": 0.518,
+        "o105Rate": 0.3863,
+        "o115Rate": 0.2837
       },
       "cards": {
         "sampleSize": 3476,
         "avgTotalCards": 3.6942,
         "varTotalCards": 3.9482,
         "overdispersionAlpha": 0.0186,
-        "o35Rate": 0.5101,
-        "o45Rate": 0.319,
-        "o55Rate": 0.1772
+        "o25Rate": 0.7029,
+        "o35Rate": 0.5111,
+        "o45Rate": 0.3197,
+        "o55Rate": 0.1783
       }
     },
     "EC": {
@@ -1517,19 +1531,21 @@
         "avgTotalCorners": 9.9894,
         "varTotalCorners": 11.9999,
         "overdispersionAlpha": 0.0201,
-        "o85Rate": 0.6402,
-        "o95Rate": 0.5291,
+        "o75Rate": 0.7455,
+        "o85Rate": 0.6473,
+        "o95Rate": 0.5357,
         "o105Rate": 0.4286,
-        "o115Rate": 0.3069
+        "o115Rate": 0.2991
       },
       "cards": {
         "sampleSize": 3380,
         "avgTotalCards": 3.7432,
         "varTotalCards": 3.921,
         "overdispersionAlpha": 0.0127,
-        "o35Rate": 0.5219,
-        "o45Rate": 0.3364,
-        "o55Rate": 0.1902
+        "o25Rate": 0.7124,
+        "o35Rate": 0.5221,
+        "o45Rate": 0.3367,
+        "o55Rate": 0.19
       }
     },
     "F1": {
@@ -1588,18 +1604,20 @@
         "avgTotalCorners": 9.466,
         "varTotalCorners": 10.8777,
         "overdispersionAlpha": 0.0158,
-        "o85Rate": 0.5931,
-        "o95Rate": 0.4642,
-        "o105Rate": 0.3412,
-        "o115Rate": 0.2402
+        "o75Rate": 0.7065,
+        "o85Rate": 0.593,
+        "o95Rate": 0.4641,
+        "o105Rate": 0.3417,
+        "o115Rate": 0.2411
       },
       "cards": {
         "sampleSize": 2148,
         "avgTotalCards": 3.9977,
         "varTotalCards": 4.4001,
         "overdispersionAlpha": 0.0252,
+        "o25Rate": 0.7617,
         "o35Rate": 0.5642,
-        "o45Rate": 0.372,
+        "o45Rate": 0.3718,
         "o55Rate": 0.2086
       }
     },
@@ -1659,19 +1677,21 @@
         "avgTotalCorners": 9.0166,
         "varTotalCorners": 10.5472,
         "overdispersionAlpha": 0.0188,
-        "o85Rate": 0.5248,
-        "o95Rate": 0.4157,
-        "o105Rate": 0.3132,
-        "o115Rate": 0.2143
+        "o75Rate": 0.6493,
+        "o85Rate": 0.5258,
+        "o95Rate": 0.4171,
+        "o105Rate": 0.3146,
+        "o115Rate": 0.2152
       },
       "cards": {
         "sampleSize": 2235,
         "avgTotalCards": 3.974,
         "varTotalCards": 4.3726,
         "overdispersionAlpha": 0.0252,
-        "o35Rate": 0.549,
-        "o45Rate": 0.374,
-        "o55Rate": 0.2183
+        "o25Rate": 0.7478,
+        "o35Rate": 0.5504,
+        "o45Rate": 0.3752,
+        "o55Rate": 0.2184
       }
     },
     "FIN": {
@@ -1767,19 +1787,21 @@
         "avgTotalCorners": 8.7014,
         "varTotalCorners": 9.7323,
         "overdispersionAlpha": 0.0136,
-        "o85Rate": 0.507,
-        "o95Rate": 0.3754,
-        "o105Rate": 0.2732,
-        "o115Rate": 0.1837
+        "o75Rate": 0.6197,
+        "o85Rate": 0.5066,
+        "o95Rate": 0.375,
+        "o105Rate": 0.2719,
+        "o115Rate": 0.1828
       },
       "cards": {
         "sampleSize": 1497,
         "avgTotalCards": 5.2946,
         "varTotalCards": 6.2721,
         "overdispersionAlpha": 0.0349,
-        "o35Rate": 0.7575,
-        "o45Rate": 0.5952,
-        "o55Rate": 0.4382
+        "o25Rate": 0.873,
+        "o35Rate": 0.7566,
+        "o45Rate": 0.5938,
+        "o55Rate": 0.4375
       }
     },
     "I1": {
@@ -1838,19 +1860,21 @@
         "avgTotalCorners": 9.4167,
         "varTotalCorners": 11.6714,
         "overdispersionAlpha": 0.0254,
-        "o85Rate": 0.5841,
-        "o95Rate": 0.4695,
-        "o105Rate": 0.351,
-        "o115Rate": 0.2481
+        "o75Rate": 0.69,
+        "o85Rate": 0.5846,
+        "o95Rate": 0.4704,
+        "o105Rate": 0.3521,
+        "o115Rate": 0.2483
       },
       "cards": {
         "sampleSize": 2390,
         "avgTotalCards": 4.3837,
         "varTotalCards": 4.8,
         "overdispersionAlpha": 0.0217,
-        "o35Rate": 0.636,
-        "o45Rate": 0.4439,
-        "o55Rate": 0.2787
+        "o25Rate": 0.8046,
+        "o35Rate": 0.6338,
+        "o45Rate": 0.4425,
+        "o55Rate": 0.2775
       }
     },
     "I2": {
@@ -1909,19 +1933,21 @@
         "avgTotalCorners": 9.689,
         "varTotalCorners": 11.3559,
         "overdispersionAlpha": 0.0178,
-        "o85Rate": 0.6183,
-        "o95Rate": 0.5057,
-        "o105Rate": 0.3889,
-        "o115Rate": 0.2934
+        "o75Rate": 0.7327,
+        "o85Rate": 0.6185,
+        "o95Rate": 0.506,
+        "o105Rate": 0.389,
+        "o115Rate": 0.2931
       },
       "cards": {
         "sampleSize": 2389,
         "avgTotalCards": 5.1649,
         "varTotalCards": 5.1378,
         "overdispersionAlpha": 0.01,
-        "o35Rate": 0.7602,
-        "o45Rate": 0.5956,
-        "o55Rate": 0.4198
+        "o25Rate": 0.8863,
+        "o35Rate": 0.7588,
+        "o45Rate": 0.5953,
+        "o55Rate": 0.4188
       }
     },
     "IRL": {
@@ -2091,8 +2117,9 @@
         "avgTotalCorners": 10.1523,
         "varTotalCorners": 11.7555,
         "overdispersionAlpha": 0.0156,
-        "o85Rate": 0.6754,
-        "o95Rate": 0.5494,
+        "o75Rate": 0.7747,
+        "o85Rate": 0.6749,
+        "o95Rate": 0.5489,
         "o105Rate": 0.4434,
         "o115Rate": 0.3277
       },
@@ -2101,8 +2128,9 @@
         "avgTotalCards": 3.0962,
         "varTotalCards": 3.9871,
         "overdispersionAlpha": 0.0929,
-        "o35Rate": 0.3719,
-        "o45Rate": 0.2233,
+        "o25Rate": 0.5853,
+        "o35Rate": 0.3728,
+        "o45Rate": 0.2238,
         "o55Rate": 0.1265
       }
     },
@@ -2199,6 +2227,7 @@
         "avgTotalCorners": 9.8118,
         "varTotalCorners": 11.9097,
         "overdispersionAlpha": 0.0218,
+        "o75Rate": 0.7275,
         "o85Rate": 0.6256,
         "o95Rate": 0.4995,
         "o105Rate": 0.3888,
@@ -2209,6 +2238,7 @@
         "avgTotalCards": 5.4581,
         "varTotalCards": 7.4331,
         "overdispersionAlpha": 0.0663,
+        "o25Rate": 0.8671,
         "o35Rate": 0.759,
         "o45Rate": 0.6075,
         "o55Rate": 0.4592
@@ -2381,19 +2411,21 @@
         "avgTotalCorners": 10.5426,
         "varTotalCorners": 12.4994,
         "overdispersionAlpha": 0.0176,
-        "o85Rate": 0.7027,
-        "o95Rate": 0.6001,
-        "o105Rate": 0.4796,
-        "o115Rate": 0.3701
+        "o75Rate": 0.7988,
+        "o85Rate": 0.703,
+        "o95Rate": 0.5982,
+        "o105Rate": 0.4783,
+        "o115Rate": 0.3694
       },
       "cards": {
         "sampleSize": 1443,
         "avgTotalCards": 3.8267,
         "varTotalCards": 3.8743,
         "overdispersionAlpha": 0.01,
-        "o35Rate": 0.5364,
-        "o45Rate": 0.3368,
-        "o55Rate": 0.1899
+        "o25Rate": 0.7374,
+        "o35Rate": 0.5362,
+        "o45Rate": 0.3363,
+        "o55Rate": 0.1895
       }
     },
     "SC1": {
@@ -2452,19 +2484,21 @@
         "avgTotalCorners": 10.2319,
         "varTotalCorners": 13.1882,
         "overdispersionAlpha": 0.0282,
-        "o85Rate": 0.654,
-        "o95Rate": 0.5498,
-        "o105Rate": 0.4321,
-        "o115Rate": 0.3424
+        "o75Rate": 0.7599,
+        "o85Rate": 0.6556,
+        "o95Rate": 0.5486,
+        "o105Rate": 0.4308,
+        "o115Rate": 0.3408
       },
       "cards": {
         "sampleSize": 1104,
         "avgTotalCards": 3.8469,
         "varTotalCards": 4.2186,
         "overdispersionAlpha": 0.0251,
-        "o35Rate": 0.538,
-        "o45Rate": 0.3533,
-        "o55Rate": 0.1957
+        "o25Rate": 0.7347,
+        "o35Rate": 0.5387,
+        "o45Rate": 0.3534,
+        "o55Rate": 0.196
       }
     },
     "SC2": {
@@ -2523,9 +2557,10 @@
         "avgTotalCorners": 9.8071,
         "varTotalCorners": 11.972,
         "overdispersionAlpha": 0.0225,
-        "o85Rate": 0.6271,
-        "o95Rate": 0.513,
-        "o105Rate": 0.3998,
+        "o75Rate": 0.7381,
+        "o85Rate": 0.625,
+        "o95Rate": 0.5119,
+        "o105Rate": 0.3989,
         "o115Rate": 0.2978
       },
       "cards": {
@@ -2533,9 +2568,10 @@
         "avgTotalCards": 3.8156,
         "varTotalCards": 4.0819,
         "overdispersionAlpha": 0.0183,
-        "o35Rate": 0.5338,
-        "o45Rate": 0.3429,
-        "o55Rate": 0.202
+        "o25Rate": 0.7291,
+        "o35Rate": 0.5344,
+        "o45Rate": 0.3434,
+        "o55Rate": 0.2029
       }
     },
     "SC3": {
@@ -2594,19 +2630,21 @@
         "avgTotalCorners": 9.6089,
         "varTotalCorners": 10.9895,
         "overdispersionAlpha": 0.015,
-        "o85Rate": 0.6043,
-        "o95Rate": 0.4777,
-        "o105Rate": 0.3771,
-        "o115Rate": 0.2803
+        "o75Rate": 0.723,
+        "o85Rate": 0.6048,
+        "o95Rate": 0.4783,
+        "o105Rate": 0.3758,
+        "o115Rate": 0.2798
       },
       "cards": {
         "sampleSize": 1075,
         "avgTotalCards": 4.0893,
         "varTotalCards": 4.2788,
         "overdispersionAlpha": 0.0113,
-        "o35Rate": 0.5972,
-        "o45Rate": 0.3814,
-        "o55Rate": 0.2288
+        "o25Rate": 0.7731,
+        "o35Rate": 0.5996,
+        "o45Rate": 0.3856,
+        "o55Rate": 0.2297
       }
     },
     "SP1": {
@@ -2665,19 +2703,21 @@
         "avgTotalCorners": 9.3914,
         "varTotalCorners": 10.9005,
         "overdispersionAlpha": 0.0171,
-        "o85Rate": 0.5827,
-        "o95Rate": 0.4614,
-        "o105Rate": 0.3476,
-        "o115Rate": 0.2447
+        "o75Rate": 0.7049,
+        "o85Rate": 0.5836,
+        "o95Rate": 0.462,
+        "o105Rate": 0.3479,
+        "o115Rate": 0.2445
       },
       "cards": {
         "sampleSize": 2399,
         "avgTotalCards": 4.9487,
         "varTotalCards": 6.5883,
         "overdispersionAlpha": 0.0669,
-        "o35Rate": 0.6924,
-        "o45Rate": 0.5306,
-        "o55Rate": 0.3764
+        "o25Rate": 0.8319,
+        "o35Rate": 0.6928,
+        "o45Rate": 0.5309,
+        "o55Rate": 0.3761
       }
     },
     "SP2": {
@@ -2736,19 +2776,21 @@
         "avgTotalCorners": 9.2033,
         "varTotalCorners": 10.2568,
         "overdispersionAlpha": 0.0124,
-        "o85Rate": 0.5628,
-        "o95Rate": 0.4416,
-        "o105Rate": 0.3163,
-        "o115Rate": 0.2249
+        "o75Rate": 0.6967,
+        "o85Rate": 0.5637,
+        "o95Rate": 0.4431,
+        "o105Rate": 0.3183,
+        "o115Rate": 0.2267
       },
       "cards": {
         "sampleSize": 2912,
         "avgTotalCards": 5.1271,
         "varTotalCards": 6.056,
         "overdispersionAlpha": 0.0353,
-        "o35Rate": 0.7376,
-        "o45Rate": 0.5755,
-        "o55Rate": 0.4214
+        "o25Rate": 0.863,
+        "o35Rate": 0.7393,
+        "o45Rate": 0.5777,
+        "o55Rate": 0.4237
       }
     },
     "SWE": {
@@ -2881,18 +2923,20 @@
         "avgTotalCorners": 9.5682,
         "varTotalCorners": 10.8278,
         "overdispersionAlpha": 0.0138,
-        "o85Rate": 0.6034,
-        "o95Rate": 0.4873,
-        "o105Rate": 0.3652,
-        "o115Rate": 0.2635
+        "o75Rate": 0.7247,
+        "o85Rate": 0.6032,
+        "o95Rate": 0.4871,
+        "o105Rate": 0.3651,
+        "o115Rate": 0.2633
       },
       "cards": {
         "sampleSize": 1818,
         "avgTotalCards": 4.676,
         "varTotalCards": 6.6099,
         "overdispersionAlpha": 0.0884,
-        "o35Rate": 0.6491,
-        "o45Rate": 0.4857,
+        "o25Rate": 0.7991,
+        "o35Rate": 0.6481,
+        "o45Rate": 0.4849,
         "o55Rate": 0.3339
       }
     },
@@ -3555,6 +3599,578 @@
         "brierSkill": 0.0068,
         "ci95Lower": 0.0033,
         "ci95Upper": 0.0103,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      }
+    },
+    "teamMultiGoalsPerLeague": {
+      "ARG": {
+        "competitionCode": "ARG",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 1999,
+        "samples": 15992,
+        "modelBrier": 0.21456,
+        "baseBrier": 0.2162,
+        "modelLogLoss": 0.61847,
+        "baseLogLoss": 0.62257,
+        "brierSkill": 0.0076,
+        "ci95Lower": 0.0007,
+        "ci95Upper": 0.0145,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "AUT": {
+        "competitionCode": "AUT",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 688,
+        "samples": 5504,
+        "modelBrier": 0.22629,
+        "baseBrier": 0.23131,
+        "modelLogLoss": 0.64424,
+        "baseLogLoss": 0.65512,
+        "brierSkill": 0.0217,
+        "ci95Lower": 0.0108,
+        "ci95Upper": 0.0328,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "B1": {
+        "competitionCode": "B1",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1013,
+        "samples": 8104,
+        "modelBrier": 0.22436,
+        "baseBrier": 0.23196,
+        "modelLogLoss": 0.63984,
+        "baseLogLoss": 0.65645,
+        "brierSkill": 0.0328,
+        "ci95Lower": 0.024,
+        "ci95Upper": 0.0407,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "BSA": {
+        "competitionCode": "BSA",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 1482,
+        "samples": 11856,
+        "modelBrier": 0.22091,
+        "baseBrier": 0.22295,
+        "modelLogLoss": 0.63261,
+        "baseLogLoss": 0.63733,
+        "brierSkill": 0.0092,
+        "ci95Lower": 0.0016,
+        "ci95Upper": 0.0165,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "CHN": {
+        "competitionCode": "CHN",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 882,
+        "samples": 7056,
+        "modelBrier": 0.22599,
+        "baseBrier": 0.23204,
+        "modelLogLoss": 0.64362,
+        "baseLogLoss": 0.65649,
+        "brierSkill": 0.0261,
+        "ci95Lower": 0.0145,
+        "ci95Upper": 0.0372,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "D1": {
+        "competitionCode": "D1",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1002,
+        "samples": 8016,
+        "modelBrier": 0.22799,
+        "baseBrier": 0.23547,
+        "modelLogLoss": 0.64789,
+        "baseLogLoss": 0.66354,
+        "brierSkill": 0.0318,
+        "ci95Lower": 0.0214,
+        "ci95Upper": 0.042,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "D2": {
+        "competitionCode": "D2",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1013,
+        "samples": 8104,
+        "modelBrier": 0.23336,
+        "baseBrier": 0.23354,
+        "modelLogLoss": 0.65919,
+        "baseLogLoss": 0.65945,
+        "brierSkill": 0.0008,
+        "ci95Lower": -0.0068,
+        "ci95Upper": 0.0087,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
+      },
+      "DNK": {
+        "competitionCode": "DNK",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 701,
+        "samples": 5608,
+        "modelBrier": 0.22935,
+        "baseBrier": 0.23318,
+        "modelLogLoss": 0.6509,
+        "baseLogLoss": 0.65883,
+        "brierSkill": 0.0164,
+        "ci95Lower": 0.0077,
+        "ci95Upper": 0.0262,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "E0": {
+        "competitionCode": "E0",
+        "leagueGroup": "UK_WITH_REF",
+        "matches": 1285,
+        "samples": 10280,
+        "modelBrier": 0.22769,
+        "baseBrier": 0.2347,
+        "modelLogLoss": 0.64721,
+        "baseLogLoss": 0.66203,
+        "brierSkill": 0.0299,
+        "ci95Lower": 0.0221,
+        "ci95Upper": 0.0381,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "E1": {
+        "competitionCode": "E1",
+        "leagueGroup": "UK_WITH_REF",
+        "matches": 1816,
+        "samples": 14528,
+        "modelBrier": 0.22159,
+        "baseBrier": 0.22505,
+        "modelLogLoss": 0.63422,
+        "baseLogLoss": 0.6421,
+        "brierSkill": 0.0154,
+        "ci95Lower": 0.008,
+        "ci95Upper": 0.0222,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "E2": {
+        "competitionCode": "E2",
+        "leagueGroup": "UK_WITH_REF",
+        "matches": 1767,
+        "samples": 14136,
+        "modelBrier": 0.22471,
+        "baseBrier": 0.2288,
+        "modelLogLoss": 0.64088,
+        "baseLogLoss": 0.64988,
+        "brierSkill": 0.0179,
+        "ci95Lower": 0.012,
+        "ci95Upper": 0.0248,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "E3": {
+        "competitionCode": "E3",
+        "leagueGroup": "UK_WITH_REF",
+        "matches": 1817,
+        "samples": 14536,
+        "modelBrier": 0.22711,
+        "baseBrier": 0.22827,
+        "modelLogLoss": 0.64613,
+        "baseLogLoss": 0.6488,
+        "brierSkill": 0.0051,
+        "ci95Lower": -0.0009,
+        "ci95Upper": 0.0107,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
+      },
+      "EC": {
+        "competitionCode": "EC",
+        "leagueGroup": "UK_WITH_REF",
+        "matches": 1783,
+        "samples": 14264,
+        "modelBrier": 0.22707,
+        "baseBrier": 0.23127,
+        "modelLogLoss": 0.64601,
+        "baseLogLoss": 0.65503,
+        "brierSkill": 0.0182,
+        "ci95Lower": 0.0124,
+        "ci95Upper": 0.0242,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "F1": {
+        "competitionCode": "F1",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1068,
+        "samples": 8544,
+        "modelBrier": 0.22841,
+        "baseBrier": 0.23272,
+        "modelLogLoss": 0.64873,
+        "baseLogLoss": 0.65796,
+        "brierSkill": 0.0185,
+        "ci95Lower": 0.0102,
+        "ci95Upper": 0.0273,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "F2": {
+        "competitionCode": "F2",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1094,
+        "samples": 8752,
+        "modelBrier": 0.2292,
+        "baseBrier": 0.23026,
+        "modelLogLoss": 0.65082,
+        "baseLogLoss": 0.65306,
+        "brierSkill": 0.0046,
+        "ci95Lower": -0.0029,
+        "ci95Upper": 0.0125,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
+      },
+      "FIN": {
+        "competitionCode": "FIN",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 664,
+        "samples": 5312,
+        "modelBrier": 0.22695,
+        "baseBrier": 0.23464,
+        "modelLogLoss": 0.64539,
+        "baseLogLoss": 0.66203,
+        "brierSkill": 0.0328,
+        "ci95Lower": 0.0201,
+        "ci95Upper": 0.0433,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "G1": {
+        "competitionCode": "G1",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 773,
+        "samples": 6184,
+        "modelBrier": 0.22071,
+        "baseBrier": 0.23404,
+        "modelLogLoss": 0.63199,
+        "baseLogLoss": 0.66092,
+        "brierSkill": 0.057,
+        "ci95Lower": 0.0465,
+        "ci95Upper": 0.071,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "I1": {
+        "competitionCode": "I1",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1320,
+        "samples": 10560,
+        "modelBrier": 0.22151,
+        "baseBrier": 0.23074,
+        "modelLogLoss": 0.63352,
+        "baseLogLoss": 0.65397,
+        "brierSkill": 0.04,
+        "ci95Lower": 0.0314,
+        "ci95Upper": 0.0505,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "I2": {
+        "competitionCode": "I2",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1214,
+        "samples": 9712,
+        "modelBrier": 0.22155,
+        "baseBrier": 0.22379,
+        "modelLogLoss": 0.63468,
+        "baseLogLoss": 0.6395,
+        "brierSkill": 0.01,
+        "ci95Lower": 0.003,
+        "ci95Upper": 0.0169,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "IRL": {
+        "competitionCode": "IRL",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 683,
+        "samples": 5464,
+        "modelBrier": 0.22311,
+        "baseBrier": 0.22811,
+        "modelLogLoss": 0.63768,
+        "baseLogLoss": 0.64846,
+        "brierSkill": 0.0219,
+        "ci95Lower": 0.009,
+        "ci95Upper": 0.0354,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "JPN": {
+        "competitionCode": "JPN",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 1114,
+        "samples": 8912,
+        "modelBrier": 0.22578,
+        "baseBrier": 0.22887,
+        "modelLogLoss": 0.64288,
+        "baseLogLoss": 0.65001,
+        "brierSkill": 0.0135,
+        "ci95Lower": 0.0064,
+        "ci95Upper": 0.0219,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "MEX": {
+        "competitionCode": "MEX",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 1101,
+        "samples": 8808,
+        "modelBrier": 0.22689,
+        "baseBrier": 0.23097,
+        "modelLogLoss": 0.64557,
+        "baseLogLoss": 0.65432,
+        "brierSkill": 0.0176,
+        "ci95Lower": 0.0091,
+        "ci95Upper": 0.0256,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "N1": {
+        "competitionCode": "N1",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1061,
+        "samples": 8488,
+        "modelBrier": 0.22628,
+        "baseBrier": 0.23723,
+        "modelLogLoss": 0.64357,
+        "baseLogLoss": 0.66723,
+        "brierSkill": 0.0462,
+        "ci95Lower": 0.0354,
+        "ci95Upper": 0.0568,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "NOR": {
+        "competitionCode": "NOR",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 918,
+        "samples": 7344,
+        "modelBrier": 0.23061,
+        "baseBrier": 0.236,
+        "modelLogLoss": 0.65348,
+        "baseLogLoss": 0.66474,
+        "brierSkill": 0.0228,
+        "ci95Lower": 0.0138,
+        "ci95Upper": 0.0323,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "P1": {
+        "competitionCode": "P1",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1041,
+        "samples": 8326,
+        "modelBrier": 0.21964,
+        "baseBrier": 0.23159,
+        "modelLogLoss": 0.62943,
+        "baseLogLoss": 0.65566,
+        "brierSkill": 0.0516,
+        "ci95Lower": 0.0416,
+        "ci95Upper": 0.0636,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "POL": {
+        "competitionCode": "POL",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 1061,
+        "samples": 8488,
+        "modelBrier": 0.22677,
+        "baseBrier": 0.22837,
+        "modelLogLoss": 0.6457,
+        "baseLogLoss": 0.64887,
+        "brierSkill": 0.007,
+        "ci95Lower": -0.001,
+        "ci95Upper": 0.0156,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
+      },
+      "ROU": {
+        "competitionCode": "ROU",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 1086,
+        "samples": 8688,
+        "modelBrier": 0.22368,
+        "baseBrier": 0.22678,
+        "modelLogLoss": 0.63872,
+        "baseLogLoss": 0.64563,
+        "brierSkill": 0.0137,
+        "ci95Lower": 0.0055,
+        "ci95Upper": 0.0212,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "RUS": {
+        "competitionCode": "RUS",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 775,
+        "samples": 6200,
+        "modelBrier": 0.22023,
+        "baseBrier": 0.22773,
+        "modelLogLoss": 0.63067,
+        "baseLogLoss": 0.64752,
+        "brierSkill": 0.033,
+        "ci95Lower": 0.0195,
+        "ci95Upper": 0.0451,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "SC0": {
+        "competitionCode": "SC0",
+        "leagueGroup": "UK_WITH_REF",
+        "matches": 799,
+        "samples": 6392,
+        "modelBrier": 0.22606,
+        "baseBrier": 0.23576,
+        "modelLogLoss": 0.64345,
+        "baseLogLoss": 0.66432,
+        "brierSkill": 0.0412,
+        "ci95Lower": 0.0262,
+        "ci95Upper": 0.0552,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "SC1": {
+        "competitionCode": "SC1",
+        "leagueGroup": "UK_WITH_REF",
+        "matches": 574,
+        "samples": 4592,
+        "modelBrier": 0.2305,
+        "baseBrier": 0.23301,
+        "modelLogLoss": 0.65333,
+        "baseLogLoss": 0.65854,
+        "brierSkill": 0.0108,
+        "ci95Lower": -0.0019,
+        "ci95Upper": 0.0228,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
+      },
+      "SC2": {
+        "competitionCode": "SC2",
+        "leagueGroup": "UK_WITH_REF",
+        "matches": 562,
+        "samples": 4496,
+        "modelBrier": 0.22661,
+        "baseBrier": 0.23143,
+        "modelLogLoss": 0.64482,
+        "baseLogLoss": 0.65532,
+        "brierSkill": 0.0208,
+        "ci95Lower": 0.0096,
+        "ci95Upper": 0.0339,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "SC3": {
+        "competitionCode": "SC3",
+        "leagueGroup": "UK_WITH_REF",
+        "matches": 599,
+        "samples": 4792,
+        "modelBrier": 0.2312,
+        "baseBrier": 0.23013,
+        "modelLogLoss": 0.65506,
+        "baseLogLoss": 0.65251,
+        "brierSkill": -0.0047,
+        "ci95Lower": -0.0168,
+        "ci95Upper": 0.0057,
+        "beatsBaseline": false,
+        "tierMode": "SPECULATIVE_ONLY"
+      },
+      "SP1": {
+        "competitionCode": "SP1",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1312,
+        "samples": 10496,
+        "modelBrier": 0.21992,
+        "baseBrier": 0.22734,
+        "modelLogLoss": 0.63099,
+        "baseLogLoss": 0.64689,
+        "brierSkill": 0.0326,
+        "ci95Lower": 0.0235,
+        "ci95Upper": 0.0413,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "SP2": {
+        "competitionCode": "SP2",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1539,
+        "samples": 12312,
+        "modelBrier": 0.22276,
+        "baseBrier": 0.22568,
+        "modelLogLoss": 0.63678,
+        "baseLogLoss": 0.64343,
+        "brierSkill": 0.0129,
+        "ci95Lower": 0.0061,
+        "ci95Upper": 0.0195,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "SWE": {
+        "competitionCode": "SWE",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 911,
+        "samples": 7288,
+        "modelBrier": 0.22977,
+        "baseBrier": 0.2339,
+        "modelLogLoss": 0.65164,
+        "baseLogLoss": 0.66045,
+        "brierSkill": 0.0177,
+        "ci95Lower": 0.0075,
+        "ci95Upper": 0.0268,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "SWZ": {
+        "competitionCode": "SWZ",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 801,
+        "samples": 6408,
+        "modelBrier": 0.22716,
+        "baseBrier": 0.23026,
+        "modelLogLoss": 0.64606,
+        "baseLogLoss": 0.65275,
+        "brierSkill": 0.0135,
+        "ci95Lower": 0.0043,
+        "ci95Upper": 0.0233,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "T1": {
+        "competitionCode": "T1",
+        "leagueGroup": "EURO_NO_REF",
+        "matches": 1144,
+        "samples": 9152,
+        "modelBrier": 0.22629,
+        "baseBrier": 0.23412,
+        "modelLogLoss": 0.6442,
+        "baseLogLoss": 0.6608,
+        "brierSkill": 0.0334,
+        "ci95Lower": 0.0234,
+        "ci95Upper": 0.0428,
+        "beatsBaseline": true,
+        "tierMode": "ENABLED"
+      },
+      "USA": {
+        "competitionCode": "USA",
+        "leagueGroup": "EXTRA_GOALS_ONLY",
+        "matches": 1896,
+        "samples": 15168,
+        "modelBrier": 0.23121,
+        "baseBrier": 0.2338,
+        "modelLogLoss": 0.65473,
+        "baseLogLoss": 0.66017,
+        "brierSkill": 0.0111,
+        "ci95Lower": 0.0054,
+        "ci95Upper": 0.0168,
         "beatsBaseline": true,
         "tierMode": "ENABLED"
       }

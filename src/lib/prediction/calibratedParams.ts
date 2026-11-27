@@ -41,6 +41,7 @@ export interface CalibratedCornersConfig {
   avgTotalCorners: number;
   varTotalCorners: number;
   overdispersionAlpha: number;
+  o75Rate: number;
   o85Rate: number;
   o95Rate: number;
   o105Rate: number;
@@ -52,6 +53,7 @@ export interface CalibratedCardsConfig {
   avgTotalCards: number;
   varTotalCards: number;
   overdispersionAlpha: number;
+  o25Rate: number;
   o35Rate: number;
   o45Rate: number;
   o55Rate: number;
@@ -193,6 +195,7 @@ export interface CalibratedParamsData {
       baseBrier: number;
     }>;
     perLeague?: Record<string, MultiGoalsLeagueValidation>;
+    teamMultiGoalsPerLeague?: Record<string, MultiGoalsLeagueValidation>;
   };
   leagues: Record<string, CalibratedLeagueConfig>;
 }
@@ -317,4 +320,10 @@ export function getMultiGoalsLeagueValidation(compCode?: string | null): MultiGo
   const canon = getCanonicalLeagueKey(compCode);
   if (!canon) return null;
   return DATA.multiGoalsValidation?.perLeague?.[canon] || null;
+}
+
+export function getTeamMultiGoalsLeagueValidation(compCode?: string | null): MultiGoalsLeagueValidation | null {
+  const canon = getCanonicalLeagueKey(compCode);
+  if (!canon) return null;
+  return DATA.multiGoalsValidation?.teamMultiGoalsPerLeague?.[canon] || DATA.multiGoalsValidation?.perLeague?.[canon] || null;
 }

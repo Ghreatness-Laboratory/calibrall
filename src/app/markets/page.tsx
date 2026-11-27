@@ -35,9 +35,20 @@ const FOOTBALL_MARKET_OPTIONS: {
   { code: 'TOTAL_GOALS_O20_PUSH', label: '4. Over 2.0 goals (push at 2)', optionType: 'over_under_goals', category: 'total_goals', period: 'Regular time' },
   { code: 'BTTS_YES', label: '5. Both teams to score (Yes)', optionType: 'both_teams_to_score', category: 'btts', period: 'Regular time' },
   { code: 'BTTS_NO', label: '5. Both teams to score (No)', optionType: 'both_teams_to_score', category: 'btts', period: 'Regular time' },
-  { code: 'TOTAL_CORNERS_O95', label: '6. Over 9.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'TEAM_CORNERS_HOME_O45', label: '6. Home over 4.5 corners', optionType: 'corners', category: 'team_corners', period: 'Regular time' },
+  { code: 'CORNERS_O75', label: '6. Over 7.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_O85', label: '6. Over 8.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_O95', label: '6. Over 9.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_O105', label: '6. Over 10.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_O115', label: '6. Over 11.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_U75', label: '6. Under 7.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_U85', label: '6. Under 8.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_U95', label: '6. Under 9.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_U105', label: '6. Under 10.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_U115', label: '6. Under 11.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CARDS_O25', label: '7. Over 2.5 cards', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
+  { code: 'CARDS_O35', label: '7. Over 3.5 cards', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
   { code: 'CARDS_O45', label: '7. Over 4.5 cards', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
+  { code: 'CARDS_O55', label: '7. Over 5.5 cards', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
   { code: 'CARDS_UNDER', label: '7. Under cards', optionType: 'bookings', category: 'bookings', period: 'Regular time', disabledRecommendation: true },
   { code: 'HSH_2ND', label: '8. Highest scoring half: 2nd half', optionType: 'highest_scoring_half', category: 'half_time', period: 'Full time' },
   { code: 'FH_GOALS_O05', label: '9. 1st half over 0.5 goals', optionType: 'first_half_goals', category: 'half_time', period: '1st half' },
@@ -46,8 +57,14 @@ const FOOTBALL_MARKET_OPTIONS: {
   { code: 'MULTI_GOALS_2_4', label: '11. Multi goals: 2 to 4 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
   { code: 'MULTI_GOALS_2_3', label: '11. Multi goals: 2 to 3 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
   { code: 'MULTI_GOALS_3_5', label: '11. Multi goals: 3 to 5 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'TEAM_MULTI_GOALS_HOME_0_1', label: '11. Home multi goals: 0 to 1', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
   { code: 'TEAM_MULTI_GOALS_HOME_1_2', label: '11. Home multi goals: 1 to 2', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'TEAM_MULTI_GOALS_HOME_1_3', label: '11. Home multi goals: 1 to 3', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'TEAM_MULTI_GOALS_HOME_2_3', label: '11. Home multi goals: 2 to 3', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
   { code: 'TEAM_MULTI_GOALS_AWAY_0_1', label: '11. Away multi goals: 0 to 1', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'TEAM_MULTI_GOALS_AWAY_1_2', label: '11. Away multi goals: 1 to 2', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'TEAM_MULTI_GOALS_AWAY_1_3', label: '11. Away multi goals: 1 to 3', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'TEAM_MULTI_GOALS_AWAY_2_3', label: '11. Away multi goals: 2 to 3', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
   { code: 'FH_MULTI_GOALS_0_1', label: '11. 1st half multi goals: 0 to 1', optionType: 'first_half_multi_goals', category: 'multi_goals', period: '1st half' },
   { code: 'FH_MULTI_GOALS_1_2', label: '11. 1st half multi goals: 1 to 2', optionType: 'first_half_multi_goals', category: 'multi_goals', period: '1st half' },
 ];
@@ -197,7 +214,11 @@ export default function MarketExplorerPage() {
         }
       });
 
-    return list.sort((a, b) => b.prediction.modelProbability - a.prediction.modelProbability);
+    return list.sort(
+      (a, b) =>
+        (b.prediction.calibratedProbability ?? b.prediction.modelProbability) -
+        (a.prediction.calibratedProbability ?? a.prediction.modelProbability)
+    );
   }, [fixtures, evaluations, isBasketball, basketballLeagueFilter, selectedBasketballCat, selectedFootballLine]);
 
   const activeOption =
@@ -485,6 +506,8 @@ export default function MarketExplorerPage() {
                             className={
                               prediction.isSpeculative
                                 ? 'text-[var(--medium)] font-semibold'
+                                : !prediction.isValidated
+                                ? 'text-[var(--text-3)]'
                                 : prediction.confidenceTier === 'HIGH'
                                 ? 'text-[var(--accent)] font-semibold'
                                 : 'text-[var(--text-2)]'
@@ -492,13 +515,13 @@ export default function MarketExplorerPage() {
                           >
                             {prediction.isSpeculative
                               ? 'Speculative'
+                              : !prediction.isValidated
+                              ? 'Unvalidated'
                               : prediction.confidenceTier === 'HIGH'
                               ? 'High'
                               : prediction.confidenceTier === 'MEDIUM'
                               ? 'Medium'
-                              : prediction.marketCategory === 'multi_goals'
-                              ? 'Low'
-                              : 'Analysis only'}
+                              : 'Low'}
                           </span>
                         </td>
                         <td className="py-3 px-3.5 text-right">

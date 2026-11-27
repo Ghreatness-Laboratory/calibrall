@@ -80,8 +80,15 @@ export const REAL_LEAGUE_HISTORICAL_FREQUENCIES: Record<string, {
   shHomeWinRate: number;
   shDrawRate: number;
   shAwayWinRate: number;
+  cornersO75Rate: number;
+  cornersO85Rate: number;
   cornersO95Rate: number;
+  cornersO105Rate: number;
+  cornersO115Rate: number;
+  cardsO25Rate: number;
+  cardsO35Rate: number;
   cardsO45Rate: number;
+  cardsO55Rate: number;
 }> = {
   PL: {
     avgGoals: 2.88,
@@ -102,8 +109,15 @@ export const REAL_LEAGUE_HISTORICAL_FREQUENCIES: Record<string, {
     shHomeWinRate: 0.435,
     shDrawRate: 0.328,
     shAwayWinRate: 0.237,
+    cornersO75Rate: 0.781,
+    cornersO85Rate: 0.674,
     cornersO95Rate: 0.558,
+    cornersO105Rate: 0.435,
+    cornersO115Rate: 0.331,
+    cardsO25Rate: 0.711,
+    cardsO35Rate: 0.524,
     cardsO45Rate: 0.428,
+    cardsO55Rate: 0.194,
   },
   PD: {
     avgGoals: 2.54,
@@ -124,8 +138,15 @@ export const REAL_LEAGUE_HISTORICAL_FREQUENCIES: Record<string, {
     shHomeWinRate: 0.412,
     shDrawRate: 0.352,
     shAwayWinRate: 0.236,
+    cornersO75Rate: 0.695,
+    cornersO85Rate: 0.578,
     cornersO95Rate: 0.462,
+    cornersO105Rate: 0.348,
+    cornersO115Rate: 0.245,
+    cardsO25Rate: 0.858,
+    cardsO35Rate: 0.718,
     cardsO45Rate: 0.542,
+    cardsO55Rate: 0.382,
   },
   BL1: {
     avgGoals: 3.18,
@@ -146,8 +167,15 @@ export const REAL_LEAGUE_HISTORICAL_FREQUENCIES: Record<string, {
     shHomeWinRate: 0.428,
     shDrawRate: 0.318,
     shAwayWinRate: 0.254,
+    cornersO75Rate: 0.745,
+    cornersO85Rate: 0.640,
     cornersO95Rate: 0.534,
+    cornersO105Rate: 0.415,
+    cornersO115Rate: 0.305,
+    cardsO25Rate: 0.718,
+    cardsO35Rate: 0.525,
     cardsO45Rate: 0.348,
+    cardsO55Rate: 0.195,
   },
   SA: {
     avgGoals: 2.62,
@@ -168,8 +196,15 @@ export const REAL_LEAGUE_HISTORICAL_FREQUENCIES: Record<string, {
     shHomeWinRate: 0.418,
     shDrawRate: 0.346,
     shAwayWinRate: 0.236,
+    cornersO75Rate: 0.715,
+    cornersO85Rate: 0.602,
     cornersO95Rate: 0.485,
+    cornersO105Rate: 0.370,
+    cornersO115Rate: 0.265,
+    cardsO25Rate: 0.818,
+    cardsO35Rate: 0.665,
     cardsO45Rate: 0.495,
+    cardsO55Rate: 0.332,
   },
   CL: {
     avgGoals: 3.02,
@@ -190,8 +225,15 @@ export const REAL_LEAGUE_HISTORICAL_FREQUENCIES: Record<string, {
     shHomeWinRate: 0.442,
     shDrawRate: 0.315,
     shAwayWinRate: 0.243,
+    cornersO75Rate: 0.735,
+    cornersO85Rate: 0.625,
     cornersO95Rate: 0.515,
+    cornersO105Rate: 0.398,
+    cornersO115Rate: 0.292,
+    cardsO25Rate: 0.745,
+    cardsO35Rate: 0.565,
     cardsO45Rate: 0.385,
+    cardsO55Rate: 0.235,
   },
   DEFAULT: {
     avgGoals: 2.78,
@@ -212,8 +254,15 @@ export const REAL_LEAGUE_HISTORICAL_FREQUENCIES: Record<string, {
     shHomeWinRate: 0.425,
     shDrawRate: 0.335,
     shAwayWinRate: 0.240,
+    cornersO75Rate: 0.740,
+    cornersO85Rate: 0.628,
     cornersO95Rate: 0.510,
+    cornersO105Rate: 0.392,
+    cornersO115Rate: 0.285,
+    cardsO25Rate: 0.770,
+    cardsO35Rate: 0.600,
     cardsO45Rate: 0.445,
+    cardsO55Rate: 0.280,
   },
 };
 
@@ -253,8 +302,15 @@ function resolveCompetitionFreq(competitionCode: string) {
     shHomeWinRate: cal.halves?.shHomeWinRate ?? fallback.shHomeWinRate,
     shDrawRate: cal.halves?.shDrawRate ?? fallback.shDrawRate,
     shAwayWinRate: cal.halves?.shAwayWinRate ?? fallback.shAwayWinRate,
+    cornersO75Rate: cal.corners?.o75Rate ?? fallback.cornersO75Rate,
+    cornersO85Rate: cal.corners?.o85Rate ?? fallback.cornersO85Rate,
     cornersO95Rate: cal.corners?.o95Rate ?? fallback.cornersO95Rate,
+    cornersO105Rate: cal.corners?.o105Rate ?? fallback.cornersO105Rate,
+    cornersO115Rate: cal.corners?.o115Rate ?? fallback.cornersO115Rate,
+    cardsO25Rate: cal.cards?.o25Rate ?? fallback.cardsO25Rate,
+    cardsO35Rate: cal.cards?.o35Rate ?? fallback.cardsO35Rate,
     cardsO45Rate: cal.cards?.o45Rate ?? fallback.cardsO45Rate,
+    cardsO55Rate: cal.cards?.o55Rate ?? fallback.cardsO55Rate,
   };
 }
 
@@ -428,16 +484,17 @@ export function getMarketBaseline(
     const l = line ?? 9.5;
 
     let cOver = comp.cornersO95Rate;
-    if (l <= 8.5) cOver = 0.68;
+    if (l <= 7.5) cOver = comp.cornersO75Rate;
+    else if (l <= 8.5) cOver = comp.cornersO85Rate;
     else if (l <= 9.5) cOver = comp.cornersO95Rate;
-    else if (l <= 10.5) cOver = 0.42;
-    else if (l <= 11.5) cOver = 0.32;
+    else if (l <= 10.5) cOver = comp.cornersO105Rate;
+    else cOver = comp.cornersO115Rate;
 
     let tOver = cOver;
     if (teamStats?.homeTeamHomeCornersAvg && teamStats?.awayTeamAwayCornersAvg) {
       const expTotal = teamStats.homeTeamHomeCornersAvg + teamStats.awayTeamAwayCornersAvg;
       const cornerRatio = expTotal / comp.avgCorners;
-      tOver = Math.min(0.88, Math.max(0.18, cOver * cornerRatio));
+      tOver = Math.min(0.92, Math.max(0.14, cOver * cornerRatio));
     }
 
     compRate = isOver ? cOver : (1 - cOver);
@@ -451,10 +508,10 @@ export function getMarketBaseline(
     const l = line ?? 4.5;
 
     let cOver = comp.cardsO45Rate;
-    if (l <= 2.5) cOver = 0.78;
-    else if (l <= 3.5) cOver = 0.65;
+    if (l <= 2.5) cOver = comp.cardsO25Rate;
+    else if (l <= 3.5) cOver = comp.cardsO35Rate;
     else if (l <= 4.5) cOver = comp.cardsO45Rate;
-    else if (l <= 5.5) cOver = 0.28;
+    else cOver = comp.cardsO55Rate;
 
     compRate = isOver ? cOver : (1 - cOver);
     teamRate = compRate;

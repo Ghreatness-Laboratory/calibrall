@@ -528,7 +528,7 @@ export class DixonColesV25Engine {
       getLeagueCalibratedConfig(features.competitionCode)?.corners?.overdispersionAlpha ??
       0.085;
 
-    const lines = [8.5, 9.5, 10.5, 11.5];
+    const lines = [7.5, 8.5, 9.5, 10.5, 11.5];
     const overUnderLines: Record<number, { over: number; under: number }> = {};
 
     lines.forEach(l => {

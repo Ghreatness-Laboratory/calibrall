@@ -1220,7 +1220,7 @@ export default function MatchAnalysisPage() {
               </h3>
             </div>
             <span className="text-[11px] text-[var(--text-2)] tabular-nums">
-              {totalCorners !== null ? `${totalCorners.toFixed(1)} expected` : 'Unavailable'}
+              {totalCorners !== null ? `${totalCorners.toFixed(1)} expected` : 'Needs history'}
             </span>
           </div>
 
@@ -1282,7 +1282,7 @@ export default function MatchAnalysisPage() {
             </div>
           ) : (
             <div className="p-4 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] text-center text-[12.5px] text-[var(--text-2)]">
-              Corner market lines are withheld because verified corner history is unavailable for this fixture.
+              Needs history: corner market lines are withheld because verified corner history is unavailable for this fixture.
             </div>
           )}
         </div>

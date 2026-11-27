@@ -166,14 +166,18 @@ function runMultiGoalsTests() {
       }
     }
 
-    // Line ladder collapses multi_goals to at most ONE winning ranked candidate
+    // Line ladder collapses each Multi goals scope (full_match, home, away, first_half) to at most ONE winning ranked candidate
+    for (const scope of ['full_match', 'home', 'away', 'first_half'] as const) {
+      const scopedRanked = plMg.filter(p => p.multiGoalsMeta?.scope === scope && p.rankingScore > 0);
+      assert.ok(scopedRanked.length <= 1, `Multi goals ladder (${scope}) must recommend at most 1 line, got ${scopedRanked.length}`);
+    }
     const rankedMg = plMg.filter(p => p.rankingScore > 0);
-    assert.ok(rankedMg.length <= 1, `Multi goals ladder must recommend at most 1 line, got ${rankedMg.length}`);
-    if (rankedMg.length === 1) {
-      const winner = rankedMg[0];
-      assert.ok((winner.multiGoalsMeta?.span ?? 9) <= 4, 'Ladder winner obeys span cap');
-      assert.ok((winner.plainEnglishReason || '').includes('range width'), 'Evidence includes range width');
-      assert.ok((winner.plainEnglishReason || '').includes('Model line, no market price'), 'Evidence explains model line without price');
+    if (rankedMg.length >= 1) {
+      for (const winner of rankedMg) {
+        assert.ok((winner.multiGoalsMeta?.span ?? 9) <= 4, 'Ladder winner obeys span cap');
+        assert.ok((winner.plainEnglishReason || '').includes('range width'), 'Evidence includes range width');
+        assert.ok((winner.plainEnglishReason || '').includes('Model line, no market price'), 'Evidence explains model line without price');
+      }
     }
 
     // 4b. EXTRA_GOALS_ONLY league (BSA) omits 1st-half Multi goals (20 ranges only)
@@ -236,6 +240,29 @@ function runMultiGoalsTests() {
       assert.equal(p.rankingScore, 0, 'Speculative league Multi goals rankingScore must be 0');
       assert.equal(p.isTopPick, false, 'Speculative league Multi goals cannot become topPick');
     }
+
+    // 4d-bis. Dedicated Team Multi Goals per-league validation: POL passes full_match MG but is SPECULATIVE_ONLY for team MG; I2 passes both
+    const polEval = DixonColesV25Evaluator.evaluateFixture(
+      makeBaseContext({
+        fixtureId: 'fix_mg_pol',
+        competitionCode: 'POL',
+        competitionName: 'Ekstraklasa',
+      })
+    );
+    const polFull = polEval.predictions.filter(p => p.optionType === 'multi_goals');
+    const polTeam = polEval.predictions.filter(p => p.optionType === 'team_multi_goals');
+    assert.ok(polFull.length > 0 && polFull.every(p => !p.isSpeculative), 'POL full match Multi goals must be enabled (not speculative)');
+    assert.ok(polTeam.length > 0 && polTeam.every(p => p.isSpeculative && p.rankingScore === 0), 'POL Team multi goals must be marked speculative and non-ranking');
+
+    const i2Eval = DixonColesV25Evaluator.evaluateFixture(
+      makeBaseContext({
+        fixtureId: 'fix_mg_i2',
+        competitionCode: 'I2',
+        competitionName: 'Serie B',
+      })
+    );
+    const i2Team = i2Eval.predictions.filter(p => p.optionType === 'team_multi_goals');
+    assert.ok(i2Team.length > 0 && i2Team.every(p => !p.isSpeculative), 'I2 Team multi goals must pass its dedicated league backtest');
 
     // 4e. Missing history abstains cleanly
     const thinEval = DixonColesV25Evaluator.evaluateFixture(

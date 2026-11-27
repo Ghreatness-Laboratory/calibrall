@@ -271,11 +271,11 @@ function main() {
 
     const cornerTotals: number[] = [];
     const cornerSeasons = new Set<string>();
-    let sumHC = 0, sumAC = 0, cO85 = 0, cO95 = 0, cO105 = 0, cO115 = 0;
+    let sumHC = 0, sumAC = 0, cO75 = 0, cO85 = 0, cO95 = 0, cO105 = 0, cO115 = 0;
 
     const cardTotals: number[] = [];
     const cardSeasons = new Set<string>();
-    let cO35 = 0, cO45 = 0, cO55 = 0;
+    let cO25 = 0, cO35 = 0, cO45 = 0, cO55 = 0;
 
     let refN = 0;
 
@@ -321,6 +321,7 @@ function main() {
         if (m.season) cornerSeasons.add(m.season);
         sumHC += m.home_corners;
         sumAC += m.away_corners;
+        if (tc > 7.5) cO75++;
         if (tc > 8.5) cO85++;
         if (tc > 9.5) cO95++;
         if (tc > 10.5) cO105++;
@@ -331,6 +332,7 @@ function main() {
         const tCards = m.home_yellow_cards + m.away_yellow_cards + (m.home_red_cards ?? 0) + (m.away_red_cards ?? 0);
         cardTotals.push(tCards);
         if (m.season) cardSeasons.add(m.season);
+        if (tCards > 2.5) cO25++;
         if (tCards > 3.5) cO35++;
         if (tCards > 4.5) cO45++;
         if (tCards > 5.5) cO55++;
@@ -454,6 +456,7 @@ function main() {
         avgTotalCorners: Number(avgCorners.toFixed(4)),
         varTotalCorners: Number(varCorners.toFixed(4)),
         overdispersionAlpha: Number(cornersAlpha.toFixed(4)),
+        o75Rate: Number((cO75 / cornersN).toFixed(4)),
         o85Rate: Number((cO85 / cornersN).toFixed(4)),
         o95Rate: Number((cO95 / cornersN).toFixed(4)),
         o105Rate: Number((cO105 / cornersN).toFixed(4)),
@@ -464,6 +467,7 @@ function main() {
         avgTotalCards: Number(avgCards.toFixed(4)),
         varTotalCards: Number(varCards.toFixed(4)),
         overdispersionAlpha: Number(cardsAlpha.toFixed(4)),
+        o25Rate: Number((cO25 / cardsN).toFixed(4)),
         o35Rate: Number((cO35 / cardsN).toFixed(4)),
         o45Rate: Number((cO45 / cardsN).toFixed(4)),
         o55Rate: Number((cO55 / cardsN).toFixed(4)),
@@ -534,7 +538,7 @@ function main() {
   const GOAL_LINES = [0.5, 1.5, 2.5, 3.5, 4.5];
   const TEAM_GOAL_LINES = [0.5, 1.5, 2.5];
   const AH_LINES = [-1.5, -1.25, -1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5];
-  const CORNER_LINES = [8.5, 9.5, 10.5, 11.5];
+  const CORNER_LINES = [7.5, 8.5, 9.5, 10.5, 11.5];
   const CARD_LINES = [2.5, 3.5, 4.5, 5.5];
 
   const causalStats = new Map<string, CausalLeagueStats>();
@@ -548,7 +552,7 @@ function main() {
         awayO: { 0.5: 0, 1.5: 0, 2.5: 0 },
         ahRetSum: Object.fromEntries(AH_LINES.map(l => [l, 0])),
         htN: 0, h1g: 0, a1g: 0, h2g: 0, a2g: 0, hsh1: 0, hsh2: 0, hshEq: 0, fhO05: 0, fhO15: 0, shH: 0, shD: 0, shA: 0,
-        cornersN: 0, hc: 0, ac: 0, cornersSumSq: 0, cornersO: { 8.5: 0, 9.5: 0, 10.5: 0, 11.5: 0 },
+        cornersN: 0, hc: 0, ac: 0, cornersSumSq: 0, cornersO: { 7.5: 0, 8.5: 0, 9.5: 0, 10.5: 0, 11.5: 0 },
         cardsN: 0, cardsSum: 0, cardsSumSq: 0, cardsO: { 2.5: 0, 3.5: 0, 4.5: 0, 5.5: 0 },
       };
       causalStats.set(comp, st);

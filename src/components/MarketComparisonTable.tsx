@@ -661,8 +661,10 @@ export default function MarketComparisonTable({
                 </h4>
               </div>
               <span className="text-[11px] text-[var(--text-2)]">
-                {multiGoalsPredictions.some((p) => p.isSpeculative)
+                {multiGoalsPredictions.every((p) => p.isSpeculative)
                   ? 'Speculative · Unvalidated league'
+                  : multiGoalsPredictions.some((p) => p.isSpeculative)
+                  ? 'Mixed validation · Some bands speculative'
                   : 'Model line, no market price'}
               </span>
             </div>
