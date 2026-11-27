@@ -760,8 +760,8 @@ export function evaluateContextFactors(params: {
         weight: 0.38,
         direction: 'positive',
         impactDescription: isDerby 
-          ? 'Derby rivalry multiplier (+0.80 expected bookings).' 
-          : '+0.35 booking expectation in high-leverage points match.',
+          ? 'Derby rivalry multiplier (+0.80 expected cards).' 
+          : '+0.35 card expectation in high leverage points match.',
         magnitude: 0.89,
       },
       {

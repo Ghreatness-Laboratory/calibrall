@@ -439,12 +439,14 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
   const homeNeeds = homeStoredCount === 0;
   const awayNeeds = awayStoredCount === 0;
 
+  const pluralWord = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
+
   if (homeNeeds || awayNeeds) {
-    let reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored, ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`;
+    let reason = `Insufficient data: ${homeTeamDisplayName} has ${pluralWord(homeStoredCount, 'match', 'matches')} stored, ${awayTeamDisplayName} has ${pluralWord(awayStoredCount, 'match', 'matches')} stored in database (needs history backfill)`;
     if (homeNeeds && !awayNeeds) {
-      reason = `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored in database (${awayTeamDisplayName} has ${awayStoredCount} matches stored; needs history backfill)`;
+      reason = `Insufficient data: ${homeTeamDisplayName} has ${pluralWord(homeStoredCount, 'match', 'matches')} stored in database (${awayTeamDisplayName} has ${pluralWord(awayStoredCount, 'match', 'matches')} stored; needs history backfill)`;
     } else if (!homeNeeds && awayNeeds) {
-      reason = `Insufficient data: ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (${homeTeamDisplayName} has ${homeStoredCount} matches stored; needs history backfill)`;
+      reason = `Insufficient data: ${awayTeamDisplayName} has ${pluralWord(awayStoredCount, 'match', 'matches')} stored in database (${homeTeamDisplayName} has ${pluralWord(homeStoredCount, 'match', 'matches')} stored; needs history backfill)`;
     }
     return {
       homeXg: 0,
@@ -475,10 +477,10 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
 
   if (isHomeStale) {
     const reason = (homeDb.daysSinceLastMatch === null || homeDb.lastMatchDate === null)
-      ? `Insufficient data: ${homeTeamDisplayName} has ${homeStoredCount} matches stored in database (needs history backfill)`
+      ? `Insufficient data: ${homeTeamDisplayName} has ${pluralWord(homeStoredCount, 'match', 'matches')} stored in database (needs history backfill)`
       : (homeDb.daysSinceLastMatch > 21
-          ? `Data out of date: ${homeTeamDisplayName} last match was ${homeDb.daysSinceLastMatch} days ago (${homeStoredCount} matches stored)`
-          : `Data out of date: ${homeTeamDisplayName} has only ${homeDb.matchesInLast120Days} matches in last 120 days (${homeStoredCount} matches stored, min 5 required)`);
+          ? `Data out of date: ${homeTeamDisplayName} last match was ${pluralWord(homeDb.daysSinceLastMatch, 'day', 'days')} ago (${pluralWord(homeStoredCount, 'match', 'matches')} stored)`
+          : `Data out of date: ${homeTeamDisplayName} has only ${pluralWord(homeDb.matchesInLast120Days, 'match', 'matches')} in last 120 days (${pluralWord(homeStoredCount, 'match', 'matches')} stored, min 5 required)`);
     return {
       homeXg: 0,
       awayXg: 0,
@@ -501,10 +503,10 @@ export function getFixtureStatistics(fixture: Fixture): FixtureStatisticalContex
 
   if (isAwayStale) {
     const reason = (awayDb.daysSinceLastMatch === null || awayDb.lastMatchDate === null)
-      ? `Insufficient data: ${awayTeamDisplayName} has ${awayStoredCount} matches stored in database (needs history backfill)`
+      ? `Insufficient data: ${awayTeamDisplayName} has ${pluralWord(awayStoredCount, 'match', 'matches')} stored in database (needs history backfill)`
       : (awayDb.daysSinceLastMatch > 21
-          ? `Data out of date: ${awayTeamDisplayName} last match was ${awayDb.daysSinceLastMatch} days ago (${awayStoredCount} matches stored)`
-          : `Data out of date: ${awayTeamDisplayName} has only ${awayDb.matchesInLast120Days} matches in last 120 days (${awayStoredCount} matches stored, min 5 required)`);
+          ? `Data out of date: ${awayTeamDisplayName} last match was ${pluralWord(awayDb.daysSinceLastMatch, 'day', 'days')} ago (${pluralWord(awayStoredCount, 'match', 'matches')} stored)`
+          : `Data out of date: ${awayTeamDisplayName} has only ${pluralWord(awayDb.matchesInLast120Days, 'match', 'matches')} in last 120 days (${pluralWord(awayStoredCount, 'match', 'matches')} stored, min 5 required)`);
     return {
       homeXg: 0,
       awayXg: 0,

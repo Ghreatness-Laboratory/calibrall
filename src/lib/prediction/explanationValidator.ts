@@ -472,27 +472,42 @@ export function validateExplanationConsistency(params: {
   const full = String(explanation.fullSummary || '').trim();
   const oneLine = String(explanation.oneLineSummary || '').trim();
 
+  const tiles: ExplanationDriverTile[] = explanation.driverTiles || [];
+  const alts = explanation.alternates || [];
+  const tilesText = tiles.map((t) => `${t.label} ${t.value}`).join(' ');
+  const altsText = alts.map((a) => `${a.marketName} ${a.selection}`).join(' ');
+  const combinedDisplay = `${homeTeam} ${awayTeam} ${full} ${activePick?.selection || ''} ${tilesText} ${altsText}`;
+
   // 1. Broken/dirty tokens check
   if (!full || !oneLine) {
     issues.push({ code: 'EMPTY_SUMMARY', detail: 'Generated explanation text is empty.', severity: 'error' });
   }
-  if (/\b(undefined|NaN|null|Infinity)\b/i.test(full)) {
+  if (/\b(undefined|NaN|null|Infinity)\b/i.test(`${full} ${tilesText} ${altsText}`)) {
     issues.push({ code: 'INVALID_LITERAL', detail: `Summary contains invalid literal: ${full}`, severity: 'error' });
   }
   if (full && !/[.!?]$/.test(full)) {
     issues.push({ code: 'TRUNCATED_SENTENCE', detail: `Summary does not end cleanly with terminal punctuation: "${full.slice(-40)}"`, severity: 'error' });
   }
-  if (/\bclears?\s+\d+(?:\.\d+)?\b(?!\s*%)/i.test(full) || /\bclearing\s+(?:our\s+)?\d+(?:\.\d+)?\b(?!\s*%)/i.test(full)) {
+  if (
+    /\bclears?\s+\d+(?:\.\d+)?(?!\d)(?!\.\d)(?!\s*%)/i.test(full) ||
+    /\bclearing\s+(?:our\s+)?\d+(?:\.\d+)?(?!\d)(?!\.\d)(?!\s*%)/i.test(full)
+  ) {
     issues.push({ code: 'MISSING_PERCENT_UNIT', detail: 'Threshold number appears without % unit.', severity: 'error' });
   }
-  if (/\b1\s+(?:meetings|matches|days|games)\b/i.test(full)) {
-    issues.push({ code: 'PLURALIZATION_BUG', detail: 'Singular count used with plural noun ("1 meetings/matches/days/games").', severity: 'error' });
+  if (
+    /\b(?:projects?|projected|averages?|averaging)\s+\d+(?:\.\d+)?\s*(?:[.;,]|$)/i.test(full) ||
+    /\bstd\s+\d+(?:\.\d+)?(?!\d)(?!\.\d)(?!\s*(?:pts|points|%))/i.test(full)
+  ) {
+    issues.push({ code: 'DANGLING_NUMBER_UNITLESS', detail: 'Projected or averaged number appears without an explicit unit.', severity: 'error' });
   }
-  if (/\bbookings\b/i.test(full) || (activePick && /\bbookings\b/i.test(activePick.selection))) {
+  if (/\b1\s+(?:meetings|matches|days|games|cards|corners|goals)\b/i.test(`${full} ${tilesText}`)) {
+    issues.push({ code: 'PLURALIZATION_BUG', detail: 'Singular count used with plural noun.', severity: 'error' });
+  }
+  if (/\bbookings?\b/i.test(combinedDisplay)) {
     issues.push({ code: 'TERMINOLOGY_BOOKINGS', detail: 'Legacy term "bookings" found instead of canonical "cards".', severity: 'error' });
   }
-  if (/Nott['’]?m\s+Forest/i.test(`${homeTeam} ${awayTeam} ${full}`)) {
-    issues.push({ code: 'NON_CANONICAL_TEAM_NAME', detail: 'Abbreviated provider name "Nott\'m Forest" leaked into display output.', severity: 'error' });
+  if (/(?:Nott['’]?m\s+Forest|Sheffield\s+Utd|Sheffield\s+Weds|Bristol\s+Rvs)/i.test(combinedDisplay)) {
+    issues.push({ code: 'NON_CANONICAL_TEAM_NAME', detail: 'Non-canonical provider team alias leaked into display output.', severity: 'error' });
   }
 
   // 2. Single source of truth check against activePick
@@ -546,7 +561,6 @@ export function validateExplanationConsistency(params: {
     }
 
     // 3. Alternates outranking headline without reason
-    const alts = explanation.alternates || [];
     const hasReason = Boolean(explanation.headlineSelectionReason && explanation.headlineSelectionReason.trim().length > 0);
     for (const alt of alts) {
       if (alt.marketCode === activePick.marketCode) {
@@ -565,32 +579,39 @@ export function validateExplanationConsistency(params: {
       }
     }
 
-    // 4. Market-specific evidence boundary checks
+    // 4. Market-specific evidence boundary checks (prose + driver tiles)
     const family = getMarketEvidenceFamily(activePick, sport);
     if (family === 'cards') {
-      if (/\b(?:xG|expected goals|scored and .* conceded|total goals)\b/i.test(full)) {
+      if (/\b(?:xG|expected goals|scored and .* conceded|total goals)\b/i.test(`${full} ${tilesText}`)) {
         issues.push({
           code: 'MARKET_EVIDENCE_LEAK_GOALS_IN_CARDS',
           detail: 'Goals/xG evidence leaked into a cards explanation.',
           severity: 'error',
         });
       }
-      if (/\bcorners\b/i.test(full)) {
+      if (/\bcorners\b/i.test(`${full} ${tilesText}`)) {
         issues.push({
           code: 'MARKET_EVIDENCE_LEAK_CORNERS_IN_CARDS',
           detail: 'Corners evidence leaked into a cards explanation.',
           severity: 'error',
         });
       }
+      if (/\baverages\s+\d+(?:\.\d+)?\s+cards\s+per\s+match(?!\s+over\s+the\s+last\s+\d+)/i.test(full)) {
+        issues.push({
+          code: 'UNSCALED_CARD_RATE',
+          detail: 'Team card rate printed without measured sample window.',
+          severity: 'error',
+        });
+      }
     } else if (family === 'corners') {
-      if (/\b(?:xG|expected goals|scored and .* conceded|total goals)\b/i.test(full)) {
+      if (/\b(?:xG|expected goals|scored and .* conceded|total goals)\b/i.test(`${full} ${tilesText}`)) {
         issues.push({
           code: 'MARKET_EVIDENCE_LEAK_GOALS_IN_CORNERS',
           detail: 'Goals/xG evidence leaked into a corners explanation.',
           severity: 'error',
         });
       }
-      if (/\b(?:cards|referee|yellow|red card)\b/i.test(full)) {
+      if (/\b(?:cards|referee|yellow|red card)\b/i.test(`${full} ${tilesText}`)) {
         issues.push({
           code: 'MARKET_EVIDENCE_LEAK_CARDS_IN_CORNERS',
           detail: 'Cards/referee evidence leaked into a corners explanation.',
@@ -600,8 +621,8 @@ export function validateExplanationConsistency(params: {
     }
 
     // 5. H2H < 3 check
-    const h2hMention = full.match(/(\d+)\s+head to head\s+meetings?/i);
-    if (h2hMention) {
+    const h2hMention = full.match(/(\d+)\s+(?:head to head\s+)?meetings?/i);
+    if (h2hMention && /head to head|last \d+ meetings/i.test(full)) {
       const count = Number(h2hMention[1]);
       if (Number.isFinite(count) && count < 3) {
         issues.push({
@@ -610,6 +631,14 @@ export function validateExplanationConsistency(params: {
           severity: 'error',
         });
       }
+    }
+    const h2hTileMatch = tilesText.match(/\bH2H\b[^()]*\((\d+)\)/i);
+    if (h2hTileMatch && Number(h2hTileMatch[1]) < 3) {
+      issues.push({
+        code: 'H2H_BELOW_MIN_SAMPLE',
+        detail: `H2H driver tile cited with sample size ${h2hTileMatch[1]} (< 3 minimum).`,
+        severity: 'error',
+      });
     }
   } else if (!isThinHistory && (explanation.alternates?.length || 0) > 0) {
     // Abstained fixture shouldn't carry a fake recommended topPick in reasoning
@@ -623,7 +652,6 @@ export function validateExplanationConsistency(params: {
   }
 
   // 6. Driver tile sanity check
-  const tiles: ExplanationDriverTile[] = explanation.driverTiles || [];
   for (const tile of tiles) {
     if (/\b(undefined|NaN|null)\b/i.test(`${tile.label} ${tile.value}`)) {
       issues.push({

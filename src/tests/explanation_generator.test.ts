@@ -482,13 +482,13 @@ function runTests() {
     context: fb3Ctx,
   });
 
-  // Football Case 4: Cards Pick with Referee Data (Over 4.5 bookings)
+  // Football Case 4: Cards Pick with Referee Data (Over 4.5 cards)
   const fb4Fixture = makeTestFootballFixture('fb4', 'Inter', 'Milan', sa, { isDerby: true });
   const fb4Top = makeTestFootballPrediction(fb4Fixture.id, {
     marketCode: 'CARDS_O45',
     optionType: 'bookings',
     marketCategory: 'bookings',
-    marketName: 'Bookings',
+    marketName: 'Cards',
     selection: 'Over 4.5 cards',
     line: 4.5,
     modelProbability: 0.662,
@@ -498,10 +498,10 @@ function runTests() {
   });
   const fb4Alts = [
     makeTestFootballPrediction(fb4Fixture.id, {
-      marketCode: 'TEAM_BOOKINGS_AWAY_O25',
+      marketCode: 'TEAM_CARDS_AWAY_O25',
       optionType: 'team_bookings',
       marketCategory: 'bookings',
-      marketName: 'Team bookings',
+      marketName: 'Team cards',
       selection: 'Milan Over 2.5 cards',
       modelProbability: 0.598,
       confidenceTier: 'MEDIUM',
@@ -535,8 +535,14 @@ function runTests() {
     expectedCornersHome: 5.5,
     expectedCornersAway: 4.6,
     expectedCards: 5.4,
-    homeCardForRating: 2.35,
-    awayCardForRating: 2.65,
+    homeAvgCardsFor: 2.35,
+    awayAvgCardsFor: 2.65,
+    homeAvgYellowCards: 2.25,
+    awayAvgYellowCards: 2.55,
+    homeAvgRedCards: 0.10,
+    awayAvgRedCards: 0.10,
+    homeCardsWindow: 10,
+    awayCardsWindow: 10,
     referee: 'Daniele Orsato',
     refereeAnnounced: true,
     refereeShrunkRate: 5.18,

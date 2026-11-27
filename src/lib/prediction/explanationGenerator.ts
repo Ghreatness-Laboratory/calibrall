@@ -358,11 +358,12 @@ export function generateFootballExplanation(params: {
     const s1 = cleanDisplayText(
       `Not enough history to recommend a market for ${home} vs ${away}${sampleClause}.`
     );
-    const s2 = cleanDisplayText(
+    let s2 = cleanDisplayText(
       evaluation.noRecommendationReason ||
         context?.noRecommendationReason ||
         'At least 10 recent verified matches per club are required before publishing a calibrated recommendation or probability range.'
     );
+    if (s2 && !/[.!?]$/.test(s2)) s2 += '.';
     const fullSummary = `${s1} ${s2}`;
     const thinTiles: ExplanationDriverTile[] = [];
     if (homeSamples !== null && awaySamples !== null) {
@@ -535,8 +536,6 @@ export function generateFootballExplanation(params: {
       cornerAvgParts.push(
         `${home} winning ${context.homeAvgCornersFor.toFixed(1)}${againstClause} corners per match over the last ${context.homeCornersWindow}`
       );
-    } else if (isFiniteNum(context?.homeCornerForRating) && context.homeCornerForRating > 2.2) {
-      cornerAvgParts.push(`${home} winning ${context.homeCornerForRating.toFixed(1)} corners per match`);
     }
 
     if (
@@ -549,10 +548,8 @@ export function generateFootballExplanation(params: {
         ? ` and conceding ${context.awayAvgCornersAgainst.toFixed(1)}`
         : '';
       cornerAvgParts.push(
-        `${away} winning ${context.awayAvgCornersFor.toFixed(1)}${againstClause} over the last ${context.awayCornersWindow}`
+        `${away} winning ${context.awayAvgCornersFor.toFixed(1)}${againstClause} corners per match over the last ${context.awayCornersWindow}`
       );
-    } else if (isFiniteNum(context?.awayCornerForRating) && context.awayCornerForRating > 2.2) {
-      cornerAvgParts.push(`${away} winning ${context.awayCornerForRating.toFixed(1)}`);
     }
 
     const avgClause = cornerAvgParts.length > 0 ? `, with ${cornerAvgParts.join(' and ')}` : '';
@@ -563,8 +560,8 @@ export function generateFootballExplanation(params: {
     if (allow('h2hAvgTotalCorners') && h2hCornersMeetingsCount >= 3 && h2hAvgTotalCorners !== null) {
       sentence2Body += `; their last ${plural(
         h2hCornersMeetingsCount,
-        'meeting',
-        'meetings'
+        'head to head meeting',
+        'head to head meetings'
       )} averaged ${h2hAvgTotalCorners.toFixed(2)} corners`;
     }
   } else if (family === 'cards' && expCards !== null) {
@@ -580,13 +577,15 @@ export function generateFootballExplanation(params: {
         isFiniteNum(context.homeAvgYellowCards) && isFiniteNum(context.homeAvgRedCards)
           ? ` (${context.homeAvgYellowCards.toFixed(2)} yellow, ${context.homeAvgRedCards.toFixed(2)} red)`
           : '';
+      const drawnClause =
+        allow('homeAvgCardsAgainst') && isFiniteNum(context.homeAvgCardsAgainst)
+          ? ` and drawing ${context.homeAvgCardsAgainst.toFixed(2)}`
+          : '';
       teamCardParts.push(
         `${home} averages ${context.homeAvgCardsFor.toFixed(2)} cards per match over the last ${
           context.homeCardsWindow
-        }${yrClause}`
+        }${yrClause}${drawnClause}`
       );
-    } else if (isFiniteNum(context?.homeCardForRating) && context.homeCardForRating > 1.55) {
-      teamCardParts.push(`${home} averages ${context.homeCardForRating.toFixed(2)} cards per match`);
     }
 
     if (
@@ -599,13 +598,15 @@ export function generateFootballExplanation(params: {
         isFiniteNum(context.awayAvgYellowCards) && isFiniteNum(context.awayAvgRedCards)
           ? ` (${context.awayAvgYellowCards.toFixed(2)} yellow, ${context.awayAvgRedCards.toFixed(2)} red)`
           : '';
+      const drawnClause =
+        allow('awayAvgCardsAgainst') && isFiniteNum(context.awayAvgCardsAgainst)
+          ? ` and drawing ${context.awayAvgCardsAgainst.toFixed(2)}`
+          : '';
       teamCardParts.push(
         `${away} averages ${context.awayAvgCardsFor.toFixed(2)} cards per match over the last ${
           context.awayCardsWindow
-        }${yrClause}`
+        }${yrClause}${drawnClause}`
       );
-    } else if (isFiniteNum(context?.awayCardForRating) && context.awayCardForRating > 1.55) {
-      teamCardParts.push(`${away} averages ${context.awayCardForRating.toFixed(2)} cards per match`);
     }
 
     const teamClause = teamCardParts.length > 0 ? `, as ${teamCardParts.join(' and ')}` : '';
@@ -1025,8 +1026,13 @@ export function syncSlateExplanations<
 
 function deriveBasketballHeadlineReason(
   topPick: BasketballPickCandidate | null,
-  picks: BasketballPickCandidate[]
+  picks: BasketballPickCandidate[],
+  explicitReason?: string
 ): string | undefined {
+  const direct = explicitReason || (topPick as any)?.headlineSelectionReason;
+  if (typeof direct === 'string' && direct.trim().length > 0) {
+    return cleanDisplayText(direct.trim());
+  }
   if (!topPick) return undefined;
   const hasPricedEv = Boolean(
     !topPick.isModelLine &&
@@ -1131,10 +1137,11 @@ export function generateBasketballExplanation(params: {
     const s1 = cleanDisplayText(
       `Not enough history to recommend a pick for ${home} vs ${away}${gamesClause}.`
     );
-    const s2 = cleanDisplayText(
+    let s2 = cleanDisplayText(
       evaluation.abstentionReason ||
         'Additional verified season games are needed before publishing calibrated totals.'
     );
+    if (s2 && !/[.!?]$/.test(s2)) s2 += '.';
     const thinTiles: ExplanationDriverTile[] = [];
     if (homeGames !== null && awayGames !== null) {
       thinTiles.push({ label: 'Sample depth', value: `${homeGames}H / ${awayGames}A games` });
@@ -1187,11 +1194,11 @@ export function generateBasketballExplanation(params: {
 
   let sentence2 = '';
   if (hasMeans) {
-    const stdClause = hasStd ? `, std ${proj.gameTotalStd.toFixed(1)}` : '';
+    const stdClause = hasStd ? `, std ${proj.gameTotalStd.toFixed(1)} pts` : '';
     const avgClause = hasTeamScoring
-      ? `, with ${home} averaging ${proj.homeAvgScored.toFixed(1)} scored vs ${away} allowing ${proj.awayAvgAllowed.toFixed(
+      ? `, with ${home} averaging ${proj.homeAvgScored.toFixed(1)} pts scored vs ${away} allowing ${proj.awayAvgAllowed.toFixed(
           1
-        )}`
+        )} pts`
       : '';
     sentence2 = cleanDisplayText(
       `Model projects ${home} ${proj.homeMean.toFixed(1)} pts and ${away} ${proj.awayMean.toFixed(
@@ -1202,7 +1209,7 @@ export function generateBasketballExplanation(params: {
     sentence2 = cleanDisplayText(
       `${home} averages ${proj.homeAvgScored.toFixed(1)} points scored vs ${away} allowing ${proj.awayAvgAllowed.toFixed(
         1
-      )}.`
+      )} points.`
     );
   }
 
@@ -1250,7 +1257,7 @@ export function generateBasketballExplanation(params: {
 
   let marketNote = '';
   const hasSportsbookTotal = isFiniteNum(fixture.basketballStats?.sportsbookTotal);
-  const gameTotalStr = isFiniteNum(proj?.gameTotalMean) ? ` (game total ${proj.gameTotalMean.toFixed(1)})` : '';
+  const gameTotalStr = isFiniteNum(proj?.gameTotalMean) ? ` (game total ${proj.gameTotalMean.toFixed(1)} pts)` : '';
 
   if (
     topPick &&
@@ -1262,17 +1269,17 @@ export function generateBasketballExplanation(params: {
     const evPart = isFiniteNum(topPick.expectedValue)
       ? ` (${topPick.expectedValue >= 0 ? '+' : '\u2212'}${Math.abs(topPick.expectedValue * 100).toFixed(1)}% EV)`
       : '';
-    marketNote = `Model projects ${topPick.projectedMean.toFixed(1)} vs ${cleanDisplayText(
+    marketNote = `Model projects ${topPick.projectedMean.toFixed(1)} pts vs ${cleanDisplayText(
       topPick.priceSource
-    )} line ${topPick.line.toFixed(1)}${gameTotalStr} at ${topPick.marketOdds.toFixed(2)} odds${evPart}.`;
+    )} line ${topPick.line.toFixed(1)} pts${gameTotalStr} at ${topPick.marketOdds.toFixed(2)} odds${evPart}.`;
   } else if (hasSportsbookTotal && isFiniteNum(proj?.gameTotalMean)) {
     marketNote = `Model total ${proj.gameTotalMean.toFixed(1)} pts vs ${fixture.basketballStats!.sportsbookTotal!.toFixed(
       1
-    )} posted total; no bookmaker price is available, so this is a model line only.`;
+    )} pts posted total; no bookmaker price is available, so this is a model line only.`;
   } else if (topPick && isFiniteNum(topPick.projectedMean) && isFiniteNum(topPick.line)) {
-    marketNote = `Model projects ${topPick.projectedMean.toFixed(1)} vs ${topPick.line.toFixed(
+    marketNote = `Model projects ${topPick.projectedMean.toFixed(1)} pts vs ${topPick.line.toFixed(
       1
-    )} line${gameTotalStr}; no bookmaker price is available, so this is a model line only.`;
+    )} pts line${gameTotalStr}; no bookmaker price is available, so this is a model line only.`;
   } else if (evaluation.abstentionReason) {
     marketNote = cleanDisplayText(evaluation.abstentionReason);
     if (marketNote && !/[.!?]$/.test(marketNote)) marketNote += '.';

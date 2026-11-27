@@ -306,7 +306,7 @@ export const CANONICAL_TEAMS: Record<string, CanonicalTeam> = {
   team_sheffield_utd: {
     canonicalId: 'team_sheffield_utd',
     canonicalName: 'Sheffield United FC',
-    shortName: 'Sheffield Utd',
+    shortName: 'Sheffield United',
     tla: 'SHU',
     competitionCode: 'ELC',
     crestUrl: 'https://crests.football-data.org/356.png',
@@ -317,7 +317,7 @@ export const CANONICAL_TEAMS: Record<string, CanonicalTeam> = {
   team_sheffield_wed: {
     canonicalId: 'team_sheffield_wed',
     canonicalName: 'Sheffield Wednesday FC',
-    shortName: 'Sheffield Weds',
+    shortName: 'Sheffield Wednesday',
     tla: 'SHW',
     competitionCode: 'ELC',
     crestUrl: 'https://crests.football-data.org/345.png',
@@ -471,7 +471,7 @@ export const CANONICAL_TEAMS: Record<string, CanonicalTeam> = {
   team_oxford_utd: {
     canonicalId: 'team_oxford_utd',
     canonicalName: 'Oxford United FC',
-    shortName: 'Oxford',
+    shortName: 'Oxford United',
     tla: 'OXF',
     competitionCode: 'ELC',
     crestUrl: 'https://crests.football-data.org/1084.png',
@@ -628,7 +628,7 @@ export const CANONICAL_TEAMS: Record<string, CanonicalTeam> = {
   team_bristol_rovers: {
     canonicalId: 'team_bristol_rovers',
     canonicalName: 'Bristol Rovers FC',
-    shortName: 'Bristol Rvs',
+    shortName: 'Bristol Rovers',
     tla: 'BRR',
     competitionCode: 'E2',
     crestUrl: 'https://crests.football-data.org/1080.png',
@@ -1308,6 +1308,7 @@ import manualOverrides from './teamNameOverrides.json';
 import { TEAM_STRENGTH_DATABASE, lookupTeamStrength } from './teamDatabase';
 import { getLocalDatabase } from '../supabase/client';
 import { EXPANDED_CANONICAL_TEAMS } from './expandedTeams';
+import { displayName } from '../utils/formatText';
 
 export const CANONICAL_ID_ALIASES: Record<string, string> = {
   team_mancity: 'team_man_city',
@@ -1580,6 +1581,14 @@ const PROVIDER_ID_INDEX: Record<ExternalTeamProviderKey, Map<string, CanonicalTe
 };
 
 for (const team of Object.values(CANONICAL_TEAMS)) {
+  const prevShortLower = String(team.shortName || '').toLowerCase().trim();
+  const unifiedShort = displayName(team.canonicalName || team.shortName);
+  if (prevShortLower && !team.aliases.includes(prevShortLower)) {
+    team.aliases.push(prevShortLower);
+  }
+  if (unifiedShort) {
+    team.shortName = unifiedShort;
+  }
   const teamComp = normalizeCompLookupCode(team.competitionCode);
 
   // Provider-scoped ID index (prevents numeric collisions across providers e.g. Sportmonks 85 vs Football-Data.org 85)

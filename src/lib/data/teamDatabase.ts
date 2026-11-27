@@ -4,6 +4,7 @@
 // the system strictly returns insufficientData: true instead of manufacturing fake predictions.
 
 import manualOverrides from './teamNameOverrides.json';
+import { displayName } from '../utils/formatText';
 
 export interface TeamStrengthRecord {
   id: string;
@@ -3346,6 +3347,17 @@ for (const pid of PROMOTED_BRAZIL_2026_TEAM_IDS) {
   if (TEAM_STRENGTH_DATABASE[key]) {
     TEAM_STRENGTH_DATABASE[key].isPromoted = true;
     TEAM_STRENGTH_DATABASE[key].competitionCode = 'BSA';
+  }
+}
+
+for (const rec of Object.values(TEAM_STRENGTH_DATABASE)) {
+  const prevShortLower = String(rec.shortName || '').toLowerCase().trim();
+  const unifiedShort = displayName(rec.name || rec.shortName);
+  if (prevShortLower && !rec.aliases.includes(prevShortLower)) {
+    rec.aliases.push(prevShortLower);
+  }
+  if (unifiedShort) {
+    rec.shortName = unifiedShort;
   }
 }
 

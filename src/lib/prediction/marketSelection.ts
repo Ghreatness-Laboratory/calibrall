@@ -1013,7 +1013,7 @@ export function evaluateFixtureMarkets(
       optionType: 'european_handicap',
       marketCategory: 'handicap',
       marketName: meta.title,
-      selection: `${context.homeTeamName} Win (+1)`,
+      selection: `${homeDisplay} Win (+1)`,
       line: 1,
       period: 'REGULAR_TIME',
       settlementRule: meta.settlementRule,
@@ -1021,7 +1021,7 @@ export function evaluateFixtureMarkets(
       handicapType: 'european',
       handicapLine: 1,
       confidence: baseConfidence,
-      plainEnglishReason: `${context.homeTeamName} win or draw cushion yields ${(goalDist.europeanHandicap[1].home * 100).toFixed(0)}% European handicap probability.`,
+      plainEnglishReason: `${homeDisplay} win or draw cushion yields ${(goalDist.europeanHandicap[1].home * 100).toFixed(0)}% European handicap probability.`,
       dataPoints: [{ metricName: 'Home (+1) Prob', value: `${(goalDist.europeanHandicap[1].home * 100).toFixed(1)}%` }]
     });
   }
@@ -1270,15 +1270,15 @@ export function evaluateFixtureMarkets(
         marketCode: 'TEAM_CARDS_HOME_O15',
         optionType: 'team_bookings',
         marketCategory: 'bookings',
-        marketName: `${context.homeTeamName} Cards`,
-        selection: `${context.homeTeamName} Over 1.5 cards`,
+        marketName: `${homeDisplay} Cards`,
+        selection: `${homeDisplay} Over 1.5 cards`,
         line: 1.5,
         period: 'REGULAR_TIME',
         settlementRule: 'Regular time yellow/red cards shown to home team.',
         modelProbability: cardDist.team.home[1.5].over,
         confidence: baseConfidence,
         requiresDisciplinaryData: true,
-        plainEnglishReason: `${context.homeTeamName} tactical foul profile projects ${(cardDist.team.home[1.5].over * 100).toFixed(0)}% Over 1.5 cards likelihood.`,
+        plainEnglishReason: `${homeDisplay} tactical foul profile projects ${(cardDist.team.home[1.5].over * 100).toFixed(0)}% Over 1.5 cards likelihood.`,
         dataPoints: [{ metricName: 'Home Exp Cards', value: (effectiveCards * 0.48).toFixed(1) }]
       });
     }
@@ -1288,36 +1288,36 @@ export function evaluateFixtureMarkets(
         marketCode: 'TEAM_CARDS_AWAY_O15',
         optionType: 'team_bookings',
         marketCategory: 'bookings',
-        marketName: `${context.awayTeamName} Cards`,
-        selection: `${context.awayTeamName} Over 1.5 cards`,
+        marketName: `${awayDisplay} Cards`,
+        selection: `${awayDisplay} Over 1.5 cards`,
         line: 1.5,
         period: 'REGULAR_TIME',
         settlementRule: 'Regular time yellow/red cards shown to away team.',
         modelProbability: cardDist.team.away[1.5].over,
         confidence: baseConfidence,
         requiresDisciplinaryData: true,
-        plainEnglishReason: `${context.awayTeamName} away discipline index projects ${(cardDist.team.away[1.5].over * 100).toFixed(0)}% chance of 2+ cards.`,
+        plainEnglishReason: `${awayDisplay} away discipline index projects ${(cardDist.team.away[1.5].over * 100).toFixed(0)}% chance of 2+ cards.`,
         dataPoints: [{ metricName: 'Away Exp Cards', value: (effectiveCards * 0.52).toFixed(1) }]
       });
     }
 
-    // Booking Points (Yellow = 10, Red = 25)
+    // Card Points (Yellow = 10, Red = 25)
     const expBookingPoints = effectiveCards * 11.2;
     const probOver355Pts = 1 - (poissonProb(expBookingPoints / 10, 0) + poissonProb(expBookingPoints / 10, 1) + poissonProb(expBookingPoints / 10, 2) + poissonProb(expBookingPoints / 10, 3));
     rawCandidates.push({
       marketCode: 'BOOKING_POINTS_O355',
       optionType: 'booking_points',
       marketCategory: 'bookings',
-      marketName: 'Booking Points (10/25 rule)',
-      selection: 'Over 35.5 Booking Points',
+      marketName: 'Card Points (10/25 rule)',
+      selection: 'Over 35.5 Card Points',
       line: 35.5,
       period: 'REGULAR_TIME',
       settlementRule: 'Yellow=10 pts, Red=25 pts. Over 35.5 wins if 40+ points.',
       modelProbability: Math.min(0.95, Math.max(0.05, probOver355Pts)),
       confidence: baseConfidence,
       requiresDisciplinaryData: true,
-      plainEnglishReason: `Expected ${expBookingPoints.toFixed(0)} booking points based on referee cards/game rate.`,
-      dataPoints: [{ metricName: 'Expected Booking Pts', value: expBookingPoints.toFixed(0) }]
+      plainEnglishReason: `Expected ${expBookingPoints.toFixed(0)} card points based on referee cards/game rate.`,
+      dataPoints: [{ metricName: 'Expected Card Pts', value: expBookingPoints.toFixed(0) }]
     });
   }
 
@@ -1539,18 +1539,45 @@ export function evaluateFixtureMarkets(
     const predictionId = `pred_${context.fixtureId}_${c.marketCode}`;
     const topFactors: FactorContribution[] = factorContributionsByMarket[c.marketCategory] || factorContributionsByMarket['match_result'] || [];
 
-    const alternativesRejected = [
-      {
-        alternative: c.marketCode.startsWith('1X2') ? 'Total Goals Over 2.5' : '1X2 Match Winner',
-        modelProbability: 0.52,
-        reasonRejected: 'Market odds overround exceeds statistical edge (+0.8% below hurdle rate).'
-      },
-      {
-        alternative: c.marketCategory === 'total_corners' ? 'Team Corners Home O5.5' : 'Both Teams to Score (No)',
-        modelProbability: 0.48,
-        reasonRejected: 'Elevated variance due to current tactical state tags; failed qualification filter.'
-      }
-    ];
+    const alternativesRejected =
+      c.marketCategory === 'bookings'
+        ? [
+            {
+              alternative: 'Total Cards Over 5.5',
+              modelProbability: 0.44,
+              reasonRejected: 'Higher card line falls below required confidence threshold.',
+            },
+            {
+              alternative: `${homeDisplay} Over 2.5 cards`,
+              modelProbability: 0.41,
+              reasonRejected: 'Team card split carries higher referee variance than match total.',
+            },
+          ]
+        : c.marketCategory === 'total_corners' || c.marketCategory === 'team_corners'
+        ? [
+            {
+              alternative: 'Total Corners Over 11.5',
+              modelProbability: 0.46,
+              reasonRejected: 'Higher corner ladder rung falls below minimum probability hurdle.',
+            },
+            {
+              alternative: `${homeDisplay} Over 5.5 corners`,
+              modelProbability: 0.48,
+              reasonRejected: 'Team corner split carries elevated game state variance.',
+            },
+          ]
+        : [
+            {
+              alternative: c.marketCode.startsWith('1X2') ? 'Total Goals Over 2.5' : '1X2 Match Winner',
+              modelProbability: 0.52,
+              reasonRejected: 'Market odds overround exceeds statistical edge (+0.8% below hurdle rate).',
+            },
+            {
+              alternative: 'Both Teams to Score (No)',
+              modelProbability: 0.48,
+              reasonRejected: 'Elevated variance due to current tactical state tags; failed qualification filter.',
+            },
+          ];
 
     const localCorrelationWarnings: string[] = [];
     if (c.marketCode === 'TOTAL_GOALS_O25') {
@@ -1813,10 +1840,12 @@ export function evaluateFixtureMarkets(
         topPick.selection
       );
     } else {
-      noRecommendationReason = `No strong recommendation for ${context.homeTeamName} vs ${context.awayTeamName} (${context.sampleSizeMatches ?? 0} matches stored): available statistical evidence and current market lines do not meet configured minimum edge, gating validation, or uncertainty thresholds.`;
+      const nMatches = context.sampleSizeMatches ?? 0;
+      noRecommendationReason = `No strong recommendation for ${homeDisplay} vs ${awayDisplay} (${nMatches} ${nMatches === 1 ? 'match' : 'matches'} stored): available statistical evidence and current market lines do not meet configured minimum edge, gating validation, or uncertainty thresholds.`;
     }
   } else {
-    noRecommendationReason = `No strong recommendation for ${context.homeTeamName} vs ${context.awayTeamName} (${context.sampleSizeMatches ?? 0} matches stored): all market families failed minimum data completeness or edge thresholds.`;
+    const nMatches = context.sampleSizeMatches ?? 0;
+    noRecommendationReason = `No strong recommendation for ${homeDisplay} vs ${awayDisplay} (${nMatches} ${nMatches === 1 ? 'match' : 'matches'} stored): all market families failed minimum data completeness or edge thresholds.`;
   }
 
   // Also evaluate substitutes for other ranked options that exhibit fragility

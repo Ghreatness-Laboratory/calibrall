@@ -277,7 +277,7 @@ export async function sweepAndRecordExplanationIssues(
         checkedFixtureIds.push(item.fixtureId);
         const home = cleanDisplayText(displayName(item.fixture.homeTeam) || item.fixture.homeTeam.name);
         const away = cleanDisplayText(displayName(item.fixture.awayTeam) || item.fixture.awayTeam.name);
-        const exp = item.writtenExplanation;
+        const exp = item.fixture.writtenExplanation;
         if (!exp) continue;
 
         const val = validateExplanationConsistency({

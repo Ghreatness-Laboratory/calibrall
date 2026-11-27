@@ -55,7 +55,7 @@ export default function MethodologyPage() {
           <li>Opposition defensive block depth</li>
         </ul>
         <p className="leading-[1.55]">
-          For disciplinary bookings (yellow = 1, red = 2), our model integrates referee historical issuance rates with rivalry intensity multipliers.
+          For disciplinary cards (yellow = 1, red = 2), our model integrates referee historical issuance rates with rivalry intensity multipliers.
         </p>
       </section>
 

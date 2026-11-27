@@ -147,7 +147,7 @@ function buildEvidenceLine(
     parts.push(`rest ${proj.homeRestDays}d vs ${proj.awayRestDays}d`);
   }
 
-  if (proj.h2hMeetings >= 2 && proj.h2hAvgTotal !== null && cat === 'game_total') {
+  if (proj.h2hMeetings >= 3 && proj.h2hAvgTotal !== null && cat === 'game_total') {
     parts.push(`${proj.h2hMeetings} H2H meetings average ${proj.h2hAvgTotal.toFixed(1)} pts`);
   }
 
@@ -589,6 +589,18 @@ export function selectDiversifiedBasketballSlatePicks(
 
     if (chosen) {
       chosen.isTopPick = true;
+      const topUnconstrained = eligible[0];
+      if (
+        topUnconstrained &&
+        topUnconstrained.marketCode !== chosen.marketCode &&
+        topUnconstrained.calibratedProbability > chosen.calibratedProbability + 0.0025
+      ) {
+        (chosen as any).headlineSelectionReason = cleanDisplayText(
+          `Selected under the 40% slate market diversity rule instead of a higher probability ${cleanDisplayText(
+            topUnconstrained.marketCategory
+          )} line.`
+        );
+      }
       ev.topPick = chosen;
       activeCounts.set(chosen.marketCategory, (activeCounts.get(chosen.marketCategory) || 0) + 1);
     }

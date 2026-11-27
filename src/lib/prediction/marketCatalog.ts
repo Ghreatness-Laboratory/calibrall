@@ -389,11 +389,11 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
   },
   booking_points: {
     type: 'booking_points',
-    title: 'Booking Points (10/25 rule)',
+    title: 'Card Points (10/25 rule)',
     category: 'bookings',
     period: 'REGULAR_TIME',
-    description: 'Standard booking points: Yellow card = 10 pts, Red card = 25 pts. Over/Under 35.5, 45.5 pts.',
-    defaultSelections: ['Over 35.5 Booking Pts', 'Over 45.5 Booking Pts'],
+    description: 'Standard card points: Yellow card = 10 pts, Red card = 25 pts. Over/Under 35.5, 45.5 pts.',
+    defaultSelections: ['Over 35.5 Card Pts', 'Over 45.5 Card Pts'],
     supportedLines: [35.5, 45.5],
     settlementRule: 'Regular time yellow = 10, red = 25. Max 35 points per player.',
     dataRequirements: {

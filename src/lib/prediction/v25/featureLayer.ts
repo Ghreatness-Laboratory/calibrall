@@ -698,7 +698,7 @@ export class FeatureLayerEngine {
         refereeSampleSize,
         refereeCardsPerMatch: 0,
         refereeLeagueBaseline: 0,
-        refereeExplanation: `Bookings data unavailable for competition ${context.competitionCode}. Cards market disabled.`,
+        refereeExplanation: `Cards data unavailable for competition ${context.competitionCode}. Cards market disabled.`,
         refereeFoulsPerCard: 0,
         teamFoulsPerMatch: 0,
         teamCardsPerMatch: 0,
@@ -733,7 +733,7 @@ export class FeatureLayerEngine {
       typeof context.awayAvgCardsFor === 'number';
     const teamCardsPerMatch = hasMeasuredTeamCards
       ? Number((((context.homeAvgCardsFor as number) + (context.awayAvgCardsFor as number)) / 2).toFixed(2))
-      : Number((computedBookings / 2).toFixed(2));
+      : 0;
 
     const hasMeasuredFouls =
       typeof context.foulsSampleCount === 'number' &&

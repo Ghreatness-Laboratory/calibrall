@@ -287,9 +287,9 @@ export class DixonColesV25Evaluator {
     const awaySamples = context.awaySampleMatches ?? context.sampleSizeMatches ?? 0;
     const leagueSamples = leagueCfg?.goals.sampleSize ?? cap.sampleSizeMatches ?? 0;
     const h2hMeetingsCount = features.h2h.meetingsCount;
-    const h2hSummaryText = h2hMeetingsCount > 0
+    const h2hSummaryText = h2hMeetingsCount >= 3
       ? cleanDisplayText(`${h2hMeetingsCount} prior meetings (${features.h2h.homeWins}W ${features.h2h.draws}D ${features.h2h.awayWins}L), shrunk goal diff ${features.h2h.shrunkGoalDiff >= 0 ? '+' : ''}${features.h2h.shrunkGoalDiff.toFixed(2)}`)
-      : 'No recent head to head meetings in stored window';
+      : 'No qualifying head to head sample of 3 or more meetings in stored window';
 
     // 5. Calibrate, gate by walk-forward BSS, compute EV only on real odds
     const processed: MarketPrediction[] = [];
@@ -671,7 +671,7 @@ export class DixonColesV25Evaluator {
 
       const homeLabel = displayName(context.homeTeamName);
       const awayLabel = displayName(context.awayTeamName);
-      const teamContextPrefix = `${homeLabel} (${homeSamples} matches stored) vs ${awayLabel} (${awaySamples} matches stored)`;
+      const teamContextPrefix = `${homeLabel} (${homeSamples} ${homeSamples === 1 ? 'match' : 'matches'} stored) vs ${awayLabel} (${awaySamples} ${awaySamples === 1 ? 'match' : 'matches'} stored)`;
       const abstainReasonText = !gate.isAllowed
         ? `${teamContextPrefix}: ${gate.statusText}`
         : !passesMultiGoalsTightness
@@ -982,7 +982,7 @@ export class DixonColesV25Evaluator {
         }
       }
     } else {
-      noRecommendationReason = cleanDisplayText(`No pick selected for ${displayName(context.homeTeamName)} (${homeSamples} matches stored) vs ${displayName(context.awayTeamName)} (${awaySamples} matches stored): no evaluated market cleared the calibrated probability hurdles and walk forward Brier skill validation.`);
+      noRecommendationReason = cleanDisplayText(`No pick selected for ${displayName(context.homeTeamName)} (${homeSamples} ${homeSamples === 1 ? 'match' : 'matches'} stored) vs ${displayName(context.awayTeamName)} (${awaySamples} ${awaySamples === 1 ? 'match' : 'matches'} stored): no evaluated market cleared the calibrated probability hurdles and walk forward Brier skill validation.`);
     }
 
     // Sort all processed predictions: eligible first in exact EV/edge rank, then remaining by calProb

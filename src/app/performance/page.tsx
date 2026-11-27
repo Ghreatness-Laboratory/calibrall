@@ -1131,7 +1131,7 @@ export default function PerformancePage() {
                   <strong className="text-[var(--text)]">Missing value treatment:</strong> Empirical Bayesian shrinkage pulls sparse samples toward league priors.
                 </li>
                 <li>
-                  <strong className="text-[var(--text)]">Booking normalization:</strong> Yellow=1, red=2, second yellow=3 across European and domestic feeds.
+                  <strong className="text-[var(--text)]">Card normalization:</strong> Yellow=1, red=2, second yellow=3 across European and domestic feeds.
                 </li>
               </ul>
             </div>

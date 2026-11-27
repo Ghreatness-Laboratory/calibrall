@@ -65,7 +65,7 @@ export class WhyPanelGenerator {
         factorsFor.push('Referee unannounced');
       }
       if (features.isDerby) {
-        factorsFor.push(`High intensity derby rivalry elevates duel friction and disciplinary bookings`);
+        factorsFor.push(`High intensity derby rivalry elevates duel friction and disciplinary cards`);
       } else {
         factorsFor.push(`Tactical midfield duel density in transition phases`);
       }
@@ -103,7 +103,7 @@ export class WhyPanelGenerator {
     if (features.weatherCondition && features.weatherCondition.isAvailable) {
       factorsFor.push(cleanDisplayText(`Kickoff weather: ${features.weatherCondition.summary}`));
     }
-    if (features.h2hContext && features.h2hContext.filteredRecentCount > 0) {
+    if (!isCards && !isCorners && features.h2hContext && features.h2hContext.filteredRecentCount >= 3) {
       factorsFor.push(cleanDisplayText(features.h2hContext.summaryText));
     }
     if (features.externalBenchmark) {

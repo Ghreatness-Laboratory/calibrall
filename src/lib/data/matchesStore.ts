@@ -1128,7 +1128,7 @@ class MatchesStore {
             teamMap.set(homeId, {
               id: homeId,
               name: m.home_team_name,
-              short_name: m.home_team_name,
+              short_name: displayName(m.home_team_name),
               competition_code: m.competition_code,
               crest_url: null,
               tla: null,
@@ -1147,7 +1147,7 @@ class MatchesStore {
             teamMap.set(awayId, {
               id: awayId,
               name: m.away_team_name,
-              short_name: m.away_team_name,
+              short_name: displayName(m.away_team_name),
               competition_code: m.competition_code,
               crest_url: null,
               tla: null,
@@ -1492,11 +1492,11 @@ class MatchesStore {
       daysSinceLastMatch = Math.max(0, Math.round((refTime - matchTime) / (1000 * 60 * 60 * 24)));
       if (daysSinceLastMatch > 21) {
         isStale = true;
-        staleReason = `Data out of date: ${teamName} last match was ${daysSinceLastMatch} days ago (${formMatches.length} matches stored)`;
+        staleReason = `Data out of date: ${displayName(teamName)} last match was ${daysSinceLastMatch} ${daysSinceLastMatch === 1 ? 'day' : 'days'} ago (${formMatches.length} ${formMatches.length === 1 ? 'match' : 'matches'} stored)`;
       }
     } else {
       isStale = true;
-      staleReason = `Data out of date: ${teamName} has 0 matches stored in database (needs history backfill)`;
+      staleReason = `Data out of date: ${displayName(teamName)} has 0 matches stored in database (needs history backfill)`;
     }
 
     // Ratings & Uncertainty:
