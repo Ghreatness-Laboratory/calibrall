@@ -306,9 +306,8 @@ export class DixonColesV25Evaluator {
       let predCompleteness = baseCoverage * 0.94;
       if (context.lineupConfirmed) predCompleteness += 0.035;
       if (context.sampleSizeMatches >= 20) predCompleteness += 0.035;
-      else if (context.sampleSizeMatches < 14) predCompleteness -= 0.05;
+      else if (homeSamples < 10 || awaySamples < 10) predCompleteness -= 0.05;
       if (cand.marketOdds !== undefined) predCompleteness += 0.035;
-      else predCompleteness -= 0.04;
       if (cand.marketCategory === 'total_corners' || cand.marketCategory === 'team_corners') predCompleteness -= 0.045;
       else if (cand.marketCategory === 'bookings') predCompleteness -= 0.055;
       else if (cand.marketCategory === 'handicap') predCompleteness -= 0.025;
@@ -333,7 +332,7 @@ export class DixonColesV25Evaluator {
       }
       const baseMarketSpread = (baseUncertainty * 0.32 * categoryMultiplier) + 0.012;
       const samplePenalty = Math.max(0, 16 - context.sampleSizeMatches) * 0.003;
-      const weatherPenalty = features.weather.isMissing ? 0.008 : 0;
+      const weatherPenalty = features.weather.isMissing ? 0.004 : 0;
       const riskPenalty = riskEval.downgradesCount * 0.008;
       const completenessPenalty = (1.0 - predCompleteness) * 0.055;
       const uncertaintySpread = Number(Math.min(0.12, Math.max(0.024,
@@ -450,6 +449,22 @@ export class DixonColesV25Evaluator {
 
       if (isSpeculativeOnlyLeague) {
         confAssessment.confidenceTier = 'LOW';
+        confAssessment.confidenceReasons.unshift(`speculative only league gate in ${gate.leagueGroup}`);
+      }
+
+      const homeCleanName = displayName(context.homeTeamName);
+      const awayCleanName = displayName(context.awayTeamName);
+      let confidenceReasonText: string | undefined = undefined;
+      if (confAssessment.confidenceTier === 'LOW') {
+        if (homeSamples < 10) {
+          confidenceReasonText = cleanDisplayText(`only ${homeSamples} recent matches for ${homeCleanName}`);
+        } else if (awaySamples < 10) {
+          confidenceReasonText = cleanDisplayText(`only ${awaySamples} recent matches for ${awayCleanName}`);
+        } else if (confAssessment.confidenceReasons.length > 0) {
+          confidenceReasonText = cleanDisplayText(confAssessment.confidenceReasons[0]);
+        }
+      } else if (confAssessment.confidenceReasons.length > 0) {
+        confidenceReasonText = cleanDisplayText(confAssessment.confidenceReasons[0]);
       }
 
       // Qualification Status
@@ -684,6 +699,7 @@ export class DixonColesV25Evaluator {
         expectedValue: ev,
         edge,
         confidenceTier: confAssessment.confidenceTier,
+        confidenceReason: confidenceReasonText,
         riskTier: confAssessment.confidenceTier,
         confidenceScore: confAssessment.confidenceScore,
         modelConfidence: confAssessment.confidenceTier === 'HIGH' ? 'HIGH' : confAssessment.confidenceTier === 'MEDIUM' ? 'MODERATE' : 'LOW',

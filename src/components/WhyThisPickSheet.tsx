@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { X, Lock, Sparkles, ArrowUpRight } from 'lucide-react';
 import { WrittenMatchExplanation } from '@/types';
@@ -13,6 +14,9 @@ interface Props {
   pickLabel?: string;
   explanation?: WrittenMatchExplanation;
 }
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function buildDriverChips(reasoning: Record<string, any> | undefined): { label: string; value: string }[] {
   if (!reasoning || typeof reasoning !== 'object') return [];
@@ -31,7 +35,11 @@ function buildDriverChips(reasoning: Record<string, any> | undefined): { label: 
         value: `${reasoning.homeSampleMatches} / ${reasoning.awaySampleMatches} matches`,
       });
     }
-    if (typeof reasoning.h2hMeetingsCount === 'number' && reasoning.h2hMeetingsCount > 0 && typeof reasoning.h2hAvgTotalGoals === 'number') {
+    if (
+      typeof reasoning.h2hMeetingsCount === 'number' &&
+      reasoning.h2hMeetingsCount > 0 &&
+      typeof reasoning.h2hAvgTotalGoals === 'number'
+    ) {
       items.push({
         label: 'Head to head avg',
         value: `${reasoning.h2hAvgTotalGoals.toFixed(2)} goals (${reasoning.h2hMeetingsCount})`,
@@ -79,6 +87,29 @@ function buildDriverChips(reasoning: Record<string, any> | undefined): { label: 
   return items.slice(0, 4);
 }
 
+function formatTierPill(tier?: string) {
+  const upper = String(tier || '').toUpperCase();
+  if (upper === 'HIGH') {
+    return {
+      label: 'High confidence',
+      className: 'bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30',
+    };
+  }
+  if (upper === 'MEDIUM') {
+    return {
+      label: 'Medium confidence',
+      className: 'bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30',
+    };
+  }
+  if (upper === 'LOW') {
+    return {
+      label: 'Low confidence',
+      className: 'bg-[var(--danger-soft)] text-[var(--danger)] border border-[var(--danger)]/30',
+    };
+  }
+  return null;
+}
+
 export default function WhyThisPickSheet({
   open,
   onClose,
@@ -86,134 +117,314 @@ export default function WhyThisPickSheet({
   pickLabel,
   explanation,
 }: Props) {
+  const [mounted, setMounted] = useState(false);
+  const [dragOffsetY, setDragOffsetY] = useState(0);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const bodyScrollRef = useRef<HTMLDivElement | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+  const draggingRef = useRef(false);
+
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open || typeof document === 'undefined') return;
+
+    const previousFocused = document.activeElement as HTMLElement | null;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    const panelEl = panelRef.current;
+    const focusTimer = window.setTimeout(() => {
+      if (!panelEl) return;
+      const focusables = panelEl.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (focusables.length > 0) {
+        focusables[0].focus();
+      } else {
+        panelEl.focus();
+      }
+    }, 0);
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key === 'Tab' && panelEl) {
+        const focusables = Array.from(panelEl.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+          (el) => el.offsetParent !== null
+        );
+        if (focusables.length === 0) {
+          e.preventDefault();
+          panelEl.focus();
+          return;
+        }
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (e.shiftKey) {
+          if (active === first || !panelEl.contains(active)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else if (active === last || !panelEl.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.touchAction = prevBodyTouchAction;
+      setDragOffsetY(0);
+      if (previousFocused && typeof previousFocused.focus === 'function') {
+        previousFocused.focus();
+      }
+    };
   }, [open, onClose]);
 
-  if (!open || !explanation) return null;
+  if (!mounted || !open || !explanation) return null;
 
   const drivers = buildDriverChips(explanation.reasoning);
+  const rawProb =
+    typeof explanation.rawProbability === 'number'
+      ? explanation.rawProbability
+      : typeof explanation.reasoning?.topPick?.rawProbability === 'number'
+      ? explanation.reasoning.topPick.rawProbability
+      : undefined;
+  const calProb =
+    typeof explanation.calibratedProbability === 'number'
+      ? explanation.calibratedProbability
+      : typeof explanation.reasoning?.topPick?.calibratedProbability === 'number'
+      ? explanation.reasoning.topPick.calibratedProbability
+      : undefined;
+  const showCalibrationComparison =
+    typeof rawProb === 'number' &&
+    typeof calProb === 'number' &&
+    Math.abs(rawProb - calProb) >= 0.001;
 
-  return (
+  const confidenceTier =
+    explanation.confidenceTier || explanation.reasoning?.topPick?.confidenceTier;
+  const confidenceReason =
+    explanation.confidenceReason || explanation.reasoning?.topPick?.confidenceReason;
+  const tierBadge = formatTierPill(confidenceTier);
+
+  const handleTouchStart = (e: React.TouchEvent, forceAllow: boolean) => {
+    if (e.touches.length !== 1) return;
+    const scrollTop = bodyScrollRef.current?.scrollTop ?? 0;
+    if (!forceAllow && scrollTop > 2) return;
+    touchStartYRef.current = e.touches[0].clientY;
+    draggingRef.current = true;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!draggingRef.current || touchStartYRef.current === null) return;
+    const deltaY = e.touches[0].clientY - touchStartYRef.current;
+    if (deltaY > 0) {
+      setDragOffsetY(Math.min(deltaY, 240));
+    } else {
+      setDragOffsetY(0);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    touchStartYRef.current = null;
+    if (dragOffsetY > 70) {
+      setDragOffsetY(0);
+      onClose();
+    } else {
+      setDragOffsetY(0);
+    }
+  };
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/75 p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Why this pick"
+      aria-label="Model explanation"
+      data-testid="why-this-pick-backdrop"
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-lg bg-[var(--surface)] border border-[var(--line)] rounded-t-[24px] sm:rounded-[20px] p-5 pb-7 sm:pb-5 space-y-4 max-h-[85vh] overflow-y-auto overscroll-y-contain"
+        ref={panelRef}
+        tabIndex={-1}
+        data-testid="why-this-pick-sheet"
         onClick={(e) => e.stopPropagation()}
+        style={{
+          transform: dragOffsetY > 0 ? `translateY(${dragOffsetY}px)` : undefined,
+          transition: draggingRef.current ? 'none' : 'transform 160ms ease-out',
+        }}
+        className="w-full sm:max-w-lg bg-[#111815] border-t sm:border border-[var(--line)] rounded-t-[20px] sm:rounded-[20px] max-h-[85dvh] flex flex-col overflow-hidden shadow-2xl focus:outline-none"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-0.5">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--accent)]">
-              <Sparkles className="w-3.5 h-3.5 shrink-0" />
-              <span>Model explanation</span>
+        {/* Drag handle & Header */}
+        <div
+          className="px-5 pt-2.5 pb-3 shrink-0 select-none"
+          onTouchStart={(e) => handleTouchStart(e, true)}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div
+            aria-hidden="true"
+            className="w-10 h-1 rounded-full bg-white/25 mx-auto mb-3"
+          />
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--accent)]">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  <span>Model explanation</span>
+                </div>
+                {tierBadge && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${tierBadge.className}`}
+                  >
+                    {tierBadge.label}
+                  </span>
+                )}
+              </div>
+              <h3 className="font-display text-[17px] font-bold text-[var(--text)] leading-snug truncate">
+                {cleanDisplayText(matchTitle)}
+              </h3>
+              {pickLabel && (
+                <p className="text-[12.5px] font-medium text-[var(--text-2)] truncate">
+                  {cleanDisplayText(pickLabel)}
+                </p>
+              )}
             </div>
-            <h3 className="font-display text-[17px] font-bold text-[var(--text)] leading-snug truncate">
-              {cleanDisplayText(matchTitle)}
-            </h3>
-            {pickLabel && (
-              <p className="text-[12.5px] font-medium text-[var(--text-2)] truncate">
-                {cleanDisplayText(pickLabel)}
-              </p>
-            )}
-          </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-w-[44px] min-h-[44px] -mr-2 -mt-2 flex items-center justify-center rounded-[12px] text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] touch-press"
-            aria-label="Close explanation"
-          >
-            <X className="w-5 h-5" />
-          </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-w-[44px] min-h-[44px] -mr-2 -mt-1 flex items-center justify-center rounded-[12px] text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] touch-press"
+              aria-label="Close explanation"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        {explanation.tierLocked ? (
-          <div className="space-y-3">
-            <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-3.5 text-[13px] leading-[1.55] text-[var(--text)]">
-              {cleanDisplayText(explanation.oneLineSummary)}
-            </div>
+        {/* Scrollable Sheet Body */}
+        <div
+          ref={bodyScrollRef}
+          onTouchStart={(e) => handleTouchStart(e, false)}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="flex-1 overflow-y-auto overscroll-y-contain px-5 space-y-3"
+          style={
+            !explanation.tierLocked
+              ? { paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }
+              : { paddingBottom: '12px' }
+          }
+        >
+          <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-3.5 space-y-2 text-[13px] leading-[1.55] text-[var(--text)]">
+            <p>
+              {cleanDisplayText(
+                explanation.tierLocked
+                  ? explanation.oneLineSummary
+                  : explanation.fullSummary || explanation.oneLineSummary
+              )}
+            </p>
+            {confidenceTier === 'LOW' && confidenceReason && (
+              <p className="text-[12px] text-[var(--danger)] font-medium">
+                {cleanDisplayText(`Confidence note: ${confidenceReason}.`)}
+              </p>
+            )}
+            {showCalibrationComparison && (
+              <p className="text-[11.5px] text-[var(--text-2)] tabular-nums">
+                Raw model {(rawProb! * 100).toFixed(1)}% · Calibrated {(calProb! * 100).toFixed(1)}%
+              </p>
+            )}
+          </div>
 
-            <div className="bg-[var(--medium-soft)] border border-[var(--medium)]/30 rounded-[14px] p-4 space-y-2.5">
+          {explanation.tierLocked ? (
+            <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[14px] p-3.5 space-y-1.5">
               <div className="flex items-center gap-2 text-[13px] font-semibold text-[var(--medium)]">
                 <Lock className="w-4 h-4 shrink-0" />
-                <span>Full model reasoning &amp; alternates locked</span>
+                <span>Full model reasoning locked</span>
               </div>
-              <p className="text-[12.5px] leading-[1.5] text-[var(--text-2)]">
-                {explanation.dailySummaryLimitReached
-                  ? 'Free accounts include up to 3 daily summary lines. Upgrade to Pro for full numeric breakdowns and the next 2 alternate selections on every match.'
-                  : 'Upgrade to Pro to unlock the complete match breakdown, numeric drivers, and the next 2 best alternate picks.'}
+              <p className="text-[12.5px] leading-[1.45] text-[var(--text-2)]">
+                Pro (₦500/month) unlocks model drivers and the next 2 alternate picks.
               </p>
-              <Link
-                href="/pricing"
-                className="min-h-[44px] w-full inline-flex items-center justify-center gap-1.5 rounded-[12px] bg-[var(--accent-fill)] text-[#0A0E0D] font-semibold text-[13px] px-4 touch-press"
-              >
-                <span>View Pro plans</span>
-                <ArrowUpRight className="w-4 h-4" />
-              </Link>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-3.5 text-[13px] leading-[1.55] text-[var(--text)]">
-              {cleanDisplayText(explanation.fullSummary || explanation.oneLineSummary)}
-            </div>
-
-            {drivers.length > 0 && (
-              <div className="grid grid-cols-2 gap-2">
-                {drivers.map((d) => (
-                  <div
-                    key={d.label}
-                    className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-2.5"
-                  >
-                    <div className="text-[10.5px] text-[var(--text-3)]">{d.label}</div>
-                    <div className="text-[12.5px] font-semibold text-[var(--text)] tabular-nums mt-0.5 truncate">
-                      {cleanDisplayText(d.value)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {explanation.alternates && explanation.alternates.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-[12px] font-semibold text-[var(--text-2)]">
-                  Next 2 best alternates
-                </div>
-                <div className="border border-[var(--line)] rounded-[12px] divide-y divide-[var(--line)] overflow-hidden">
-                  {explanation.alternates.slice(0, 2).map((alt) => (
+          ) : (
+            <>
+              {drivers.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {drivers.map((d) => (
                     <div
-                      key={alt.marketCode}
-                      className="px-3 py-2.5 bg-[var(--surface-2)] flex items-center justify-between gap-2"
+                      key={d.label}
+                      className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-2.5"
                     >
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-semibold text-[var(--text)] truncate">
-                          {cleanDisplayText(alt.selection)}
-                        </div>
-                        <div className="text-[10.5px] text-[var(--text-3)] truncate">
-                          {cleanDisplayText(alt.marketName)}
-                        </div>
+                      <div className="text-[10.5px] text-[var(--text-3)]">{d.label}</div>
+                      <div className="text-[12.5px] font-semibold text-[var(--text)] tabular-nums mt-0.5 truncate">
+                        {cleanDisplayText(d.value)}
                       </div>
-                      <span className="font-display text-[14px] font-bold text-[var(--accent)] tabular-nums shrink-0">
-                        {(alt.probability * 100).toFixed(1)}%
-                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
+
+              {explanation.alternates && explanation.alternates.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[12px] font-semibold text-[var(--text-2)]">
+                    Next 2 best alternates
+                  </div>
+                  <div className="border border-[var(--line)] rounded-[12px] divide-y divide-[var(--line)] overflow-hidden">
+                    {explanation.alternates.slice(0, 2).map((alt) => (
+                      <div
+                        key={alt.marketCode}
+                        className="px-3 py-2.5 bg-[var(--surface-2)] flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-semibold text-[var(--text)] truncate">
+                            {cleanDisplayText(alt.selection)}
+                          </div>
+                          <div className="text-[10.5px] text-[var(--text-3)] truncate">
+                            {cleanDisplayText(alt.marketName)}
+                          </div>
+                        </div>
+                        <span className="font-display text-[14px] font-bold text-[var(--accent)] tabular-nums shrink-0">
+                          {(alt.probability * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Sticky Primary CTA Footer for Locked State */}
+        {explanation.tierLocked && (
+          <div
+            className="sticky bottom-0 px-5 pt-3 border-t border-[var(--line)] bg-[#111815] shrink-0"
+            style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}
+          >
+            <Link
+              href="/pricing"
+              onClick={onClose}
+              className="min-h-[44px] w-full inline-flex items-center justify-center gap-1.5 rounded-[12px] bg-[var(--accent-fill)] text-[#0A0E0D] font-semibold text-[13.5px] px-4 touch-press"
+            >
+              <span>See plans</span>
+              <ArrowUpRight className="w-4 h-4" />
+            </Link>
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -24,6 +24,7 @@ export interface V25ConfidenceAssessment {
   confidenceScore: number; // 0.0 to 1.0
   isHandicapQualified: boolean;
   disqualificationReason?: string;
+  confidenceReasons: string[];
 }
 
 export class ConfidenceEngine {
@@ -112,9 +113,16 @@ export class ConfidenceEngine {
       hasMissingLineup = true;
     }
 
+    // When team news is globally disabled (free-tier data architecture), evaluateConfidence
+    // already caps HIGH -> MEDIUM via !isTeamNewsEnabled(). Do not also count the ambient
+    // pre-lineup status as an active match risk flag that inflates uncertainty/downgrades.
+    const activeRiskCount = isTeamNewsEnabled()
+      ? flags.length
+      : flags.length - (hasMissingLineup ? 1 : 0);
+
     return {
       flags,
-      downgradesCount: flags.length,
+      downgradesCount: activeRiskCount,
       hasVenueH2HContradiction,
       hasAdverseFormGap,
       hasKeyAbsences,
@@ -122,7 +130,7 @@ export class ConfidenceEngine {
       hasDerbyRivalry,
       hasNewManager,
       hasMissingLineup,
-      summaryNote: flags.length > 0 ? `${flags.length} active risk flag${flags.length > 1 ? 's' : ''} detected.` : undefined,
+      summaryNote: activeRiskCount > 0 ? `${activeRiskCount} active risk flag${activeRiskCount > 1 ? 's' : ''} detected.` : undefined,
     };
   }
 
@@ -152,6 +160,7 @@ export class ConfidenceEngine {
     // Strict rule: If ANY risk flag is present, HIGH tier is strictly impossible!
     let tier: ConfidenceTier = 'LOW';
     const hasAdverseNegativeEdge = edgeOverMarket !== undefined && edgeOverMarket < -0.05;
+    const confidenceReasons: string[] = [];
 
     if (isMultiGoals) {
       if (
@@ -171,6 +180,10 @@ export class ConfidenceEngine {
         tier = 'MEDIUM';
       } else {
         tier = 'LOW';
+        if (calibratedProb < 0.48) confidenceReasons.push(`calibrated probability ${(calibratedProb * 100).toFixed(1)}% below 48.0%`);
+        if (uncertaintySpread > 0.085) confidenceReasons.push(`uncertainty spread ±${(uncertaintySpread * 100).toFixed(1)}% above 8.5%`);
+        if (dataCompleteness < 0.65) confidenceReasons.push(`data coverage ${Math.round(dataCompleteness * 100)}% below 65%`);
+        if (riskEvaluation.downgradesCount > 1) confidenceReasons.push(`${riskEvaluation.downgradesCount} active risk flags`);
       }
     } else if (
       isTeamNewsEnabled() &&
@@ -187,17 +200,29 @@ export class ConfidenceEngine {
       uncertaintySpread <= 0.075 &&
       dataCompleteness >= 0.65 &&
       riskEvaluation.downgradesCount <= 1 &&
-      !riskEvaluation.hasVenueH2HContradiction && // Venue contradiction forbids MEDIUM on handicaps
+      (!isAsianHandicap || !riskEvaluation.hasVenueH2HContradiction) && // Venue contradiction forbids MEDIUM on handicaps
       !riskEvaluation.hasAdverseFormGap
     ) {
       tier = 'MEDIUM';
+      if (!isTeamNewsEnabled() && calibratedProb >= 0.70) {
+        confidenceReasons.push('capped at Medium without confirmed team news');
+      }
     } else {
       tier = 'LOW';
+      if (calibratedProb < 0.55) confidenceReasons.push(`calibrated probability ${(calibratedProb * 100).toFixed(1)}% below 55.0%`);
+      if (uncertaintySpread > 0.075) confidenceReasons.push(`uncertainty spread ±${(uncertaintySpread * 100).toFixed(1)}% above 7.5%`);
+      if (dataCompleteness < 0.65) confidenceReasons.push(`data coverage ${Math.round(dataCompleteness * 100)}% below 65%`);
+      if (riskEvaluation.downgradesCount > 1) confidenceReasons.push(`${riskEvaluation.downgradesCount} active risk flags`);
+      if (isAsianHandicap && riskEvaluation.hasVenueH2HContradiction) confidenceReasons.push('contradicting venue head to head history');
+      if (riskEvaluation.hasAdverseFormGap) confidenceReasons.push('adverse recent form gap');
     }
 
     // MANDATORY CAP: No High tier allowed when team news is absent
     if (!isTeamNewsEnabled() && tier === 'HIGH') {
       tier = 'MEDIUM';
+      if (!confidenceReasons.some((r) => r.includes('team news'))) {
+        confidenceReasons.push('capped at Medium without confirmed team news');
+      }
     }
 
     // Specialized Asian Handicap gating rule:
@@ -233,6 +258,7 @@ export class ConfidenceEngine {
       confidenceScore,
       isHandicapQualified,
       disqualificationReason,
+      confidenceReasons,
     };
   }
 }

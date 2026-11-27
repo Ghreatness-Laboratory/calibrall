@@ -168,10 +168,52 @@ export function generateFootballExplanation(params: {
   const topPick = evaluation.topPick;
   const alternates = selectTopFootballAlternates(evaluation.predictions || [], topPick);
 
+  const rawProb = topPick
+    ? isFiniteNum(topPick.rawModelProbability)
+      ? topPick.rawModelProbability
+      : topPick.modelProbability
+    : undefined;
+  const calProb = topPick
+    ? isFiniteNum(topPick.calibratedProbability)
+      ? topPick.calibratedProbability
+      : topPick.modelProbability
+    : undefined;
+  const probsDiffer =
+    isFiniteNum(rawProb) && isFiniteNum(calProb) && Math.abs(rawProb - calProb) >= 0.001;
+
+  let derivedConfidenceReason = topPick?.confidenceReason
+    ? cleanDisplayText(topPick.confidenceReason)
+    : undefined;
+  if (!derivedConfidenceReason && topPick?.confidenceTier === 'LOW') {
+    if (homeSamples !== null && homeSamples < 10) {
+      derivedConfidenceReason = cleanDisplayText(`only ${homeSamples} recent matches for ${home}`);
+    } else if (awaySamples !== null && awaySamples < 10) {
+      derivedConfidenceReason = cleanDisplayText(`only ${awaySamples} recent matches for ${away}`);
+    } else if (isFiniteNum(topPick.uncertaintySpread) && topPick.uncertaintySpread > 0.075) {
+      derivedConfidenceReason = cleanDisplayText(
+        `uncertainty spread ±${(topPick.uncertaintySpread * 100).toFixed(1)}%`
+      );
+    } else if (isFiniteNum(topPick.dataCompletenessScore) && topPick.dataCompletenessScore < 0.65) {
+      derivedConfidenceReason = cleanDisplayText(
+        `data coverage ${Math.round(topPick.dataCompletenessScore * 100)}%`
+      );
+    } else if (Array.isArray(topPick.riskFlags) && topPick.riskFlags.length > 0) {
+      derivedConfidenceReason = cleanDisplayText(topPick.riskFlags[0]);
+    }
+  }
+
   let sentence1 = '';
-  if (topPick && isFiniteNum(topPick.modelProbability)) {
+  if (topPick && isFiniteNum(calProb)) {
+    const tierLabel = tierToDisplayLabel(topPick.confidenceTier);
+    const tierClause =
+      topPick.confidenceTier === 'LOW' && derivedConfidenceReason
+        ? `${tierLabel} confidence: ${derivedConfidenceReason}`
+        : `${tierLabel} confidence`;
+    const calibrationClause = probsDiffer && isFiniteNum(rawProb)
+      ? `; raw model ${pct(rawProb)} vs calibrated ${pct(calProb)}`
+      : '';
     sentence1 = cleanDisplayText(
-      `Model recommends ${cleanDisplayText(topPick.selection)} at ${pct(topPick.modelProbability)} (${tierToDisplayLabel(topPick.confidenceTier)} confidence).`
+      `Model recommends ${cleanDisplayText(topPick.selection)} at ${pct(calProb)} (${tierClause})${calibrationClause}.`
     );
   } else {
     sentence1 = cleanDisplayText(
@@ -321,7 +363,7 @@ export function generateFootballExplanation(params: {
     ) {
       marketBody += `; selected band ${topPick.multiGoalsMeta.band} keeps range width at ${topPick.multiGoalsMeta.span} around ${topPick.multiGoalsMeta.expectedTotalGoals.toFixed(2)} expected goals`;
     } else if (!sentence3Context && topPick.evidence?.whyLineChosen) {
-      const ladderSnippet = cleanDisplayText(topPick.evidence.whyLineChosen).split('.')[0]?.trim();
+      const ladderSnippet = cleanDisplayText(topPick.evidence.whyLineChosen).split(/(?<!\d)\.(?!\d)/)[0]?.trim();
       if (ladderSnippet) {
         marketBody += `; ${ladderSnippet.charAt(0).toLowerCase() + ladderSnippet.slice(1)}`;
       }
@@ -340,6 +382,10 @@ export function generateFootballExplanation(params: {
   return {
     oneLineSummary: splitFirstSentence(sentence1) || sentence1,
     fullSummary,
+    confidenceTier: topPick?.confidenceTier,
+    confidenceReason: derivedConfidenceReason,
+    rawProbability: isFiniteNum(rawProb) ? Number(rawProb.toFixed(4)) : undefined,
+    calibratedProbability: isFiniteNum(calProb) ? Number(calProb.toFixed(4)) : undefined,
     reasoning: {
       sport: 'football',
       status: topPick ? 'recommended' : 'abstain',
@@ -377,10 +423,17 @@ export function generateFootballExplanation(params: {
         ? {
             marketCode: topPick.marketCode,
             selection: cleanDisplayText(topPick.selection),
-            probability: isFiniteNum(topPick.modelProbability)
-              ? Number(topPick.modelProbability.toFixed(4))
+            probability: isFiniteNum(calProb)
+              ? Number(calProb.toFixed(4))
+              : null,
+            rawProbability: isFiniteNum(rawProb)
+              ? Number(rawProb.toFixed(4))
+              : null,
+            calibratedProbability: isFiniteNum(calProb)
+              ? Number(calProb.toFixed(4))
               : null,
             confidenceTier: topPick.confidenceTier,
+            confidenceReason: derivedConfidenceReason || null,
             priceSource: cleanDisplayText(
               topPick.priceSource || (topPick.marketOdds ? 'Verified Odds' : 'Model line, no market price')
             ),
@@ -585,9 +638,29 @@ export function generateBasketballExplanation(params: {
     .slice(0, 4)
     .join(' ');
 
+  const bbConfidenceTier = topPick
+    ? topPick.tier === 'HIGH'
+      ? 'HIGH'
+      : topPick.tier === 'MEDIUM'
+      ? 'MEDIUM'
+      : 'LOW'
+    : undefined;
+  const bbConfidenceReason =
+    topPick && bbConfidenceTier === 'LOW'
+      ? homeGames !== null && homeGames < 10
+        ? cleanDisplayText(`only ${homeGames} recent games for ${home}`)
+        : awayGames !== null && awayGames < 10
+        ? cleanDisplayText(`only ${awayGames} recent games for ${away}`)
+        : cleanDisplayText('small edge or elevated total variance')
+      : undefined;
+
   return {
     oneLineSummary: splitFirstSentence(sentence1) || sentence1,
     fullSummary,
+    confidenceTier: bbConfidenceTier,
+    confidenceReason: bbConfidenceReason,
+    rawProbability: topPick && isFiniteNum(topPick.calibratedProbability) ? Number(topPick.calibratedProbability.toFixed(4)) : undefined,
+    calibratedProbability: topPick && isFiniteNum(topPick.calibratedProbability) ? Number(topPick.calibratedProbability.toFixed(4)) : undefined,
     reasoning: {
       sport: 'basketball',
       status: topPick ? 'recommended' : 'abstain',

@@ -96,7 +96,7 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Primary navigation"
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[var(--bg)]/85 backdrop-blur-xl border-t border-[var(--line)] flex flex-col justify-start"
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#111815] border-t border-[var(--line)] flex flex-col justify-start"
       style={{
         height: 'calc(62px + max(16px, env(safe-area-inset-bottom, 0px)))',
         paddingBottom: 'max(16px, env(safe-area-inset-bottom, 0px))',

@@ -248,6 +248,10 @@ export interface WrittenMatchExplanation {
   reasoning: Record<string, any>;
   alternates: WrittenMatchAlternate[];
   generatedAt: string;
+  confidenceTier?: ConfidenceTier;
+  confidenceReason?: string;
+  rawProbability?: number;
+  calibratedProbability?: number;
   tierLocked?: boolean;
   dailySummaryLimitReached?: boolean;
 }
@@ -562,6 +566,7 @@ export interface MarketPrediction {
   liveStateStatus?: LiveStateStatus;
   // Dixon Coles v2.5 Upgrades
   confidenceTier?: ConfidenceTier;
+  confidenceReason?: string;
   calibratedProbability?: number;
   rawModelProbability?: number;
   uncertaintySpread?: number;

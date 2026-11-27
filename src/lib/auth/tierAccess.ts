@@ -50,6 +50,10 @@ export function redactExplanationForTier(
     reasoning: {},
     alternates: [],
     generatedAt: explanation.generatedAt,
+    confidenceTier: explanation.confidenceTier,
+    confidenceReason: explanation.confidenceReason,
+    rawProbability: explanation.rawProbability,
+    calibratedProbability: explanation.calibratedProbability,
     tierLocked: true,
     dailySummaryLimitReached: !withinDailyCap,
   };

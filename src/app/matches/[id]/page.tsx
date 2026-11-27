@@ -498,13 +498,23 @@ export default function MatchAnalysisPage() {
                       <p className="text-[12.5px] text-[var(--text)] leading-[1.5]">
                         {cleanDisplayText(expl.oneLineSummary)}
                       </p>
-                      <Link
-                        href="/pricing"
-                        className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 rounded-[12px] bg-[var(--accent-fill)] text-[#0A0E0D] font-semibold text-[12.5px] touch-press"
-                      >
-                        <span>Upgrade to Pro for full explanation and alternates</span>
-                        <ArrowUpRight className="w-4 h-4" />
-                      </Link>
+                      <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="space-y-0.5">
+                          <div className="text-[12.5px] font-semibold text-[var(--medium)]">
+                            Full model reasoning locked
+                          </div>
+                          <p className="text-[12px] text-[var(--text-2)]">
+                            Pro (₦500/month) unlocks model drivers and the next 2 alternate picks.
+                          </p>
+                        </div>
+                        <Link
+                          href="/pricing"
+                          className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 rounded-[12px] bg-[var(--accent-fill)] text-[#0A0E0D] font-semibold text-[12.5px] shrink-0 touch-press"
+                        >
+                          <span>See plans</span>
+                          <ArrowUpRight className="w-4 h-4" />
+                        </Link>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -923,13 +933,23 @@ export default function MatchAnalysisPage() {
               <p className="text-[12.5px] text-[var(--text)] leading-[1.5]">
                 {cleanDisplayText(fixture.writtenExplanation.oneLineSummary)}
               </p>
-              <Link
-                href="/pricing"
-                className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 rounded-[12px] bg-[var(--accent-fill)] text-[#0A0E0D] font-semibold text-[12.5px] touch-press"
-              >
-                <span>Upgrade to Pro for full explanation and alternates</span>
-                <ArrowUpRight className="w-4 h-4" />
-              </Link>
+              <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="space-y-0.5">
+                  <div className="text-[12.5px] font-semibold text-[var(--medium)]">
+                    Full model reasoning locked
+                  </div>
+                  <p className="text-[12px] text-[var(--text-2)]">
+                    Pro (₦500/month) unlocks model drivers and the next 2 alternate picks.
+                  </p>
+                </div>
+                <Link
+                  href="/pricing"
+                  className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 rounded-[12px] bg-[var(--accent-fill)] text-[#0A0E0D] font-semibold text-[12.5px] shrink-0 touch-press"
+                >
+                  <span>See plans</span>
+                  <ArrowUpRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">

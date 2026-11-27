@@ -85,7 +85,12 @@ export async function loadFootballPickModerationMap(
   return result;
 }
 
-export function loadStoredFootballExplanation(fixtureId: string): WrittenMatchExplanation | null {
+const CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION = 'v2.5.1';
+
+export function loadStoredFootballExplanation(
+  fixtureId: string,
+  options?: { requireCurrentVersion?: boolean }
+): WrittenMatchExplanation | null {
   if (typeof window !== 'undefined') return null;
   try {
     if (isProductionRuntime()) return null;
@@ -98,6 +103,9 @@ export function loadStoredFootballExplanation(fixtureId: string): WrittenMatchEx
           reasoning_json?: string;
           alternates_json?: string;
           recorded_at?: string;
+          model_version?: string | null;
+          confidence_tier?: string | null;
+          calibrated_probability?: number | null;
           is_hidden?: number | boolean | null;
           voided_reason?: string | null;
         }
@@ -106,7 +114,7 @@ export function loadStoredFootballExplanation(fixtureId: string): WrittenMatchEx
     try {
       row = db
         .prepare(
-          `SELECT summary, reasoning_json, alternates_json, recorded_at, is_hidden, voided_reason
+          `SELECT summary, reasoning_json, alternates_json, recorded_at, model_version, confidence_tier, calibrated_probability, is_hidden, voided_reason
            FROM football_picks
            WHERE fixture_id = ?
            LIMIT 1`
@@ -127,6 +135,12 @@ export function loadStoredFootballExplanation(fixtureId: string): WrittenMatchEx
     if (row.is_hidden === 1 || row.is_hidden === true || Boolean(row.voided_reason)) {
       return null;
     }
+    if (
+      options?.requireCurrentVersion &&
+      row.model_version !== CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION
+    ) {
+      return null;
+    }
 
     let reasoning: Record<string, any> = {};
     let alternates: WrittenMatchAlternate[] = [];
@@ -143,11 +157,31 @@ export function loadStoredFootballExplanation(fixtureId: string): WrittenMatchEx
     }
 
     const fullSummary = cleanDisplayText(row.summary);
+    const storedTopPick = reasoning?.topPick;
+    const storedTier = (storedTopPick?.confidenceTier || row.confidence_tier || undefined) as
+      | WrittenMatchExplanation['confidenceTier']
+      | undefined;
+    const storedRawProb =
+      typeof storedTopPick?.rawProbability === 'number' ? storedTopPick.rawProbability : undefined;
+    const storedCalProb =
+      typeof storedTopPick?.calibratedProbability === 'number'
+        ? storedTopPick.calibratedProbability
+        : typeof row.calibrated_probability === 'number'
+        ? row.calibrated_probability
+        : undefined;
+
     return {
       oneLineSummary: firstSentence(fullSummary),
       fullSummary,
       reasoning,
       alternates,
+      confidenceTier: storedTier,
+      confidenceReason:
+        typeof storedTopPick?.confidenceReason === 'string' && storedTopPick.confidenceReason
+          ? storedTopPick.confidenceReason
+          : undefined,
+      rawProbability: storedRawProb,
+      calibratedProbability: storedCalProb,
       generatedAt: String(row.recorded_at || new Date().toISOString()),
     };
   } catch {
@@ -160,8 +194,14 @@ export function persistOrLoadImmutableFootballExplanation(
   evaluation: Pick<EvaluatedFixtureResult, 'topPick' | 'predictions' | 'noRecommendationReason'>,
   context?: FixtureContext
 ): WrittenMatchExplanation {
-  // 1. Existing stored row ALWAYS takes precedence (strictly immutable after kickoff/creation)
-  const existing = loadStoredFootballExplanation(fixture.id);
+  const isUpcoming = fixture.status === 'TIMED' || fixture.status === 'SCHEDULED';
+  const kickoffMs = Date.parse(fixture.kickoffTime);
+  const isPreKickoff = isUpcoming && Number.isFinite(kickoffMs) && kickoffMs > Date.now();
+
+  // 1. Post-kickoff rows are ALWAYS immutable. Pre-kickoff rows are reused once at current model_version.
+  const existing = loadStoredFootballExplanation(fixture.id, {
+    requireCurrentVersion: isPreKickoff,
+  });
   if (existing) {
     return existing;
   }
@@ -172,20 +212,30 @@ export function persistOrLoadImmutableFootballExplanation(
   // 3. Persist ONLY if strictly pre-kickoff (never backfill finished or in-play fixtures)
   if (typeof window === 'undefined') {
     try {
-      const isUpcoming = fixture.status === 'TIMED' || fixture.status === 'SCHEDULED';
-      const kickoffMs = Date.parse(fixture.kickoffTime);
-      if (isUpcoming && Number.isFinite(kickoffMs) && kickoffMs > Date.now() && !isProductionRuntime()) {
+      if (isPreKickoff && !isProductionRuntime()) {
         const db = getLocalDatabase();
         if (db) {
           const top = evaluation.topPick;
           db.prepare(
-            `INSERT OR IGNORE INTO football_picks (
+            `INSERT INTO football_picks (
               fixture_id, competition_code, kickoff_time,
               market_code, market_name, selection,
               calibrated_probability, confidence_tier, price_source,
               summary, reasoning_json, alternates_json,
               model_version, recorded_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(fixture_id) DO UPDATE SET
+              market_code = excluded.market_code,
+              market_name = excluded.market_name,
+              selection = excluded.selection,
+              calibrated_probability = excluded.calibrated_probability,
+              confidence_tier = excluded.confidence_tier,
+              price_source = excluded.price_source,
+              summary = excluded.summary,
+              reasoning_json = excluded.reasoning_json,
+              alternates_json = excluded.alternates_json,
+              model_version = excluded.model_version,
+              recorded_at = excluded.recorded_at`
           ).run(
             fixture.id,
             fixture.competition?.code || null,
@@ -193,13 +243,13 @@ export function persistOrLoadImmutableFootballExplanation(
             top?.marketCode || null,
             top ? cleanDisplayText(top.marketName) : null,
             top ? cleanDisplayText(top.selection) : null,
-            top ? Number(top.modelProbability.toFixed(4)) : null,
+            top ? Number((top.calibratedProbability ?? top.modelProbability).toFixed(4)) : null,
             top?.confidenceTier || null,
             top ? cleanDisplayText(top.priceSource || (top.marketOdds ? 'Verified Odds' : 'Model line, no market price')) : null,
             generated.fullSummary,
             JSON.stringify(generated.reasoning || {}),
             JSON.stringify(generated.alternates || []),
-            'v2.5.0',
+            CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION,
             generated.generatedAt
           );
         }
