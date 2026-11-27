@@ -429,7 +429,7 @@ export default function FixtureCard({
         <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] p-3 space-y-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <span className="px-2 py-0.5 rounded-full bg-[var(--medium-soft)] text-[var(--medium)] text-[10.5px] font-semibold border border-[var(--medium)]/30">
-              Abstained
+              {fixture.insufficientData ? 'Abstained' : 'No recommendation'}
             </span>
             {!isFinished && <LineupChip lineupState={lineupState} isPastKickoff={isPastKickoff} />}
           </div>

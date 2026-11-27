@@ -22,6 +22,7 @@ import {
   type MarketEvidenceFamily,
 } from './explanationValidator';
 import type { BasketballGameEvaluation, BasketballPickCandidate } from '@/lib/basketball/picker';
+import { isDisabledRecommendationMarket } from '@/lib/markets';
 
 function isFiniteNum(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v);
@@ -114,6 +115,7 @@ export function selectTopFootballAlternates(
   const out: WrittenMatchAlternate[] = [];
   for (const p of sorted) {
     if (out.length >= 2) break;
+    if (isDisabledRecommendationMarket(p)) continue;
     if (seenCodes.has(p.marketCode)) continue;
     if (p.isSpeculative) continue;
     if (p.marketCategory === 'multi_goals' && (p.rankingScore ?? 0) <= 0) continue;
@@ -397,7 +399,10 @@ export function generateFootballExplanation(params: {
     };
   }
 
-  const topPick = evaluation.topPick;
+  const topPick =
+    evaluation.topPick && !isDisabledRecommendationMarket(evaluation.topPick)
+      ? evaluation.topPick
+      : null;
   const family: MarketEvidenceFamily = getMarketEvidenceFamily(topPick, 'football');
   const allow = (field: Parameters<typeof isEvidenceFieldAllowed>[1]) =>
     isEvidenceFieldAllowed(family, field);

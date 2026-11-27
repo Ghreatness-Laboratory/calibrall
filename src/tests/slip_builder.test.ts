@@ -11,7 +11,7 @@ import {
   EvaluatedFootballSlateEntry,
 } from '../lib/slips/candidateBuilder';
 import { searchSlips } from '../lib/slips/slipSearch';
-import { computeSlipSettlementFromLegs } from '../lib/slips/dailySlipRecord';
+import { computeSlipSettlementFromLegs, settleSingleLeg } from '../lib/slips/dailySlipRecord';
 import type {
   Competition,
   Fixture,
@@ -699,7 +699,76 @@ async function runTests() {
   assert.equal(settledVoid.status, 'WON');
   assert.equal(settledVoid.settledOdds, 1.5, 'Void leg removed and odds recalculated to remaining leg 1.50');
   assert.equal(settledVoid.voidedLegsCount, 1);
-  console.log('Same-match prohibition & void-leg recalculation verified.');
+
+  // Disabled under-bookings leg must NEVER enter Slip Builder or daily fixed slips, while historical CARDS_U45 legs still settle normally
+  const cardUnderCandidate: SlipCandidateLeg = {
+    matchId: 'cards_u_blocked_m1',
+    sport: 'football',
+    matchLabel: 'Arsenal vs Chelsea',
+    homeTeamId: 'h1',
+    awayTeamId: 'a1',
+    homeTeamName: 'Arsenal',
+    awayTeamName: 'Chelsea',
+    competitionId: 'comp_pl',
+    competitionCode: 'PL',
+    competitionName: 'Premier League',
+    kickoffTime: kickoffSoon,
+    marketCode: 'CARDS_U45',
+    marketGroup: 'bookings',
+    marketName: 'Cards',
+    selection: 'Under 4.5 cards',
+    line: 4.5,
+    decimalOdds: 1.45,
+    oddsSourceType: 'real_bookmaker',
+    bookmakerName: 'Bet365',
+    observedAt: obs14MinAgo,
+    priceAgeMinutes: 14,
+    priceAgeLabel: 'price from 14 minutes ago',
+    calibratedProbability: 0.78,
+    impliedProbability: 1 / 1.45,
+    marketEdge: 0.09,
+    expectedValue: 0.13,
+    confidenceTier: 'HIGH',
+    teamNewsLowered: false,
+    teamNewsNote: null,
+    oneLineWhy: 'Under cards test leg.',
+    bookmakerQuotes: [],
+    bestQuoteApplied: false,
+  };
+  const goalsLeg: SlipCandidateLeg = {
+    ...cardUnderCandidate,
+    matchId: 'goals_allowed_m2',
+    marketCode: 'TOTAL_GOALS_O15',
+    marketGroup: 'total_goals',
+    marketName: 'Total goals',
+    selection: 'Over 1.5 goals',
+    line: 1.5,
+    oneLineWhy: 'Goals test leg.',
+  };
+  const blockedSlips = searchSlips([cardUnderCandidate, goalsLeg], { targetOdds: 2.0, maxLegs: 4, style: 'safest' });
+  assert.equal(blockedSlips.length, 0, 'Disabled CARDS_U45 candidate must be excluded from searchSlips');
+
+  const historicalCardsUnderSettlement = settleSingleLeg(
+    {
+      ...sampleLegs[0],
+      marketCode: 'CARDS_U45',
+      marketName: 'Cards',
+      selection: 'Under 4.5 cards',
+      line: 4.5,
+      legStatus: 'PENDING',
+    },
+    {
+      status: 'FINISHED',
+      homeScore: 1,
+      awayScore: 1,
+      homeYellowCards: 2,
+      awayYellowCards: 1,
+      homeRedCards: 0,
+      awayRedCards: 0,
+    }
+  );
+  assert.equal(historicalCardsUnderSettlement.legStatus, 'WON', 'Existing/historical CARDS_U45 slip legs must continue settling normally');
+  console.log('Same-match prohibition, void-leg recalculation, & under-bookings slip guard verified.');
 
   console.log('\n=== 5. 200+ GAME PERFORMANCE BENCHMARK ===');
   const largeSlate: SlipCandidateLeg[] = [];

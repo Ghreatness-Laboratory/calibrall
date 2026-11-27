@@ -161,7 +161,7 @@ export const SUPPORTED_OPTIONS_CATALOGUE: Record<SupportedOptionType, OptionType
     category: 'bookings',
     period: 'REGULAR_TIME',
     description: 'Total cards over/under and team cards. Uses dedicated disciplinary model incorporating referee card averages, derby tension factor, and team historical cards. Requires verified card data, else abstains.',
-    defaultSelections: ['Total Cards Over', 'Total Cards Under', 'Team Cards Over'],
+    defaultSelections: ['Total Cards Over', 'Team Cards Over'],
     supportedLines: [3.5, 4.5, 5.5, 2.5],
     settlementRule: 'Regular time only. Yellow card = 1 card; direct red = 2 cards; yellow-to-red = 2 cards (max 3 cards per player). Cards to coaching staff or bench do not count.',
     dataRequirements: {

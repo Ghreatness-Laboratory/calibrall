@@ -28,6 +28,7 @@ import {
   getFixtureCanonicalCompetitionId,
 } from '@/lib/data/competitionSearch';
 import { SLIP_BUILDER_GLOBAL_BOUNDS } from '@/lib/tiers';
+import { isDisabledRecommendationMarket } from '@/lib/markets';
 import { getFlaggedExplanationFixtureIds } from './storage';
 import type {
   SlipBookmakerQuote,
@@ -522,6 +523,7 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
       let matchAddedLeg = false;
 
       for (const pick of poolPicks) {
+        if (isDisabledRecommendationMarket(pick)) continue;
         if (pick.abstainReason || pick.sanityTripwire || pick.isSpeculative) continue;
         if (
           pick.marketCategory === 'multi_goals' &&

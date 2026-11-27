@@ -11,6 +11,7 @@ import { getBasketballFixturesAndEvaluations } from '@/lib/basketball/readServic
 import { resolveTierFromSession, redactExplanationForTier } from '@/lib/auth/tierAccess';
 import { requireApiUser } from '@/lib/supabase/serverAuth';
 import { displayName } from '@/lib/utils/formatText';
+import { isDisabledRecommendationMarket } from '@/lib/markets';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -121,7 +122,7 @@ export async function GET(request: Request) {
 
   const diversified = syncSlateExplanations(selectDiversifiedSlatePicks(evaluated, 0.40));
   const qualified = diversified
-    .filter(item => item.topPick !== null)
+    .filter(item => item.topPick !== null && !isDisabledRecommendationMarket(item.topPick))
     .map((item, idx) => ({
       fixtureId: item.fixture.id,
       match: `${displayName(item.fixture.homeTeam)} vs ${displayName(item.fixture.awayTeam)}`,

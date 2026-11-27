@@ -872,7 +872,9 @@ export default function MatchAnalysisPage() {
         <section className="rounded-[18px] p-4 border border-[var(--medium)]/30 bg-[var(--medium-soft)] space-y-1.5">
           <div className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--medium)]">
             <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={2} />
-            <span>Statistical evidence insufficient</span>
+            <span>
+              {isDataInsufficient ? 'Statistical evidence insufficient' : 'No recommendation'}
+            </span>
           </div>
           <p className="text-[12.5px] text-[var(--text)] leading-[1.5]">
             {cleanDisplayText(

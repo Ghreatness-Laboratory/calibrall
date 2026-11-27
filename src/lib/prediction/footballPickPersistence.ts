@@ -14,6 +14,7 @@ import { cleanDisplayText } from '@/lib/utils/formatText';
 import { generateFootballExplanation } from './explanationGenerator';
 import { validateExplanationConsistency } from './explanationValidator';
 import type { EvaluatedFixtureResult } from './marketSelection';
+import { isDisabledRecommendationMarket } from '@/lib/markets';
 
 function firstSentence(text: string): string {
   const cleaned = cleanDisplayText(text).trim();
@@ -272,7 +273,14 @@ export function persistOrLoadImmutableFootballExplanation(
   );
   const isStaleThinHistory =
     isPreKickoff && existing?.reasoning?.status === 'thin_history' && hasRealDataNow;
-  if (existing && !isStaleThinHistory) {
+  const isStaleDisabledPreKickoff =
+    isPreKickoff &&
+    isDisabledRecommendationMarket({
+      marketCode: existing?.reasoning?.topPick?.marketCode,
+      marketName: existing?.reasoning?.topPick?.marketName,
+      selection: existing?.reasoning?.topPick?.selection,
+    });
+  if (existing && !isStaleThinHistory && !isStaleDisabledPreKickoff) {
     return existing;
   }
 

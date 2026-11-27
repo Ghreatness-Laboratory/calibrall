@@ -1,6 +1,7 @@
 import type { SlipBuildStyle } from '@/lib/tiers';
 import { SLIP_BUILDER_GLOBAL_BOUNDS } from '@/lib/tiers';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { isDisabledRecommendationMarket } from '@/lib/markets';
 import type { BuiltSlip, SlipCandidateLeg } from './types';
 
 export interface SlipSearchOptions {
@@ -226,6 +227,7 @@ export function searchSlipsWithStats(
 
   const validCandidates = rawCandidates.filter(
     (c) =>
+      !isDisabledRecommendationMarket(c) &&
       Number.isFinite(c.decimalOdds) &&
       c.decimalOdds >= 1.02 &&
       c.decimalOdds <= upperBound &&

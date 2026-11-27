@@ -29,6 +29,7 @@ import { calculateFragilityScore } from '../fragilityAndSubstitutes';
 import { getCalibratedParams, getLeagueCalibratedConfig, getLeagueCapabilities } from '../calibratedParams';
 import { checkMarketGating } from '../marketGating';
 import { devigCompleteMarket } from '../oddsEngine';
+import { isDisabledRecommendationMarket } from '@/lib/markets';
 
 export const PICK_CONFIDENCE_THRESHOLD = 0.70;
 export const MULTI_GOALS_HIGH_THRESHOLD = 0.60;
@@ -772,6 +773,7 @@ export class DixonColesV25Evaluator {
     //    - No-odds picks must beat baseline (> 0.01) and not be generic
     //    - No wide +1.5 cushion handicaps when tighter lines exist (never allow handicapLine >= 1.5 as recommendation)
     const rawEligible = processed.filter(p => {
+      if (isDisabledRecommendationMarket(p)) return false;
       if (!p.isValidated) return false;
       if (p.sanityTripwire) return false;
       if (p.qualificationStatus === 'NO_RECOMMENDATION' || p.qualificationStatus === 'UNQUALIFIED_HIGH_UNCERTAINTY' || p.qualificationStatus === 'PROBABILITY_ANALYSIS_ONLY') {
@@ -1353,19 +1355,6 @@ export class DixonColesV25Evaluator {
             marketOdds: kLine === 4.5 ? odds.over45Cards : undefined,
             plainEnglishReason: `Negative Binomial cards model expects ${cards.expectedCards.toFixed(2)} cards. ${refReason}`,
           });
-          list.push({
-            marketCode: `CARDS_U${codeSuf}`,
-            optionType: 'bookings',
-            marketCategory: 'bookings',
-            marketName: `Total Cards Under ${kLine}`,
-            selection: `Under ${kLine} cards`,
-            line: kLine,
-            period: 'REGULAR_TIME',
-            settlementRule: `Yellow card = 1, Red card = 2. Total cards < ${kLine}.`,
-            rawProb: dist.under,
-            marketOdds: kLine === 4.5 ? odds.under45Cards : undefined,
-            plainEnglishReason: `Negative Binomial cards model expects ${cards.expectedCards.toFixed(2)} cards. ${refReason}`,
-          });
         }
       });
     }
@@ -1591,6 +1580,6 @@ export class DixonColesV25Evaluator {
       }
     }
 
-    return list;
+    return list.filter(candidate => !isDisabledRecommendationMarket(candidate));
   }
 }

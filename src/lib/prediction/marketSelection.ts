@@ -42,6 +42,7 @@ import {
 } from './marketCatalog';
 import { displayName } from '@/lib/utils/formatText';
 import { compareFootballPicksByRank, computeFootballPickRankScore } from './explanationValidator';
+import { isDisabledRecommendationMarket } from '@/lib/markets';
 export { compareFootballPicksByRank, computeFootballPickRankScore };
 import { 
   getMarketBaseline, 
@@ -1244,25 +1245,7 @@ export function evaluateFixtureMarkets(
       }
     });
 
-    // Under 4.5
-    if (cardDist.total[4.5]) {
-      rawCandidates.push({
-        marketCode: 'CARDS_U45',
-        optionType: 'bookings',
-        marketCategory: 'bookings',
-        marketName: meta.title,
-        selection: 'Under 4.5 cards',
-        line: 4.5,
-        period: 'REGULAR_TIME',
-        settlementRule: meta.settlementRule,
-        modelProbability: cardDist.total[4.5].under,
-        odds: context.verifiedOdds?.under45Cards,
-        confidence: isDerby ? 'LOW' : baseConfidence,
-        requiresDisciplinaryData: true,
-        plainEnglishReason: `Negative Binomial cards model projects ${(cardDist.total[4.5].under * 100).toFixed(0)}% chance under 4.5 (${refBasisText}).`,
-        dataPoints: [{ metricName: 'Expected Total Cards', value: effectiveCards.toFixed(2) }]
-      });
-    }
+    // Under bookings/cards lines are intentionally omitted per DISABLED_RECOMMENDATIONS.
 
     // Team cards
     if (cardDist.team.home[1.5]) {
@@ -1403,8 +1386,9 @@ export function evaluateFixtureMarkets(
     });
   }
 
-  // Filter by isOptionTypeEnabled and allowedOptionTypes
+  // Filter by DISABLED_RECOMMENDATIONS, isOptionTypeEnabled, and allowedOptionTypes
   const activeCandidates = rawCandidates.filter(c => {
+    if (isDisabledRecommendationMarket(c)) return false;
     if (!isOptionTypeEnabled(c.optionType)) return false;
     if (allowedOptionTypes && allowedOptionTypes.length > 0 && !allowedOptionTypes.includes(c.optionType)) return false;
     return true;
@@ -2060,12 +2044,29 @@ export function selectDiversifiedSlatePicks<T extends SlatePickCandidate>(
   items: T[],
   maxFamilyShare: number = 0.40
 ): T[] {
-  const result = items.map(item => ({
-    ...item,
-    topPick: item.topPick,
-    predictions: item.predictions,
-    noRecommendationReason: item.noRecommendationReason,
-  }));
+  const result = items.map(item => {
+    const cleanPreds = item.predictions.filter(p => !isDisabledRecommendationMarket(p));
+    let cleanTop = item.topPick && !isDisabledRecommendationMarket(item.topPick) ? item.topPick : null;
+    let reason = item.noRecommendationReason;
+    if (item.topPick && !cleanTop) {
+      const replacement = cleanPreds
+        .filter(p => p.isValidated && !p.sanityTripwire && (p.rankingScore ?? 0) > 0)
+        .sort(compareFootballPicksByRank)[0] || null;
+      cleanTop = replacement ? { ...replacement, isTopPick: true } : null;
+      if (!cleanTop) {
+        reason = 'No recommendation';
+      }
+    }
+    return {
+      ...item,
+      topPick: cleanTop,
+      predictions: cleanPreds.map(p => ({
+        ...p,
+        isTopPick: cleanTop ? p.marketCode === cleanTop.marketCode : false,
+      })),
+      noRecommendationReason: reason,
+    };
+  });
 
   const getFamily = (p: MarketPrediction): MarketFamily =>
     (p.marketFamily as MarketFamily) || getMarketFamily(p.optionType, p.marketCode, p.marketCategory);
@@ -2073,6 +2074,7 @@ export function selectDiversifiedSlatePicks<T extends SlatePickCandidate>(
   const pickStrength = (p: MarketPrediction): number => computeFootballPickRankScore(p);
 
   const isEligibleAlternative = (p: MarketPrediction): boolean => {
+    if (isDisabledRecommendationMarket(p)) return false;
     if (!p.isValidated || p.sanityTripwire) return false;
     if (p.optionType === 'asian_handicap' && (p.handicapLine ?? 0) >= 1.5) return false;
     if ((p.rankingScore ?? 0) <= 0) return false;

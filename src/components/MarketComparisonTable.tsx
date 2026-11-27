@@ -20,6 +20,10 @@ import {
   groupPredictionsByConfidenceTier,
 } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import {
+  isDisabledRecommendationMarket,
+  UNDER_BOOKINGS_BOARD_MESSAGE,
+} from '@/lib/markets';
 
 interface Props {
   predictions: MarketPrediction[];
@@ -61,10 +65,15 @@ export default function MarketComparisonTable({
     setOpenTiers((prev) => ({ ...prev, [tier]: !prev[tier] }));
   };
 
+  const visiblePredictions = useMemo(
+    () => predictions.filter((p) => !isDisabledRecommendationMarket(p)),
+    [predictions]
+  );
+
   // Single source of truth used by BOTH the summary card + stacked bar AND the collapsible tier sections
   const tierGroups = useMemo(
-    () => groupPredictionsByConfidenceTier(predictions),
-    [predictions]
+    () => groupPredictionsByConfidenceTier(visiblePredictions),
+    [visiblePredictions]
   );
 
   const totalCount = tierGroups.total || 1;
@@ -74,13 +83,13 @@ export default function MarketComparisonTable({
 
   const handicapPredictions = useMemo(
     () =>
-      predictions.filter(
+      visiblePredictions.filter(
         (p) =>
           p.marketCategory === 'handicap' ||
           p.optionType === 'asian_handicap' ||
           p.optionType === 'european_handicap'
       ),
-    [predictions]
+    [visiblePredictions]
   );
 
   const safestHomeHandicap = useMemo(() => {
@@ -98,8 +107,8 @@ export default function MarketComparisonTable({
   }, [handicapPredictions, awayTeamName]);
 
   const goalBoundsPredictions = useMemo(
-    () => predictions.filter((p) => p.marketCategory === 'goal_bounds'),
-    [predictions]
+    () => visiblePredictions.filter((p) => p.marketCategory === 'goal_bounds'),
+    [visiblePredictions]
   );
 
   const mostLikelyGoalBand = useMemo(
@@ -125,8 +134,8 @@ export default function MarketComparisonTable({
   );
 
   const multiGoalsPredictions = useMemo(
-    () => predictions.filter((p) => p.marketCategory === 'multi_goals'),
-    [predictions]
+    () => visiblePredictions.filter((p) => p.marketCategory === 'multi_goals'),
+    [visiblePredictions]
   );
 
   const topFullMatchMultiGoals = useMemo(
@@ -146,14 +155,26 @@ export default function MarketComparisonTable({
   );
 
   const halfPredictions = useMemo(
-    () => predictions.filter((p) => p.marketCategory === 'half_time'),
-    [predictions]
+    () => visiblePredictions.filter((p) => p.marketCategory === 'half_time'),
+    [visiblePredictions]
+  );
+
+  const cardsPredictions = useMemo(
+    () =>
+      visiblePredictions.filter(
+        (p) =>
+          p.marketCategory === 'bookings' ||
+          p.optionType === 'bookings' ||
+          p.optionType === 'team_bookings' ||
+          p.optionType === 'booking_points'
+      ),
+    [visiblePredictions]
   );
 
   const hasHalfData = halfPredictions.length > 0;
 
   const filteredList = useMemo(() => {
-    let list = [...predictions];
+    let list = [...visiblePredictions];
     if (marketFilter !== 'ALL') {
       list = list.filter((p) => p.marketCategory === marketFilter || p.optionType === marketFilter);
     }
@@ -162,7 +183,28 @@ export default function MarketComparisonTable({
       const pB = b.calibratedProbability ?? b.modelProbability;
       return sortAsc ? pA - pB : pB - pA;
     });
-  }, [predictions, marketFilter, sortAsc]);
+  }, [visiblePredictions, marketFilter, sortAsc]);
+
+  const renderDisabledUnderBookingsRow = () => (
+    <div
+      key="disabled_cards_under"
+      className="px-3.5 py-3 flex items-center justify-between gap-3 bg-[var(--surface-2)]/40 border-b border-[var(--line)] last:border-b-0"
+    >
+      <div className="flex-1 min-w-0">
+        <div className="font-display font-semibold text-[13.5px] leading-snug text-[var(--text)]">
+          Under bookings (cards)
+        </div>
+        <div className="text-[11.5px] text-[var(--text-2)] mt-0.5 leading-[1.45]">
+          {cleanDisplayText(UNDER_BOOKINGS_BOARD_MESSAGE)}
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <span className="font-display text-[13px] font-semibold text-[var(--text-3)]">
+          —
+        </span>
+      </div>
+    </div>
+  );
 
   const renderPredictionRow = (pred: MarketPrediction) => {
     const isSelected = selectedPredictionId === pred.id;
@@ -372,7 +414,7 @@ export default function MarketComparisonTable({
           Market intel
         </h2>
         <p className="text-[12.5px] text-[var(--text-2)] leading-[1.5]">
-          {predictions.length} calibrated lines evaluated from Dixon Coles and volume models.
+          {visiblePredictions.length} calibrated lines evaluated from Dixon Coles and volume models.
         </p>
       </div>
 
@@ -761,6 +803,24 @@ export default function MarketComparisonTable({
               </div>
             )}
           </div>
+
+          {/* Bookings / cards */}
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-[var(--line)] pb-2.5">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-[var(--accent)]" />
+                <h4 className="font-display text-[14px] font-semibold text-[var(--text)]">
+                  Bookings (cards)
+                </h4>
+              </div>
+              <span className="text-[11px] text-[var(--text-2)]">Over lines only</span>
+            </div>
+
+            <div className="border border-[var(--line)] rounded-[12px] overflow-hidden">
+              {cardsPredictions.map(renderPredictionRow)}
+              {renderDisabledUnderBookingsRow()}
+            </div>
+          </div>
         </div>
       )}
 
@@ -806,8 +866,12 @@ export default function MarketComparisonTable({
           </div>
 
           <div>
-            {filteredList.length > 0 ? (
-              filteredList.map(renderPredictionRow)
+            {filteredList.length > 0 || marketFilter === 'ALL' || marketFilter === 'bookings' ? (
+              <>
+                {filteredList.map(renderPredictionRow)}
+                {(marketFilter === 'ALL' || marketFilter === 'bookings') &&
+                  renderDisabledUnderBookingsRow()}
+              </>
             ) : (
               <div className="p-5 text-center text-[12.5px] text-[var(--text-3)]">
                 No markets match this category filter.

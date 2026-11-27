@@ -16,8 +16,10 @@ import { DixonColesV25Evaluator } from '../lib/prediction/v25/v25Evaluator';
 import { DixonColesV25Engine, COVARIATE_COEFFICIENTS } from '../lib/prediction/v25/dixonColesV25';
 import { FeatureLayerEngine } from '../lib/prediction/v25/featureLayer';
 import { getCalibratedParams, getLeagueCapabilities, getLeagueCalibratedConfig } from '../lib/prediction/calibratedParams';
-import { selectDiversifiedSlatePicks } from '../lib/prediction/marketSelection';
+import { selectDiversifiedSlatePicks, evaluateFixtureMarkets } from '../lib/prediction/marketSelection';
 import { checkMarketGating } from '../lib/prediction/marketGating';
+import { DISABLED_RECOMMENDATIONS, isDisabledRecommendationMarket } from '../lib/markets';
+import { selectTopFootballAlternates } from '../lib/prediction/explanationGenerator';
 
 function assertNoFirstHalfCorners(predictions: { marketCode: string; marketCategory: string; marketName: string; selection: string; period: string }[], label: string) {
   const fhCornerHits = predictions.filter(p =>
@@ -262,7 +264,7 @@ async function runTests() {
   }
   for (const sfx of ['25', '35', '45', '55']) {
     assert(e0Codes.has(`CARDS_O${sfx}`), `Missing CARDS_O${sfx}`);
-    assert(e0Codes.has(`CARDS_U${sfx}`), `Missing CARDS_U${sfx}`);
+    assert(!e0Codes.has(`CARDS_U${sfx}`), `Disabled CARDS_U${sfx} must NOT be emitted`);
   }
   const ahHomeCount = e0Eval.predictions.filter(p => p.marketCode.startsWith('AH_HOME_')).length;
   const ahAwayCount = e0Eval.predictions.filter(p => p.marketCode.startsWith('AH_AWAY_')).length;
@@ -367,6 +369,79 @@ async function runTests() {
     }
   }
   console.log('✓ PASS [PickEvidence Integrity]: Structured evidence populated cleanly with zero ASCII -/_');
+
+  // 11. DISABLED_RECOMMENDATIONS = ['cards_under']: enforce across match, team, half-based cards while keeping Over bookings, Under corners, Under goals
+  assert.deepStrictEqual([...DISABLED_RECOMMENDATIONS], ['cards_under']);
+  assert.strictEqual(isDisabledRecommendationMarket({ marketCode: 'CARDS_U45' }), true);
+  assert.strictEqual(isDisabledRecommendationMarket({ marketCode: 'TEAM_CARDS_HOME_U15', optionType: 'team_bookings', selection: 'Arsenal Under 1.5 cards' }), true);
+  assert.strictEqual(isDisabledRecommendationMarket({ marketCode: 'FH_CARDS_U15', optionType: 'bookings', selection: '1st half Under 1.5 bookings' }), true);
+  assert.strictEqual(isDisabledRecommendationMarket({ marketCode: 'CARDS_O45', optionType: 'bookings', selection: 'Over 4.5 cards' }), false);
+  assert.strictEqual(isDisabledRecommendationMarket({ marketCode: 'CORNERS_U105', optionType: 'corners', selection: 'Under 10.5 corners' }), false);
+  assert.strictEqual(isDisabledRecommendationMarket({ marketCode: 'TOTAL_GOALS_U25', optionType: 'over_under_goals', selection: 'Under 2.5 goals' }), false);
+
+  const lowCardCtx: FixtureContext = {
+    ...e0DerbyContext,
+    fixtureId: 'test_low_cards_under_blocked',
+    isDerby: false,
+    expectedCards: 1.9,
+    expectedCornersHome: 3.4,
+    expectedCornersAway: 3.1,
+    verifiedOdds: {
+      over45Cards: 3.2,
+      under45Cards: 1.25,
+    },
+  };
+  const lowCardEval = DixonColesV25Evaluator.evaluateFixture(lowCardCtx);
+  const lowCardMarketSel = evaluateFixtureMarkets(lowCardCtx);
+  for (const res of [lowCardEval, lowCardMarketSel]) {
+    const anyDisabledPred = res.predictions.filter(p => isDisabledRecommendationMarket(p));
+    assert.strictEqual(anyDisabledPred.length, 0, 'Zero under-bookings candidates may appear in predictions');
+    if (res.topPick) {
+      assert.strictEqual(isDisabledRecommendationMarket(res.topPick), false, 'topPick must never be under-bookings');
+    } else {
+      assert(Boolean(res.noRecommendationReason), 'Abstained fixture must provide noRecommendationReason');
+    }
+    const alts = selectTopFootballAlternates(res.predictions, res.topPick);
+    assert(alts.every(a => !isDisabledRecommendationMarket({ marketCode: a.marketCode, marketName: a.marketName, selection: a.selection })), 'Alternates must never include under-bookings');
+  }
+  assert(lowCardEval.predictions.some(p => p.marketCode.startsWith('CORNERS_U')), 'Under corners must remain eligible');
+  assert(lowCardEval.predictions.some(p => p.marketCode.startsWith('TOTAL_GOALS_U')), 'Under goals must remain eligible');
+  assert(lowCardEval.predictions.some(p => p.marketCode.startsWith('CARDS_O')), 'Over bookings must remain active');
+
+  // Verify selectDiversifiedSlatePicks strips a forced disabled topPick and falls back to No recommendation when none left
+  const forcedOnlyUnder = selectDiversifiedSlatePicks([
+    {
+      fixtureId: 'forced_under_only',
+      topPick: {
+        id: 'p_u45',
+        fixtureId: 'forced_under_only',
+        marketCode: 'CARDS_U45',
+        optionType: 'bookings',
+        marketCategory: 'bookings',
+        marketName: 'Cards (Total & Team)',
+        selection: 'Under 4.5 cards',
+        period: 'REGULAR_TIME',
+        settlementRule: 'Yellow = 1, Red = 2.',
+        modelProbability: 0.79,
+        calibratedProbability: 0.79,
+        modelConfidence: 'HIGH',
+        qualificationStatus: 'QUALIFIED_VALUE',
+        rankingScore: 1500,
+        isTopPick: true,
+        settlementStatus: 'PENDING',
+        evidenceTier: 'Tier 1',
+        dataQualityScore: 0.9,
+        isProbabilityBasedAnalysis: false,
+        isValidated: true,
+        dataPoints: [],
+      },
+      predictions: [],
+      noRecommendationReason: undefined,
+    },
+  ]);
+  assert.strictEqual(forcedOnlyUnder[0].topPick, null, 'Forced under-bookings topPick with no eligible alternate must fall back to null');
+  assert.strictEqual(forcedOnlyUnder[0].noRecommendationReason, 'No recommendation');
+  console.log('✓ PASS [DISABLED_RECOMMENDATIONS cards_under]: Match/team/half under bookings blocked while Over bookings, Under corners & Under goals remain eligible');
   console.log('--- ALL QUANTITATIVE MODELS & GATING TESTS PASSED ---');
 }
 

@@ -12,6 +12,10 @@ import { formatOdds } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import type { BasketballMarketCategory } from '@/lib/basketball/markets';
 import type { BasketballPickCandidate } from '@/lib/basketball/picker';
+import {
+  isDisabledRecommendationMarket,
+  UNDER_BOOKINGS_BOARD_MESSAGE,
+} from '@/lib/markets';
 
 const FOOTBALL_MARKET_OPTIONS: {
   code: string;
@@ -19,6 +23,7 @@ const FOOTBALL_MARKET_OPTIONS: {
   optionType: SupportedOptionType;
   category: string;
   period: string;
+  disabledRecommendation?: boolean;
 }[] = [
   { code: '1X2_HOME', label: '1. Win: Home victory (1)', optionType: 'win', category: 'match_result', period: 'Regular time' },
   { code: '1X2_AWAY', label: '1. Win: Away victory (2)', optionType: 'win', category: 'match_result', period: 'Regular time' },
@@ -33,6 +38,7 @@ const FOOTBALL_MARKET_OPTIONS: {
   { code: 'TOTAL_CORNERS_O95', label: '6. Over 9.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
   { code: 'TEAM_CORNERS_HOME_O45', label: '6. Home over 4.5 corners', optionType: 'corners', category: 'team_corners', period: 'Regular time' },
   { code: 'CARDS_O45', label: '7. Over 4.5 cards', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
+  { code: 'CARDS_UNDER', label: '7. Under cards', optionType: 'bookings', category: 'bookings', period: 'Regular time', disabledRecommendation: true },
   { code: 'HSH_2ND', label: '8. Highest scoring half: 2nd half', optionType: 'highest_scoring_half', category: 'half_time', period: 'Full time' },
   { code: 'FH_GOALS_O05', label: '9. 1st half over 0.5 goals', optionType: 'first_half_goals', category: 'half_time', period: '1st half' },
   { code: '2H_RESULT_HOME', label: '10. 2nd half result: Home win', optionType: 'second_half_result', category: 'half_time', period: '2nd half' },
@@ -164,6 +170,10 @@ export default function MarketExplorerPage() {
       });
     }
 
+    if (selectedFootballLine === 'CARDS_UNDER') {
+      return [];
+    }
+
     const list: {
       fixtureId: string;
       fixture: Fixture;
@@ -175,7 +185,9 @@ export default function MarketExplorerPage() {
       .forEach((fixture) => {
         const stats = getFixtureStatistics(fixture);
         const evalResult = evaluateFixtureMarkets(buildFixtureContextFromStats(fixture, stats));
-        const matchedPred = evalResult.predictions.find((p) => p.marketCode === selectedFootballLine);
+        const matchedPred = evalResult.predictions.find(
+          (p) => p.marketCode === selectedFootballLine && !isDisabledRecommendationMarket(p)
+        );
         if (matchedPred) {
           list.push({
             fixtureId: fixture.id,
@@ -190,6 +202,8 @@ export default function MarketExplorerPage() {
 
   const activeOption =
     marketOptions.find((o) => o.code === selectedMarketLine) || marketOptions[0];
+  const isDisabledFootballMarket =
+    !isBasketball && Boolean((activeOption as { disabledRecommendation?: boolean } | undefined)?.disabledRecommendation);
 
   const footballOptionTabs = [
     { id: 'ALL', label: 'All market types' },
@@ -348,15 +362,30 @@ export default function MarketExplorerPage() {
                 <span>Period: {cleanDisplayText(activeOption?.period)}</span>
               </span>
               <span>·</span>
-              <span>Ranked by calibrated probability</span>
+              <span>
+                {isDisabledFootballMarket
+                  ? 'Not recommended'
+                  : 'Ranked by calibrated probability'}
+              </span>
             </div>
           </div>
           <span className="text-[var(--text-2)] text-[11.5px] tabular-nums">
-            {comparisons.length} {isBasketball ? 'games' : 'fixtures'}
+            {isDisabledFootballMarket
+              ? '—'
+              : `${comparisons.length} ${isBasketball ? 'games' : 'fixtures'}`}
           </span>
         </div>
 
-        {comparisons.length > 0 ? (
+        {isDisabledFootballMarket ? (
+          <div className="p-6 text-center space-y-1.5">
+            <div className="font-display text-[14px] font-semibold text-[var(--text)]">
+              Under bookings (cards)
+            </div>
+            <p className="text-[12.5px] text-[var(--text-2)]">
+              {cleanDisplayText(UNDER_BOOKINGS_BOARD_MESSAGE)}
+            </p>
+          </div>
+        ) : comparisons.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[12px]">
               <thead className="bg-[var(--surface)] text-[var(--text-2)] text-[11px] font-medium border-b border-[var(--line)]">
