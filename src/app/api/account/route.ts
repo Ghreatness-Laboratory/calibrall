@@ -6,6 +6,7 @@ import {
   getServerSupabaseConfig,
   getSupabaseServiceClient,
 } from '@/lib/supabase/serverAuth';
+import { maybeSendTrialReminderEmail } from '@/lib/notifications/trialReminders';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -19,6 +20,9 @@ export async function GET(request: Request) {
     );
   }
 
+  // Non-blocking optional reminder email (only sends if email provider is configured)
+  void maybeSendTrialReminderEmail(session).catch(() => {});
+
   return NextResponse.json(
     {
       user: session.user,
@@ -27,6 +31,12 @@ export async function GET(request: Request) {
         tier: session.effectiveTier,
         isAdmin: session.isAdmin,
         isExpired: session.isExpired,
+        entitlementStatus: session.entitlements.status,
+        hasModelAccess: session.entitlements.hasModelAccess,
+        trialStartedAt: session.entitlements.trialStartedAt,
+        trialEndsAt: session.entitlements.trialEndsAt,
+        trialDaysRemaining: session.entitlements.trialDaysRemaining,
+        emailConfirmed: session.entitlements.emailConfirmed,
       },
     },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } }
@@ -49,7 +59,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  // Strictly only allow displayName updates; ignore role, tier, or tier_expires_at
+  // Strictly only allow displayName updates; ignore role, tier, trial dates, or tier_expires_at
   const rawName = typeof body.displayName === 'string' ? body.displayName.trim() : '';
   if (!rawName || rawName.length > 80) {
     return NextResponse.json(
@@ -92,6 +102,12 @@ export async function PATCH(request: Request) {
         tierExpiresAt: session.profile.tierExpiresAt,
         isAdmin: session.isAdmin,
         isExpired: session.isExpired,
+        entitlementStatus: session.entitlements.status,
+        hasModelAccess: session.entitlements.hasModelAccess,
+        trialStartedAt: session.entitlements.trialStartedAt,
+        trialEndsAt: session.entitlements.trialEndsAt,
+        trialDaysRemaining: session.entitlements.trialDaysRemaining,
+        emailConfirmed: session.entitlements.emailConfirmed,
         createdAt: data.created_at,
       },
     },

@@ -193,7 +193,7 @@ function LoginForm() {
       <p className="text-center text-[12.5px] text-[var(--text-2)]">
         New to Calibrall?{' '}
         <Link href="/signup" className="text-[var(--accent)] font-semibold hover:underline">
-          Create free account
+          Start your 7-day free trial
         </Link>
       </p>
     </div>

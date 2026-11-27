@@ -48,6 +48,7 @@ export default function BottomNav() {
   const isRecordActive = pathname.startsWith('/performance') || pathname.startsWith('/record');
   const isSavedActive = pathname.startsWith('/saved');
   const isAccountActive =
+    pathname.startsWith('/account') ||
     pathname.startsWith('/settings') ||
     pathname.startsWith('/pricing') ||
     pathname.startsWith('/admin') ||
@@ -86,7 +87,7 @@ export default function BottomNav() {
     {
       id: 'account',
       label: 'Account',
-      href: '/settings',
+      href: '/account',
       icon: User,
       isActive: isAccountActive,
     },

@@ -7,6 +7,7 @@ import {
 import {
   isAdminPagePath,
   isAuthEntryPath,
+  isExpiredAllowedPagePath,
   isPublicPagePath,
 } from '@/lib/auth/routeAccess';
 
@@ -37,7 +38,7 @@ export async function handleAuthMiddleware(
     return NextResponse.next();
   }
 
-  // API routes handle their own JSON 401/403/503 responses (never HTML redirects)
+  // API routes handle their own JSON 401/402/403/404/503 responses (never HTML redirects)
   if (pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
@@ -51,18 +52,6 @@ export async function handleAuthMiddleware(
   const getSession = deps?.getSession ?? getMiddlewareAuthSession;
   const session = await getSession(request, response);
 
-  // Redirect already signed-in users away from /login and /signup
-  if (session && isAuthEntryPath(pathname) && !request.nextUrl.searchParams.get('error')) {
-    const requestedNext = request.nextUrl.searchParams.get('next');
-    const target = isSafeRedirectPath(requestedNext);
-    return NextResponse.redirect(new URL(target, request.url));
-  }
-
-  // Public pages allow visitors without login
-  if (isPublicPagePath(pathname)) {
-    return response;
-  }
-
   // /admin and /admin/* routes strictly require role === 'admin'; non-admins and visitors get 404
   if (isAdminPagePath(pathname)) {
     if (!session || !session.isAdmin || session.profile.role !== 'admin' || session.profile.suspended) {
@@ -70,6 +59,38 @@ export async function handleAuthMiddleware(
       notFoundRes.headers.set('Cache-Control', 'no-store, max-age=0');
       return notFoundRes;
     }
+    return response;
+  }
+
+  // Redirect already signed-in users away from /login and /signup
+  if (session && isAuthEntryPath(pathname) && !request.nextUrl.searchParams.get('error')) {
+    if (!session.entitlements.hasModelAccess) {
+      const requestedNext = request.nextUrl.searchParams.get('next');
+      const safeTarget = isSafeRedirectPath(requestedNext);
+      const target = isExpiredAllowedPagePath(safeTarget.split('?')[0])
+        ? safeTarget
+        : '/pricing?reason=trial_ended';
+      return NextResponse.redirect(new URL(target, request.url));
+    }
+    const requestedNext = request.nextUrl.searchParams.get('next');
+    const target = isSafeRedirectPath(requestedNext);
+    return NextResponse.redirect(new URL(target, request.url));
+  }
+
+  // Expired authenticated accounts may only visit landing, /pricing, /account, /settings, /terms, /privacy
+  if (session && !session.entitlements.hasModelAccess) {
+    if (isExpiredAllowedPagePath(pathname)) {
+      return response;
+    }
+    const pricingUrl = new URL('/pricing', request.url);
+    pricingUrl.searchParams.set('reason', 'trial_ended');
+    const redirectRes = NextResponse.redirect(pricingUrl);
+    redirectRes.headers.set('Cache-Control', 'no-store, max-age=0');
+    return redirectRes;
+  }
+
+  // Public pages allow visitors without login
+  if (isPublicPagePath(pathname)) {
     return response;
   }
 

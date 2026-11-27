@@ -39,7 +39,7 @@ export default async function LandingPage() {
             Every call, on record.
           </h1>
           <p className="text-[14px] sm:text-[15px] leading-[1.55] text-[var(--text-2)] max-w-2xl">
-            Free probabilistic football and basketball predictions where every pick is timestamped before kickoff and scored after full time.
+            Start your 7-day free trial. No card needed. Probabilistic football and basketball predictions where every pick is timestamped before kickoff and scored after full time.
           </p>
         </div>
 
@@ -47,14 +47,14 @@ export default async function LandingPage() {
           {session ? (
             <>
               <Link
-                href="/fixtures"
+                href={session.entitlements.hasModelAccess ? '/fixtures' : '/pricing?reason=trial_ended'}
                 className="min-h-[46px] px-5 rounded-[12px] bg-[var(--accent-fill)] hover:opacity-95 text-[var(--accent-ink)] font-bold text-[14px] flex items-center justify-center gap-2 transition-opacity touch-press"
               >
-                <span>Open fixtures</span>
+                <span>{session.entitlements.hasModelAccess ? 'Open fixtures' : 'Choose a plan'}</span>
                 <ArrowRight className="w-4 h-4" strokeWidth={2.2} />
               </Link>
               <Link
-                href="/settings"
+                href="/account"
                 className="min-h-[46px] px-5 rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] hover:border-[var(--border-strong)] text-[var(--text)] font-semibold text-[14px] flex items-center justify-center transition-colors touch-press"
               >
                 Account
@@ -66,7 +66,7 @@ export default async function LandingPage() {
                 href="/signup"
                 className="min-h-[46px] px-5 rounded-[12px] bg-[var(--accent-fill)] hover:opacity-95 text-[var(--accent-ink)] font-bold text-[14px] flex items-center justify-center gap-2 transition-opacity touch-press"
               >
-                <span>Create free account</span>
+                <span>Start 7-day free trial</span>
                 <ArrowRight className="w-4 h-4" strokeWidth={2.2} />
               </Link>
               <Link

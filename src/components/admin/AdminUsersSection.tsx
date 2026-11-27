@@ -124,9 +124,13 @@ export default function AdminUsersSection() {
             className="h-9 px-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface-2)] text-[13px] text-[var(--text)]"
           >
             <option value="all">All statuses</option>
-            <option value="active">Active only</option>
+            <option value="trial">In trial</option>
+            <option value="trial_ending_3d">Trial ending in 3d</option>
+            <option value="paid">Paid plan</option>
+            <option value="expired">Expired</option>
+            <option value="active">Active (not suspended)</option>
             <option value="suspended">Suspended only</option>
-            <option value="expiring">Expiring in 7 days</option>
+            <option value="expiring">Paid expiring in 7d</option>
           </select>
         </div>
 
@@ -166,6 +170,17 @@ export default function AdminUsersSection() {
                     <span className="px-2 py-0.5 rounded-[4px] border border-[var(--border)] bg-[var(--surface)] text-[11px] font-medium uppercase text-[var(--text)]">
                       {u.tier}
                     </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-[4px] border text-[11px] font-medium uppercase ${
+                        u.accessStatus === 'paid' || u.accessStatus === 'admin'
+                          ? 'border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent)]'
+                          : u.accessStatus === 'trial'
+                          ? 'border-amber-500/40 bg-amber-500/10 text-amber-500'
+                          : 'border-[var(--danger)]/40 bg-[var(--danger-soft)] text-[var(--danger)]'
+                      }`}
+                    >
+                      {u.accessStatus}
+                    </span>
                     {u.role === 'admin' && (
                       <span className="px-2 py-0.5 rounded-[4px] border border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[11px] font-medium text-[var(--accent)] flex items-center gap-1">
                         <Shield className="w-3 h-3" />
@@ -183,7 +198,21 @@ export default function AdminUsersSection() {
 
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11.5px] text-[var(--text-2)]">
                   <div>
-                    <span className="text-[var(--text-3)]">Expiry: </span>
+                    <span className="text-[var(--text-3)]">Trial start: </span>
+                    <span className="text-[var(--text)]">{formatAdminDate(u.trialStartedAt)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-3)]">Trial end: </span>
+                    <span className="text-[var(--text)]">{formatAdminDate(u.trialEndsAt)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-3)]">Trial days left: </span>
+                    <span className="text-[var(--text)] tabular-nums">
+                      {u.accessStatus === 'trial' ? `${u.trialDaysRemaining}d` : u.accessStatus === 'expired' ? '0d' : '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[var(--text-3)]">Paid expiry: </span>
                     <span className="text-[var(--text)]">
                       {u.role === 'admin'
                         ? 'Never'
@@ -196,7 +225,7 @@ export default function AdminUsersSection() {
                     <span className="text-[var(--text-3)]">Last sign in: </span>
                     <span className="text-[var(--text)]">{formatAdminDate(u.lastSignInAt)}</span>
                   </div>
-                  <div className="col-span-2">
+                  <div>
                     <span className="text-[var(--text-3)]">Created: </span>
                     <span className="text-[var(--text)]">{formatAdminDate(u.createdAt)}</span>
                   </div>

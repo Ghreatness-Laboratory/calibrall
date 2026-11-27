@@ -11,6 +11,10 @@ export interface AdminUserItem {
   role: 'user' | 'admin';
   tier: 'free' | 'pro' | 'premium';
   tierExpiresAt: string | null;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  trialDaysRemaining: number;
+  accessStatus: 'admin' | 'paid' | 'trial' | 'expired';
   suspended: boolean;
   suspendedAt: string | null;
   suspendedReason: string | null;

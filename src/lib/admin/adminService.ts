@@ -8,12 +8,14 @@ import {
   persistenceBackendInfo,
 } from '@/lib/supabase/client';
 import {
+  getEntitlements,
   getServerSupabaseConfig,
   getSupabaseServiceClient,
   normalizeRole,
   normalizeTier,
   type AccountRole,
   type AccountTier,
+  type EntitlementStatus,
   type ServerAuthSession,
 } from '@/lib/supabase/serverAuth';
 import { matchesStore } from '@/lib/data/matchesStore';
@@ -36,6 +38,10 @@ export interface AdminUserRecord {
   role: AccountRole;
   tier: AccountTier;
   tierExpiresAt: string | null;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  trialDaysRemaining: number;
+  accessStatus: EntitlementStatus;
   suspended: boolean;
   suspendedAt: string | null;
   suspendedReason: string | null;
@@ -149,13 +155,31 @@ function requireLocalDb() {
 }
 
 function mapSqliteUserRow(r: any): AdminUserRecord {
+  const role = normalizeRole(r.role);
+  const tier = normalizeTier(r.tier);
+  const tierExpiresAt = r.tier_expires_at ? String(r.tier_expires_at) : null;
+  const trialStartedAt = r.trial_started_at ? String(r.trial_started_at) : null;
+  const trialEndsAt = r.trial_ends_at ? String(r.trial_ends_at) : null;
+  const ent = getEntitlements({
+    role,
+    tier,
+    tierExpiresAt,
+    trialStartedAt,
+    trialEndsAt,
+    emailConfirmed: true,
+  });
+
   return {
     id: String(r.id),
     email: String(r.email || ''),
     displayName: r.display_name ? String(r.display_name) : null,
-    role: normalizeRole(r.role),
-    tier: normalizeTier(r.tier),
-    tierExpiresAt: r.tier_expires_at ? String(r.tier_expires_at) : null,
+    role,
+    tier,
+    tierExpiresAt,
+    trialStartedAt,
+    trialEndsAt,
+    trialDaysRemaining: ent.trialDaysRemaining,
+    accessStatus: ent.status,
     suspended: Boolean(r.suspended === 1 || r.suspended === true),
     suspendedAt: r.suspended_at ? String(r.suspended_at) : null,
     suspendedReason: r.suspended_reason ? String(r.suspended_reason) : null,
@@ -166,20 +190,54 @@ function mapSqliteUserRow(r: any): AdminUserRecord {
 }
 
 function mapSupabaseProfileRow(r: any): AdminUserRecord {
+  const role = normalizeRole(r.role);
+  const tier = normalizeTier(r.tier);
+  const tierExpiresAt =
+    r.tierExpiresAt !== undefined
+      ? r.tierExpiresAt
+        ? String(r.tierExpiresAt)
+        : null
+      : r.tier_expires_at
+      ? String(r.tier_expires_at)
+      : null;
+  const trialStartedAt =
+    r.trialStartedAt !== undefined
+      ? r.trialStartedAt
+        ? String(r.trialStartedAt)
+        : null
+      : r.trial_started_at
+      ? String(r.trial_started_at)
+      : null;
+  const trialEndsAt =
+    r.trialEndsAt !== undefined
+      ? r.trialEndsAt
+        ? String(r.trialEndsAt)
+        : null
+      : r.trial_ends_at
+      ? String(r.trial_ends_at)
+      : null;
+  const emailConfirmedAt = r.emailConfirmedAt ? String(r.emailConfirmedAt) : null;
+  const emailConfirmed = r.emailConfirmedAt !== undefined ? Boolean(emailConfirmedAt) : true;
+  const ent = getEntitlements({
+    role,
+    tier,
+    tierExpiresAt,
+    trialStartedAt,
+    trialEndsAt,
+    emailConfirmed,
+  });
+
   return {
     id: String(r.id),
     email: String(r.email || ''),
     displayName: r.displayName !== undefined ? (r.displayName ? String(r.displayName) : null) : r.display_name ? String(r.display_name) : null,
-    role: normalizeRole(r.role),
-    tier: normalizeTier(r.tier),
-    tierExpiresAt:
-      r.tierExpiresAt !== undefined
-        ? r.tierExpiresAt
-          ? String(r.tierExpiresAt)
-          : null
-        : r.tier_expires_at
-        ? String(r.tier_expires_at)
-        : null,
+    role,
+    tier,
+    tierExpiresAt,
+    trialStartedAt,
+    trialEndsAt,
+    trialDaysRemaining: ent.trialDaysRemaining,
+    accessStatus: ent.status,
     suspended: Boolean(r.suspended === true || r.suspended === 1),
     suspendedAt:
       r.suspendedAt !== undefined
@@ -206,7 +264,7 @@ function mapSupabaseProfileRow(r: any): AdminUserRecord {
         : r.last_sign_in_at
         ? String(r.last_sign_in_at)
         : null,
-    emailConfirmedAt: r.emailConfirmedAt ? String(r.emailConfirmedAt) : null,
+    emailConfirmedAt,
   };
 }
 
@@ -303,6 +361,7 @@ export async function getAdminOverview() {
   const nowIso = now.toISOString();
   const ago7dIso = new Date(now.getTime() - 7 * 86_400_000).toISOString();
   const ago30dIso = new Date(now.getTime() - 30 * 86_400_000).toISOString();
+  const plus3dIso = new Date(now.getTime() + 3 * 86_400_000).toISOString();
   const plus7dIso = new Date(now.getTime() + 7 * 86_400_000).toISOString();
   const todayUtcPrefix = nowIso.slice(0, 10);
 
@@ -315,6 +374,10 @@ export async function getAdminOverview() {
     expiringIn7d: 0,
     suspendedCount: 0,
     adminCount: 0,
+    usersInTrial: 0,
+    usersPaid: 0,
+    usersExpired: 0,
+    trialsEndingIn3d: 0,
   };
 
   let databaseSizeBytes: number | null = null;
@@ -336,7 +399,10 @@ export async function getAdminOverview() {
       premRes,
       adminRes,
       suspRes,
+      nonAdminActiveRes,
       paidUsersRes,
+      trialUsersRes,
+      trials3dRes,
       expiringRes,
       dbSizeRes,
       callsTodayRes,
@@ -355,9 +421,30 @@ export async function getAdminOverview() {
       serviceClient
         .from('profiles')
         .select('id', { count: 'exact', head: true })
+        .eq('role', 'user')
+        .eq('suspended', false),
+      serviceClient
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('role', 'user')
         .in('tier', ['pro', 'premium'])
         .eq('suspended', false)
         .or(`tier_expires_at.is.null,tier_expires_at.gt.${nowIso}`),
+      serviceClient
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('role', 'user')
+        .eq('tier', 'free')
+        .eq('suspended', false)
+        .gt('trial_ends_at', nowIso),
+      serviceClient
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('role', 'user')
+        .eq('tier', 'free')
+        .eq('suspended', false)
+        .gt('trial_ends_at', nowIso)
+        .lte('trial_ends_at', plus3dIso),
       serviceClient
         .from('profiles')
         .select('id', { count: 'exact', head: true })
@@ -388,6 +475,9 @@ export async function getAdminOverview() {
     ]);
 
     const activeSubs = Number(paidUsersRes.count) || 0;
+    const usersInTrial = Number(trialUsersRes.count) || 0;
+    const nonAdminActive = Number(nonAdminActiveRes.count) || 0;
+    const usersExpired = Math.max(0, nonAdminActive - activeSubs - usersInTrial);
 
     userMetrics = {
       totalUsers: Number(totalRes.count) || 0,
@@ -402,6 +492,10 @@ export async function getAdminOverview() {
       expiringIn7d: Number(expiringRes.count) || 0,
       suspendedCount: Number(suspRes.count) || 0,
       adminCount: Number(adminRes.count) || 0,
+      usersInTrial,
+      usersPaid: activeSubs,
+      usersExpired,
+      trialsEndingIn3d: Number(trials3dRes.count) || 0,
     };
 
     if (!dbSizeRes.error && typeof dbSizeRes.data === 'number') {
@@ -437,10 +531,35 @@ export async function getAdminOverview() {
           SUM(CASE WHEN LOWER(role) = 'admin' THEN 1 ELSE 0 END) AS adminCount,
           SUM(CASE WHEN COALESCE(suspended, 0) = 1 THEN 1 ELSE 0 END) AS suspendedCount,
           SUM(CASE
-            WHEN LOWER(tier) IN ('pro', 'premium')
+            WHEN LOWER(role) = 'user'
+              AND LOWER(tier) IN ('pro', 'premium')
               AND COALESCE(suspended, 0) = 0
               AND (tier_expires_at IS NULL OR tier_expires_at > ?)
             THEN 1 ELSE 0 END) AS activeSubscriptions,
+          SUM(CASE
+            WHEN LOWER(role) = 'user'
+              AND LOWER(tier) = 'free'
+              AND COALESCE(suspended, 0) = 0
+              AND trial_ends_at IS NOT NULL
+              AND trial_ends_at > ?
+            THEN 1 ELSE 0 END) AS usersInTrial,
+          SUM(CASE
+            WHEN LOWER(role) = 'user'
+              AND COALESCE(suspended, 0) = 0
+              AND (
+                (LOWER(tier) IN ('pro', 'premium') AND tier_expires_at IS NOT NULL AND tier_expires_at <= ?)
+                OR
+                (LOWER(tier) = 'free' AND (trial_ends_at IS NULL OR trial_ends_at <= ?))
+              )
+            THEN 1 ELSE 0 END) AS usersExpired,
+          SUM(CASE
+            WHEN LOWER(role) = 'user'
+              AND LOWER(tier) = 'free'
+              AND COALESCE(suspended, 0) = 0
+              AND trial_ends_at IS NOT NULL
+              AND trial_ends_at > ?
+              AND trial_ends_at <= ?
+            THEN 1 ELSE 0 END) AS trialsEndingIn3d,
           SUM(CASE
             WHEN LOWER(role) = 'user'
               AND LOWER(tier) IN ('pro', 'premium')
@@ -451,8 +570,20 @@ export async function getAdminOverview() {
             THEN 1 ELSE 0 END) AS expiringIn7d
         FROM profiles`
       )
-      .get(ago7dIso, ago30dIso, nowIso, nowIso, plus7dIso) as Record<string, any>;
+      .get(
+        ago7dIso,
+        ago30dIso,
+        nowIso,
+        nowIso,
+        nowIso,
+        nowIso,
+        nowIso,
+        plus3dIso,
+        nowIso,
+        plus7dIso
+      ) as Record<string, any>;
 
+    const activeSubs = Number(row?.activeSubscriptions) || 0;
     userMetrics = {
       totalUsers: Number(row?.totalUsers) || 0,
       newUsers7d: Number(row?.newUsers7d) || 0,
@@ -462,10 +593,14 @@ export async function getAdminOverview() {
         pro: Number(row?.proCount) || 0,
         premium: Number(row?.premiumCount) || 0,
       },
-      activeSubscriptions: Number(row?.activeSubscriptions) || 0,
+      activeSubscriptions: activeSubs,
       expiringIn7d: Number(row?.expiringIn7d) || 0,
       suspendedCount: Number(row?.suspendedCount) || 0,
       adminCount: Number(row?.adminCount) || 0,
+      usersInTrial: Number(row?.usersInTrial) || 0,
+      usersPaid: activeSubs,
+      usersExpired: Number(row?.usersExpired) || 0,
+      trialsEndingIn3d: Number(row?.trialsEndingIn3d) || 0,
     };
 
     try {
@@ -640,19 +775,51 @@ export async function listAdminUsers(options: {
     let query = serviceClient
       .from('profiles')
       .select(
-        'id, email, display_name, role, tier, tier_expires_at, suspended, suspended_at, suspended_reason, created_at',
+        'id, email, display_name, role, tier, tier_expires_at, trial_started_at, trial_ends_at, suspended, suspended_at, suspended_reason, created_at',
         { count: 'exact' }
       )
       .order('created_at', { ascending: false })
       .order('id', { ascending: true });
 
+    const nowIso = new Date().toISOString();
+    const plus3dIso = new Date(Date.now() + 3 * 86_400_000).toISOString();
+    const plus7dIso = new Date(Date.now() + 7 * 86_400_000).toISOString();
+
     if (tier !== 'all') query = query.eq('tier', tier);
     if (role !== 'all') query = query.eq('role', role);
     if (status === 'suspended') query = query.eq('suspended', true);
     if (status === 'active') query = query.eq('suspended', false);
+    if (status === 'trial') {
+      query = query
+        .eq('role', 'user')
+        .eq('tier', 'free')
+        .eq('suspended', false)
+        .gt('trial_ends_at', nowIso);
+    }
+    if (status === 'paid') {
+      query = query
+        .eq('role', 'user')
+        .in('tier', ['pro', 'premium'])
+        .eq('suspended', false)
+        .or(`tier_expires_at.is.null,tier_expires_at.gt.${nowIso}`);
+    }
+    if (status === 'expired') {
+      query = query
+        .eq('role', 'user')
+        .eq('suspended', false)
+        .or(
+          `and(tier.in.(pro,premium),tier_expires_at.not.is.null,tier_expires_at.lte.${nowIso}),and(tier.eq.free,or(trial_ends_at.is.null,trial_ends_at.lte.${nowIso}))`
+        );
+    }
+    if (status === 'trial_ending_3d') {
+      query = query
+        .eq('role', 'user')
+        .eq('tier', 'free')
+        .eq('suspended', false)
+        .gt('trial_ends_at', nowIso)
+        .lte('trial_ends_at', plus3dIso);
+    }
     if (status === 'expiring') {
-      const nowIso = new Date().toISOString();
-      const plus7dIso = new Date(Date.now() + 7 * 86_400_000).toISOString();
       query = query
         .in('tier', ['pro', 'premium'])
         .eq('role', 'user')
@@ -685,6 +852,7 @@ export async function listAdminUsers(options: {
   const where: string[] = [];
   const params: any[] = [];
   const nowIso = new Date().toISOString();
+  const plus3dIso = new Date(Date.now() + 3 * 86_400_000).toISOString();
   const plus7dIso = new Date(Date.now() + 7 * 86_400_000).toISOString();
 
   if (search) {
@@ -706,6 +874,26 @@ export async function listAdminUsers(options: {
     where.push(`COALESCE(suspended, 0) = 1`);
   } else if (status === 'active') {
     where.push(`COALESCE(suspended, 0) = 0`);
+  } else if (status === 'trial') {
+    where.push(
+      `LOWER(role) = 'user' AND LOWER(tier) = 'free' AND COALESCE(suspended, 0) = 0 AND trial_ends_at IS NOT NULL AND trial_ends_at > ?`
+    );
+    params.push(nowIso);
+  } else if (status === 'paid') {
+    where.push(
+      `LOWER(role) = 'user' AND LOWER(tier) IN ('pro', 'premium') AND COALESCE(suspended, 0) = 0 AND (tier_expires_at IS NULL OR tier_expires_at > ?)`
+    );
+    params.push(nowIso);
+  } else if (status === 'expired') {
+    where.push(
+      `LOWER(role) = 'user' AND COALESCE(suspended, 0) = 0 AND ((LOWER(tier) IN ('pro', 'premium') AND tier_expires_at IS NOT NULL AND tier_expires_at <= ?) OR (LOWER(tier) = 'free' AND (trial_ends_at IS NULL OR trial_ends_at <= ?)))`
+    );
+    params.push(nowIso, nowIso);
+  } else if (status === 'trial_ending_3d') {
+    where.push(
+      `LOWER(role) = 'user' AND LOWER(tier) = 'free' AND COALESCE(suspended, 0) = 0 AND trial_ends_at IS NOT NULL AND trial_ends_at > ? AND trial_ends_at <= ?`
+    );
+    params.push(nowIso, plus3dIso);
   } else if (status === 'expiring') {
     where.push(
       `LOWER(role) = 'user' AND LOWER(tier) IN ('pro', 'premium') AND COALESCE(suspended, 0) = 0 AND tier_expires_at IS NOT NULL AND tier_expires_at > ? AND tier_expires_at <= ?`
@@ -896,11 +1084,14 @@ export async function updateAdminUser(
       | 'change_tier'
       | 'set_expiry'
       | 'revoke_free'
+      | 'extend_trial'
+      | 'end_trial'
       | 'set_role'
       | 'suspend'
       | 'reactivate';
     tier?: string;
     expiryDays?: number;
+    trialDays?: number;
     customDate?: string | null;
     extendFromCurrent?: boolean;
     clearExpiry?: boolean;
@@ -954,6 +1145,30 @@ export async function updateAdminUser(
     updateFields.tier = 'free';
     updateFields.tier_expires_at = null;
     auditAction = 'USER_TIER_REVOKED';
+  } else if (payload.action === 'extend_trial') {
+    const days = Number(payload.trialDays ?? payload.expiryDays);
+    if (!Number.isFinite(days) || days <= 0 || days > 365) {
+      throw new AdminServiceError('trialDays must be between 1 and 365.', 400);
+    }
+    const baseMs =
+      current.trialEndsAt && Number.isFinite(Date.parse(current.trialEndsAt))
+        ? Math.max(Date.now(), Date.parse(current.trialEndsAt))
+        : Date.now();
+    const nextEndIso = new Date(baseMs + days * 86_400_000).toISOString();
+    updateFields.tier = 'free';
+    updateFields.tier_expires_at = null;
+    updateFields.trial_started_at = current.trialStartedAt || nowIso;
+    updateFields.trial_ends_at = nextEndIso;
+    note = note || `Extended trial by ${days} day(s)`;
+    auditAction = 'USER_TRIAL_EXTENDED';
+  } else if (payload.action === 'end_trial') {
+    const pastIso = new Date(Date.now() - 1000).toISOString();
+    updateFields.tier = 'free';
+    updateFields.tier_expires_at = null;
+    updateFields.trial_started_at = current.trialStartedAt || pastIso;
+    updateFields.trial_ends_at = pastIso;
+    note = note || 'Trial ended immediately by admin';
+    auditAction = 'USER_TRIAL_ENDED';
   } else if (payload.action === 'set_role') {
     if (!payload.confirm) {
       throw new AdminServiceError('Explicit confirmation is required to change admin role.', 400);
@@ -993,6 +1208,9 @@ export async function updateAdminUser(
     role: current.role,
     tier: current.tier,
     tierExpiresAt: current.tierExpiresAt,
+    trialStartedAt: current.trialStartedAt,
+    trialEndsAt: current.trialEndsAt,
+    accessStatus: current.accessStatus,
     suspended: current.suspended,
     suspendedAt: current.suspendedAt,
     suspendedReason: current.suspendedReason,
@@ -1024,6 +1242,9 @@ export async function updateAdminUser(
     role: updatedDetail.user.role,
     tier: updatedDetail.user.tier,
     tierExpiresAt: updatedDetail.user.tierExpiresAt,
+    trialStartedAt: updatedDetail.user.trialStartedAt,
+    trialEndsAt: updatedDetail.user.trialEndsAt,
+    accessStatus: updatedDetail.user.accessStatus,
     suspended: updatedDetail.user.suspended,
     suspendedAt: updatedDetail.user.suspendedAt,
     suspendedReason: updatedDetail.user.suspendedReason,

@@ -3,6 +3,7 @@
 
 export type AccountTierId = 'free' | 'pro' | 'premium';
 
+export const TRIAL_DAYS = 7;
 export const FREE_DAILY_SUMMARY_LIMIT = 3;
 
 export interface TierRuleConfig {
@@ -30,11 +31,11 @@ export const TIER_ORDER: AccountTierId[] = ['free', 'pro', 'premium'];
 export const TIER_RULES: Record<AccountTierId, TierRuleConfig> = {
   free: {
     id: 'free',
-    name: 'Free',
-    badge: 'Standard',
+    name: 'Free Trial',
+    badge: `${TRIAL_DAYS}-Day Trial`,
     monthlyPriceUsd: 0,
     monthlyPriceNgn: 0,
-    billingLabel: 'Free forever',
+    billingLabel: `${TRIAL_DAYS}-day free trial`,
     dailySummaryLimit: FREE_DAILY_SUMMARY_LIMIT,
     fullExplanationsEnabled: false,
     alternatePicksVisible: 0,
@@ -44,14 +45,16 @@ export const TIER_RULES: Record<AccountTierId, TierRuleConfig> = {
     scorelineMatrixAccess: false,
     apiWorkflowAccess: false,
     summary:
-      'Fixtures, calibrated probabilities, public track record, and 3 match summaries per day.',
+      `Active for ${TRIAL_DAYS} days after email confirmation: fixtures, calibrated probabilities, public track record, and 3 match summaries per day.`,
     features: [
+      `${TRIAL_DAYS}-day trial access upon email confirmation`,
       'Daily fixture probabilities & Record ledger',
       '3 full match summary lines per day',
       'Football & basketball coverage',
     ],
     limitations: [
-      'Full written explanation locked behind upgrade',
+      'Requires Pro or Premium after 7 days',
+      'Full written explanation locked behind paid plan',
       'Model drivers & 2 alternate picks hidden',
       'Poisson scoreline matrix restricted',
     ],
@@ -118,3 +121,76 @@ export const ADMIN_OVERRIDE_RULE = {
   description:
     'Admin accounts permanently receive Premium access across every page, market, league, and sport with no expiry.',
 };
+
+export function getDisplayBillingLabel(tierId: AccountTierId): string {
+  if (tierId === 'pro') {
+    return process.env.NEXT_PUBLIC_PRO_PRICE_LABEL?.trim() || TIER_RULES.pro.billingLabel;
+  }
+  if (tierId === 'premium') {
+    return process.env.NEXT_PUBLIC_PREMIUM_PRICE_LABEL?.trim() || TIER_RULES.premium.billingLabel;
+  }
+  return TIER_RULES.free.billingLabel;
+}
+
+export type TrialBannerTone = 'normal' | 'amber' | 'red';
+
+export interface TrialBannerState {
+  visible: boolean;
+  tone: TrialBannerTone;
+  daysLeft: number;
+  label: string;
+  isReminderDay: boolean;
+  reminderStage: 'day5' | 'day7' | null;
+}
+
+export function getTrialBannerState(input: {
+  entitlementStatus?: 'admin' | 'paid' | 'trial' | 'expired';
+  trialDaysRemaining?: number;
+  isAdmin?: boolean;
+}): TrialBannerState {
+  if (input.isAdmin || input.entitlementStatus === 'admin' || input.entitlementStatus === 'paid') {
+    return {
+      visible: false,
+      tone: 'normal',
+      daysLeft: 0,
+      label: '',
+      isReminderDay: false,
+      reminderStage: null,
+    };
+  }
+
+  if (input.entitlementStatus === 'expired') {
+    return {
+      visible: true,
+      tone: 'red',
+      daysLeft: 0,
+      label: 'Free trial ended. Choose a plan to continue',
+      isReminderDay: true,
+      reminderStage: 'day7',
+    };
+  }
+
+  if (input.entitlementStatus === 'trial') {
+    const daysLeft = Math.max(1, Math.min(TRIAL_DAYS, Number(input.trialDaysRemaining) || 1));
+    const tone: TrialBannerTone = daysLeft <= 1 ? 'red' : daysLeft <= 2 ? 'amber' : 'normal';
+    const dayWord = daysLeft === 1 ? 'day' : 'days';
+    return {
+      visible: true,
+      tone,
+      daysLeft,
+      label: `Free trial: ${daysLeft} ${dayWord} left`,
+      isReminderDay: daysLeft <= 2,
+      reminderStage: daysLeft <= 1 ? 'day7' : daysLeft <= 2 ? 'day5' : null,
+    };
+  }
+
+  return {
+    visible: false,
+    tone: 'normal',
+    daysLeft: 0,
+    label: '',
+    isReminderDay: false,
+    reminderStage: null,
+  };
+}
+

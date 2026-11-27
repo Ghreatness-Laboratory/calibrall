@@ -683,6 +683,10 @@ export function getLocalDatabase(): any {
           role TEXT NOT NULL DEFAULT 'user',
           tier TEXT NOT NULL DEFAULT 'free',
           tier_expires_at TEXT NULL,
+          trial_started_at TEXT NULL,
+          trial_ends_at TEXT NULL,
+          trial_reminder_5d_sent_at TEXT NULL,
+          trial_ended_email_sent_at TEXT NULL,
           suspended INTEGER NOT NULL DEFAULT 0,
           suspended_at TEXT NULL,
           suspended_reason TEXT NULL,
@@ -732,6 +736,10 @@ export function getLocalDatabase(): any {
       `);
 
       // Ensure columns exist on older tables
+      try { db.exec('ALTER TABLE profiles ADD COLUMN trial_started_at TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE profiles ADD COLUMN trial_ends_at TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE profiles ADD COLUMN trial_reminder_5d_sent_at TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE profiles ADD COLUMN trial_ended_email_sent_at TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE profiles ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
       try { db.exec('ALTER TABLE profiles ADD COLUMN suspended_at TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE profiles ADD COLUMN suspended_reason TEXT;'); } catch (_) {}

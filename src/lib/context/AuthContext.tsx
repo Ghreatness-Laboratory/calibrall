@@ -10,7 +10,7 @@ import React, {
 import { useRouter } from 'next/navigation';
 import { getSupabaseBrowserClient, isBrowserSupabaseConfigured } from '@/lib/supabase/browser';
 import { clearAllClientUserCaches } from '@/lib/storage/userStorage';
-import type { AccountRole, AccountTier } from '@/lib/supabase/serverAuth';
+import type { AccountRole, AccountTier, EntitlementStatus } from '@/lib/supabase/serverAuth';
 
 export interface AuthUserSummary {
   id: string;
@@ -21,6 +21,12 @@ export interface AuthUserSummary {
   tierExpiresAt: string | null;
   isExpired: boolean;
   isAdmin: boolean;
+  entitlementStatus: EntitlementStatus;
+  hasModelAccess: boolean;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  trialDaysRemaining: number;
+  emailConfirmed: boolean;
   createdAt: string;
 }
 
@@ -68,6 +74,12 @@ export function AuthProvider({
           tierExpiresAt: json.profile.tierExpiresAt || null,
           isExpired: Boolean(json.profile.isExpired),
           isAdmin: Boolean(json.profile.isAdmin),
+          entitlementStatus: json.profile.entitlementStatus || (json.profile.isAdmin ? 'admin' : json.profile.isExpired ? 'expired' : 'trial'),
+          hasModelAccess: json.profile.hasModelAccess !== undefined ? Boolean(json.profile.hasModelAccess) : !json.profile.isExpired,
+          trialStartedAt: json.profile.trialStartedAt || null,
+          trialEndsAt: json.profile.trialEndsAt || null,
+          trialDaysRemaining: Number(json.profile.trialDaysRemaining) || 0,
+          emailConfirmed: json.profile.emailConfirmed !== false,
           createdAt: String(json.profile.createdAt || ''),
         };
         setUser(nextUser);

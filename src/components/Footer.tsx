@@ -29,7 +29,7 @@ export default function Footer() {
               <Link href="/performance" className="hover:text-[var(--text)] transition-colors">
                 Record
               </Link>
-              <Link href="/settings" className="hover:text-[var(--text)] transition-colors">
+              <Link href="/account" className="hover:text-[var(--text)] transition-colors">
                 Account
               </Link>
             </>
@@ -39,7 +39,7 @@ export default function Footer() {
                 Log in
               </Link>
               <Link href="/signup" className="hover:text-[var(--text)] transition-colors">
-                Create free account
+                Start 7-day free trial
               </Link>
             </>
           )}

@@ -7,7 +7,9 @@ import { handleAuthMiddleware } from '../middleware';
 import {
   buildServerAuthSessionFromUserAndProfile,
   computeEffectiveEntitlements,
+  getEntitlements,
   isSafeRedirectPath,
+  requireApiUser,
   type ServerAuthSession,
 } from '../lib/supabase/serverAuth';
 import {
@@ -15,8 +17,11 @@ import {
   resolveTierFromSession,
   FREE_DAILY_SUMMARY_LIMIT,
 } from '../lib/auth/tierAccess';
-import { isPublicPagePath, isAdminPagePath } from '../lib/auth/routeAccess';
+import { isPublicPagePath, isAdminPagePath, isExpiredAllowedPagePath } from '../lib/auth/routeAccess';
 import { verifyAdminSecretHeader } from '../lib/auth/adminAuth';
+import { getTrialBannerState, TRIAL_DAYS } from '../lib/tiers';
+import { applyPaystackPaymentRecord } from '../lib/payments/paystackService';
+import { isDisposableEmail } from '../lib/auth/disposableDomains';
 
 import { GET as getAccount, PATCH as patchAccount, DELETE as deleteAccount } from '../app/api/account/route';
 import { GET as getFixtures } from '../app/api/v1/fixtures/route';
@@ -71,12 +76,25 @@ function makeFakeSession(overrides: {
   role?: 'user' | 'admin';
   tier?: 'free' | 'pro' | 'premium';
   tierExpiresAt?: string | null;
+  trialStartedAt?: string | null;
+  trialEndsAt?: string | null;
+  emailConfirmed?: boolean;
 }): ServerAuthSession {
   const role = overrides.role ?? 'user';
   const tier = overrides.tier ?? 'free';
   const tierExpiresAt = overrides.tierExpiresAt ?? null;
   const id = overrides.id ?? '00000000-0000-4000-8000-000000000001';
   const email = overrides.email ?? 'member@example.com';
+  const now = Date.now();
+  const trialStartedAt =
+    overrides.trialStartedAt !== undefined
+      ? overrides.trialStartedAt
+      : new Date(now).toISOString();
+  const trialEndsAt =
+    overrides.trialEndsAt !== undefined
+      ? overrides.trialEndsAt
+      : new Date(now + TRIAL_DAYS * 86_400_000).toISOString();
+  const emailConfirmed = overrides.emailConfirmed ?? true;
 
   return buildServerAuthSessionFromUserAndProfile(
     { id, email },
@@ -87,6 +105,9 @@ function makeFakeSession(overrides: {
       role,
       tier,
       tierExpiresAt,
+      trialStartedAt,
+      trialEndsAt,
+      emailConfirmed,
       createdAt: '2026-01-01T00:00:00.000Z',
     }
   );
@@ -354,14 +375,15 @@ async function runTests() {
   // Verify landing page copy & zero fake demo copy across UI
   const landingCode = fs.readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8');
   assert(landingCode.includes('Every call, on record.'), 'Landing page must contain exact Hero headline');
-  assert(landingCode.includes('Create free account'), 'Landing page must contain Create free account CTA');
+  assert(landingCode.includes('Start your 7-day free trial. No card needed.'), 'Landing page must contain 7-day free trial copy');
   assert(landingCode.includes('Log in'), 'Landing page must contain Log in CTA');
   assert(landingCode.includes('Predictions are probabilities, not guarantees. Gamble responsibly.'), 'Landing page must contain responsible gambling notice');
 
   const signupCode = fs.readFileSync(path.join(process.cwd(), 'src/app/signup/page.tsx'), 'utf8');
   assert(signupCode.includes('confirmed18Plus'), 'Signup page must require 18+ confirmation checkbox');
+  assert(signupCode.includes('Start your 7-day free trial. No card needed.'), 'Signup page must contain 7-day trial copy');
 
-  const forbiddenDemoStrings = ['Marcus Vance', 'Senior Quant', 'Pro Terminal', 'analyst@calibrall.app'];
+  const forbiddenDemoStrings = ['Marcus Vance', 'Senior Quant', 'Pro Terminal', 'analyst@calibrall.app', 'Free forever'];
   const scanForDemoCopy = (dir: string) => {
     for (const entry of fs.readdirSync(dir)) {
       const full = path.join(dir, entry);
@@ -370,14 +392,14 @@ async function runTests() {
       } else if (/\.(ts|tsx|js|jsx)$/.test(entry)) {
         const content = fs.readFileSync(full, 'utf8');
         for (const s of forbiddenDemoStrings) {
-          assert(!content.includes(s), `Forbidden fake profile copy "${s}" found in ${full}`);
+          assert(!content.includes(s), `Forbidden copy "${s}" found in ${full}`);
         }
       }
     }
   };
   scanForDemoCopy(path.join(process.cwd(), 'src'));
 
-  console.log(`  PASS: All ${requiredTablesInRlsAudit.length} tables hardened in migration SQL; zero fake demo profile strings found.`);
+  console.log(`  PASS: All ${requiredTablesInRlsAudit.length} tables hardened in migration SQL; zero fake demo or 'Free forever' copy found.`);
 
   // -------------------------------------------------------------------------
   // 5. ADMIN PANEL API ROUTES, 404 ENFORCEMENT & AUDIT LOGGING
@@ -573,7 +595,292 @@ async function runTests() {
     console.log('  PASS: Admin user tier mutation, audit log persistence, suspension guard, manual grant & self-demotion guard verified against DB.');
   }
 
-  console.log('\n--- ALL AUTH, RBAC, ADMIN & RLS HARDENING TESTS PASSED ---');
+  // -------------------------------------------------------------------------
+  // 6. 7-DAY FREE TRIAL LIFECYCLE, 402 GUARD, PAYSTACK RECOVERY & BANNER
+  // -------------------------------------------------------------------------
+  console.log('\n[6] Testing 7-day free trial lifecycle, 402 blocking, Paystack restoration & banner...');
+
+  // 6a. Trial migration SQL verification
+  const trialMigPath = path.join(process.cwd(), 'supabase/migrations/20261129000000_seven_day_free_trial.sql');
+  assert(fs.existsSync(trialMigPath), '7-day free trial migration SQL must exist');
+  const trialSql = fs.readFileSync(trialMigPath, 'utf8');
+  for (const sym of [
+    'trial_started_at',
+    'trial_ends_at',
+    'on_auth_user_email_confirmed',
+    'handle_user_email_confirmed',
+    "WHERE role <> 'admin'",
+    'get_admin_users_page',
+    'get_admin_user_detail',
+  ]) {
+    assert(trialSql.includes(sym), `Trial migration SQL must define ${sym}`);
+  }
+
+  // 6b. New confirmed user receives 7 days; unconfirmed user does NOT
+  const nowMs = Date.now();
+  const newConfirmedEnt = getEntitlements(
+    {
+      role: 'user',
+      tier: 'free',
+      tierExpiresAt: null,
+      trialStartedAt: new Date(nowMs).toISOString(),
+      trialEndsAt: new Date(nowMs + TRIAL_DAYS * 86_400_000).toISOString(),
+      emailConfirmed: true,
+    },
+    nowMs
+  );
+  assert.strictEqual(newConfirmedEnt.status, 'trial');
+  assert.strictEqual(newConfirmedEnt.effectiveTier, 'free');
+  assert.strictEqual(newConfirmedEnt.trialDaysRemaining, 7);
+  assert.strictEqual(newConfirmedEnt.hasModelAccess, true);
+  assert.strictEqual(newConfirmedEnt.isExpired, false);
+
+  const unconfirmedEnt = getEntitlements(
+    {
+      role: 'user',
+      tier: 'free',
+      tierExpiresAt: null,
+      trialStartedAt: null,
+      trialEndsAt: null,
+      emailConfirmed: false,
+    },
+    nowMs
+  );
+  assert.strictEqual(unconfirmedEnt.status, 'expired');
+  assert.strictEqual(unconfirmedEnt.hasModelAccess, false);
+
+  // Lapsed paid user goes directly to 'expired' (no second trial even if trialEndsAt is future)
+  const lapsedPaidEnt = getEntitlements(
+    {
+      role: 'user',
+      tier: 'pro',
+      tierExpiresAt: '2024-01-01T00:00:00.000Z',
+      trialStartedAt: new Date(nowMs).toISOString(),
+      trialEndsAt: new Date(nowMs + 7 * 86_400_000).toISOString(),
+      emailConfirmed: true,
+    },
+    nowMs
+  );
+  assert.strictEqual(lapsedPaidEnt.status, 'expired');
+  assert.strictEqual(lapsedPaidEnt.hasModelAccess, false);
+
+  // 6c. Expired trial user (backdated trial_ends_at): 402 on API, /pricing?reason=trial_ended on model pages, allowed on allowlisted pages
+  const expiredTrialSession = makeFakeSession({
+    role: 'user',
+    tier: 'free',
+    trialStartedAt: '2024-01-01T00:00:00.000Z',
+    trialEndsAt: '2024-01-08T00:00:00.000Z',
+    emailConfirmed: true,
+  });
+  assert.strictEqual(expiredTrialSession.entitlements.status, 'expired');
+  assert.strictEqual(expiredTrialSession.entitlements.hasModelAccess, false);
+  assert.strictEqual(expiredTrialSession.isExpired, true);
+
+  const api402Check = await requireApiUser(new Request('http://localhost:3000/api/v1/fixtures'), {
+    getSession: async () => expiredTrialSession,
+  });
+  assert.strictEqual(api402Check.authorized, false);
+  assert.strictEqual(api402Check.errorResponse.status, 402, 'Expired trial user must receive HTTP 402 on API');
+  const api402Body = await api402Check.errorResponse.json();
+  assert.strictEqual(api402Body.code, 'TRIAL_EXPIRED');
+  assert.strictEqual(api402Body.upgradeUrl, '/pricing?reason=trial_ended');
+
+  // Verify every /api/v1/* model data route delegates to requireApiUser
+  const v1ModelRouteFiles = [
+    'src/app/api/v1/fixtures/route.ts',
+    'src/app/api/v1/fixtures/[id]/predictions/route.ts',
+    'src/app/api/v1/fixtures/[id]/factors/route.ts',
+    'src/app/api/v1/fixtures/[id]/form/route.ts',
+    'src/app/api/v1/fixtures/[id]/lineups/route.ts',
+    'src/app/api/v1/fixtures/form/route.ts',
+    'src/app/api/v1/competitions/route.ts',
+    'src/app/api/v1/predictions/today/route.ts',
+    'src/app/api/v1/performance/summary/route.ts',
+    'src/app/api/v1/monitoring/route.ts',
+    'src/app/api/v1/nba/stats/route.ts',
+  ];
+  for (const rel of v1ModelRouteFiles) {
+    const code = fs.readFileSync(path.join(process.cwd(), rel), 'utf8');
+    assert(code.includes('requireApiUser('), `${rel} must call requireApiUser() for 401/402 enforcement`);
+  }
+
+  for (const allowed of ['/', '/pricing', '/account', '/settings', '/terms', '/privacy']) {
+    assert.strictEqual(isExpiredAllowedPagePath(allowed), true);
+    const res = await handleAuthMiddleware(makeNextRequest(allowed), {
+      getSession: async () => expiredTrialSession,
+    });
+    assert.strictEqual(res.status, 200, `Expired user must still access ${allowed} (200), got ${res.status}`);
+  }
+
+  for (const blocked of ['/fixtures', '/matches', '/matches/fix_1', '/predictions', '/picks', '/markets', '/performance', '/record', '/saved', '/methodology']) {
+    const res = await handleAuthMiddleware(makeNextRequest(blocked), {
+      getSession: async () => expiredTrialSession,
+    });
+    assert.strictEqual(res.status, 307, `Expired user GET ${blocked} must redirect (307), got ${res.status}`);
+    assert.strictEqual(
+      res.headers.get('location'),
+      'http://localhost:3000/pricing?reason=trial_ended',
+      `Expired user GET ${blocked} must redirect to /pricing?reason=trial_ended`
+    );
+  }
+
+  // Expired user hitting /admin still gets 404
+  const expiredAdminAttempt = await handleAuthMiddleware(makeNextRequest('/admin'), {
+    getSession: async () => expiredTrialSession,
+  });
+  assert.strictEqual(expiredAdminAttempt.status, 404);
+
+  // 6d. Admin with backdated trial_ends_at is NEVER blocked
+  const adminWithBackdatedTrial = makeFakeSession({
+    role: 'admin',
+    tier: 'free',
+    trialStartedAt: '2020-01-01T00:00:00.000Z',
+    trialEndsAt: '2020-01-08T00:00:00.000Z',
+    tierExpiresAt: '2020-01-08T00:00:00.000Z',
+  });
+  assert.strictEqual(adminWithBackdatedTrial.entitlements.status, 'admin');
+  assert.strictEqual(adminWithBackdatedTrial.entitlements.hasModelAccess, true);
+  assert.strictEqual(adminWithBackdatedTrial.isExpired, false);
+  const adminApiAccess = await requireApiUser(new Request('http://localhost:3000/api/v1/fixtures'), {
+    getSession: async () => adminWithBackdatedTrial,
+  });
+  assert.strictEqual(adminApiAccess.authorized, true);
+
+  // 6e. Banner countdown & colors (normal / amber at 2d / red at 1d & expired / hidden for admin & paid)
+  const banner5d = getTrialBannerState({ entitlementStatus: 'trial', trialDaysRemaining: 5, isAdmin: false });
+  assert.strictEqual(banner5d.visible, true);
+  assert.strictEqual(banner5d.tone, 'normal');
+  assert.strictEqual(banner5d.label, 'Free trial: 5 days left');
+  assert.strictEqual(banner5d.isReminderDay, false);
+
+  const banner2d = getTrialBannerState({ entitlementStatus: 'trial', trialDaysRemaining: 2, isAdmin: false });
+  assert.strictEqual(banner2d.visible, true);
+  assert.strictEqual(banner2d.tone, 'amber');
+  assert.strictEqual(banner2d.label, 'Free trial: 2 days left');
+  assert.strictEqual(banner2d.isReminderDay, true);
+  assert.strictEqual(banner2d.reminderStage, 'day5');
+
+  const banner1d = getTrialBannerState({ entitlementStatus: 'trial', trialDaysRemaining: 1, isAdmin: false });
+  assert.strictEqual(banner1d.visible, true);
+  assert.strictEqual(banner1d.tone, 'red');
+  assert.strictEqual(banner1d.label, 'Free trial: 1 day left');
+  assert.strictEqual(banner1d.isReminderDay, true);
+  assert.strictEqual(banner1d.reminderStage, 'day7');
+
+  assert.strictEqual(getTrialBannerState({ entitlementStatus: 'paid', trialDaysRemaining: 0, isAdmin: false }).visible, false);
+  assert.strictEqual(getTrialBannerState({ entitlementStatus: 'trial', trialDaysRemaining: 2, isAdmin: true }).visible, false);
+
+  // 6f. Disposable email domain check
+  assert.strictEqual(isDisposableEmail('throwaway@mailinator.com'), true);
+  assert.strictEqual(isDisposableEmail('person@gmail.com'), false);
+
+  // 6g. Real DB tests: Paystack payment immediately restores expired user + admin extend_trial/end_trial + overview counts
+  if (db) {
+    const tAdminId = 'test-trial-admin-0001';
+    const tUserId = 'test-trial-user-0002';
+    const nowIso = new Date().toISOString();
+    const pastStart = '2024-01-01T00:00:00.000Z';
+    const pastEnd = '2024-01-08T00:00:00.000Z';
+    const tAdminSession = makeFakeSession({
+      id: tAdminId,
+      email: 'trial-admin@calibrall.app',
+      role: 'admin',
+      tier: 'premium',
+    });
+
+    try {
+      db.prepare(`DELETE FROM admin_audit_log WHERE target_user_id IN (?, ?) OR admin_id = ?`).run(tAdminId, tUserId, tAdminId);
+      db.prepare(`DELETE FROM paystack_payments WHERE user_id = ?`).run(tUserId);
+      db.prepare(`DELETE FROM profiles WHERE id IN (?, ?)`).run(tAdminId, tUserId);
+
+      db.prepare(
+        `INSERT INTO profiles (id, email, display_name, role, tier, created_at) VALUES (?, ?, 'Trial Admin', 'admin', 'premium', ?)`
+      ).run(tAdminId, 'trial-admin@calibrall.app', nowIso);
+      db.prepare(
+        `INSERT INTO profiles (id, email, display_name, role, tier, trial_started_at, trial_ends_at, created_at) VALUES (?, ?, 'Trial User', 'user', 'free', ?, ?, ?)`
+      ).run(tUserId, 'trial-user@calibrall.app', pastStart, pastEnd, nowIso);
+
+      // Expired user starts blocked
+      const beforePay = await getAdminUserDetail(tUserId);
+      assert.strictEqual(beforePay.user.accessStatus, 'expired');
+      assert.strictEqual(beforePay.user.trialDaysRemaining, 0);
+
+      // Overview reports trial/expired/paid metrics
+      const ov1 = await getAdminOverviewSvc();
+      assert(typeof ov1.users.usersInTrial === 'number');
+      assert(typeof ov1.users.usersExpired === 'number' && ov1.users.usersExpired >= 1);
+      assert(typeof ov1.users.usersPaid === 'number');
+      assert(typeof ov1.users.trialsEndingIn3d === 'number');
+
+      // Admin extends trial -> user immediately returns to 'trial' + audit logged
+      const extRes = await updateAdminUser(tAdminSession, tUserId, {
+        action: 'extend_trial',
+        trialDays: 5,
+        note: 'Support trial extension',
+      });
+      assert.strictEqual(extRes.user.accessStatus, 'trial');
+      assert.strictEqual(extRes.user.trialDaysRemaining, 5);
+      assert.strictEqual(extRes.auditLog.action, 'USER_TRIAL_EXTENDED');
+
+      // Admin ends trial now -> user immediately returns to 'expired' + audit logged
+      const endRes = await updateAdminUser(tAdminSession, tUserId, {
+        action: 'end_trial',
+        note: 'Trial ended in test',
+      });
+      assert.strictEqual(endRes.user.accessStatus, 'expired');
+      assert.strictEqual(endRes.user.trialDaysRemaining, 0);
+      assert.strictEqual(endRes.auditLog.action, 'USER_TRIAL_ENDED');
+
+      // User pays via Paystack -> access is restored immediately
+      const payRes = await applyPaystackPaymentRecord({
+        reference: `test_pay_${Date.now()}`,
+        userId: tUserId,
+        customerEmail: 'trial-user@calibrall.app',
+        planRaw: 'pro',
+        amountKobo: 2900000,
+        currency: 'NGN',
+        status: 'success',
+        channel: 'card',
+        durationDays: 30,
+      });
+      assert.strictEqual(payRes.applied, true);
+      assert.strictEqual(payRes.plan, 'pro');
+
+      const afterPay = await getAdminUserDetail(tUserId);
+      assert.strictEqual(afterPay.user.tier, 'pro');
+      assert.strictEqual(afterPay.user.accessStatus, 'paid');
+
+      const restoredSession = buildServerAuthSessionFromUserAndProfile(
+        { id: afterPay.user.id, email: afterPay.user.email },
+        {
+          id: afterPay.user.id,
+          email: afterPay.user.email,
+          displayName: afterPay.user.displayName,
+          role: afterPay.user.role,
+          tier: afterPay.user.tier,
+          tierExpiresAt: afterPay.user.tierExpiresAt,
+          trialStartedAt: afterPay.user.trialStartedAt,
+          trialEndsAt: afterPay.user.trialEndsAt,
+          emailConfirmed: true,
+          createdAt: afterPay.user.createdAt,
+        }
+      );
+      assert.strictEqual(restoredSession.entitlements.status, 'paid');
+      assert.strictEqual(restoredSession.entitlements.hasModelAccess, true);
+      assert.strictEqual(restoredSession.effectiveTier, 'pro');
+      const apiAfterPay = await requireApiUser(new Request('http://localhost:3000/api/v1/fixtures'), {
+        getSession: async () => restoredSession,
+      });
+      assert.strictEqual(apiAfterPay.authorized, true);
+    } finally {
+      db.prepare(`DELETE FROM admin_audit_log WHERE target_user_id IN (?, ?) OR admin_id = ?`).run(tAdminId, tUserId, tAdminId);
+      db.prepare(`DELETE FROM paystack_payments WHERE user_id = ?`).run(tUserId);
+      db.prepare(`DELETE FROM profiles WHERE id IN (?, ?)`).run(tAdminId, tUserId);
+    }
+  }
+
+  console.log('  PASS: 7-day trial, 402 enforcement, expired redirects, Paystack restoration, admin override, banner states & admin trial controls verified.');
+  console.log('\n--- ALL AUTH, RBAC, ADMIN, TRIAL & RLS HARDENING TESTS PASSED ---');
 }
 
 runTests().catch((err) => {

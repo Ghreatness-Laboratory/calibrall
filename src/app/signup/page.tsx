@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { getSupabaseBrowserClient, isBrowserSupabaseConfigured } from '@/lib/supabase/browser';
 import { useAuth } from '@/lib/context/AuthContext';
+import { isDisposableEmail } from '@/lib/auth/disposableDomains';
 
 function sanitizeNextTarget(raw: string | null): string {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) {
@@ -40,6 +41,11 @@ function SignupForm() {
 
     if (!confirmed18Plus) {
       setErrorMsg('You must confirm you are at least 18 years old to create an account.');
+      return;
+    }
+
+    if (isDisposableEmail(email)) {
+      setErrorMsg('Please use a permanent email address. Disposable email domains are not eligible for the 7-day free trial.');
       return;
     }
 
@@ -125,10 +131,10 @@ function SignupForm() {
     <div className="max-w-md mx-auto py-6 sm:py-10 space-y-5">
       <div className="space-y-1.5 text-center">
         <h1 className="font-display text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-[var(--text)]">
-          Create free account
+          Start your 7-day free trial. No card needed.
         </h1>
         <p className="text-[13px] text-[var(--text-2)]">
-          Access calibrated football and basketball probabilities on the public record.
+          Access calibrated football and basketball probabilities after confirming your email.
         </p>
       </div>
 
@@ -139,10 +145,10 @@ function SignupForm() {
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <h2 className="font-display text-[17px] font-semibold text-[var(--text)]">
-              Verify your email
+              Confirm your email to start your trial
             </h2>
             <p className="text-[13px] text-[var(--text-2)] leading-[1.55]">
-              We sent a verification link to <span className="text-[var(--text)] font-medium">{email}</span>. Open the link in your inbox to activate your account and continue to fixtures.
+              We sent a verification link to <span className="text-[var(--text)] font-medium">{email}</span>. Your 7-day free trial starts as soon as you confirm your email address.
             </p>
             <div className="pt-2">
               <Link
@@ -253,7 +259,7 @@ function SignupForm() {
                 ) : (
                   <UserPlus className="w-4 h-4" strokeWidth={2.2} />
                 )}
-                <span>{submitting ? 'Creating account...' : 'Create free account'}</span>
+                <span>{submitting ? 'Creating account...' : 'Start 7-day free trial'}</span>
               </button>
             </form>
 

@@ -13,6 +13,7 @@ import TopSportBar from '@/components/TopSportBar';
 import { SportProvider } from '@/lib/context/SportContext';
 import { AuthProvider, type AuthUserSummary } from '@/lib/context/AuthContext';
 import { getServerAuthSession, getServerSupabaseConfig } from '@/lib/supabase/serverAuth';
+import { maybeSendTrialReminderEmail } from '@/lib/notifications/trialReminders';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -43,7 +44,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'Calibrall | Every call, on record.',
   description:
-    'Free probabilistic football and basketball predictions where every pick is timestamped before kickoff and scored after full time.',
+    'Start your 7-day free trial. Probabilistic football and basketball predictions where every pick is timestamped before kickoff and scored after full time.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
@@ -63,7 +64,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Calibrall | Every call, on record.',
     description:
-      'Free probabilistic football and basketball predictions where every pick is timestamped before kickoff and scored after full time.',
+      'Start your 7-day free trial. Probabilistic football and basketball predictions where every pick is timestamped before kickoff and scored after full time.',
     type: 'website',
   },
 };
@@ -75,6 +76,9 @@ export default async function RootLayout({
 }) {
   const session = await getServerAuthSession();
   const { isAuthConfigured } = getServerSupabaseConfig();
+  if (session) {
+    void maybeSendTrialReminderEmail(session).catch(() => {});
+  }
 
   const initialUser: AuthUserSummary | null = session
     ? {
@@ -86,6 +90,12 @@ export default async function RootLayout({
         tierExpiresAt: session.profile.tierExpiresAt,
         isExpired: session.isExpired,
         isAdmin: session.isAdmin,
+        entitlementStatus: session.entitlements.status,
+        hasModelAccess: session.entitlements.hasModelAccess,
+        trialStartedAt: session.entitlements.trialStartedAt,
+        trialEndsAt: session.entitlements.trialEndsAt,
+        trialDaysRemaining: session.entitlements.trialDaysRemaining,
+        emailConfirmed: session.entitlements.emailConfirmed,
         createdAt: session.profile.createdAt,
       }
     : null;

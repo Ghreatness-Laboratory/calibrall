@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import DesktopInstallButton from '@/components/pwa/DesktopInstallButton';
 import DropdownInstallItem from '@/components/pwa/DropdownInstallItem';
+import TrialBanner from '@/components/TrialBanner';
 import { useSport } from '@/lib/context/SportContext';
 import { useAuth } from '@/lib/context/AuthContext';
 
@@ -51,7 +52,7 @@ export default function Navbar() {
       ro?.disconnect();
       window.removeEventListener('resize', updateOffset);
     };
-  }, [isFixtureDetail, isAuthenticated]);
+  }, [isFixtureDetail, isAuthenticated, user?.entitlementStatus, user?.trialDaysRemaining]);
 
   useEffect(() => {
     try {
@@ -108,9 +109,13 @@ export default function Navbar() {
   const userInitial = (user?.displayName || user?.email || 'U').trim().charAt(0).toUpperCase();
   const tierLabel = isAdmin
     ? 'Admin (Full)'
+    : user?.entitlementStatus === 'expired'
+    ? 'Expired'
+    : user?.entitlementStatus === 'trial'
+    ? `Trial (${user.trialDaysRemaining}d left)`
     : user?.tier
     ? user.tier.charAt(0).toUpperCase() + user.tier.slice(1)
-    : 'Free';
+    : 'Trial';
 
   return (
     <header
@@ -248,7 +253,7 @@ export default function Navbar() {
                       </button>
 
                       <Link
-                        href="/settings"
+                        href="/account"
                         onClick={() => setUserDropdownOpen(false)}
                         className="min-h-[44px] flex items-center px-3.5 text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] text-[12.5px]"
                       >
@@ -319,6 +324,7 @@ export default function Navbar() {
           )}
         </div>
       </div>
+      <TrialBanner />
     </header>
   );
 }

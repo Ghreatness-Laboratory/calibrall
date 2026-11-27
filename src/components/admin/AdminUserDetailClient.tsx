@@ -38,6 +38,7 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
   const [expiryPreset, setExpiryPreset] = useState<string>('30');
   const [customExpiryDate, setCustomExpiryDate] = useState('');
   const [extendFromCurrent, setExtendFromCurrent] = useState(true);
+  const [trialExtendDays, setTrialExtendDays] = useState<string>('7');
   const [noteInput, setNoteInput] = useState('');
 
   // Role confirmation dialog
@@ -200,6 +201,17 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
               {targetUser.tier}
             </span>
             <span
+              className={`px-2.5 py-1 rounded-[6px] border text-[11.5px] uppercase font-semibold ${
+                targetUser.accessStatus === 'paid' || targetUser.accessStatus === 'admin'
+                  ? 'border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent)]'
+                  : targetUser.accessStatus === 'trial'
+                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-500'
+                  : 'border-[var(--danger)]/40 bg-[var(--danger-soft)] text-[var(--danger)]'
+              }`}
+            >
+              Status: {targetUser.accessStatus}
+            </span>
+            <span
               className={`px-2.5 py-1 rounded-[6px] text-[11.5px] font-semibold ${
                 targetUser.role === 'admin'
                   ? 'bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30'
@@ -217,6 +229,28 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[12px] pt-2 border-t border-[var(--border)]">
+          <div className="p-2.5 rounded-[8px] bg-[var(--surface-2)]">
+            <div className="text-[var(--text-3)]">Trial start</div>
+            <div className="text-[var(--text)] font-medium mt-0.5">
+              {formatAdminDate(targetUser.trialStartedAt)}
+            </div>
+          </div>
+          <div className="p-2.5 rounded-[8px] bg-[var(--surface-2)]">
+            <div className="text-[var(--text-3)]">Trial end</div>
+            <div className="text-[var(--text)] font-medium mt-0.5">
+              {formatAdminDate(targetUser.trialEndsAt)}
+            </div>
+          </div>
+          <div className="p-2.5 rounded-[8px] bg-[var(--surface-2)]">
+            <div className="text-[var(--text-3)]">Trial days left</div>
+            <div className="text-[var(--text)] font-medium mt-0.5 tabular-nums">
+              {targetUser.accessStatus === 'trial'
+                ? `${targetUser.trialDaysRemaining} day(s)`
+                : targetUser.accessStatus === 'expired'
+                ? '0 days (expired)'
+                : 'Not on trial'}
+            </div>
+          </div>
           <div className="p-2.5 rounded-[8px] bg-[var(--surface-2)]">
             <div className="text-[var(--text-3)]">Subscription expiry</div>
             <div className="text-[var(--text)] font-medium mt-0.5">
@@ -392,6 +426,51 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
             >
               Revoke to free
             </button>
+          </div>
+
+          <div className="pt-3 border-t border-[var(--border)] space-y-2">
+            <div className="text-[12.5px] font-semibold text-[var(--text)]">Trial controls</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={365}
+                value={trialExtendDays}
+                onChange={(e) => setTrialExtendDays(e.target.value)}
+                aria-label="Trial extend days"
+                className="w-20 h-9 px-2.5 rounded-[8px] border border-[var(--border)] bg-[var(--surface-2)] text-[13px] text-[var(--text)] tabular-nums"
+              />
+              <button
+                type="button"
+                disabled={submitting || targetUser.role === 'admin'}
+                onClick={() =>
+                  runMutation(
+                    {
+                      action: 'extend_trial',
+                      trialDays: Math.max(1, Number(trialExtendDays) || 7),
+                      note: noteInput.trim() || undefined,
+                    },
+                    `Trial extended by ${Math.max(1, Number(trialExtendDays) || 7)} day(s).`
+                  )
+                }
+                className="h-9 px-3 rounded-[8px] border border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[12px] font-semibold text-[var(--accent)] disabled:opacity-40"
+              >
+                Extend trial
+              </button>
+              <button
+                type="button"
+                disabled={submitting || targetUser.role === 'admin'}
+                onClick={() =>
+                  runMutation(
+                    { action: 'end_trial', note: noteInput.trim() || 'Trial ended by admin' },
+                    'Trial ended immediately.'
+                  )
+                }
+                className="h-9 px-3 rounded-[8px] border border-[var(--danger)]/40 bg-[var(--danger-soft)] text-[12px] font-semibold text-[var(--danger)] disabled:opacity-40"
+              >
+                End trial now
+              </button>
+            </div>
           </div>
         </form>
 

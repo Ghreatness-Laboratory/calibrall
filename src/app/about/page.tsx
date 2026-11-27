@@ -52,7 +52,7 @@ export default function AboutPage() {
           <span>Independent statistical workspace</span>
         </h2>
         <p>
-          Calibrall is an informational and statistical research platform. It does not accept bets, process wagers, or act as a bookmaker. Access requires a free registered account and confirmation that you are 18 or older.
+          Calibrall is an informational and statistical research platform. It does not accept bets, process wagers, or act as a bookmaker. Access begins with a 7-day free trial after email confirmation and requires confirmation that you are 18 or older.
         </p>
       </section>
 
@@ -61,7 +61,7 @@ export default function AboutPage() {
           href="/signup"
           className="min-h-[44px] px-4 rounded-[12px] bg-[var(--accent-fill)] text-[var(--accent-ink)] font-bold text-[13px] inline-flex items-center gap-1.5"
         >
-          <span>Create free account</span>
+          <span>Start 7-day free trial</span>
           <ArrowRight className="w-4 h-4" />
         </Link>
         <Link

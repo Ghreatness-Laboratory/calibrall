@@ -24,6 +24,10 @@ interface OverviewResponse {
     expiringIn7d: number;
     suspendedCount: number;
     adminCount: number;
+    usersInTrial?: number;
+    usersPaid?: number;
+    usersExpired?: number;
+    trialsEndingIn3d?: number;
   };
   sync: {
     latestSyncTime: string | null;
@@ -210,6 +214,22 @@ export default function AdminOverviewSection() {
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2 pt-1 text-[12px] text-[var(--text-2)]">
+            <div className="flex items-center justify-between p-2 rounded-[8px] bg-[var(--surface-2)]">
+              <span>Users in trial</span>
+              <span className="font-semibold text-[var(--text)] tabular-nums">{data.users.usersInTrial ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-[8px] bg-[var(--surface-2)]">
+              <span>Trials ending (3d)</span>
+              <span className="font-semibold text-amber-500 tabular-nums">{data.users.trialsEndingIn3d ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-[8px] bg-[var(--surface-2)]">
+              <span>Paid accounts</span>
+              <span className="font-semibold text-[var(--accent)] tabular-nums">{data.users.usersPaid ?? data.users.activeSubscriptions}</span>
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-[8px] bg-[var(--surface-2)]">
+              <span>Expired accounts</span>
+              <span className="font-semibold text-[var(--danger)] tabular-nums">{data.users.usersExpired ?? 0}</span>
+            </div>
             <div className="flex items-center justify-between p-2 rounded-[8px] bg-[var(--surface-2)]">
               <span>Admin accounts</span>
               <span className="font-semibold text-[var(--text)] tabular-nums">{data.users.adminCount}</span>
