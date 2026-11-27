@@ -40,40 +40,40 @@ export default function AdminTierConfigSection() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[15px] font-bold text-[var(--text)]">{cleanDisplayText(rule.name)}</span>
-                    <span className="text-[12px] font-mono text-[var(--accent)]">{cleanDisplayText(rule.monthlyPriceLabel)}</span>
+                    <span className="text-[12px] font-mono text-[var(--accent)]">{cleanDisplayText(rule.billingLabel)}</span>
                   </div>
-                  <p className="text-[12px] text-[var(--text-2)]">{cleanDisplayText(rule.tagline)}</p>
+                  <p className="text-[12px] text-[var(--text-2)]">{cleanDisplayText(rule.summary)}</p>
 
                   <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11.5px]">
                     <div className="p-2 rounded-[6px] bg-[var(--surface)] border border-[var(--border)]">
                       <div className="text-[var(--text-3)]">Daily summaries</div>
                       <div className="font-semibold text-[var(--text)] tabular-nums">
-                        {rule.dailyFullSummaryLimit === null ? 'Unlimited' : rule.dailyFullSummaryLimit}
+                        {rule.dailySummaryLimit === null ? 'Unlimited' : rule.dailySummaryLimit}
                       </div>
                     </div>
                     <div className="p-2 rounded-[6px] bg-[var(--surface)] border border-[var(--border)]">
                       <div className="text-[var(--text-3)]">Alternates</div>
                       <div className="font-semibold text-[var(--text)] tabular-nums">
-                        {rule.alternatesIncluded ? 'Included' : 'Locked'}
+                        {rule.alternatePicksVisible > 0 ? `${rule.alternatePicksVisible} included` : 'Locked'}
                       </div>
                     </div>
                     <div className="p-2 rounded-[6px] bg-[var(--surface)] border border-[var(--border)]">
                       <div className="text-[var(--text-3)]">Drivers</div>
                       <div className="font-semibold text-[var(--text)]">
-                        {rule.fullDriversIncluded ? 'Full' : 'Redacted'}
+                        {rule.modelDriversVisible ? 'Full' : 'Redacted'}
                       </div>
                     </div>
                     <div className="p-2 rounded-[6px] bg-[var(--surface)] border border-[var(--border)]">
-                      <div className="text-[var(--text-3)]">Priority sync</div>
+                      <div className="text-[var(--text-3)]">API workflows</div>
                       <div className="font-semibold text-[var(--text)]">
-                        {rule.priorityDataRefresh ? 'Enabled' : 'Standard'}
+                        {rule.apiWorkflowAccess ? 'Enabled' : 'Standard'}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <ul className="space-y-1.5 pt-2 border-t border-[var(--border)]">
-                  {rule.highlights.map((item, idx) => (
+                  {rule.features.map((item, idx) => (
                     <li key={idx} className="text-[12px] text-[var(--text-2)] flex items-start gap-2">
                       <Check className="w-3.5 h-3.5 text-[var(--accent)] mt-0.5 shrink-0" />
                       <span>{cleanDisplayText(item)}</span>
@@ -90,10 +90,10 @@ export default function AdminTierConfigSection() {
             <Shield className="w-4 h-4 text-[var(--accent)] mt-0.5 shrink-0" />
             <div>
               <div className="text-[13px] font-semibold text-[var(--text)]">
-                {cleanDisplayText(ADMIN_OVERRIDE_RULE.label)}
+                Admin override rule
               </div>
               <div className="text-[12px] text-[var(--text-2)]">
-                Effective tier: {ADMIN_OVERRIDE_RULE.effectiveTier}. Expiry enforced: {ADMIN_OVERRIDE_RULE.neverExpires ? 'Never' : 'Yes'}. {cleanDisplayText(ADMIN_OVERRIDE_RULE.notes)}
+                Effective tier: {ADMIN_OVERRIDE_RULE.effectiveTier}. Expiry enforced: {ADMIN_OVERRIDE_RULE.neverExpires ? 'Never' : 'Yes'}. {cleanDisplayText(ADMIN_OVERRIDE_RULE.description)}
               </div>
             </div>
           </div>

@@ -29,7 +29,11 @@ export async function POST(request: Request) {
       rawSport === 'football' ? 'football' : rawSport === 'basketball' ? 'basketball' : 'all';
     const rawMode = String(body?.mode || 'schedule').toLowerCase();
     const mode: SyncMode =
-      rawMode === 'results' ? 'results' : rawMode === 'odds' ? 'odds' : 'schedule';
+      rawMode === 'results' || rawMode === 'full'
+        ? 'full'
+        : rawMode === 'odds' || rawMode === 'live'
+          ? 'live'
+          : 'schedule';
 
     const result = await triggerAdminSync(auth.session, { sport, mode });
     return NextResponse.json(result, {

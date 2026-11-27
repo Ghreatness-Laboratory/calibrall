@@ -510,7 +510,7 @@ export async function buildEvaluatedBasketballSlate(forceRefresh = false): Promi
     if (!ev) continue;
     if (hiddenOrVoidedGameIds.has(g.id)) {
       ev.topPick = null;
-      ev.noRecommendationReason = 'Pick hidden or voided by system administration.';
+      ev.abstentionReason = 'Pick hidden or voided by system administration.';
     }
     evaluationsById[g.id] = ev;
     emptyCounts[g.league].windowCount++;
@@ -762,7 +762,7 @@ export async function getBasketballFixtureByIdFromDb(gameId: string): Promise<{
   );
   if (hasModeratedVoid) {
     evaluation.topPick = null;
-    evaluation.noRecommendationReason = 'Pick hidden or voided by system administration.';
+    evaluation.abstentionReason = 'Pick hidden or voided by system administration.';
   }
 
   const topPickRow = activePickRows.find((pr: any) => pr.summary && (pr.is_top_pick === 1 || pr.is_top_pick === true)) || activePickRows.find((pr: any) => pr.summary);

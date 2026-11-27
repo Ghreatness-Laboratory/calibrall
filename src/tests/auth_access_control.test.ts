@@ -457,7 +457,7 @@ async function runTests() {
       assert.strictEqual(userList.users.length, 1);
       assert.strictEqual(userList.users[0].tier, 'free');
 
-      // 2. Admin changes test user tier -> takes effect immediately + writes audit log
+      // 2. Admin changes test user tier -> takes effect immediately + writes audit log with before/after
       const tierUpdate = await updateAdminUser(svcAdminSession, testUserId, {
         action: 'change_tier',
         tier: 'pro',
@@ -467,15 +467,30 @@ async function runTests() {
       assert.strictEqual(tierUpdate.user.tier, 'pro');
       assert(tierUpdate.user.tierExpiresAt, 'Tier expiry must be set');
       assert.strictEqual(tierUpdate.auditLog.action, 'USER_TIER_UPDATED');
+      assert.strictEqual(tierUpdate.auditLog.adminId, testAdminId);
+      assert.strictEqual(tierUpdate.auditLog.targetUserId, testUserId);
+      assert.strictEqual(tierUpdate.auditLog.beforeState?.tier, 'free');
+      assert.strictEqual(tierUpdate.auditLog.afterState?.tier, 'pro');
 
       const reloaded = await getAdminUserDetail(testUserId);
       assert.strictEqual(reloaded.user.tier, 'pro');
-      const ent = computeEffectiveEntitlements({
-        role: reloaded.user.role,
-        tier: reloaded.user.tier,
-        tierExpiresAt: reloaded.user.tierExpiresAt,
-      });
-      assert.strictEqual(ent.effectiveTier, 'pro');
+      const liveMemberSession = buildServerAuthSessionFromUserAndProfile(
+        { id: reloaded.user.id, email: reloaded.user.email },
+        {
+          id: reloaded.user.id,
+          email: reloaded.user.email,
+          displayName: reloaded.user.displayName,
+          role: reloaded.user.role,
+          tier: reloaded.user.tier,
+          tierExpiresAt: reloaded.user.tierExpiresAt,
+          suspended: reloaded.user.suspended,
+          createdAt: reloaded.user.createdAt,
+        }
+      );
+      assert.strictEqual(resolveTierFromSession(liveMemberSession), 'pro');
+      const unlockedForPro = redactExplanationForTier(sampleExplanation, liveMemberSession.effectiveTier, 99)!;
+      assert.strictEqual(unlockedForPro.tierLocked, false);
+      assert.strictEqual(unlockedForPro.fullSummary, 'Deep model rationale.');
 
       // 3. Self-demotion must be rejected
       let selfDemoteFailed = false;
@@ -490,7 +505,39 @@ async function runTests() {
       }
       assert.strictEqual(selfDemoteFailed, true, 'Admin self-demotion must be rejected with HTTP 400');
 
-      // 4. Manual payment grant updates tier & writes payment + audit entry
+      // 4. Suspend and reactivate user -> blocks admin middleware + records audit logs
+      const suspendedRes = await updateAdminUser(svcAdminSession, testUserId, {
+        action: 'suspend',
+        reason: 'Chargeback review',
+      });
+      assert.strictEqual(suspendedRes.user.suspended, true);
+      assert.strictEqual(suspendedRes.auditLog.action, 'USER_SUSPENDED');
+      const suspendedSession = buildServerAuthSessionFromUserAndProfile(
+        { id: testUserId, email: 'member-test@calibrall.app' },
+        {
+          id: testUserId,
+          email: 'member-test@calibrall.app',
+          displayName: 'Test Member',
+          role: 'admin',
+          tier: 'premium',
+          tierExpiresAt: null,
+          suspended: true,
+          createdAt: nowIso,
+        }
+      );
+      const suspendedAdminRes = await handleAuthMiddleware(makeNextRequest('/admin'), {
+        getSession: async () => suspendedSession,
+      });
+      assert.strictEqual(suspendedAdminRes.status, 404, 'Suspended admin must receive 404 on /admin');
+
+      const reactivatedRes = await updateAdminUser(svcAdminSession, testUserId, {
+        action: 'reactivate',
+        note: 'Cleared review',
+      });
+      assert.strictEqual(reactivatedRes.user.suspended, false);
+      assert.strictEqual(reactivatedRes.auditLog.action, 'USER_REACTIVATED');
+
+      // 5. Manual payment grant updates tier & writes payment + audit entry
       const grant = await recordManualGrant(svcAdminSession, {
         userIdOrEmail: testUserId,
         plan: 'premium',
@@ -498,16 +545,22 @@ async function runTests() {
         grantNote: 'Invoice comp grant',
       });
       assert.strictEqual(grant.payment.isManualGrant, true);
-      const paymentsPage = await listAdminPayments({ manualOnly: 'true', search: 'Invoice comp' });
+      const paymentsPage = await listAdminPayments({ manualOnly: 'true', search: 'Invoice comp', page: 1, pageSize: 10 });
+      assert.strictEqual(paymentsPage.page, 1);
+      assert.strictEqual(paymentsPage.pageSize, 10);
+      assert(paymentsPage.totalPages >= 1);
       assert(paymentsPage.payments.some((p) => p.reference === grant.payment.reference));
 
-      const auditPage = await listAuditLogs({ targetUserId: testUserId });
+      const auditPage = await listAuditLogs({ targetUserId: testUserId, page: 1, pageSize: 10 });
       assert(auditPage.logs.some((l) => l.action === 'USER_TIER_UPDATED'));
+      assert(auditPage.logs.some((l) => l.action === 'USER_SUSPENDED'));
+      assert(auditPage.logs.some((l) => l.action === 'USER_REACTIVATED'));
       assert(auditPage.logs.some((l) => l.action === 'MANUAL_PAYMENT_GRANTED'));
 
-      // 5. System health query works cleanly
+      // 6. System health query works cleanly
       const health = await getAdminSystemHealth({ page: 1, pageSize: 10 });
       assert(typeof health.errorCount24h === 'number');
+      assert.strictEqual(health.callLogs.pageSize, 10);
     } finally {
       db.prepare(`DELETE FROM admin_audit_log WHERE target_user_id IN (?, ?) OR admin_id = ?`).run(
         testAdminId,
@@ -517,7 +570,7 @@ async function runTests() {
       db.prepare(`DELETE FROM paystack_payments WHERE user_id = ?`).run(testUserId);
       db.prepare(`DELETE FROM profiles WHERE id IN (?, ?)`).run(testAdminId, testUserId);
     }
-    console.log('  PASS: Admin user tier mutation, audit log persistence, manual grant & self-demotion guard verified against DB.');
+    console.log('  PASS: Admin user tier mutation, audit log persistence, suspension guard, manual grant & self-demotion guard verified against DB.');
   }
 
   console.log('\n--- ALL AUTH, RBAC, ADMIN & RLS HARDENING TESTS PASSED ---');

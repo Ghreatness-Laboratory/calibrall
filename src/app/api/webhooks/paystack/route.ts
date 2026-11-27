@@ -88,7 +88,6 @@ export async function POST(request: Request) {
 
     await serviceClient.from('paystack_payments').upsert(
       {
-        id: crypto.randomUUID(),
         user_id: userId,
         email: customerEmail,
         reference,

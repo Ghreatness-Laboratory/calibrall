@@ -27,6 +27,7 @@ import { serverCache } from '@/lib/cache/serverCache';
 import { bustBasketballSlateCache } from '@/lib/basketball/readService';
 import { getFootballDataProvider } from '@/lib/data/provider';
 import { syncBasketballLivePipeline } from '@/lib/basketball/liveSync';
+import { fetchAllRows } from '@/lib/supabase/pagination';
 
 export interface AdminUserRecord {
   id: string;
@@ -124,7 +125,7 @@ function parseJsonSafe<T>(raw: unknown, fallback: T): T {
   }
 }
 
-function useRemoteServiceClient() {
+function getRemoteServiceClient() {
   const backend = persistenceBackendInfo();
   const serviceClient = getSupabaseServiceClient();
   if (backend.isRemoteSupabase) {
@@ -221,7 +222,7 @@ export async function writeAdminAuditLog(entry: {
 }): Promise<AdminAuditLogRecord> {
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
 
   if (serviceClient) {
     const { data, error } = await serviceClient
@@ -297,7 +298,7 @@ export async function writeAdminAuditLog(entry: {
 }
 
 export async function getAdminOverview() {
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
   const now = new Date();
   const nowIso = now.toISOString();
   const ago7dIso = new Date(now.getTime() - 7 * 86_400_000).toISOString();
@@ -353,9 +354,10 @@ export async function getAdminOverview() {
       serviceClient.from('profiles').select('id', { count: 'exact', head: true }).eq('suspended', true),
       serviceClient
         .from('profiles')
-        .select('id, role, tier, tier_expires_at, suspended')
+        .select('id', { count: 'exact', head: true })
         .in('tier', ['pro', 'premium'])
-        .range(0, 999),
+        .eq('suspended', false)
+        .or(`tier_expires_at.is.null,tier_expires_at.gt.${nowIso}`),
       serviceClient
         .from('profiles')
         .select('id', { count: 'exact', head: true })
@@ -365,11 +367,15 @@ export async function getAdminOverview() {
         .gt('tier_expires_at', nowIso)
         .lte('tier_expires_at', plus7dIso),
       serviceClient.rpc('get_calibrall_database_size'),
-      serviceClient
-        .from('provider_call_logs')
-        .select('provider')
-        .gte('timestamp', `${todayUtcPrefix}T00:00:00.000Z`)
-        .range(0, 999),
+      fetchAllRows<{ provider: string | null }>((from, to) =>
+        serviceClient
+          .from('provider_call_logs')
+          .select('provider')
+          .gte('timestamp', `${todayUtcPrefix}T00:00:00.000Z`)
+          .order('timestamp', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      ),
       serviceClient.from('paystack_payments').select('id', { count: 'exact', head: true }),
       serviceClient
         .from('paystack_payments')
@@ -381,12 +387,7 @@ export async function getAdminOverview() {
         .eq('status', 'success'),
     ]);
 
-    const paidRows = Array.isArray(paidUsersRes.data) ? paidUsersRes.data : [];
-    const activeSubs = paidRows.filter((p: any) => {
-      if (p.suspended === true || p.suspended === 1) return false;
-      if (!p.tier_expires_at) return true;
-      return Date.parse(String(p.tier_expires_at)) > now.getTime();
-    }).length;
+    const activeSubs = Number(paidUsersRes.count) || 0;
 
     userMetrics = {
       totalUsers: Number(totalRes.count) || 0,
@@ -608,7 +609,7 @@ export async function listAdminUsers(options: {
   const tier = (options.tier || 'all').toLowerCase();
   const role = (options.role || 'all').toLowerCase();
   const status = (options.status || 'all').toLowerCase();
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
 
   if (serviceClient) {
     const rpcRes = await serviceClient.rpc('get_admin_users_page', {
@@ -649,6 +650,16 @@ export async function listAdminUsers(options: {
     if (role !== 'all') query = query.eq('role', role);
     if (status === 'suspended') query = query.eq('suspended', true);
     if (status === 'active') query = query.eq('suspended', false);
+    if (status === 'expiring') {
+      const nowIso = new Date().toISOString();
+      const plus7dIso = new Date(Date.now() + 7 * 86_400_000).toISOString();
+      query = query
+        .in('tier', ['pro', 'premium'])
+        .eq('role', 'user')
+        .eq('suspended', false)
+        .gt('tier_expires_at', nowIso)
+        .lte('tier_expires_at', plus7dIso);
+    }
     if (search) {
       const cleanQ = search.replace(/[%_,()]/g, '');
       query = query.or(`email.ilike.%${cleanQ}%,display_name.ilike.%${cleanQ}%`);
@@ -724,12 +735,17 @@ export async function listAdminUsers(options: {
 }
 
 export async function getAdminUserDetail(userId: string) {
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
   let user: AdminUserRecord | null = null;
   let auditLogs: AdminAuditLogRecord[] = [];
   let payments: AdminPaymentRecord[] = [];
 
   if (serviceClient) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    if (!isUuid) {
+      throw new AdminServiceError('User not found', 404);
+    }
+
     const rpcRes = await serviceClient.rpc('get_admin_user_detail', { p_user_id: userId });
     if (!rpcRes.error && rpcRes.data) {
       user = mapSupabaseProfileRow(rpcRes.data);
@@ -750,15 +766,15 @@ export async function getAdminUserDetail(userId: string) {
       serviceClient
         .from('admin_audit_log')
         .select('*')
-        .eq('target_user_id', userId)
+        .or(`target_user_id.eq.${userId},entity_id.eq.${userId}`)
         .order('created_at', { ascending: false })
-        .range(0, 24),
+        .range(0, 49),
       serviceClient
         .from('paystack_payments')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .range(0, 24),
+        .range(0, 49),
     ]);
 
     auditLogs = (auditRes.data || []).map((r: any) => ({
@@ -895,7 +911,7 @@ export async function updateAdminUser(
   }
 ) {
   const { user: current } = await getAdminUserDetail(targetUserId);
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
   const nowIso = new Date().toISOString();
 
   const updateFields: Record<string, any> = {};
@@ -1088,7 +1104,7 @@ export async function listAuditLogs(options: {
   const action = (options.action || 'all').trim();
   const targetUserId = (options.targetUserId || '').trim();
   const search = (options.search || '').trim();
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
 
   if (serviceClient) {
     let query = serviceClient
@@ -1186,7 +1202,7 @@ export async function listAdminPayments(options: {
   const status = (options.status || 'all').toLowerCase();
   const manualOnly = (options.manualOnly || 'all').toLowerCase();
   const search = (options.search || '').trim();
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
 
   if (serviceClient) {
     let query = serviceClient
@@ -1306,7 +1322,7 @@ export async function recordManualGrant(
     throw new AdminServiceError('A note is required when recording a manual grant.', 400);
   }
 
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
   let targetUser: AdminUserRecord | null = null;
 
   if (serviceClient) {
@@ -1444,26 +1460,32 @@ export async function listAdminPicks(options: {
   const sport = (options.sport || 'all').toLowerCase();
   const status = (options.status || 'all').toLowerCase();
   const search = (options.search || '').trim().toLowerCase();
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
 
   const items: AdminPickRecord[] = [];
 
   if (serviceClient) {
     const [fbRes, bbRes] = await Promise.all([
       sport === 'basketball'
-        ? Promise.resolve({ data: [], error: null })
-        : serviceClient
-            .from('football_picks')
-            .select('*')
-            .order('recorded_at', { ascending: false })
-            .range(0, 999),
+        ? Promise.resolve({ data: [] as any[], error: null })
+        : fetchAllRows<any>((from, to) =>
+            serviceClient
+              .from('football_picks')
+              .select('*')
+              .order('recorded_at', { ascending: false })
+              .order('fixture_id', { ascending: true })
+              .range(from, to)
+          ),
       sport === 'football'
-        ? Promise.resolve({ data: [], error: null })
-        : serviceClient
-            .from('bb_picks')
-            .select('*')
-            .order('recorded_at', { ascending: false })
-            .range(0, 999),
+        ? Promise.resolve({ data: [] as any[], error: null })
+        : fetchAllRows<any>((from, to) =>
+            serviceClient
+              .from('bb_picks')
+              .select('*')
+              .order('recorded_at', { ascending: false })
+              .order('id', { ascending: true })
+              .range(from, to)
+          ),
     ]);
 
     for (const r of fbRes.data || []) {
@@ -1531,7 +1553,7 @@ export async function listAdminPicks(options: {
     const db = requireLocalDb();
     if (sport !== 'basketball') {
       const fbRows = db
-        .prepare(`SELECT * FROM football_picks ORDER BY recorded_at DESC LIMIT 1000`)
+        .prepare(`SELECT * FROM football_picks ORDER BY recorded_at DESC`)
         .all() as any[];
       for (const r of fbRows) {
         const isHidden = Boolean(r.is_hidden === 1 || r.is_hidden === true);
@@ -1566,7 +1588,7 @@ export async function listAdminPicks(options: {
     }
     if (sport !== 'football') {
       const bbRows = db
-        .prepare(`SELECT * FROM bb_picks ORDER BY recorded_at DESC LIMIT 1000`)
+        .prepare(`SELECT * FROM bb_picks ORDER BY recorded_at DESC`)
         .all() as any[];
       for (const r of bbRows) {
         const isHidden = Boolean(r.is_hidden === 1 || r.is_hidden === true);
@@ -1648,7 +1670,7 @@ export async function moderateAdminPick(
     throw new AdminServiceError('A moderation reason is required to hide or void a pick.', 400);
   }
 
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
   const nowIso = new Date().toISOString();
   const table = sport === 'basketball' ? 'bb_picks' : 'football_picks';
   const idCol = sport === 'basketball' ? 'id' : 'fixture_id';
@@ -1779,7 +1801,7 @@ export async function triggerAdminSync(
 
   const completedAt = new Date().toISOString();
   const jobStatus = errorMessage ? 'FAILED' : 'COMPLETED';
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
 
   try {
     if (serviceClient) {
@@ -1851,7 +1873,7 @@ export async function getAdminSystemHealth(options: {
   const { page, pageSize, offset } = clampPagination(options.page, options.pageSize, 25);
   const provider = (options.provider || 'all').trim();
   const onlyErrors = Boolean(options.onlyErrors);
-  const serviceClient = useRemoteServiceClient();
+  const serviceClient = getRemoteServiceClient();
   const ago24hIso = new Date(Date.now() - 86_400_000).toISOString();
 
   let callLogs: any[] = [];
