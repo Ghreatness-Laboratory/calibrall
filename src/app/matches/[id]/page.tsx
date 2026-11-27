@@ -34,6 +34,7 @@ import LineupChip from '@/components/LineupChip';
 import { getFixtureLineupState } from '@/lib/data/lineupsService';
 import { forwardPickLedger } from '@/lib/prediction/forwardPickLedger';
 import { displayName, formatMatchTime, cleanDisplayText } from '@/lib/utils/formatText';
+import { formatMonthlyPrice } from '@/lib/tiers';
 
 const BB_CAT_TITLES: Record<BasketballMarketCategory, string> = {
   game_total: 'Game Total Over/Under',
@@ -504,7 +505,7 @@ export default function MatchAnalysisPage() {
                             Full model reasoning locked
                           </div>
                           <p className="text-[12px] text-[var(--text-2)]">
-                            Pro (₦500/month) unlocks model drivers and the next 2 alternate picks.
+                            Pro ({formatMonthlyPrice('pro')}) unlocks model drivers and the next 2 alternate picks.
                           </p>
                         </div>
                         <Link
@@ -939,7 +940,7 @@ export default function MatchAnalysisPage() {
                     Full model reasoning locked
                   </div>
                   <p className="text-[12px] text-[var(--text-2)]">
-                    Pro (₦500/month) unlocks model drivers and the next 2 alternate picks.
+                    Pro ({formatMonthlyPrice('pro')}) unlocks model drivers and the next 2 alternate picks.
                   </p>
                 </div>
                 <Link

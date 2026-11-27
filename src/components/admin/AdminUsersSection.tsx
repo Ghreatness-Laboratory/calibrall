@@ -187,6 +187,16 @@ export default function AdminUsersSection() {
                         <span>Admin</span>
                       </span>
                     )}
+                    {u.pendingTier && (
+                      <span className="px-2 py-0.5 rounded-[4px] border border-amber-500/40 bg-amber-500/10 text-[11px] font-medium text-amber-500">
+                        Pending: {u.pendingTier}
+                      </span>
+                    )}
+                    {u.cancelAtPeriodEnd && (
+                      <span className="px-2 py-0.5 rounded-[4px] border border-[var(--danger)]/40 bg-[var(--danger-soft)] text-[11px] font-medium text-[var(--danger)]">
+                        Cancels at end
+                      </span>
+                    )}
                     {u.suspended && (
                       <span className="px-2 py-0.5 rounded-[4px] border border-[var(--danger)]/40 bg-[var(--danger-soft)] text-[11px] font-medium text-[var(--danger)] flex items-center gap-1">
                         <Ban className="w-3 h-3" />

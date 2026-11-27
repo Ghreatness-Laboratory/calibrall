@@ -683,6 +683,10 @@ export function getLocalDatabase(): any {
           role TEXT NOT NULL DEFAULT 'user',
           tier TEXT NOT NULL DEFAULT 'free',
           tier_expires_at TEXT NULL,
+          pending_tier TEXT NULL,
+          pending_tier_effective_at TEXT NULL,
+          cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+          renewal_reminder_sent_at TEXT NULL,
           trial_started_at TEXT NULL,
           trial_ends_at TEXT NULL,
           trial_reminder_5d_sent_at TEXT NULL,
@@ -721,6 +725,7 @@ export function getLocalDatabase(): any {
           grant_note TEXT,
           paid_at TEXT,
           metadata TEXT DEFAULT '{}',
+          raw_webhook TEXT NULL,
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS provider_sync_jobs (
@@ -736,6 +741,10 @@ export function getLocalDatabase(): any {
       `);
 
       // Ensure columns exist on older tables
+      try { db.exec('ALTER TABLE profiles ADD COLUMN pending_tier TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE profiles ADD COLUMN pending_tier_effective_at TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE profiles ADD COLUMN cancel_at_period_end INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
+      try { db.exec('ALTER TABLE profiles ADD COLUMN renewal_reminder_sent_at TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE profiles ADD COLUMN trial_started_at TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE profiles ADD COLUMN trial_ends_at TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE profiles ADD COLUMN trial_reminder_5d_sent_at TEXT;'); } catch (_) {}
@@ -744,6 +753,7 @@ export function getLocalDatabase(): any {
       try { db.exec('ALTER TABLE profiles ADD COLUMN suspended_at TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE profiles ADD COLUMN suspended_reason TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE profiles ADD COLUMN last_sign_in_at TEXT;'); } catch (_) {}
+      try { db.exec('ALTER TABLE paystack_payments ADD COLUMN raw_webhook TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE football_picks ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
       try { db.exec('ALTER TABLE football_picks ADD COLUMN voided_reason TEXT;'); } catch (_) {}
       try { db.exec('ALTER TABLE football_picks ADD COLUMN moderated_by TEXT;'); } catch (_) {}

@@ -52,7 +52,15 @@ export default function Navbar() {
       ro?.disconnect();
       window.removeEventListener('resize', updateOffset);
     };
-  }, [isFixtureDetail, isAuthenticated, user?.entitlementStatus, user?.trialDaysRemaining]);
+  }, [
+    isFixtureDetail,
+    isAuthenticated,
+    user?.entitlementStatus,
+    user?.trialDaysRemaining,
+    user?.tierExpiresAt,
+    user?.cancelAtPeriodEnd,
+    user?.pendingTier,
+  ]);
 
   useEffect(() => {
     try {

@@ -4,73 +4,115 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Clock, AlertTriangle, X, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
-import { getTrialBannerState } from '@/lib/tiers';
+import { getPaidRenewalBannerState, getTrialBannerState } from '@/lib/tiers';
 
 export default function TrialBanner() {
   const { user, isAuthenticated, isAdmin } = useAuth();
   const [dismissedReminder, setDismissedReminder] = useState(false);
 
-  const state = getTrialBannerState({
+  const trialState = getTrialBannerState({
     entitlementStatus: user?.entitlementStatus,
     trialDaysRemaining: user?.trialDaysRemaining,
     isAdmin,
   });
 
+  const paidRenewalState = getPaidRenewalBannerState({
+    entitlementStatus: user?.entitlementStatus,
+    tier: user?.tier,
+    tierExpiresAt: user?.tierExpiresAt,
+    cancelAtPeriodEnd: user?.cancelAtPeriodEnd,
+    isAdmin,
+  });
+
+  const showPaidRenewalBanner = Boolean(
+    isAuthenticated && user && !isAdmin && !trialState.visible && paidRenewalState.showRenewalBanner
+  );
+
   useEffect(() => {
-    if (!state.reminderStage || typeof window === 'undefined') {
+    if (!trialState.reminderStage || typeof window === 'undefined') {
       setDismissedReminder(false);
       return;
     }
     try {
-      const key = `calibrall_trial_notice_dismissed_${user?.id || 'anon'}_${state.reminderStage}`;
+      const key = `calibrall_trial_notice_dismissed_${user?.id || 'anon'}_${trialState.reminderStage}`;
       setDismissedReminder(sessionStorage.getItem(key) === 'true');
     } catch {
       setDismissedReminder(false);
     }
-  }, [state.reminderStage, user?.id]);
+  }, [trialState.reminderStage, user?.id]);
 
-  if (!isAuthenticated || !user || !state.visible) {
+  if (!isAuthenticated || !user || (!trialState.visible && !showPaidRenewalBanner)) {
     return null;
+  }
+
+  if (showPaidRenewalBanner) {
+    const toneClass =
+      paidRenewalState.tone === 'red'
+        ? 'bg-[var(--danger-soft)] border-t border-[var(--danger)]/35 text-[var(--danger)]'
+        : 'bg-amber-500/15 border-t border-amber-500/35 text-amber-700 dark:text-amber-300';
+    const ctaClass =
+      paidRenewalState.tone === 'red'
+        ? 'bg-[var(--danger)] text-white'
+        : 'bg-amber-500 text-slate-950';
+
+    return (
+      <div className={toneClass} data-testid="paid-renewal-banner" data-tone={paidRenewalState.tone}>
+        <div className="max-w-[430px] md:max-w-4xl lg:max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-between gap-2 text-[12px]">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <div className="min-w-0 truncate font-semibold">{paidRenewalState.label}</div>
+          </div>
+
+          <Link
+            href="/pricing"
+            className={`min-h-[28px] px-2.5 rounded-[8px] text-[11.5px] font-bold inline-flex items-center gap-1 transition-opacity hover:opacity-90 shrink-0 ${ctaClass}`}
+          >
+            <span>Renew now</span>
+            <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const dismissNotice = () => {
     setDismissedReminder(true);
     try {
-      if (state.reminderStage) {
-        const key = `calibrall_trial_notice_dismissed_${user.id}_${state.reminderStage}`;
+      if (trialState.reminderStage) {
+        const key = `calibrall_trial_notice_dismissed_${user.id}_${trialState.reminderStage}`;
         sessionStorage.setItem(key, 'true');
       }
     } catch {}
   };
 
   const containerToneClass =
-    state.tone === 'red'
+    trialState.tone === 'red'
       ? 'bg-[var(--danger-soft)] border-t border-[var(--danger)]/35 text-[var(--danger)]'
-      : state.tone === 'amber'
+      : trialState.tone === 'amber'
       ? 'bg-amber-500/15 border-t border-amber-500/35 text-amber-700 dark:text-amber-300'
       : 'bg-[var(--surface)] border-t border-[var(--line)] text-[var(--text-2)]';
 
   const badgeToneClass =
-    state.tone === 'red'
+    trialState.tone === 'red'
       ? 'bg-[var(--danger)] text-white'
-      : state.tone === 'amber'
+      : trialState.tone === 'amber'
       ? 'bg-amber-500 text-slate-950'
       : 'bg-[var(--accent-fill)] text-[var(--accent-ink)]';
 
-  const Icon = state.tone === 'normal' ? Clock : AlertTriangle;
+  const Icon = trialState.tone === 'normal' ? Clock : AlertTriangle;
 
   return (
-    <div className={containerToneClass} data-testid="trial-banner" data-tone={state.tone}>
+    <div className={containerToneClass} data-testid="trial-banner" data-tone={trialState.tone}>
       <div className="max-w-[430px] md:max-w-4xl lg:max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-between gap-2 text-[12px]">
         <div className="flex items-center gap-2 min-w-0">
           <Icon className="w-3.5 h-3.5 shrink-0" />
           <div className="min-w-0 truncate">
-            <span className="font-semibold">{state.label}</span>
-            {state.isReminderDay && !dismissedReminder && (
+            <span className="font-semibold">{trialState.label}</span>
+            {trialState.isReminderDay && !dismissedReminder && (
               <span className="hidden sm:inline ml-2 opacity-90">
                 {user.entitlementStatus === 'expired'
-                  ? '— Upgrade to Pro or Premium to restore model access.'
-                  : state.reminderStage === 'day7'
+                  ? '— Choose Pro or Premium to restore model access.'
+                  : trialState.reminderStage === 'day7'
                   ? '— Final day of your trial. Choose Pro or Premium to keep access.'
                   : '— Reminder: your trial ends soon. Choose a plan to stay uninterrupted.'}
               </span>
@@ -80,14 +122,14 @@ export default function TrialBanner() {
 
         <div className="flex items-center gap-1.5 shrink-0">
           <Link
-            href={state.tone === 'red' ? '/pricing?reason=trial_ended' : '/pricing'}
+            href={trialState.tone === 'red' ? '/pricing?reason=trial_ended' : '/pricing'}
             className={`min-h-[28px] px-2.5 rounded-[8px] text-[11.5px] font-bold inline-flex items-center gap-1 transition-opacity hover:opacity-90 ${badgeToneClass}`}
           >
-            <span>Upgrade</span>
+            <span>{user.entitlementStatus === 'expired' ? 'Choose a plan' : 'Upgrade'}</span>
             <ArrowRight className="w-3 h-3" />
           </Link>
 
-          {state.isReminderDay && !dismissedReminder && (
+          {trialState.isReminderDay && !dismissedReminder && (
             <button
               type="button"
               onClick={dismissNotice}

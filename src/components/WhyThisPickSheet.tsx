@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { X, Lock, Sparkles, ArrowUpRight } from 'lucide-react';
 import { WrittenMatchExplanation } from '@/types';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+import { formatMonthlyPrice } from '@/lib/tiers';
 
 interface Props {
   open: boolean;
@@ -355,7 +356,7 @@ export default function WhyThisPickSheet({
                 <span>Full model reasoning locked</span>
               </div>
               <p className="text-[12.5px] leading-[1.45] text-[var(--text-2)]">
-                Pro (₦500/month) unlocks model drivers and the next 2 alternate picks.
+                Pro ({formatMonthlyPrice('pro')}) unlocks model drivers and the next 2 alternate picks.
               </p>
             </div>
           ) : (

@@ -4,6 +4,7 @@ import {
   applyPaystackPaymentRecord,
   resolvePaystackSecretKey,
 } from '@/lib/payments/paystackService';
+import { PLAN_PERIOD_DAYS } from '@/lib/tiers';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -76,17 +77,23 @@ export async function GET(request: Request) {
       status: txStatus,
       channel: data?.channel ? String(data.channel) : 'paystack',
       paidAt: data?.paid_at ? String(data.paid_at) : null,
-      durationDays: Number(data?.metadata?.duration_days || 30),
-      metadata: json,
+      durationDays: Number(data?.metadata?.duration_days || PLAN_PERIOD_DAYS),
+      metadata: data?.metadata || {},
+      rawWebhook: data,
     });
+
+    const verified = applied.status === 'success' && (applied.applied || applied.alreadyProcessed);
 
     return NextResponse.json(
       {
-        verified: txStatus === 'success',
+        verified,
+        alreadyProcessed: applied.alreadyProcessed,
         reference,
         status: applied.status,
         plan: applied.plan,
+        amountKobo: Number(data.amount) || 0,
         tierExpiresAt: applied.tierExpiresAt,
+        error: applied.errorReason || (!verified ? `Payment status: ${applied.status}` : undefined),
       },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );

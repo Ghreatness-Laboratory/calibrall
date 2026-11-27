@@ -2,10 +2,13 @@ import crypto from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getServerAuthSession } from '@/lib/supabase/serverAuth';
 import {
-  getPaystackPlanSettings,
+  computeCheckoutQuoteForProfile,
+  createPendingCheckoutRecord,
+  getRawProfileSubscriptionState,
   resolvePaystackSecretKey,
   type PaidPlanId,
 } from '@/lib/payments/paystackService';
+import { PLAN_PERIOD_DAYS } from '@/lib/tiers';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,6 +19,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: 'Please log in before subscribing to a plan.', code: 'AUTH_REQUIRED' },
       { status: 401, headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
+  }
+
+  if (session.isAdmin || session.profile.role === 'admin') {
+    return NextResponse.json(
+      { error: 'Admin: full access accounts do not require payment.', code: 'ADMIN_NO_PAYMENT' },
+      { status: 403, headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );
   }
 
@@ -46,7 +56,27 @@ export async function POST(request: Request) {
   }
 
   const plan: PaidPlanId = rawPlan;
-  const settings = getPaystackPlanSettings(plan);
+  const dbProfile = await getRawProfileSubscriptionState(session.user.id).catch(() => null);
+  const quote = computeCheckoutQuoteForProfile(dbProfile || session.profile, plan);
+
+  if (!quote.allowed) {
+    return NextResponse.json(
+      { error: quote.reason || 'Checkout not allowed for this account.' },
+      { status: 403, headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
+  }
+
+  if (quote.mode === 'downgrade_schedule') {
+    return NextResponse.json(
+      {
+        error:
+          'Downgrading from Premium to Pro takes effect at the end of your current paid period with no charge now.',
+        code: 'DOWNGRADE_SCHEDULE_ONLY',
+      },
+      { status: 400, headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
+  }
+
   const reference = `calibrall_${plan}_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
 
   const reqOrigin = new URL(request.url).origin;
@@ -54,6 +84,14 @@ export async function POST(request: Request) {
   const callbackUrl = `${baseUrl}/pricing`;
 
   try {
+    await createPendingCheckoutRecord({
+      reference,
+      userId: session.user.id,
+      email: session.user.email,
+      plan,
+      quote,
+    });
+
     const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -62,14 +100,17 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         email: session.user.email,
-        amount: settings.amountKobo,
-        ...(settings.planCode ? { plan: settings.planCode } : {}),
+        amount: quote.amountKobo,
+        currency: 'NGN',
         reference,
         callback_url: callbackUrl,
         metadata: {
           user_id: session.user.id,
           plan,
-          duration_days: settings.durationDays,
+          checkout_mode: quote.mode,
+          credit_ngn: quote.creditNgn,
+          expected_amount_kobo: quote.amountKobo,
+          duration_days: PLAN_PERIOD_DAYS,
         },
       }),
     });
@@ -87,6 +128,11 @@ export async function POST(request: Request) {
         authorizationUrl: String(json.data.authorization_url),
         reference: String(json.data.reference || reference),
         plan,
+        mode: quote.mode,
+        amountNgn: quote.amountNgn,
+        amountKobo: quote.amountKobo,
+        creditNgn: quote.creditNgn,
+        newExpiryIso: quote.newExpiryIso,
       },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );

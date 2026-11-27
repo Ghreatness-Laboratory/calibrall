@@ -8,9 +8,11 @@ import {
   persistenceBackendInfo,
 } from '@/lib/supabase/client';
 import {
+  evaluateDuePendingTierTransition,
   getEntitlements,
   getServerSupabaseConfig,
   getSupabaseServiceClient,
+  normalizePendingTier,
   normalizeRole,
   normalizeTier,
   type AccountRole,
@@ -18,6 +20,7 @@ import {
   type EntitlementStatus,
   type ServerAuthSession,
 } from '@/lib/supabase/serverAuth';
+import { sanitizePaystackPayload } from '@/lib/payments/paystackService';
 import { matchesStore } from '@/lib/data/matchesStore';
 import { getBasketballDataStatus } from '@/lib/basketball/store';
 import {
@@ -38,6 +41,9 @@ export interface AdminUserRecord {
   role: AccountRole;
   tier: AccountTier;
   tierExpiresAt: string | null;
+  pendingTier: 'pro' | 'premium' | null;
+  pendingTierEffectiveAt: string | null;
+  cancelAtPeriodEnd: boolean;
   trialStartedAt: string | null;
   trialEndsAt: string | null;
   trialDaysRemaining: number;
@@ -79,6 +85,7 @@ export interface AdminPaymentRecord {
   grantNote: string | null;
   paidAt: string | null;
   createdAt: string;
+  rawWebhook: Record<string, any> | null;
 }
 
 export interface AdminPickRecord {
@@ -158,6 +165,9 @@ function mapSqliteUserRow(r: any): AdminUserRecord {
   const role = normalizeRole(r.role);
   const tier = normalizeTier(r.tier);
   const tierExpiresAt = r.tier_expires_at ? String(r.tier_expires_at) : null;
+  const pendingTier = normalizePendingTier(r.pending_tier);
+  const pendingTierEffectiveAt = r.pending_tier_effective_at ? String(r.pending_tier_effective_at) : null;
+  const cancelAtPeriodEnd = Boolean(r.cancel_at_period_end === 1 || r.cancel_at_period_end === true);
   const trialStartedAt = r.trial_started_at ? String(r.trial_started_at) : null;
   const trialEndsAt = r.trial_ends_at ? String(r.trial_ends_at) : null;
   const ent = getEntitlements({
@@ -176,6 +186,9 @@ function mapSqliteUserRow(r: any): AdminUserRecord {
     role,
     tier,
     tierExpiresAt,
+    pendingTier,
+    pendingTierEffectiveAt,
+    cancelAtPeriodEnd,
     trialStartedAt,
     trialEndsAt,
     trialDaysRemaining: ent.trialDaysRemaining,
@@ -200,6 +213,18 @@ function mapSupabaseProfileRow(r: any): AdminUserRecord {
       : r.tier_expires_at
       ? String(r.tier_expires_at)
       : null;
+  const rawPending = r.pendingTier !== undefined ? r.pendingTier : r.pending_tier;
+  const pendingTier = normalizePendingTier(rawPending);
+  const pendingTierEffectiveAt =
+    r.pendingTierEffectiveAt !== undefined
+      ? r.pendingTierEffectiveAt
+        ? String(r.pendingTierEffectiveAt)
+        : null
+      : r.pending_tier_effective_at
+      ? String(r.pending_tier_effective_at)
+      : null;
+  const rawCancel = r.cancelAtPeriodEnd !== undefined ? r.cancelAtPeriodEnd : r.cancel_at_period_end;
+  const cancelAtPeriodEnd = Boolean(rawCancel === true || rawCancel === 1);
   const trialStartedAt =
     r.trialStartedAt !== undefined
       ? r.trialStartedAt
@@ -234,6 +259,9 @@ function mapSupabaseProfileRow(r: any): AdminUserRecord {
     role,
     tier,
     tierExpiresAt,
+    pendingTier,
+    pendingTierEffectiveAt,
+    cancelAtPeriodEnd,
     trialStartedAt,
     trialEndsAt,
     trialDaysRemaining: ent.trialDaysRemaining,
@@ -775,7 +803,7 @@ export async function listAdminUsers(options: {
     let query = serviceClient
       .from('profiles')
       .select(
-        'id, email, display_name, role, tier, tier_expires_at, trial_started_at, trial_ends_at, suspended, suspended_at, suspended_reason, created_at',
+        'id, email, display_name, role, tier, tier_expires_at, pending_tier, pending_tier_effective_at, cancel_at_period_end, trial_started_at, trial_ends_at, suspended, suspended_at, suspended_reason, created_at',
         { count: 'exact' }
       )
       .order('created_at', { ascending: false })
@@ -950,6 +978,24 @@ export async function getAdminUserDetail(userId: string) {
       throw new AdminServiceError('User not found', 404);
     }
 
+    const transition = evaluateDuePendingTierTransition(user);
+    if (transition.due && transition.nextTier) {
+      await serviceClient
+        .from('profiles')
+        .update({
+          tier: transition.nextTier,
+          pending_tier: null,
+          pending_tier_effective_at: null,
+        })
+        .eq('id', userId);
+      user = {
+        ...user,
+        tier: transition.nextTier,
+        pendingTier: null,
+        pendingTierEffectiveAt: null,
+      };
+    }
+
     const [auditRes, payRes] = await Promise.all([
       serviceClient
         .from('admin_audit_log')
@@ -994,6 +1040,7 @@ export async function getAdminUserDetail(userId: string) {
       grantNote: p.grant_note ? String(p.grant_note) : null,
       paidAt: p.paid_at ? String(p.paid_at) : null,
       createdAt: String(p.created_at || ''),
+      rawWebhook: sanitizePaystackPayload(parseJsonSafe(p.raw_webhook, null)),
     }));
 
     return { user, auditLogs, payments };
@@ -1004,6 +1051,23 @@ export async function getAdminUserDetail(userId: string) {
   if (!row) {
     throw new AdminServiceError('User not found', 404);
   }
+
+  const transition = evaluateDuePendingTierTransition({
+    role: row.role,
+    tier: row.tier,
+    tierExpiresAt: row.tier_expires_at,
+    pendingTier: row.pending_tier,
+    pendingTierEffectiveAt: row.pending_tier_effective_at,
+  });
+  if (transition.due && transition.nextTier) {
+    db.prepare(
+      `UPDATE profiles SET tier = ?, pending_tier = NULL, pending_tier_effective_at = NULL WHERE id = ?`
+    ).run(transition.nextTier, userId);
+    row.tier = transition.nextTier;
+    row.pending_tier = null;
+    row.pending_tier_effective_at = null;
+  }
+
   user = mapSqliteUserRow(row);
 
   const auditRows = db
@@ -1043,6 +1107,7 @@ export async function getAdminUserDetail(userId: string) {
     grantNote: p.grant_note ? String(p.grant_note) : null,
     paidAt: p.paid_at ? String(p.paid_at) : null,
     createdAt: String(p.created_at || ''),
+    rawWebhook: sanitizePaystackPayload(parseJsonSafe(p.raw_webhook, null)),
   }));
 
   return { user, auditLogs, payments };
@@ -1083,6 +1148,7 @@ export async function updateAdminUser(
     action:
       | 'change_tier'
       | 'set_expiry'
+      | 'set_subscription_flags'
       | 'revoke_free'
       | 'extend_trial'
       | 'end_trial'
@@ -1095,6 +1161,9 @@ export async function updateAdminUser(
     customDate?: string | null;
     extendFromCurrent?: boolean;
     clearExpiry?: boolean;
+    pendingTier?: string | null;
+    pendingTierEffectiveAt?: string | null;
+    cancelAtPeriodEnd?: boolean;
     role?: string;
     confirm?: boolean;
     reason?: string;
@@ -1117,6 +1186,9 @@ export async function updateAdminUser(
     updateFields.tier = nextTier;
     if (nextTier === 'free') {
       updateFields.tier_expires_at = null;
+      updateFields.pending_tier = null;
+      updateFields.pending_tier_effective_at = null;
+      updateFields.cancel_at_period_end = false;
     } else if (
       payload.expiryDays !== undefined ||
       payload.customDate !== undefined ||
@@ -1134,16 +1206,56 @@ export async function updateAdminUser(
     if (current.tier === 'free') {
       throw new AdminServiceError('Upgrade the user to Pro or Premium before setting an expiry.', 400);
     }
-    updateFields.tier_expires_at = computeTargetExpiryIso({
+    const nextExpiry = computeTargetExpiryIso({
       expiryDays: payload.expiryDays,
       customDate: payload.customDate,
       extendFrom: payload.extendFromCurrent ? current.tierExpiresAt : null,
       clearExpiry: payload.clearExpiry,
     });
+    updateFields.tier_expires_at = nextExpiry;
+    if (current.pendingTier) {
+      updateFields.pending_tier_effective_at = nextExpiry;
+    }
     auditAction = 'USER_EXPIRY_UPDATED';
+  } else if (payload.action === 'set_subscription_flags') {
+    if (payload.pendingTier !== undefined) {
+      const normalizedPending = payload.pendingTier
+        ? normalizePendingTier(payload.pendingTier)
+        : null;
+      if (payload.pendingTier && !normalizedPending) {
+        throw new AdminServiceError('pendingTier must be pro, premium, or null.', 400);
+      }
+      updateFields.pending_tier = normalizedPending;
+      if (!normalizedPending) {
+        updateFields.pending_tier_effective_at = null;
+      }
+    }
+    if (payload.pendingTierEffectiveAt !== undefined) {
+      if (!payload.pendingTierEffectiveAt) {
+        updateFields.pending_tier_effective_at = null;
+      } else {
+        const parsedMs = Date.parse(payload.pendingTierEffectiveAt);
+        if (!Number.isFinite(parsedMs)) {
+          throw new AdminServiceError('Invalid pendingTierEffectiveAt date.', 400);
+        }
+        updateFields.pending_tier_effective_at = new Date(parsedMs).toISOString();
+      }
+    } else if (updateFields.pending_tier && !current.pendingTierEffectiveAt && current.tierExpiresAt) {
+      updateFields.pending_tier_effective_at = current.tierExpiresAt;
+    }
+    if (payload.cancelAtPeriodEnd !== undefined) {
+      updateFields.cancel_at_period_end = Boolean(payload.cancelAtPeriodEnd);
+    }
+    if (Object.keys(updateFields).length === 0) {
+      throw new AdminServiceError('No subscription lifecycle fields provided.', 400);
+    }
+    auditAction = 'USER_SUBSCRIPTION_UPDATED';
   } else if (payload.action === 'revoke_free') {
     updateFields.tier = 'free';
     updateFields.tier_expires_at = null;
+    updateFields.pending_tier = null;
+    updateFields.pending_tier_effective_at = null;
+    updateFields.cancel_at_period_end = false;
     auditAction = 'USER_TIER_REVOKED';
   } else if (payload.action === 'extend_trial') {
     const days = Number(payload.trialDays ?? payload.expiryDays);
@@ -1157,6 +1269,9 @@ export async function updateAdminUser(
     const nextEndIso = new Date(baseMs + days * 86_400_000).toISOString();
     updateFields.tier = 'free';
     updateFields.tier_expires_at = null;
+    updateFields.pending_tier = null;
+    updateFields.pending_tier_effective_at = null;
+    updateFields.cancel_at_period_end = false;
     updateFields.trial_started_at = current.trialStartedAt || nowIso;
     updateFields.trial_ends_at = nextEndIso;
     note = note || `Extended trial by ${days} day(s)`;
@@ -1165,6 +1280,9 @@ export async function updateAdminUser(
     const pastIso = new Date(Date.now() - 1000).toISOString();
     updateFields.tier = 'free';
     updateFields.tier_expires_at = null;
+    updateFields.pending_tier = null;
+    updateFields.pending_tier_effective_at = null;
+    updateFields.cancel_at_period_end = false;
     updateFields.trial_started_at = current.trialStartedAt || pastIso;
     updateFields.trial_ends_at = pastIso;
     note = note || 'Trial ended immediately by admin';
@@ -1208,6 +1326,9 @@ export async function updateAdminUser(
     role: current.role,
     tier: current.tier,
     tierExpiresAt: current.tierExpiresAt,
+    pendingTier: current.pendingTier,
+    pendingTierEffectiveAt: current.pendingTierEffectiveAt,
+    cancelAtPeriodEnd: current.cancelAtPeriodEnd,
     trialStartedAt: current.trialStartedAt,
     trialEndsAt: current.trialEndsAt,
     accessStatus: current.accessStatus,
@@ -1242,6 +1363,9 @@ export async function updateAdminUser(
     role: updatedDetail.user.role,
     tier: updatedDetail.user.tier,
     tierExpiresAt: updatedDetail.user.tierExpiresAt,
+    pendingTier: updatedDetail.user.pendingTier,
+    pendingTierEffectiveAt: updatedDetail.user.pendingTierEffectiveAt,
+    cancelAtPeriodEnd: updatedDetail.user.cancelAtPeriodEnd,
     trialStartedAt: updatedDetail.user.trialStartedAt,
     trialEndsAt: updatedDetail.user.trialEndsAt,
     accessStatus: updatedDetail.user.accessStatus,
@@ -1462,6 +1586,7 @@ export async function listAdminPayments(options: {
       grantNote: p.grant_note ? String(p.grant_note) : null,
       paidAt: p.paid_at ? String(p.paid_at) : null,
       createdAt: String(p.created_at || ''),
+      rawWebhook: sanitizePaystackPayload(parseJsonSafe(p.raw_webhook, null)),
     }));
     const total = Number(count) || 0;
     return { payments, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
@@ -1513,6 +1638,7 @@ export async function listAdminPayments(options: {
     grantNote: p.grant_note ? String(p.grant_note) : null,
     paidAt: p.paid_at ? String(p.paid_at) : null,
     createdAt: String(p.created_at || ''),
+    rawWebhook: sanitizePaystackPayload(parseJsonSafe(p.raw_webhook, null)),
   }));
 
   return { payments, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
@@ -1665,6 +1791,7 @@ export async function recordManualGrant(
       grantNote,
       paidAt: nowIso,
       createdAt: nowIso,
+      rawWebhook: null,
     } satisfies AdminPaymentRecord,
     auditLog,
   };

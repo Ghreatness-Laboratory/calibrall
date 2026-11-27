@@ -1,8 +1,9 @@
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, ShieldCheck, Activity, Layers } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Activity, Layers, Check } from 'lucide-react';
 import { getServerAuthSession } from '@/lib/supabase/serverAuth';
 import LandingInstallHint from '@/components/pwa/LandingInstallHint';
+import { TIER_RULES, formatMonthlyPrice } from '@/lib/tiers';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +105,66 @@ export default async function LandingPage() {
             </div>
           );
         })}
+      </section>
+
+      {/* Plans preview from single source of truth */}
+      <section className="bg-[var(--surface)] border border-[var(--line)] rounded-[20px] p-5 space-y-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-display text-[17px] font-bold text-[var(--text)]">
+              Monthly plans after your trial
+            </h2>
+            <p className="text-[12.5px] text-[var(--text-2)]">
+              Manual 30-day billing in NGN. No unexpected auto-charges.
+            </p>
+          </div>
+          <Link
+            href="/pricing"
+            className="text-[12.5px] font-semibold text-[var(--accent)] hover:underline inline-flex items-center gap-1"
+          >
+            <span>See plans</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {(['pro', 'premium'] as const).map((tierId) => {
+            const rule = TIER_RULES[tierId];
+            return (
+              <div
+                key={tierId}
+                className="p-4 rounded-[14px] bg-[var(--surface-2)] border border-[var(--line)] flex flex-col justify-between space-y-3"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-display text-[16px] font-bold text-[var(--text)]">
+                      {rule.name}
+                    </span>
+                    <span className="font-display text-[20px] font-bold text-[var(--accent)] tabular-nums">
+                      {formatMonthlyPrice(tierId)}
+                    </span>
+                  </div>
+                  <ul className="space-y-1 text-[12px] text-[var(--text-2)]">
+                    {rule.features.slice(0, 3).map((feat) => (
+                      <li key={feat} className="flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                        <span className="text-[var(--text)]">{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <Link
+                  href={session ? '/pricing' : '/signup'}
+                  className="min-h-[44px] px-4 rounded-[10px] border border-[var(--line)] bg-[var(--surface)] hover:border-[var(--accent)] text-[12.5px] font-semibold text-[var(--text)] flex items-center justify-center gap-1.5 transition-colors touch-press"
+                >
+                  <span>Choose {rule.name}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {/* Responsible use & 18+ notice */}

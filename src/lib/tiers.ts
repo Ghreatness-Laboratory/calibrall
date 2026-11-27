@@ -4,14 +4,17 @@
 export type AccountTierId = 'free' | 'pro' | 'premium';
 
 export const TRIAL_DAYS = 7;
+export const PLAN_PERIOD_DAYS = 30;
+export const MS_PER_DAY = 86_400_000;
 export const FREE_DAILY_SUMMARY_LIMIT = 3;
 
 export interface TierRuleConfig {
   id: AccountTierId;
   name: string;
   badge: string;
-  monthlyPriceUsd: number;
   monthlyPriceNgn: number;
+  amountKobo: number;
+  periodDays: number;
   billingLabel: string;
   dailySummaryLimit: number | null; // null = unlimited
   fullExplanationsEnabled: boolean;
@@ -28,13 +31,19 @@ export interface TierRuleConfig {
 
 export const TIER_ORDER: AccountTierId[] = ['free', 'pro', 'premium'];
 
+export function formatNaira(amountNgn: number): string {
+  const safe = Math.max(0, Math.round(Number(amountNgn) || 0));
+  return `₦${safe.toLocaleString('en-US')}`;
+}
+
 export const TIER_RULES: Record<AccountTierId, TierRuleConfig> = {
   free: {
     id: 'free',
     name: 'Free Trial',
     badge: `${TRIAL_DAYS}-Day Trial`,
-    monthlyPriceUsd: 0,
     monthlyPriceNgn: 0,
+    amountKobo: 0,
+    periodDays: TRIAL_DAYS,
     billingLabel: `${TRIAL_DAYS}-day free trial`,
     dailySummaryLimit: FREE_DAILY_SUMMARY_LIMIT,
     fullExplanationsEnabled: false,
@@ -63,9 +72,10 @@ export const TIER_RULES: Record<AccountTierId, TierRuleConfig> = {
     id: 'pro',
     name: 'Pro',
     badge: 'Extended',
-    monthlyPriceUsd: 19,
-    monthlyPriceNgn: 29000,
-    billingLabel: '$19 per month',
+    monthlyPriceNgn: 500,
+    amountKobo: 50000,
+    periodDays: PLAN_PERIOD_DAYS,
+    billingLabel: `${formatNaira(500)}/month`,
     dailySummaryLimit: null,
     fullExplanationsEnabled: true,
     alternatePicksVisible: 2,
@@ -88,9 +98,10 @@ export const TIER_RULES: Record<AccountTierId, TierRuleConfig> = {
     id: 'premium',
     name: 'Premium',
     badge: 'Full research',
-    monthlyPriceUsd: 49,
-    monthlyPriceNgn: 75000,
-    billingLabel: '$49 per month',
+    monthlyPriceNgn: 2500,
+    amountKobo: 250000,
+    periodDays: PLAN_PERIOD_DAYS,
+    billingLabel: `${formatNaira(2500)}/month`,
     dailySummaryLimit: null,
     fullExplanationsEnabled: true,
     alternatePicksVisible: 2,
@@ -122,14 +133,62 @@ export const ADMIN_OVERRIDE_RULE = {
     'Admin accounts permanently receive Premium access across every page, market, league, and sport with no expiry.',
 };
 
+export function formatMonthlyPrice(tierId: AccountTierId): string {
+  if (tierId === 'free') return TIER_RULES.free.billingLabel;
+  return `${formatNaira(TIER_RULES[tierId].monthlyPriceNgn)}/month`;
+}
+
 export function getDisplayBillingLabel(tierId: AccountTierId): string {
-  if (tierId === 'pro') {
-    return process.env.NEXT_PUBLIC_PRO_PRICE_LABEL?.trim() || TIER_RULES.pro.billingLabel;
+  return formatMonthlyPrice(tierId);
+}
+
+export interface ProToPremiumUpgradeQuote {
+  remainingDays: number;
+  remainingWholeDays: number;
+  basePriceNgn: number;
+  creditNgn: number;
+  chargeNgn: number;
+  chargeKobo: number;
+  newExpiryIso: string;
+}
+
+/**
+ * Computes prorated upgrade charge from active Pro to Premium:
+ * charge = max(0, 2500 - (remaining_days / 30) * 500) rounded to nearest Naira.
+ * New expiry = now + 30 days.
+ */
+export function calculateProToPremiumUpgradeQuote(params: {
+  tierExpiresAt: string | null | undefined;
+  nowMs?: number;
+}): ProToPremiumUpgradeQuote {
+  const nowMs = params.nowMs ?? Date.now();
+  const proPriceNgn = TIER_RULES.pro.monthlyPriceNgn;
+  const premiumPriceNgn = TIER_RULES.premium.monthlyPriceNgn;
+
+  let remainingDays = 0;
+  if (params.tierExpiresAt) {
+    const expMs = Date.parse(params.tierExpiresAt);
+    if (Number.isFinite(expMs) && expMs > nowMs) {
+      const clampedMs = Math.min(PLAN_PERIOD_DAYS * MS_PER_DAY, Math.max(0, expMs - nowMs));
+      remainingDays = clampedMs / MS_PER_DAY;
+    }
   }
-  if (tierId === 'premium') {
-    return process.env.NEXT_PUBLIC_PREMIUM_PRICE_LABEL?.trim() || TIER_RULES.premium.billingLabel;
-  }
-  return TIER_RULES.free.billingLabel;
+
+  const rawCharge = Math.max(0, premiumPriceNgn - (remainingDays / PLAN_PERIOD_DAYS) * proPriceNgn);
+  const chargeNgn = Math.round(rawCharge);
+  const creditNgn = Math.max(0, premiumPriceNgn - chargeNgn);
+  const chargeKobo = chargeNgn * 100;
+  const newExpiryIso = new Date(nowMs + PLAN_PERIOD_DAYS * MS_PER_DAY).toISOString();
+
+  return {
+    remainingDays,
+    remainingWholeDays: Math.ceil(remainingDays),
+    basePriceNgn: premiumPriceNgn,
+    creditNgn,
+    chargeNgn,
+    chargeKobo,
+    newExpiryIso,
+  };
 }
 
 export type TrialBannerTone = 'normal' | 'amber' | 'red';
@@ -191,6 +250,64 @@ export function getTrialBannerState(input: {
     label: '',
     isReminderDay: false,
     reminderStage: null,
+  };
+}
+
+export interface PaidRenewalBannerState {
+  daysLeft: number;
+  showRenewButton: boolean;
+  showRenewalBanner: boolean;
+  tone: TrialBannerTone;
+  label: string;
+}
+
+export function getPaidRenewalBannerState(input: {
+  entitlementStatus?: 'admin' | 'paid' | 'trial' | 'expired';
+  tier?: AccountTierId;
+  tierExpiresAt?: string | null;
+  cancelAtPeriodEnd?: boolean;
+  isAdmin?: boolean;
+  nowMs?: number;
+}): PaidRenewalBannerState {
+  if (
+    input.isAdmin ||
+    input.entitlementStatus !== 'paid' ||
+    !input.tierExpiresAt ||
+    input.cancelAtPeriodEnd
+  ) {
+    return {
+      daysLeft: 0,
+      showRenewButton: false,
+      showRenewalBanner: false,
+      tone: 'normal',
+      label: '',
+    };
+  }
+
+  const nowMs = input.nowMs ?? Date.now();
+  const expMs = Date.parse(input.tierExpiresAt);
+  if (!Number.isFinite(expMs) || expMs <= nowMs) {
+    return {
+      daysLeft: 0,
+      showRenewButton: false,
+      showRenewalBanner: false,
+      tone: 'normal',
+      label: '',
+    };
+  }
+
+  const daysLeft = Math.max(1, Math.ceil((expMs - nowMs) / MS_PER_DAY));
+  const showRenewButton = daysLeft <= 5;
+  const showRenewalBanner = daysLeft <= 3;
+  const planName = input.tier === 'premium' ? TIER_RULES.premium.name : TIER_RULES.pro.name;
+  const dayWord = daysLeft === 1 ? 'day' : 'days';
+
+  return {
+    daysLeft,
+    showRenewButton,
+    showRenewalBanner,
+    tone: daysLeft <= 1 ? 'red' : 'amber',
+    label: `${planName} plan ends in ${daysLeft} ${dayWord}. Renew now to keep access`,
   };
 }
 

@@ -328,6 +328,17 @@ export default function AdminPaymentsSection() {
                   </div>
                 )}
 
+                {p.rawWebhook && (
+                  <details className="text-[11px] text-[var(--text-2)]">
+                    <summary className="cursor-pointer text-[var(--accent)] hover:underline">
+                      Raw webhook (no card data)
+                    </summary>
+                    <pre className="mt-1 p-2 rounded-[6px] bg-[var(--surface)] border border-[var(--border)] overflow-x-auto text-[10.5px] leading-snug">
+                      {JSON.stringify(p.rawWebhook, null, 2)}
+                    </pre>
+                  </details>
+                )}
+
                 {p.userId && (
                   <div className="pt-1 flex justify-end">
                     <Link

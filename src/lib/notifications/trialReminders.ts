@@ -38,7 +38,10 @@ function getEmailProviderConfig(): {
 
 async function claimReminderColumn(
   userId: string,
-  column: 'trial_reminder_5d_sent_at' | 'trial_ended_email_sent_at',
+  column:
+    | 'trial_reminder_5d_sent_at'
+    | 'trial_ended_email_sent_at'
+    | 'renewal_reminder_sent_at',
   nowIso: string
 ): Promise<boolean> {
   const serviceClient = getSupabaseServiceClient();
@@ -149,7 +152,7 @@ export async function maybeSendTrialReminderEmail(
         to: user.email,
         subject: 'Your Calibrall 7-day free trial has ended',
         text: `Your 7-day free trial has ended. Choose Pro or Premium to restore immediate access to Calibrall models: ${pricingUrl}`,
-        html: `<p>Your Calibrall 7-day free trial has ended.</p><p>Choose a Pro or Premium plan to restore access immediately: <a href="${pricingUrl}">${pricingUrl}</a></p>`,
+        html: `<p>Your 7-day free trial has ended.</p><p>Choose a Pro or Premium plan to restore access immediately: <a href="${pricingUrl}">${pricingUrl}</a></p>`,
       });
       return { sent: 'ended' };
     } catch {
@@ -158,4 +161,67 @@ export async function maybeSendTrialReminderEmail(
   }
 
   return { sent: null };
+}
+
+/**
+ * Sends at most one renewal reminder email per billing period when a manual monthly paid plan
+ * has <= 3 days remaining and cancel_at_period_end is false.
+ * Strictly no-ops if no email provider/key is configured.
+ */
+export async function maybeSendPaidRenewalReminderEmail(
+  session: ServerAuthSession
+): Promise<{ sent: boolean }> {
+  const cfg = getEmailProviderConfig();
+  if (!cfg.configured || !session.user.email) {
+    return { sent: false };
+  }
+
+  const { entitlements, profile, user } = session;
+  if (
+    entitlements.status !== 'paid' ||
+    session.isAdmin ||
+    profile.cancelAtPeriodEnd ||
+    profile.renewalReminderSentAt ||
+    !profile.tierExpiresAt
+  ) {
+    return { sent: false };
+  }
+
+  const expMs = Date.parse(profile.tierExpiresAt);
+  const nowMs = Date.now();
+  if (!Number.isFinite(expMs) || expMs <= nowMs) {
+    return { sent: false };
+  }
+
+  const daysLeft = Math.ceil((expMs - nowMs) / 86_400_000);
+  if (daysLeft > 3) {
+    return { sent: false };
+  }
+
+  const claimed = await claimReminderColumn(
+    user.id,
+    'renewal_reminder_sent_at',
+    new Date(nowMs).toISOString()
+  );
+  if (!claimed) {
+    return { sent: false };
+  }
+
+  const planName = session.effectiveTier === 'premium' ? 'Premium' : 'Pro';
+  const dayWord = daysLeft === 1 ? 'day' : 'days';
+  const pricingUrl = `${cfg.appUrl}/pricing?renew=1`;
+
+  try {
+    const ok = await sendResendEmail({
+      apiKey: cfg.apiKey,
+      from: cfg.fromAddress,
+      to: user.email,
+      subject: `Calibrall ${planName}: renews manually in ${daysLeft} ${dayWord}`,
+      text: `Your Calibrall ${planName} plan ends in ${daysLeft} ${dayWord}. Renew manually whenever you are ready to keep uninterrupted access: ${pricingUrl}`,
+      html: `<p>Your Calibrall <strong>${planName}</strong> plan ends in <strong>${daysLeft} ${dayWord}</strong>.</p><p>Since Calibrall uses manual monthly payments, your card will not be charged automatically. Renew here: <a href="${pricingUrl}">${pricingUrl}</a></p>`,
+    });
+    return { sent: ok };
+  } catch {
+    return { sent: false };
+  }
 }

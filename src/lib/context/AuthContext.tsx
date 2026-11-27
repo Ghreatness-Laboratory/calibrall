@@ -18,7 +18,11 @@ export interface AuthUserSummary {
   displayName: string | null;
   role: AccountRole;
   tier: AccountTier;
+  storedTier?: AccountTier;
   tierExpiresAt: string | null;
+  pendingTier?: 'pro' | 'premium' | null;
+  pendingTierEffectiveAt?: string | null;
+  cancelAtPeriodEnd?: boolean;
   isExpired: boolean;
   isAdmin: boolean;
   entitlementStatus: EntitlementStatus;
@@ -71,7 +75,11 @@ export function AuthProvider({
           displayName: json.profile.displayName || null,
           role: json.profile.role === 'admin' ? 'admin' : 'user',
           tier: json.profile.tier || 'free',
+          storedTier: json.profile.storedTier || json.profile.tier || 'free',
           tierExpiresAt: json.profile.tierExpiresAt || null,
+          pendingTier: json.profile.pendingTier || null,
+          pendingTierEffectiveAt: json.profile.pendingTierEffectiveAt || null,
+          cancelAtPeriodEnd: Boolean(json.profile.cancelAtPeriodEnd),
           isExpired: Boolean(json.profile.isExpired),
           isAdmin: Boolean(json.profile.isAdmin),
           entitlementStatus: json.profile.entitlementStatus || (json.profile.isAdmin ? 'admin' : json.profile.isExpired ? 'expired' : 'trial'),

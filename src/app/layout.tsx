@@ -13,7 +13,10 @@ import TopSportBar from '@/components/TopSportBar';
 import { SportProvider } from '@/lib/context/SportContext';
 import { AuthProvider, type AuthUserSummary } from '@/lib/context/AuthContext';
 import { getServerAuthSession, getServerSupabaseConfig } from '@/lib/supabase/serverAuth';
-import { maybeSendTrialReminderEmail } from '@/lib/notifications/trialReminders';
+import {
+  maybeSendPaidRenewalReminderEmail,
+  maybeSendTrialReminderEmail,
+} from '@/lib/notifications/trialReminders';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -78,6 +81,7 @@ export default async function RootLayout({
   const { isAuthConfigured } = getServerSupabaseConfig();
   if (session) {
     void maybeSendTrialReminderEmail(session).catch(() => {});
+    void maybeSendPaidRenewalReminderEmail(session).catch(() => {});
   }
 
   const initialUser: AuthUserSummary | null = session
@@ -87,7 +91,11 @@ export default async function RootLayout({
         displayName: session.profile.displayName,
         role: session.profile.role,
         tier: session.effectiveTier,
+        storedTier: session.profile.storedTier ?? session.profile.tier,
         tierExpiresAt: session.profile.tierExpiresAt,
+        pendingTier: session.profile.pendingTier ?? null,
+        pendingTierEffectiveAt: session.profile.pendingTierEffectiveAt ?? null,
+        cancelAtPeriodEnd: Boolean(session.profile.cancelAtPeriodEnd),
         isExpired: session.isExpired,
         isAdmin: session.isAdmin,
         entitlementStatus: session.entitlements.status,

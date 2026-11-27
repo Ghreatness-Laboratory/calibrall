@@ -39,6 +39,9 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
   const [customExpiryDate, setCustomExpiryDate] = useState('');
   const [extendFromCurrent, setExtendFromCurrent] = useState(true);
   const [trialExtendDays, setTrialExtendDays] = useState<string>('7');
+  const [pendingTierInput, setPendingTierInput] = useState<'' | 'pro' | 'premium'>('');
+  const [pendingEffectiveInput, setPendingEffectiveInput] = useState('');
+  const [cancelAtPeriodEndInput, setCancelAtPeriodEndInput] = useState(false);
   const [noteInput, setNoteInput] = useState('');
 
   // Role confirmation dialog
@@ -59,6 +62,13 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
       if (!res.ok) throw new Error(json?.error || 'Failed to load user details.');
       setTargetUser(json.user);
       setSelectedTier(json.user.tier);
+      setPendingTierInput(json.user.pendingTier || '');
+      setPendingEffectiveInput(
+        json.user.pendingTierEffectiveAt
+          ? new Date(json.user.pendingTierEffectiveAt).toISOString().slice(0, 16)
+          : ''
+      );
+      setCancelAtPeriodEndInput(Boolean(json.user.cancelAtPeriodEnd));
       setAuditLogs(Array.isArray(json.auditLogs) ? json.auditLogs : []);
       setPayments(Array.isArray(json.payments) ? json.payments : []);
     } catch (err: any) {
@@ -259,6 +269,20 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
                 : targetUser.tierExpiresAt
                 ? formatAdminDate(targetUser.tierExpiresAt)
                 : 'No expiry set'}
+            </div>
+          </div>
+          <div className="p-2.5 rounded-[8px] bg-[var(--surface-2)]">
+            <div className="text-[var(--text-3)]">Pending tier switch</div>
+            <div className="text-[var(--text)] font-medium mt-0.5">
+              {targetUser.pendingTier
+                ? `${targetUser.pendingTier.toUpperCase()} (${formatAdminDate(targetUser.pendingTierEffectiveAt)})`
+                : 'None'}
+            </div>
+          </div>
+          <div className="p-2.5 rounded-[8px] bg-[var(--surface-2)]">
+            <div className="text-[var(--text-3)]">Cancel at period end</div>
+            <div className="text-[var(--text)] font-medium mt-0.5">
+              {targetUser.cancelAtPeriodEnd ? 'Yes (stops at expiry)' : 'No'}
             </div>
           </div>
           <div className="p-2.5 rounded-[8px] bg-[var(--surface-2)]">
@@ -472,6 +496,79 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
               </button>
             </div>
           </div>
+
+          <div className="pt-3 border-t border-[var(--border)] space-y-2.5">
+            <div className="text-[12.5px] font-semibold text-[var(--text)]">
+              Subscription lifecycle flags
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] text-[var(--text-2)] mb-1">
+                  Pending tier (pending_tier)
+                </label>
+                <select
+                  aria-label="Pending tier"
+                  value={pendingTierInput}
+                  onChange={(e) =>
+                    setPendingTierInput(
+                      e.target.value === 'pro' || e.target.value === 'premium'
+                        ? e.target.value
+                        : ''
+                    )
+                  }
+                  disabled={submitting || targetUser.role === 'admin'}
+                  className="w-full h-9 px-2.5 rounded-[8px] border border-[var(--border)] bg-[var(--surface-2)] text-[12.5px] text-[var(--text)] disabled:opacity-50"
+                >
+                  <option value="">None</option>
+                  <option value="pro">Pro</option>
+                  <option value="premium">Premium</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] text-[var(--text-2)] mb-1">
+                  Effective at UTC (pending_tier_effective_at)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={pendingEffectiveInput}
+                  onChange={(e) => setPendingEffectiveInput(e.target.value)}
+                  disabled={submitting || targetUser.role === 'admin' || !pendingTierInput}
+                  className="w-full h-9 px-2.5 rounded-[8px] border border-[var(--border)] bg-[var(--surface-2)] text-[12.5px] text-[var(--text)] disabled:opacity-50"
+                />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-[12px] text-[var(--text-2)]">
+              <input
+                type="checkbox"
+                checked={cancelAtPeriodEndInput}
+                disabled={submitting || targetUser.role === 'admin'}
+                onChange={(e) => setCancelAtPeriodEndInput(e.target.checked)}
+              />
+              <span>Stop renewing at period end (cancel_at_period_end)</span>
+            </label>
+            <button
+              type="button"
+              disabled={submitting || targetUser.role === 'admin'}
+              onClick={() =>
+                runMutation(
+                  {
+                    action: 'set_subscription_flags',
+                    pendingTier: pendingTierInput || null,
+                    pendingTierEffectiveAt:
+                      pendingTierInput && pendingEffectiveInput
+                        ? `${pendingEffectiveInput}:00.000Z`
+                        : null,
+                    cancelAtPeriodEnd: cancelAtPeriodEndInput,
+                    note: noteInput.trim() || 'Subscription lifecycle flags updated by admin',
+                  },
+                  'Subscription lifecycle flags saved.'
+                )
+              }
+              className="h-9 px-3.5 rounded-[8px] border border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[12px] font-semibold text-[var(--accent)] disabled:opacity-40"
+            >
+              Save lifecycle flags
+            </button>
+          </div>
         </form>
 
         {/* Role, Suspension & Security Controls */}
@@ -658,6 +755,16 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
                   </div>
                   {p.grantNote && (
                     <div className="text-[11px] text-[var(--text-2)]">Note: {p.grantNote}</div>
+                  )}
+                  {p.rawWebhook && (
+                    <details className="text-[11px] text-[var(--text-2)] pt-1">
+                      <summary className="cursor-pointer text-[var(--accent)] hover:underline">
+                        Raw webhook payload (sanitized)
+                      </summary>
+                      <pre className="mt-1 p-2 rounded-[6px] bg-[var(--surface)] border border-[var(--border)] overflow-x-auto text-[10.5px] leading-snug">
+                        {JSON.stringify(p.rawWebhook, null, 2)}
+                      </pre>
+                    </details>
                   )}
                 </div>
               ))}

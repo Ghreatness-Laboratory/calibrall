@@ -29,7 +29,12 @@ export interface ServerProfileRecord {
   displayName: string | null;
   role: AccountRole;
   tier: AccountTier;
+  storedTier?: AccountTier;
   tierExpiresAt: string | null;
+  pendingTier?: 'pro' | 'premium' | null;
+  pendingTierEffectiveAt?: string | null;
+  cancelAtPeriodEnd?: boolean;
+  renewalReminderSentAt?: string | null;
   trialStartedAt?: string | null;
   trialEndsAt?: string | null;
   trialReminder5dSentAt?: string | null;
@@ -106,6 +111,41 @@ export function normalizeTier(raw: unknown): AccountTier {
   if (v === 'premium') return 'premium';
   if (v === 'pro') return 'pro';
   return 'free';
+}
+
+export function normalizePendingTier(raw: unknown): 'pro' | 'premium' | null {
+  const v = String(raw || '').toLowerCase();
+  if (v === 'pro') return 'pro';
+  if (v === 'premium') return 'premium';
+  return null;
+}
+
+export function evaluateDuePendingTierTransition(
+  input: {
+    role?: unknown;
+    tier?: unknown;
+    tierExpiresAt?: string | null;
+    pendingTier?: unknown;
+    pendingTierEffectiveAt?: string | null;
+  },
+  nowMs: number = Date.now()
+): { due: boolean; nextTier: 'pro' | 'premium' | null } {
+  if (normalizeRole(input.role) === 'admin') {
+    return { due: false, nextTier: null };
+  }
+  const pending = normalizePendingTier(input.pendingTier);
+  if (!pending) {
+    return { due: false, nextTier: null };
+  }
+  const effectiveIso = input.pendingTierEffectiveAt || input.tierExpiresAt;
+  if (!effectiveIso) {
+    return { due: false, nextTier: null };
+  }
+  const effectiveMs = Date.parse(effectiveIso);
+  if (Number.isFinite(effectiveMs) && effectiveMs <= nowMs) {
+    return { due: true, nextTier: pending };
+  }
+  return { due: false, nextTier: null };
 }
 
 /**
@@ -272,13 +312,19 @@ function mapRowToProfile(
   fallbackCreatedAt: string,
   emailConfirmed: boolean
 ): ServerProfileRecord {
+  const storedTier = normalizeTier(data.tier);
   return {
     id: String(data.id),
     email: String(data.email || fallbackEmail),
     displayName: data.display_name ? String(data.display_name) : fallbackDisplayName,
     role: normalizeRole(data.role),
-    tier: normalizeTier(data.tier),
+    tier: storedTier,
+    storedTier,
     tierExpiresAt: data.tier_expires_at ? String(data.tier_expires_at) : null,
+    pendingTier: normalizePendingTier(data.pending_tier),
+    pendingTierEffectiveAt: data.pending_tier_effective_at ? String(data.pending_tier_effective_at) : null,
+    cancelAtPeriodEnd: Boolean(data.cancel_at_period_end === true || data.cancel_at_period_end === 1),
+    renewalReminderSentAt: data.renewal_reminder_sent_at ? String(data.renewal_reminder_sent_at) : null,
     trialStartedAt: data.trial_started_at ? String(data.trial_started_at) : null,
     trialEndsAt: data.trial_ends_at ? String(data.trial_ends_at) : null,
     trialReminder5dSentAt: data.trial_reminder_5d_sent_at ? String(data.trial_reminder_5d_sent_at) : null,
@@ -307,7 +353,12 @@ async function fetchOrProvisionProfile(
     displayName: fallbackDisplayName || email.split('@')[0] || 'Member',
     role: 'user',
     tier: 'free',
+    storedTier: 'free',
     tierExpiresAt: null,
+    pendingTier: null,
+    pendingTierEffectiveAt: null,
+    cancelAtPeriodEnd: false,
+    renewalReminderSentAt: null,
     trialStartedAt: emailConfirmed ? nowIso : null,
     trialEndsAt: emailConfirmed ? defaultTrialEndsIso : null,
     trialReminder5dSentAt: null,
@@ -327,12 +378,17 @@ async function fetchOrProvisionProfile(
   let { data, error } = await serviceClient
     .from('profiles')
     .select(
-      'id, email, display_name, role, tier, tier_expires_at, trial_started_at, trial_ends_at, trial_reminder_5d_sent_at, trial_ended_email_sent_at, suspended, suspended_at, suspended_reason, created_at'
+      'id, email, display_name, role, tier, tier_expires_at, pending_tier, pending_tier_effective_at, cancel_at_period_end, renewal_reminder_sent_at, trial_started_at, trial_ends_at, trial_reminder_5d_sent_at, trial_ended_email_sent_at, suspended, suspended_at, suspended_reason, created_at'
     )
     .eq('id', userId)
     .maybeSingle();
 
-  if (error && /(suspended|trial_started_at|trial_ends_at)/i.test(error.message || '')) {
+  if (
+    error &&
+    /(suspended|trial_started_at|trial_ends_at|pending_tier|cancel_at_period_end|renewal_reminder_sent_at)/i.test(
+      error.message || ''
+    )
+  ) {
     const legacy = await serviceClient
       .from('profiles')
       .select('id, email, display_name, role, tier, tier_expires_at, created_at')
@@ -341,6 +397,10 @@ async function fetchOrProvisionProfile(
     data = legacy.data
       ? {
           ...legacy.data,
+          pending_tier: null,
+          pending_tier_effective_at: null,
+          cancel_at_period_end: false,
+          renewal_reminder_sent_at: null,
           suspended: false,
           suspended_at: null,
           suspended_reason: null,
@@ -354,6 +414,28 @@ async function fetchOrProvisionProfile(
   }
 
   if (!error && data) {
+    // Apply scheduled downgrade automatically if period has ended (no free uncharged days granted)
+    const transition = evaluateDuePendingTierTransition({
+      role: data.role,
+      tier: data.tier,
+      tierExpiresAt: data.tier_expires_at,
+      pendingTier: data.pending_tier,
+      pendingTierEffectiveAt: data.pending_tier_effective_at,
+    });
+    if (transition.due && transition.nextTier) {
+      await serviceClient
+        .from('profiles')
+        .update({
+          tier: transition.nextTier,
+          pending_tier: null,
+          pending_tier_effective_at: null,
+        })
+        .eq('id', userId);
+      data.tier = transition.nextTier;
+      data.pending_tier = null;
+      data.pending_tier_effective_at = null;
+    }
+
     // Start trial strictly once upon email confirmation if not yet initialized
     if (
       emailConfirmed &&
@@ -374,7 +456,7 @@ async function fetchOrProvisionProfile(
         .is('trial_started_at', null)
         .is('trial_ends_at', null)
         .select(
-          'id, email, display_name, role, tier, tier_expires_at, trial_started_at, trial_ends_at, trial_reminder_5d_sent_at, trial_ended_email_sent_at, suspended, suspended_at, suspended_reason, created_at'
+          'id, email, display_name, role, tier, tier_expires_at, pending_tier, pending_tier_effective_at, cancel_at_period_end, renewal_reminder_sent_at, trial_started_at, trial_ends_at, trial_reminder_5d_sent_at, trial_ended_email_sent_at, suspended, suspended_at, suspended_reason, created_at'
         )
         .maybeSingle();
       if (updatedRow) {
@@ -411,7 +493,7 @@ async function fetchOrProvisionProfile(
       { onConflict: 'id' }
     )
     .select(
-      'id, email, display_name, role, tier, tier_expires_at, trial_started_at, trial_ends_at, trial_reminder_5d_sent_at, trial_ended_email_sent_at, created_at'
+      'id, email, display_name, role, tier, tier_expires_at, pending_tier, pending_tier_effective_at, cancel_at_period_end, renewal_reminder_sent_at, trial_started_at, trial_ends_at, trial_reminder_5d_sent_at, trial_ended_email_sent_at, created_at'
     )
     .maybeSingle();
 
@@ -443,9 +525,21 @@ export function buildServerAuthSessionFromUserAndProfile(
     ? Boolean(user.email_confirmed_at || user.confirmed_at)
     : profile.emailConfirmed !== false;
 
-  const entitlements = getEntitlements({
+  const transition = evaluateDuePendingTierTransition({
     role: profile.role,
     tier: profile.tier,
+    tierExpiresAt: profile.tierExpiresAt,
+    pendingTier: profile.pendingTier,
+    pendingTierEffectiveAt: profile.pendingTierEffectiveAt,
+  });
+
+  const effectiveStoredTier = transition.due && transition.nextTier ? transition.nextTier : profile.tier;
+  const effectivePendingTier = transition.due ? null : profile.pendingTier ?? null;
+  const effectivePendingAt = transition.due ? null : profile.pendingTierEffectiveAt ?? null;
+
+  const entitlements = getEntitlements({
+    role: profile.role,
+    tier: effectiveStoredTier,
     tierExpiresAt: profile.tierExpiresAt,
     trialStartedAt: profile.trialStartedAt ?? null,
     trialEndsAt: profile.trialEndsAt ?? null,
@@ -460,6 +554,10 @@ export function buildServerAuthSessionFromUserAndProfile(
     },
     profile: {
       ...profile,
+      storedTier: effectiveStoredTier,
+      pendingTier: effectivePendingTier,
+      pendingTierEffectiveAt: effectivePendingAt,
+      cancelAtPeriodEnd: Boolean(profile.cancelAtPeriodEnd),
       tier: entitlements.effectiveTier,
       emailConfirmed,
     },

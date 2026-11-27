@@ -11,6 +11,9 @@ export interface AdminUserItem {
   role: 'user' | 'admin';
   tier: 'free' | 'pro' | 'premium';
   tierExpiresAt: string | null;
+  pendingTier?: 'pro' | 'premium' | null;
+  pendingTierEffectiveAt?: string | null;
+  cancelAtPeriodEnd?: boolean;
   trialStartedAt: string | null;
   trialEndsAt: string | null;
   trialDaysRemaining: number;
@@ -51,6 +54,7 @@ export interface AdminPaymentItem {
   grantNote: string | null;
   paidAt: string | null;
   createdAt: string;
+  rawWebhook?: Record<string, any> | null;
 }
 
 export interface AdminPickItem {

@@ -21,9 +21,18 @@ import {
   Lock,
   Loader2,
   Calendar,
-  ArrowRight,
+  Receipt,
+  CreditCard,
 } from 'lucide-react';
 import AccountInstallRow from '@/components/pwa/AccountInstallRow';
+import ChangePlanSheet from '@/components/ChangePlanSheet';
+import {
+  TIER_RULES,
+  formatMonthlyPrice,
+  formatNaira,
+  getPaidRenewalBannerState,
+} from '@/lib/tiers';
+import type { UserPaymentReceipt } from '@/lib/payments/paystackService';
 
 function formatPlanDate(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -42,8 +51,8 @@ function getAccountPlanStatusDisplay(
 ): { badge: string; detail: string; isExpired: boolean } {
   if (isAdmin || user?.entitlementStatus === 'admin') {
     return {
-      badge: 'Admin (Full access)',
-      detail: 'Admin access — Never expires',
+      badge: 'Admin: full access',
+      detail: 'Admin: full access — Never expires',
       isExpired: false,
     };
   }
@@ -57,11 +66,15 @@ function getAccountPlanStatusDisplay(
   }
 
   if (user.entitlementStatus === 'paid') {
-    const planName = user.tier === 'premium' ? 'Premium' : 'Pro';
+    const planName = (user.storedTier ?? user.tier) === 'premium' ? TIER_RULES.premium.name : TIER_RULES.pro.name;
     const untilDate = formatPlanDate(user.tierExpiresAt);
     return {
       badge: planName,
-      detail: untilDate ? `${planName} until ${untilDate}` : `${planName} (Active)`,
+      detail: untilDate
+        ? user.cancelAtPeriodEnd
+          ? `${planName} active until ${untilDate} (not renewing)`
+          : `${planName} until ${untilDate}`
+        : `${planName} (Active)`,
       isExpired: false,
     };
   }
@@ -104,6 +117,31 @@ export default function AccountSettingsView() {
   const [deleteError, setDeleteError] = useState<string>('');
   const [signingOut, setSigningOut] = useState(false);
 
+  const [changePlanOpen, setChangePlanOpen] = useState(false);
+  const [planActionBusy, setPlanActionBusy] = useState<string | null>(null);
+  const [planNotice, setPlanNotice] = useState<string | null>(null);
+  const [payments, setPayments] = useState<UserPaymentReceipt[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+
+  const loadPlanHistory = React.useCallback(async () => {
+    if (!user || isAdmin) {
+      setPayments([]);
+      return;
+    }
+    setPaymentsLoading(true);
+    try {
+      const res = await fetch('/api/account/plan', { cache: 'no-store' });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(json.payments)) {
+        setPayments(json.payments as UserPaymentReceipt[]);
+      }
+    } catch {
+      // silent fallback
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, [user, isAdmin]);
+
   useEffect(() => {
     setPrefs(getStoredPreferences());
     try {
@@ -115,8 +153,9 @@ export default function AccountSettingsView() {
   useEffect(() => {
     if (user) {
       setDisplayName(user.displayName || '');
+      void loadPlanHistory();
     }
-  }, [user]);
+  }, [user, loadPlanHistory]);
 
   const handleToggleMonochrome = (enabled: boolean) => {
     setIsMonochrome(enabled);
@@ -216,6 +255,62 @@ export default function AccountSettingsView() {
 
   const planStatus = getAccountPlanStatusDisplay(user, isAdmin);
   const initialLetter = (user?.displayName || user?.email || 'U').trim().charAt(0).toUpperCase();
+  const isPaidUser = !isAdmin && user?.entitlementStatus === 'paid';
+  const paidRenewal = getPaidRenewalBannerState({
+    entitlementStatus: user?.entitlementStatus,
+    tier: user?.tier,
+    tierExpiresAt: user?.tierExpiresAt,
+    cancelAtPeriodEnd: user?.cancelAtPeriodEnd,
+    isAdmin,
+  });
+  const pendingDateStr = formatPlanDate(user?.pendingTierEffectiveAt || user?.tierExpiresAt);
+  const expiryDateStr = formatPlanDate(user?.tierExpiresAt);
+
+  const handlePlanMutation = async (
+    action: 'cancel_pending_downgrade' | 'resume_renewal',
+    successMessage: string
+  ) => {
+    setPlanActionBusy(action);
+    setPlanNotice(null);
+    try {
+      const res = await fetch('/api/account/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        await refreshProfile();
+        await loadPlanHistory();
+        setPlanNotice(successMessage);
+      }
+    } finally {
+      setPlanActionBusy(null);
+    }
+  };
+
+  const handleQuickRenew = async () => {
+    if (!user || isAdmin) return;
+    const targetPlan = (user.storedTier ?? user.tier) === 'premium' ? 'premium' : 'pro';
+    setPlanActionBusy('renew_now');
+    setPlanNotice(null);
+    try {
+      const res = await fetch('/api/payments/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: targetPlan }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.authorizationUrl) {
+        window.location.href = String(json.authorizationUrl);
+        return;
+      }
+      setPlanNotice(json?.error || 'Could not start renewal checkout.');
+    } catch {
+      setPlanNotice('Unable to reach Paystack right now.');
+    } finally {
+      setPlanActionBusy(null);
+    }
+  };
 
   return (
     <div className="max-w-xl mx-auto space-y-4 py-1">
@@ -224,7 +319,7 @@ export default function AccountSettingsView() {
           Account &amp; preferences
         </h1>
         <p className="text-[12.5px] text-[var(--text-2)] leading-[1.5]">
-          Manage your account details, plan status, upgrades, and preferences.
+          Manage your account details, plan status, renewals, and preferences.
         </p>
       </div>
 
@@ -257,19 +352,93 @@ export default function AccountSettingsView() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] bg-[var(--surface-2)] border border-[var(--line)] rounded-[12px] px-3 py-2.5">
-          <div className="flex items-center gap-2 text-[var(--text)] font-medium">
-            <Calendar className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
-            <span>{planStatus.detail}</span>
+        <div className="space-y-2.5 bg-[var(--surface-2)] border border-[var(--line)] rounded-[14px] p-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-[12.5px]">
+            <div className="flex items-center gap-2 text-[var(--text)] font-medium">
+              <Calendar className="w-4 h-4 text-[var(--accent)] shrink-0" />
+              <span>{planStatus.detail}</span>
+            </div>
+
+            {!isAdmin && (
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {paidRenewal.showRenewButton && (
+                  <button
+                    type="button"
+                    disabled={Boolean(planActionBusy)}
+                    onClick={handleQuickRenew}
+                    className="min-h-[44px] px-4 rounded-[10px] bg-[var(--accent-fill)] text-[var(--accent-ink)] text-[12.5px] font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 touch-press"
+                  >
+                    {planActionBusy === 'renew_now' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-3.5 h-3.5" />
+                    )}
+                    <span>Renew now</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setChangePlanOpen(true)}
+                  className={`min-h-[44px] px-4 rounded-[10px] text-[12.5px] font-bold inline-flex items-center justify-center gap-1.5 touch-press ${
+                    paidRenewal.showRenewButton
+                      ? 'border border-[var(--line)] bg-[var(--surface)] text-[var(--text)]'
+                      : 'bg-[var(--accent-fill)] text-[var(--accent-ink)]'
+                  }`}
+                >
+                  <span>{isPaidUser ? 'Change plan' : 'Choose a plan'}</span>
+                </button>
+              </div>
+            )}
           </div>
+
+          {!isAdmin && isPaidUser && user?.pendingTier === 'pro' && (
+            <div className="pt-2 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]">
+              <span className="text-[var(--medium)] font-medium">
+                Switches to Pro on {pendingDateStr || 'period end'}
+              </span>
+              <button
+                type="button"
+                disabled={Boolean(planActionBusy)}
+                onClick={() =>
+                  handlePlanMutation('cancel_pending_downgrade', 'Scheduled switch to Pro cancelled.')
+                }
+                className="min-h-[44px] px-3 rounded-[10px] border border-[var(--line)] bg-[var(--surface)] text-[12px] font-semibold text-[var(--text)] touch-press"
+              >
+                Cancel pending switch
+              </button>
+            </div>
+          )}
+
+          {!isAdmin && isPaidUser && user?.cancelAtPeriodEnd && (
+            <div className="pt-2 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]">
+              <span className="text-[var(--medium)] font-medium">
+                Renewal stopped. Plan ends on {expiryDateStr || 'expiry'} and moves to expired.
+              </span>
+              <button
+                type="button"
+                disabled={Boolean(planActionBusy)}
+                onClick={() => handlePlanMutation('resume_renewal', 'Plan resumed.')}
+                className="min-h-[44px] px-4 rounded-[10px] bg-[var(--accent-soft)] border border-[var(--accent)] text-[12px] font-bold text-[var(--accent)] touch-press"
+              >
+                Resume
+              </button>
+            </div>
+          )}
+
           {!isAdmin && (
-            <Link
-              href={planStatus.isExpired ? '/pricing?reason=trial_ended' : '/pricing'}
-              className="px-3 py-1 rounded-[8px] bg-[var(--accent-fill)] text-[var(--accent-ink)] text-[11.5px] font-bold inline-flex items-center gap-1"
-            >
-              <span>{user?.entitlementStatus === 'paid' ? 'Change plan' : 'Upgrade'}</span>
-              <ArrowRight className="w-3 h-3" />
-            </Link>
+            <div className="pt-2 border-t border-[var(--line)] flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-[var(--text-2)]">
+              <span>
+                Pro: <strong className="text-[var(--text)]">{formatMonthlyPrice('pro')}</strong> · Premium:{' '}
+                <strong className="text-[var(--text)]">{formatMonthlyPrice('premium')}</strong>
+              </span>
+              <Link href="/pricing" className="text-[var(--accent)] font-semibold hover:underline">
+                Compare plans
+              </Link>
+            </div>
+          )}
+
+          {planNotice && (
+            <div className="text-[12px] text-[var(--accent)] font-medium">{planNotice}</div>
           )}
         </div>
 
@@ -458,6 +627,75 @@ export default function AccountSettingsView() {
         </form>
       )}
 
+      {/* Payment History Receipts */}
+      {!isAdmin && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[12px] font-medium text-[var(--text-2)]">
+              Payment history
+            </span>
+          </div>
+          <div className="border border-[var(--line)] bg-[var(--surface)] rounded-[18px] p-4 space-y-2.5">
+            {paymentsLoading && payments.length === 0 ? (
+              <div className="text-[12px] text-[var(--text-2)] flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--accent)]" />
+                <span>Loading receipts...</span>
+              </div>
+            ) : payments.length === 0 ? (
+              <div className="text-[12px] text-[var(--text-2)] flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-[var(--text-3)] shrink-0" />
+                <span>No payment receipts recorded yet.</span>
+              </div>
+            ) : (
+              <div className="divide-y divide-[var(--line)]">
+                {payments.map((receipt) => {
+                  const dateLabel = formatPlanDate(receipt.paidAt || receipt.createdAt) || 'Pending';
+                  const amountLabel = receipt.isManualGrant
+                    ? 'Manual grant'
+                    : formatNaira(receipt.amountKobo / 100);
+                  const isOk = receipt.status === 'success' || receipt.isManualGrant;
+                  return (
+                    <div
+                      key={receipt.id}
+                      className="py-2.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]"
+                    >
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-[var(--text)] capitalize">
+                            {receipt.plan}
+                          </span>
+                          <span className="text-[var(--text-3)]">·</span>
+                          <span className="text-[var(--text-2)]">{dateLabel}</span>
+                        </div>
+                        <div className="text-[11px] font-mono text-[var(--text-3)] truncate">
+                          {receipt.reference}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
+                        <span className="font-display font-bold text-[var(--text)] tabular-nums">
+                          {amountLabel}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold uppercase ${
+                            isOk
+                              ? 'bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30'
+                              : receipt.status === 'pending'
+                              ? 'bg-[var(--medium-soft)] text-[var(--medium)] border border-[var(--medium)]/30'
+                              : 'bg-[var(--danger-soft)] text-[var(--danger)] border border-[var(--danger)]/30'
+                          }`}
+                        >
+                          {receipt.isManualGrant ? 'grant' : receipt.status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Governance & Legal */}
       <div className="space-y-1.5">
         <div className="text-[12px] font-medium text-[var(--text-2)] px-1">
@@ -519,7 +757,7 @@ export default function AccountSettingsView() {
               setDeleteOpen(!deleteOpen);
               setDeleteError('');
             }}
-            className="min-h-[40px] px-3 rounded-[10px] border border-[var(--danger)]/40 text-[12px] font-semibold text-[var(--danger)] hover:bg-[var(--danger-soft)] shrink-0 touch-press"
+            className="min-h-[44px] px-3 rounded-[10px] border border-[var(--danger)]/40 text-[12px] font-semibold text-[var(--danger)] hover:bg-[var(--danger-soft)] shrink-0 touch-press"
           >
             {deleteOpen ? 'Cancel' : 'Delete account'}
           </button>
@@ -551,6 +789,15 @@ export default function AccountSettingsView() {
           </form>
         )}
       </div>
+
+      <ChangePlanSheet
+        open={changePlanOpen}
+        onClose={() => setChangePlanOpen(false)}
+        onPlanUpdated={async () => {
+          await refreshProfile();
+          await loadPlanHistory();
+        }}
+      />
     </div>
   );
 }

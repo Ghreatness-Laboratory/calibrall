@@ -6,7 +6,10 @@ import {
   getServerSupabaseConfig,
   getSupabaseServiceClient,
 } from '@/lib/supabase/serverAuth';
-import { maybeSendTrialReminderEmail } from '@/lib/notifications/trialReminders';
+import {
+  maybeSendPaidRenewalReminderEmail,
+  maybeSendTrialReminderEmail,
+} from '@/lib/notifications/trialReminders';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -20,8 +23,9 @@ export async function GET(request: Request) {
     );
   }
 
-  // Non-blocking optional reminder email (only sends if email provider is configured)
+  // Non-blocking optional reminder emails (only sends if email provider is configured)
   void maybeSendTrialReminderEmail(session).catch(() => {});
+  void maybeSendPaidRenewalReminderEmail(session).catch(() => {});
 
   return NextResponse.json(
     {
@@ -29,6 +33,10 @@ export async function GET(request: Request) {
       profile: {
         ...session.profile,
         tier: session.effectiveTier,
+        storedTier: session.profile.storedTier ?? session.profile.tier,
+        pendingTier: session.profile.pendingTier ?? null,
+        pendingTierEffectiveAt: session.profile.pendingTierEffectiveAt ?? null,
+        cancelAtPeriodEnd: Boolean(session.profile.cancelAtPeriodEnd),
         isAdmin: session.isAdmin,
         isExpired: session.isExpired,
         entitlementStatus: session.entitlements.status,
@@ -99,7 +107,11 @@ export async function PATCH(request: Request) {
         displayName: data.display_name,
         role: session.profile.role,
         tier: session.effectiveTier,
+        storedTier: session.profile.storedTier ?? session.profile.tier,
         tierExpiresAt: session.profile.tierExpiresAt,
+        pendingTier: session.profile.pendingTier ?? null,
+        pendingTierEffectiveAt: session.profile.pendingTierEffectiveAt ?? null,
+        cancelAtPeriodEnd: Boolean(session.profile.cancelAtPeriodEnd),
         isAdmin: session.isAdmin,
         isExpired: session.isExpired,
         entitlementStatus: session.entitlements.status,

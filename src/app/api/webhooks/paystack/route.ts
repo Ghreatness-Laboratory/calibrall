@@ -1,9 +1,10 @@
-import crypto from 'node:crypto';
 import { NextResponse } from 'next/server';
 import {
   applyPaystackPaymentRecord,
   resolvePaystackSecretKey,
+  verifyPaystackWebhookSignature,
 } from '@/lib/payments/paystackService';
+import { PLAN_PERIOD_DAYS } from '@/lib/tiers';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -19,19 +20,9 @@ export async function POST(request: Request) {
 
   const rawBody = await request.text();
   const signature = request.headers.get('x-paystack-signature') || '';
-  if (!signature) {
+  if (!verifyPaystackWebhookSignature(rawBody, signature, secret)) {
     return NextResponse.json(
-      { error: 'Missing Paystack signature header.' },
-      { status: 401, headers: { 'Cache-Control': 'no-store, max-age=0' } }
-    );
-  }
-
-  const expectedHash = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
-  const sigBuf = Buffer.from(signature, 'utf8');
-  const expBuf = Buffer.from(expectedHash, 'utf8');
-  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
-    return NextResponse.json(
-      { error: 'Invalid Paystack webhook signature.' },
+      { error: 'Invalid or missing Paystack webhook signature.' },
       { status: 401, headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );
   }
@@ -43,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload.' }, { status: 400 });
   }
 
-  const event = String(payload?.event || '');
+  const event = String(payload?.event || '').toLowerCase();
   const data = payload?.data || {};
   const reference = String(data?.reference || '').trim();
   if (!reference) {
@@ -51,7 +42,11 @@ export async function POST(request: Request) {
   }
 
   const status =
-    event === 'charge.success' ? 'success' : String(data?.status || event || 'pending');
+    event === 'charge.success'
+      ? 'success'
+      : event === 'charge.failed'
+      ? 'failed'
+      : String(data?.status || event || 'pending').toLowerCase();
 
   try {
     const result = await applyPaystackPaymentRecord({
@@ -64,11 +59,19 @@ export async function POST(request: Request) {
       status,
       channel: data?.channel ? String(data.channel) : 'paystack',
       paidAt: data?.paid_at ? String(data.paid_at) : null,
-      durationDays: Number(data?.metadata?.duration_days || 30),
-      metadata: payload,
+      durationDays: Number(data?.metadata?.duration_days || PLAN_PERIOD_DAYS),
+      metadata: data?.metadata || {},
+      rawWebhook: payload,
     });
 
-    return NextResponse.json({ received: true, reference, status: result.status, applied: result.applied });
+    return NextResponse.json({
+      received: true,
+      reference,
+      status: result.status,
+      applied: result.applied,
+      alreadyProcessed: result.alreadyProcessed,
+      tierExpiresAt: result.tierExpiresAt,
+    });
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message || 'Failed to persist Paystack webhook event.' },
