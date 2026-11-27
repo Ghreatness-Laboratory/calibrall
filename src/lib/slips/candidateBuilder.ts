@@ -452,6 +452,8 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
   const globalTeamNewsEnabled = isTeamNewsEnabled();
 
   const candidates: SlipCandidateLeg[] = [];
+  const realPricedMatchIds = new Set<string>();
+  const modelFairMatchIds = new Set<string>();
   const diagnostics: SlipBuildDiagnostics = {
     fixturesScanned: 0,
     upcomingFixtures: 0,
@@ -463,6 +465,8 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
     rejectedFlaggedExplanations: 0,
     rejectedAbstainedOrThin: 0,
     searchDurationMs: 0,
+    realPricedMatches: 0,
+    modelFairAvailableMatches: 0,
   };
 
   // 1. Evaluate Football entries
@@ -560,6 +564,11 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
           nowMs,
           maxPriceAgeMinutes,
         });
+
+        if (freshQuotes.length > 0) {
+          realPricedMatchIds.add(fixture.id);
+        }
+        modelFairMatchIds.add(fixture.id);
 
         if (hadStaleOnly) {
           diagnostics.rejectedStalePrices++;
@@ -761,6 +770,11 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
           maxPriceAgeMinutes,
         });
 
+        if (freshQuotes.length > 0) {
+          realPricedMatchIds.add(fixture.id);
+        }
+        modelFairMatchIds.add(fixture.id);
+
         if (hadStaleOnly) {
           diagnostics.rejectedStalePrices++;
         }
@@ -889,6 +903,8 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
   }
 
   diagnostics.candidateLegs = candidates.length;
+  diagnostics.realPricedMatches = realPricedMatchIds.size;
+  diagnostics.modelFairAvailableMatches = modelFairMatchIds.size;
   return { candidates, diagnostics };
 }
 

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireApiUser } from '@/lib/supabase/serverAuth';
 import { getSlipBuilderTierPolicy, SLIP_BUILDER_GLOBAL_BOUNDS, SlipBuildStyle } from '@/lib/tiers';
 import { loadAndBuildSlipCandidates } from '@/lib/slips/candidateBuilder';
-import { searchSlips } from '@/lib/slips/slipSearch';
+import { searchSlipsWithStats } from '@/lib/slips/slipSearch';
 import { getSlipBuildUsageToday, incrementSlipBuildUsageToday } from '@/lib/slips/storage';
 import type {
   SlipBuildRequest,
@@ -162,9 +162,6 @@ export async function POST(request: Request) {
     maxPriceAgeMinutes,
   };
 
-  // Increment usage server-side once validated
-  const buildsUsedToday = await incrementSlipBuildUsageToday(auth.session.user.id, dateIso);
-
   const t0 = Date.now();
   const nowIso = new Date().toISOString();
   const buildOut = await loadAndBuildSlipCandidates({
@@ -177,22 +174,72 @@ export async function POST(request: Request) {
     maxPriceAgeMinutes,
   });
 
-  const slips = searchSlips(buildOut.candidates, {
+  const searchOut = searchSlipsWithStats(buildOut.candidates, {
     targetOdds: normalizedRequest.targetOdds,
     maxLegs: normalizedRequest.maxLegs,
     style: normalizedRequest.style,
     maxResults: 3,
     nowIso,
   });
+  const slips = searchOut.slips;
+
+  const buildsUsedToday =
+    slips.length > 0
+      ? await incrementSlipBuildUsageToday(auth.session.user.id, dateIso)
+      : buildsUsedBefore;
 
   buildOut.diagnostics.searchDurationMs = Date.now() - t0;
+  buildOut.diagnostics.combinationsInBand = searchOut.combinationsInBand;
 
-  const emptyMessage =
-    slips.length === 0
-      ? `No combination reaches ${normalizedRequest.targetOdds.toFixed(
-          1
-        )} odds with enough confidence today. Try fewer odds, more leagues or the next day.`
-      : null;
+  const dayLabel = normalizedRequest.day === 'tomorrow' ? 'tomorrow' : 'today';
+  const upcomingCount = buildOut.diagnostics.upcomingFixtures;
+  const realPricedMatches = buildOut.diagnostics.realPricedMatches ?? 0;
+  const modelFairMatches = buildOut.diagnostics.modelFairAvailableMatches ?? 0;
+  const qualifiedMatches = buildOut.diagnostics.qualifiedMatches;
+  const canSuggestModelFair =
+    slips.length === 0 &&
+    normalizedRequest.oddsBasis === 'real' &&
+    modelFairMatches >= 2;
+
+  let emptyReasonCode: NonNullable<SlipBuildResponse['diagnostics']['emptyReasonCode']> | null = null;
+  let emptyMessage: string | null = null;
+
+  if (slips.length === 0) {
+    if (upcomingCount === 0) {
+      emptyReasonCode = 'NO_UPCOMING_GAMES';
+      emptyMessage = `0 upcoming games matched your filters for ${dayLabel}. Try switching to ${
+        normalizedRequest.day === 'today' ? 'Tomorrow' : 'Today'
+      }, Both sports, or clearing league filters.`;
+    } else if (normalizedRequest.oddsBasis === 'real' && realPricedMatches === 0) {
+      emptyReasonCode = 'NO_REAL_PRICES';
+      const staleNote =
+        buildOut.diagnostics.rejectedStalePrices > 0
+          ? ` (${buildOut.diagnostics.rejectedStalePrices} stale prices rejected)`
+          : '';
+      emptyMessage = `0 of ${upcomingCount} games have a stored real bookmaker price ${dayLabel}${staleNote}.${
+        canSuggestModelFair
+          ? ` ${modelFairMatches} qualified games are available with model fair odds.`
+          : ''
+      }`;
+    } else if (qualifiedMatches === 0) {
+      emptyReasonCode = 'NO_QUALIFIED_MATCHES';
+      emptyMessage = `0 of ${upcomingCount} upcoming games passed pre match quality gates ${dayLabel} (${buildOut.diagnostics.rejectedAbstainedOrThin} abstained or had thin sample coverage).`;
+    } else {
+      emptyReasonCode = 'NO_COMBINATIONS_IN_BAND';
+      const pricedCount =
+        normalizedRequest.oddsBasis === 'real' ? realPricedMatches : qualifiedMatches;
+      const pricedLabel =
+        normalizedRequest.oddsBasis === 'real' ? 'Games priced' : 'Games qualified';
+      emptyMessage = `${pricedLabel}: ${pricedCount}, combinations within ${normalizedRequest.targetOdds.toFixed(
+        1
+      )} \u00b1 8%: ${searchOut.combinationsInBand}. Try adjusting target odds, increasing max legs in Options, or switching to ${
+        normalizedRequest.day === 'today' ? 'Tomorrow' : 'Today'
+      }.`;
+    }
+  }
+
+  buildOut.diagnostics.emptyReasonCode = emptyReasonCode;
+  buildOut.diagnostics.canSuggestModelFair = canSuggestModelFair;
 
   const responsePayload: SlipBuildResponse = {
     slips,

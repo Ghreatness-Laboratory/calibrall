@@ -114,6 +114,12 @@ export interface SlipBuildRequest {
   maxPriceAgeMinutes?: number;
 }
 
+export type SlipEmptyReasonCode =
+  | 'NO_UPCOMING_GAMES'
+  | 'NO_QUALIFIED_MATCHES'
+  | 'NO_REAL_PRICES'
+  | 'NO_COMBINATIONS_IN_BAND';
+
 export interface SlipBuildDiagnostics {
   fixturesScanned: number;
   upcomingFixtures: number;
@@ -125,6 +131,11 @@ export interface SlipBuildDiagnostics {
   rejectedFlaggedExplanations: number;
   rejectedAbstainedOrThin: number;
   searchDurationMs: number;
+  realPricedMatches?: number;
+  modelFairAvailableMatches?: number;
+  combinationsInBand?: number;
+  emptyReasonCode?: SlipEmptyReasonCode | null;
+  canSuggestModelFair?: boolean;
 }
 
 export interface SlipBuildResponse {

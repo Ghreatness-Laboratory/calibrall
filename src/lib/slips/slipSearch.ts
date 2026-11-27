@@ -191,10 +191,22 @@ function buildSlipObject(
  * Pure deterministic Slip Builder combinatorial search.
  * Allocation-light layered beam search optimized for 200+ game slates (<50ms).
  */
+export interface SlipSearchResultWithStats {
+  slips: BuiltSlip[];
+  combinationsInBand: number;
+}
+
 export function searchSlips(
   rawCandidates: SlipCandidateLeg[],
   options: SlipSearchOptions
 ): BuiltSlip[] {
+  return searchSlipsWithStats(rawCandidates, options).slips;
+}
+
+export function searchSlipsWithStats(
+  rawCandidates: SlipCandidateLeg[],
+  options: SlipSearchOptions
+): SlipSearchResultWithStats {
   const targetOdds = Math.max(
     SLIP_BUILDER_GLOBAL_BOUNDS.minTargetOdds,
     Math.min(SLIP_BUILDER_GLOBAL_BOUNDS.maxTargetOdds, Number(options.targetOdds) || 2.0)
@@ -222,7 +234,7 @@ export function searchSlips(
       c.calibratedProbability <= 1
   );
 
-  if (validCandidates.length < 2) return [];
+  if (validCandidates.length < 2) return { slips: [], combinationsInBand: 0 };
 
   const byMatch = new Map<string, SlipCandidateLeg[]>();
   for (let i = 0; i < validCandidates.length; i++) {
@@ -367,7 +379,7 @@ export function searchSlips(
     }
   }
 
-  if (completedStates.length === 0) return [];
+  if (completedStates.length === 0) return { slips: [], combinationsInBand: 0 };
 
   completedStates.sort((a, b) => {
     if (Math.abs(b.score - a.score) > 1e-6) return b.score - a.score;
@@ -391,5 +403,8 @@ export function searchSlips(
     results.push(buildSlipObject(entry.state.legs, results.length + 1, targetOdds, style, nowIso));
   }
 
-  return results;
+  return {
+    slips: results,
+    combinationsInBand: completedStates.length,
+  };
 }
