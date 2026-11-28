@@ -98,6 +98,11 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
             <span>Statistical evidence audit</span>
           </span>
           <div className="flex items-center gap-1.5 flex-wrap">
+            {prediction.marketScope && (
+              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)]">
+                {cleanDisplayText(prediction.marketScope)}
+              </span>
+            )}
             {confidenceTier && (
               <span
                 className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${

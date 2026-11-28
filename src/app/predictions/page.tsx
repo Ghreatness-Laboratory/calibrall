@@ -887,7 +887,7 @@ export default function PredictionsPage() {
                           >
                             <div className="flex items-center justify-between text-[11px] gap-1">
                               <span className="text-[var(--text-2)] text-[11px] truncate">
-                                {BB_CATEGORY_LABELS[p.marketCategory]}
+                                {cleanDisplayText(p.marketScope || BB_CATEGORY_LABELS[p.marketCategory])}
                               </span>
                               <span
                                 className={`text-[10.5px] px-2.5 py-0.5 rounded-full border font-semibold shrink-0 ${badge.badgeClass}`}
@@ -1027,7 +1027,7 @@ export default function PredictionsPage() {
                       >
                         <div className="flex items-center justify-between text-[11px] gap-1">
                           <span className="text-[var(--text-2)] text-[11px] truncate">
-                            {getOptionTypeLabel(p.optionType)}
+                            {cleanDisplayText(p.marketScope || getOptionTypeLabel(p.optionType))}
                           </span>
                           <span
                             className={`text-[10.5px] px-2.5 py-0.5 rounded-full border font-semibold shrink-0 ${badge.badgeClass}`}

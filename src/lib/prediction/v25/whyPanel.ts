@@ -27,15 +27,32 @@ export class WhyPanelGenerator {
     const factorsFor: string[] = [];
     const factorsAgainst: string[] = [];
 
-    const isHome = selection.toLowerCase().includes('home') || 
-      selection.toLowerCase().includes(features.homeTeam.toLowerCase()) ||
+    const selLower = selection.toLowerCase();
+    const isTeamGoalsScope =
+      selLower.includes('team goals') ||
+      (optionType === 'over_under_goals' && !selLower.startsWith('match goals') && !/^(over|under)\s+\d/i.test(selLower));
+    const isTeamMultiGoals = optionType === 'team_multi_goals' || selLower.includes('team multi goals');
+    const isFirstHalfScope =
+      optionType === 'first_half_goals' ||
+      optionType === 'first_half_multi_goals' ||
+      selLower.includes('1st half');
+    const isTeamCorners = selLower.includes('team corners');
+    const isTeamCards = optionType === 'team_bookings' || selLower.includes('team cards');
+    const homeLower = features.homeTeam.toLowerCase();
+    const awayLower = features.awayTeam.toLowerCase();
+    const targetTeam = selLower.includes(awayLower) ? features.awayTeam : features.homeTeam;
+    const oppTeam = selLower.includes(awayLower) ? features.homeTeam : features.awayTeam;
+
+    const isHome =
+      selLower.includes('home') ||
+      selLower.includes(homeLower) ||
       selection.startsWith('1X2_HOME');
 
-    const isTotalOver = selection.toLowerCase().includes('over');
-    const isTotalUnder = selection.toLowerCase().includes('under');
-    const isBtts = selection.toLowerCase().includes('btts');
+    const isTotalOver = selLower.includes('over');
+    const isTotalUnder = selLower.includes('under');
+    const isBtts = selLower.includes('btts');
     const isCorners = optionType === 'corners';
-    const isCards = optionType === 'bookings';
+    const isCards = optionType === 'bookings' || optionType === 'team_bookings';
     const isMultiGoals =
       optionType === 'multi_goals' ||
       optionType === 'team_multi_goals' ||
@@ -43,13 +60,25 @@ export class WhyPanelGenerator {
 
     // 1. Build Factors FOR
     if (isMultiGoals) {
-      factorsFor.push(`Dixon Coles bivariate scoreline matrix concentrates ${(calibratedProb * 100).toFixed(1)}% calibrated mass inside ${cleanDisplayText(selection)}`);
-      factorsFor.push(`Band tightness keeps range width constrained around expected scoring tempo without defaulting to wide bands`);
-      factorsFor.push(`Historical team attack and defense rates support consistent scoring concentration across trailing matches`);
+      factorsFor.push(`Dixon Coles scoreline distribution concentrates ${(calibratedProb * 100).toFixed(1)}% calibrated mass inside ${cleanDisplayText(selection)}`);
+      if (isTeamMultiGoals) {
+        factorsFor.push(`${cleanDisplayText(targetTeam)} scoring profile and ${cleanDisplayText(oppTeam)} defensive concession rate support this goal band`);
+      } else if (isFirstHalfScope) {
+        factorsFor.push(`First half scoring share keeps opening 45 minute totals centered inside the band`);
+      } else {
+        factorsFor.push(`Band tightness keeps range width constrained around expected match scoring tempo`);
+      }
+      factorsFor.push(`Historical scoring concentration across trailing matches backs this range`);
     } else if (isCorners) {
-      factorsFor.push(`Tactical crossing rate and field tilt driving corner expectation to ${features.weather.cornerMultiplier > 1 ? 'elevated' : 'strong'} volumes`);
-      factorsFor.push(`Opposition defensive structure deep block clearances`);
-      factorsFor.push(`Pre match corner generation baseline established across trailing 10 matches`);
+      if (isTeamCorners) {
+        factorsFor.push(`${cleanDisplayText(targetTeam)} wing progression and crossing rate support its corner projection`);
+        factorsFor.push(`${cleanDisplayText(oppTeam)} defensive block clearances sustain team corner volume`);
+        factorsFor.push(`Trailing 10 match team corner rate aligns with projection`);
+      } else {
+        factorsFor.push(`Tactical crossing rate and field tilt driving match corner expectation to ${features.weather.cornerMultiplier > 1 ? 'elevated' : 'strong'} volumes`);
+        factorsFor.push(`Opposition defensive structure deep block clearances`);
+        factorsFor.push(`Pre match corner generation baseline established across trailing 10 matches`);
+      }
     } else if (isCards) {
       if (features.discipline.refereeAnnounced) {
         factorsFor.push(
@@ -67,9 +96,33 @@ export class WhyPanelGenerator {
       if (features.isDerby) {
         factorsFor.push(`High intensity derby rivalry elevates duel friction and disciplinary cards`);
       } else {
-        factorsFor.push(`Tactical midfield duel density in transition phases`);
+        factorsFor.push(
+          isTeamCards
+            ? `${cleanDisplayText(targetTeam)} midfield duel density and foul rate drive team card risk`
+            : `Tactical midfield duel density in transition phases`
+        );
       }
-      factorsFor.push(`Team disciplinary trend confirms persistent foul volume`);
+      factorsFor.push(
+        isTeamCards
+          ? `${cleanDisplayText(targetTeam)} disciplinary trend confirms persistent foul volume`
+          : `Team disciplinary trend confirms persistent foul volume`
+      );
+    } else if (isTeamGoalsScope && isTotalOver) {
+      factorsFor.push(`${cleanDisplayText(targetTeam)} rolling expected goals rate drives scoring upside`);
+      factorsFor.push(`${cleanDisplayText(oppTeam)} defensive concession profile creates high quality chances`);
+      factorsFor.push(`Tactical attacking progression favors ${cleanDisplayText(targetTeam)} output`);
+    } else if (isTeamGoalsScope && isTotalUnder) {
+      factorsFor.push(`${cleanDisplayText(targetTeam)} scoring expectation stays constrained against ${cleanDisplayText(oppTeam)} defence`);
+      factorsFor.push(`${cleanDisplayText(oppTeam)} defensive structure limits high danger chances`);
+      factorsFor.push(`Recent trailing output for ${cleanDisplayText(targetTeam)} aligns with a capped team total`);
+    } else if (isFirstHalfScope && (isTotalOver || isTotalUnder)) {
+      factorsFor.push(
+        isTotalOver
+          ? `Opening 45 minute expected goals projection supports early scoring breakthrough`
+          : `Controlled opening phase limits 1st half expected goals output`
+      );
+      factorsFor.push(`First half goal share calibrated from trailing league half splits`);
+      factorsFor.push(`Pre match tactical pacing aligns with 1st half scoring projection`);
     } else if (isTotalOver) {
       factorsFor.push(`Combined rolling expected goals exceed 2.80 per 90`);
       factorsFor.push(`Both sides feature established attacking conversion rates`);

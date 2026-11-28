@@ -30,33 +30,33 @@ const FOOTBALL_MARKET_OPTIONS: {
   { code: '1X2_DRAW', label: '2. Draw: Regular time draw', optionType: 'draw', category: 'match_result', period: 'Regular time' },
   { code: 'DC_1X', label: '3. Double chance: Home or draw (1X)', optionType: 'double_chance', category: 'double_chance', period: 'Regular time' },
   { code: 'DC_12', label: '3. Double chance: Home or away (no draw)', optionType: 'double_chance', category: 'double_chance', period: 'Regular time' },
-  { code: 'TOTAL_GOALS_O25', label: '4. Over 2.5 goals', optionType: 'over_under_goals', category: 'total_goals', period: 'Regular time' },
-  { code: 'TOTAL_GOALS_U25', label: '4. Under 2.5 goals', optionType: 'over_under_goals', category: 'total_goals', period: 'Regular time' },
-  { code: 'TOTAL_GOALS_O20_PUSH', label: '4. Over 2.0 goals (push at 2)', optionType: 'over_under_goals', category: 'total_goals', period: 'Regular time' },
+  { code: 'TOTAL_GOALS_O25', label: '4. Match goals: Over 2.5', optionType: 'over_under_goals', category: 'total_goals', period: 'Regular time' },
+  { code: 'TOTAL_GOALS_U25', label: '4. Match goals: Under 2.5', optionType: 'over_under_goals', category: 'total_goals', period: 'Regular time' },
+  { code: 'TOTAL_GOALS_O20_PUSH', label: '4. Match goals: Over 2.0 (push at 2)', optionType: 'over_under_goals', category: 'total_goals', period: 'Regular time' },
   { code: 'BTTS_YES', label: '5. Both teams to score (Yes)', optionType: 'both_teams_to_score', category: 'btts', period: 'Regular time' },
   { code: 'BTTS_NO', label: '5. Both teams to score (No)', optionType: 'both_teams_to_score', category: 'btts', period: 'Regular time' },
-  { code: 'CORNERS_O75', label: '6. Over 7.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'CORNERS_O85', label: '6. Over 8.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'CORNERS_O95', label: '6. Over 9.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'CORNERS_O105', label: '6. Over 10.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'CORNERS_O115', label: '6. Over 11.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'CORNERS_U75', label: '6. Under 7.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'CORNERS_U85', label: '6. Under 8.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'CORNERS_U95', label: '6. Under 9.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'CORNERS_U105', label: '6. Under 10.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'CORNERS_U115', label: '6. Under 11.5 corners', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
-  { code: 'CARDS_O25', label: '7. Over 2.5 cards', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
-  { code: 'CARDS_O35', label: '7. Over 3.5 cards', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
-  { code: 'CARDS_O45', label: '7. Over 4.5 cards', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
-  { code: 'CARDS_O55', label: '7. Over 5.5 cards', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
-  { code: 'CARDS_UNDER', label: '7. Under cards', optionType: 'bookings', category: 'bookings', period: 'Regular time', disabledRecommendation: true },
+  { code: 'CORNERS_O75', label: '6. Match corners: Over 7.5', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_O85', label: '6. Match corners: Over 8.5', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_O95', label: '6. Match corners: Over 9.5', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_O105', label: '6. Match corners: Over 10.5', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_O115', label: '6. Match corners: Over 11.5', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_U75', label: '6. Match corners: Under 7.5', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_U85', label: '6. Match corners: Under 8.5', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_U95', label: '6. Match corners: Under 9.5', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_U105', label: '6. Match corners: Under 10.5', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CORNERS_U115', label: '6. Match corners: Under 11.5', optionType: 'corners', category: 'total_corners', period: 'Regular time' },
+  { code: 'CARDS_O25', label: '7. Match cards: Over 2.5', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
+  { code: 'CARDS_O35', label: '7. Match cards: Over 3.5', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
+  { code: 'CARDS_O45', label: '7. Match cards: Over 4.5', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
+  { code: 'CARDS_O55', label: '7. Match cards: Over 5.5', optionType: 'bookings', category: 'bookings', period: 'Regular time' },
+  { code: 'CARDS_UNDER', label: '7. Match cards: Under cards', optionType: 'bookings', category: 'bookings', period: 'Regular time', disabledRecommendation: true },
   { code: 'HSH_2ND', label: '8. Highest scoring half: 2nd half', optionType: 'highest_scoring_half', category: 'half_time', period: 'Full time' },
-  { code: 'FH_GOALS_O05', label: '9. 1st half over 0.5 goals', optionType: 'first_half_goals', category: 'half_time', period: '1st half' },
+  { code: 'FH_GOALS_O05', label: '9. 1st half match goals: Over 0.5', optionType: 'first_half_goals', category: 'half_time', period: '1st half' },
   { code: '2H_RESULT_HOME', label: '10. 2nd half result: Home win', optionType: 'second_half_result', category: 'half_time', period: '2nd half' },
-  { code: 'MULTI_GOALS_1_3', label: '11. Multi goals: 1 to 3 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
-  { code: 'MULTI_GOALS_2_4', label: '11. Multi goals: 2 to 4 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
-  { code: 'MULTI_GOALS_2_3', label: '11. Multi goals: 2 to 3 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
-  { code: 'MULTI_GOALS_3_5', label: '11. Multi goals: 3 to 5 goals', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'MULTI_GOALS_1_3', label: '11. Match multi goals: 1 to 3', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'MULTI_GOALS_2_4', label: '11. Match multi goals: 2 to 4', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'MULTI_GOALS_2_3', label: '11. Match multi goals: 2 to 3', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
+  { code: 'MULTI_GOALS_3_5', label: '11. Match multi goals: 3 to 5', optionType: 'multi_goals', category: 'multi_goals', period: 'Regular time' },
   { code: 'TEAM_MULTI_GOALS_HOME_0_1', label: '11. Home multi goals: 0 to 1', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
   { code: 'TEAM_MULTI_GOALS_HOME_1_2', label: '11. Home multi goals: 1 to 2', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
   { code: 'TEAM_MULTI_GOALS_HOME_1_3', label: '11. Home multi goals: 1 to 3', optionType: 'team_multi_goals', category: 'multi_goals', period: 'Regular time' },
@@ -448,7 +448,14 @@ export default function MarketExplorerPage() {
                           {needsHistory || !pick ? (
                             <span className="text-[var(--medium)]">Needs history</span>
                           ) : (
-                            cleanDisplayText(pick.selection)
+                            <div>
+                              <div>{cleanDisplayText(pick.selection)}</div>
+                              {pick.marketScope && (
+                                <div className="text-[10.5px] text-[var(--text-3)] font-normal">
+                                  {cleanDisplayText(pick.marketScope)}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="py-3 px-3.5 font-display font-bold text-[var(--accent)] tabular-nums">
@@ -494,7 +501,12 @@ export default function MarketExplorerPage() {
                           <div className="text-[11px] text-[var(--text-2)]">{fixture.competition.name}</div>
                         </td>
                         <td className="py-3 px-3.5 text-[var(--text)] font-medium">
-                          {cleanDisplayText(prediction.selection)}
+                          <div>{cleanDisplayText(prediction.selection)}</div>
+                          {prediction.marketScope && (
+                            <div className="text-[10.5px] text-[var(--text-3)] font-normal">
+                              {cleanDisplayText(prediction.marketScope)}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-3.5 font-display font-bold text-[var(--accent)] tabular-nums">
                           {((prediction.calibratedProbability ?? prediction.modelProbability) * 100).toFixed(1)}%

@@ -175,6 +175,7 @@ export default function SlipRecordSection() {
                                 )}
                               </div>
                               <div className="text-[10.5px] text-[var(--text-2)]">
+                                {leg.marketScope ? `${cleanDisplayText(leg.marketScope)} · ` : ''}
                                 {cleanDisplayText(leg.selection)} · {leg.decimalOdds.toFixed(2)} (
                                 {cleanDisplayText(leg.bookmakerName)})
                                 {leg.settledScore

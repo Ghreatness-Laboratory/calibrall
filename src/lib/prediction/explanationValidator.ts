@@ -6,10 +6,122 @@ import {
   ConfidenceTier,
   ExplanationDriverTile,
   MarketPrediction,
+  MarketPeriod,
+  MultiGoalsMeta,
   WrittenMatchAlternate,
   WrittenMatchExplanation,
 } from '@/types';
 import { cleanDisplayText } from '@/lib/utils/formatText';
+
+export interface FootballTargetScope {
+  scopeKind: 'match' | 'home' | 'away';
+  isFirstHalf: boolean;
+  isTeamScoped: boolean;
+}
+
+export function resolveFootballTargetScope(pick?: {
+  marketCode?: string;
+  optionType?: string;
+  marketCategory?: string;
+  selection?: string;
+  period?: MarketPeriod | string;
+  multiGoalsMeta?: MultiGoalsMeta;
+} | null, homeTeam?: string, awayTeam?: string): FootballTargetScope {
+  if (!pick) return { scopeKind: 'match', isFirstHalf: false, isTeamScoped: false };
+  const code = String(pick.marketCode || '').toUpperCase();
+  const opt = String(pick.optionType || '').toLowerCase();
+  const cat = String(pick.marketCategory || '').toLowerCase();
+  const sel = String(pick.selection || '').toLowerCase();
+
+  const isFirstHalf =
+    pick.period === 'FIRST_HALF' ||
+    opt === 'first_half_goals' ||
+    opt === 'first_half_multi_goals' ||
+    code.startsWith('FH_') ||
+    pick.multiGoalsMeta?.scope === 'first_half' ||
+    /\b1st half\b/.test(sel);
+
+  if (
+    code.startsWith('TEAM_GOALS_HOME') ||
+    code.startsWith('TEAM_MULTI_GOALS_HOME') ||
+    code.startsWith('TEAM_CORNERS_HOME') ||
+    code.startsWith('TEAM_CARDS_HOME') ||
+    code.startsWith('TGB_HOME') ||
+    pick.multiGoalsMeta?.scope === 'home'
+  ) {
+    return { scopeKind: 'home', isFirstHalf, isTeamScoped: true };
+  }
+
+  if (
+    code.startsWith('TEAM_GOALS_AWAY') ||
+    code.startsWith('TEAM_MULTI_GOALS_AWAY') ||
+    code.startsWith('TEAM_CORNERS_AWAY') ||
+    code.startsWith('TEAM_CARDS_AWAY') ||
+    code.startsWith('TGB_AWAY') ||
+    pick.multiGoalsMeta?.scope === 'away'
+  ) {
+    return { scopeKind: 'away', isFirstHalf, isTeamScoped: true };
+  }
+
+  const isTeamCat =
+    cat === 'team_goals' ||
+    opt === 'team_multi_goals' ||
+    opt === 'team_bookings' ||
+    opt === 'team_goal_bounds' ||
+    (cat === 'team_corners' && opt !== 'corner_handicap') ||
+    /\bteam\s+(?:goals|multi goals|corners|cards|goal bounds)\b/.test(sel);
+
+  if (isTeamCat) {
+    const awayLower = awayTeam ? cleanDisplayText(awayTeam).toLowerCase() : '';
+    const homeLower = homeTeam ? cleanDisplayText(homeTeam).toLowerCase() : '';
+    if (awayLower && sel.includes(awayLower) && !sel.includes(homeLower)) {
+      return { scopeKind: 'away', isFirstHalf, isTeamScoped: true };
+    }
+    return { scopeKind: 'home', isFirstHalf, isTeamScoped: true };
+  }
+
+  return { scopeKind: 'match', isFirstHalf, isTeamScoped: false };
+}
+
+export interface BasketballTargetScope {
+  scopeKind: 'game' | 'home' | 'away';
+  isFirstHalf: boolean;
+  isTeamScoped: boolean;
+}
+
+export function resolveBasketballTargetScope(pick?: {
+  marketCode?: string;
+  marketCategory?: string;
+  side?: 'game' | 'home' | 'away';
+  selection?: string;
+} | null, homeTeam?: string, awayTeam?: string): BasketballTargetScope {
+  if (!pick) return { scopeKind: 'game', isFirstHalf: false, isTeamScoped: false };
+  const code = String(pick.marketCode || '').toUpperCase();
+  const cat = String(pick.marketCategory || '').toLowerCase();
+  const sel = String(pick.selection || '').toLowerCase();
+
+  if (cat === 'home_total' || code.startsWith('HOME_TOTAL') || code.startsWith('BB_HOME_TOTAL')) {
+    return { scopeKind: 'home', isFirstHalf: false, isTeamScoped: true };
+  }
+  if (cat === 'away_total' || code.startsWith('AWAY_TOTAL') || code.startsWith('BB_AWAY_TOTAL')) {
+    return { scopeKind: 'away', isFirstHalf: false, isTeamScoped: true };
+  }
+  if (
+    cat === 'h1_team_total' ||
+    code.includes('H1_HOME_TOTAL') ||
+    code.includes('H1_AWAY_TOTAL')
+  ) {
+    const isAway =
+      pick.side === 'away' ||
+      code.includes('AWAY') ||
+      Boolean(awayTeam && sel.includes(cleanDisplayText(awayTeam).toLowerCase()) && !(homeTeam && sel.includes(cleanDisplayText(homeTeam).toLowerCase())));
+    return { scopeKind: isAway ? 'away' : 'home', isFirstHalf: true, isTeamScoped: true };
+  }
+  if (cat === 'h1_game_total' || code.startsWith('H1_TOTAL') || code.startsWith('BB_H1_GAME_TOTAL')) {
+    return { scopeKind: 'game', isFirstHalf: true, isTeamScoped: false };
+  }
+  return { scopeKind: 'game', isFirstHalf: false, isTeamScoped: false };
+}
 
 /**
  * Unified headline & alternates ranking comparator shared across v25Evaluator,
@@ -483,6 +595,9 @@ export function validateExplanationConsistency(params: {
     optionType?: string;
     marketCategory?: string;
     marketFamily?: string;
+    period?: MarketPeriod | string;
+    multiGoalsMeta?: MultiGoalsMeta;
+    side?: 'game' | 'home' | 'away';
   } | null;
   explanation: WrittenMatchExplanation;
   isThinHistory?: boolean;
@@ -640,6 +755,48 @@ export function validateExplanationConsistency(params: {
           detail: 'Cards/referee evidence leaked into a corners explanation.',
           severity: 'error',
         });
+      }
+    }
+
+    // 4b. Team vs match scope integrity checks
+    const fullAndTiles = `${full} ${tilesText}`;
+    if (sport === 'football') {
+      const fbScope = resolveFootballTargetScope(activePick, homeTeam, awayTeam);
+      if (fbScope.isTeamScoped) {
+        if (/\b(?:total xG|combined xG|total corners|total cards|combined goals|low scoring projection)\b/i.test(fullAndTiles)) {
+          issues.push({
+            code: 'TEAM_SCOPE_LEAK_COMBINED_TOTAL',
+            detail: `Team-scoped pick (${activePick.selection}) leaked combined match totals into explanation or driver tiles.`,
+            severity: 'error',
+          });
+        }
+      } else if (fbScope.isFirstHalf) {
+        if (/\blow scoring projection\b/i.test(fullAndTiles)) {
+          issues.push({
+            code: 'FIRST_HALF_SCOPE_LEAK_FULL_MATCH',
+            detail: `First-half pick (${activePick.selection}) leaked full-match combined low scoring projection.`,
+            severity: 'error',
+          });
+        }
+      }
+    } else if (sport === 'basketball') {
+      const bbScope = resolveBasketballTargetScope(activePick, homeTeam, awayTeam);
+      if (bbScope.isTeamScoped) {
+        if (/\b(?:total pts|game total|Projected total|Split projection)\b/i.test(fullAndTiles)) {
+          issues.push({
+            code: 'BB_TEAM_SCOPE_LEAK_GAME_TOTAL',
+            detail: `Basketball team total (${activePick.selection}) leaked full-game total into explanation or driver tiles.`,
+            severity: 'error',
+          });
+        }
+      } else if (bbScope.isFirstHalf) {
+        if (/\bProjected total\b/i.test(tilesText)) {
+          issues.push({
+            code: 'BB_H1_SCOPE_LEAK_FULL_GAME',
+            detail: `1st half basketball total leaked full-game Projected total tile.`,
+            severity: 'error',
+          });
+        }
       }
     }
 

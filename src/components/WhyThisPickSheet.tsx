@@ -7,7 +7,11 @@ import { X, Lock, Sparkles, ArrowUpRight } from 'lucide-react';
 import { ExplanationDriverTile, WrittenMatchExplanation } from '@/types';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import { formatMonthlyPrice } from '@/lib/tiers';
-import { getMarketEvidenceFamily } from '@/lib/prediction/explanationValidator';
+import {
+  getMarketEvidenceFamily,
+  resolveBasketballTargetScope,
+  resolveFootballTargetScope,
+} from '@/lib/prediction/explanationValidator';
 
 interface Props {
   open: boolean;
@@ -32,9 +36,26 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
     const family =
       (reasoning.marketEvidenceFamily as ReturnType<typeof getMarketEvidenceFamily> | undefined) ||
       getMarketEvidenceFamily(reasoning.topPick, 'football');
+    const homeTeam = cleanDisplayText(String(reasoning.homeTeam || 'Home'));
+    const awayTeam = cleanDisplayText(String(reasoning.awayTeam || 'Away'));
+    const fbScope = reasoning.topPick?.marketCode
+      ? resolveFootballTargetScope({
+          marketCode: reasoning.topPick.marketCode,
+          selection: reasoning.topPick.selection,
+          homeTeam,
+          awayTeam,
+          period: reasoning.topPick.period,
+          side: reasoning.topPick.side,
+          multiGoalsMeta: reasoning.topPick.multiGoalsMeta,
+        })
+      : { scope: 'match' as const, period: 'regular' as const, isTeamScoped: false };
 
     if (family === 'cards') {
-      if (typeof reasoning.expectedCards === 'number') {
+      if (fbScope.scope === 'home' && typeof reasoning.expectedCardsHome === 'number') {
+        items.push({ label: `${homeTeam} expected cards`, value: `${reasoning.expectedCardsHome.toFixed(2)} cards` });
+      } else if (fbScope.scope === 'away' && typeof reasoning.expectedCardsAway === 'number') {
+        items.push({ label: `${awayTeam} expected cards`, value: `${reasoning.expectedCardsAway.toFixed(2)} cards` });
+      } else if (!fbScope.isTeamScoped && typeof reasoning.expectedCards === 'number') {
         items.push({ label: 'Projected total cards', value: `${reasoning.expectedCards.toFixed(2)} cards` });
       }
       if (reasoning.referee && typeof reasoning.refereeShrunkRate === 'number') {
@@ -51,6 +72,7 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
         items.push({ label: 'Referee', value: 'Unannounced' });
       }
       if (
+        !fbScope.isTeamScoped &&
         typeof reasoning.h2hCardsMeetingsCount === 'number' &&
         reasoning.h2hCardsMeetingsCount >= 3 &&
         typeof reasoning.h2hAvgTotalCards === 'number'
@@ -61,13 +83,28 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
         });
       }
     } else if (family === 'corners') {
-      if (typeof reasoning.expectedCornersHome === 'number' && typeof reasoning.expectedCornersAway === 'number') {
+      if (fbScope.scope === 'home' && typeof reasoning.expectedCornersHome === 'number') {
+        items.push({
+          label: `${homeTeam} expected corners`,
+          value: `${reasoning.expectedCornersHome.toFixed(1)} corners`,
+        });
+      } else if (fbScope.scope === 'away' && typeof reasoning.expectedCornersAway === 'number') {
+        items.push({
+          label: `${awayTeam} expected corners`,
+          value: `${reasoning.expectedCornersAway.toFixed(1)} corners`,
+        });
+      } else if (
+        !fbScope.isTeamScoped &&
+        typeof reasoning.expectedCornersHome === 'number' &&
+        typeof reasoning.expectedCornersAway === 'number'
+      ) {
         items.push({
           label: 'Projected corners',
           value: `${(reasoning.expectedCornersHome + reasoning.expectedCornersAway).toFixed(1)} (${reasoning.expectedCornersHome.toFixed(1)} + ${reasoning.expectedCornersAway.toFixed(1)})`,
         });
       }
       if (
+        !fbScope.isTeamScoped &&
         typeof reasoning.h2hCornersMeetingsCount === 'number' &&
         reasoning.h2hCornersMeetingsCount >= 3 &&
         typeof reasoning.h2hAvgTotalCorners === 'number'
@@ -78,13 +115,34 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
         });
       }
     } else {
-      if (typeof reasoning.homeXg === 'number' && typeof reasoning.awayXg === 'number') {
+      if (fbScope.scope === 'home' && typeof reasoning.homeXg === 'number') {
+        items.push({
+          label: `${homeTeam} expected goals`,
+          value: `${reasoning.homeXg.toFixed(2)} xG`,
+        });
+      } else if (fbScope.scope === 'away' && typeof reasoning.awayXg === 'number') {
+        items.push({
+          label: `${awayTeam} expected goals`,
+          value: `${reasoning.awayXg.toFixed(2)} xG`,
+        });
+      } else if (
+        fbScope.period === 'first_half' &&
+        typeof reasoning.homeXg === 'number' &&
+        typeof reasoning.awayXg === 'number'
+      ) {
+        items.push({
+          label: '1st half expected goals',
+          value: `${((reasoning.homeXg + reasoning.awayXg) * 0.45).toFixed(2)} goals`,
+        });
+      } else if (typeof reasoning.homeXg === 'number' && typeof reasoning.awayXg === 'number') {
         items.push({
           label: 'Expected goals',
           value: `${reasoning.homeXg.toFixed(2)} vs ${reasoning.awayXg.toFixed(2)}`,
         });
       }
       if (
+        !fbScope.isTeamScoped &&
+        fbScope.period !== 'first_half' &&
         typeof reasoning.h2hMeetingsCount === 'number' &&
         reasoning.h2hMeetingsCount >= 3 &&
         typeof reasoning.h2hAvgTotalGoals === 'number'
@@ -102,23 +160,61 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
       }
     }
 
-    if (typeof reasoning.homeSampleMatches === 'number' && typeof reasoning.awaySampleMatches === 'number') {
+    if (fbScope.scope === 'home' && typeof reasoning.homeSampleMatches === 'number') {
+      items.push({
+        label: 'Sample depth',
+        value: `${reasoning.homeSampleMatches} ${homeTeam} matches`,
+      });
+    } else if (fbScope.scope === 'away' && typeof reasoning.awaySampleMatches === 'number') {
+      items.push({
+        label: 'Sample depth',
+        value: `${reasoning.awaySampleMatches} ${awayTeam} matches`,
+      });
+    } else if (typeof reasoning.homeSampleMatches === 'number' && typeof reasoning.awaySampleMatches === 'number') {
       items.push({
         label: 'Sample depth',
         value: `${reasoning.homeSampleMatches}H / ${reasoning.awaySampleMatches}A matches`,
       });
     }
   } else if (reasoning.sport === 'basketball') {
-    if (typeof reasoning.projectedTotal === 'number') {
-      items.push({ label: 'Projected total', value: `${reasoning.projectedTotal.toFixed(1)} pts` });
+    const homeTeam = cleanDisplayText(String(reasoning.homeTeam || 'Home'));
+    const awayTeam = cleanDisplayText(String(reasoning.awayTeam || 'Away'));
+    const bbScope = resolveBasketballTargetScope({
+      marketCode: reasoning.topPick?.marketCode,
+      marketCategory: reasoning.topPick?.marketCategory,
+      side: reasoning.topPick?.side,
+    });
+    if (bbScope.scope === 'home_total' && typeof reasoning.homeProjected === 'number') {
+      items.push({ label: `${homeTeam} projected`, value: `${reasoning.homeProjected.toFixed(1)} pts` });
+    } else if (bbScope.scope === 'away_total' && typeof reasoning.awayProjected === 'number') {
+      items.push({ label: `${awayTeam} projected`, value: `${reasoning.awayProjected.toFixed(1)} pts` });
+    } else if (bbScope.scope === 'h1_team_total') {
+      const targetTeam = bbScope.side === 'away' ? awayTeam : homeTeam;
+      const mean = typeof reasoning.topPick?.projectedMean === 'number' ? reasoning.topPick.projectedMean : undefined;
+      if (mean !== undefined) {
+        items.push({ label: `1st half ${targetTeam}`, value: `${mean.toFixed(1)} pts` });
+      }
+    } else if (bbScope.scope === 'h1_game_total') {
+      const mean = typeof reasoning.h1ProjectedTotal === 'number' ? reasoning.h1ProjectedTotal : reasoning.topPick?.projectedMean;
+      if (typeof mean === 'number') {
+        items.push({ label: '1st half projected total', value: `${mean.toFixed(1)} pts` });
+      }
+    } else {
+      if (typeof reasoning.projectedTotal === 'number') {
+        items.push({ label: 'Projected total', value: `${reasoning.projectedTotal.toFixed(1)} pts` });
+      }
+      if (typeof reasoning.homeProjected === 'number' && typeof reasoning.awayProjected === 'number') {
+        items.push({
+          label: 'Split projection',
+          value: `${reasoning.homeProjected.toFixed(1)} / ${reasoning.awayProjected.toFixed(1)}`,
+        });
+      }
     }
-    if (typeof reasoning.homeProjected === 'number' && typeof reasoning.awayProjected === 'number') {
-      items.push({
-        label: 'Split projection',
-        value: `${reasoning.homeProjected.toFixed(1)} / ${reasoning.awayProjected.toFixed(1)}`,
-      });
-    }
-    if (typeof reasoning.homeGamesPlayed === 'number' && typeof reasoning.awayGamesPlayed === 'number') {
+    if (bbScope.targetSide === 'home' && typeof reasoning.homeGamesPlayed === 'number') {
+      items.push({ label: 'Sample depth', value: `${reasoning.homeGamesPlayed} ${homeTeam} games` });
+    } else if (bbScope.targetSide === 'away' && typeof reasoning.awayGamesPlayed === 'number') {
+      items.push({ label: 'Sample depth', value: `${reasoning.awayGamesPlayed} ${awayTeam} games` });
+    } else if (typeof reasoning.homeGamesPlayed === 'number' && typeof reasoning.awayGamesPlayed === 'number') {
       items.push({
         label: 'Sample depth',
         value: `${reasoning.homeGamesPlayed}H / ${reasoning.awayGamesPlayed}A games`,
@@ -269,6 +365,9 @@ export default function WhyThisPickSheet({
       explanation.reasoning?.marketEvidenceFamily === 'goal_runs'
   );
   const headerPickLabel = explanation.activePickSelection || pickLabel;
+  const headerMarketScope = cleanDisplayText(
+    explanation.activePickMarketScope || explanation.reasoning?.topPick?.marketScope || ''
+  );
   const marketBoard = !explanation.tierLocked && Array.isArray(explanation.marketBoard)
     ? explanation.marketBoard
     : [];
@@ -352,6 +451,11 @@ export default function WhyThisPickSheet({
                     className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${tierBadge.className}`}
                   >
                     {tierBadge.label}
+                  </span>
+                )}
+                {headerMarketScope && (
+                  <span className="px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)]">
+                    {headerMarketScope}
                   </span>
                 )}
               </div>
@@ -466,7 +570,7 @@ export default function WhyThisPickSheet({
                             {cleanDisplayText(alt.selection)}
                           </div>
                           <div className="text-[10.5px] text-[var(--text-3)] leading-snug">
-                            {cleanDisplayText(alt.marketName)}
+                            {cleanDisplayText(alt.marketScope || alt.marketName)}
                           </div>
                         </div>
                         <span className="font-display text-[14px] font-bold text-[var(--accent)] tabular-nums shrink-0">
@@ -507,7 +611,7 @@ export default function WhyThisPickSheet({
                             )}
                           </div>
                           <div className="text-[10.5px] text-[var(--text-3)] leading-snug">
-                            {cleanDisplayText(entry.marketName)}
+                            {cleanDisplayText(entry.marketScope || entry.marketName)}
                           </div>
                           {!entry.recommended && entry.reasonNotRecommended && (
                             <div className="text-[10.5px] text-[var(--text-2)] leading-snug">

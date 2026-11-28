@@ -674,7 +674,371 @@ export function getOptionTypeLabel(type: SupportedOptionType | string): string {
   }
 }
 
-import { RiskTier, MarketPrediction } from '@/types';
+import { RiskTier, MarketPrediction, MarketPeriod, MultiGoalsMeta } from '@/types';
+import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
+
+export interface ScopedMarketLabel {
+  marketScope: string;
+  marketName: string;
+  selection: string;
+}
+
+function extractOverUnderClause(raw: string, fallbackLine?: number): string {
+  const m = raw.match(/\b(Over|Under)\s+(\d+(?:\.\d+)?)(?:\s*(?:goals?|corners?|cards?|pts|points))?/i);
+  if (m) {
+    const dir = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+    return `${dir} ${m[2]}`;
+  }
+  if (typeof fallbackLine === 'number' && Number.isFinite(fallbackLine)) {
+    const dir = /\bunder\b/i.test(raw) ? 'Under' : 'Over';
+    return `${dir} ${fallbackLine}`;
+  }
+  return cleanDisplayText(raw);
+}
+
+function extractBandClause(raw: string, meta?: MultiGoalsMeta): string {
+  if (meta && Number.isFinite(meta.minGoals) && Number.isFinite(meta.maxGoals)) {
+    return `${meta.minGoals} to ${meta.maxGoals}`;
+  }
+  const m = raw.match(/(\d+)\s*(?:to|-)\s*(\d+)/i);
+  if (m) return `${m[1]} to ${m[2]}`;
+  if (meta?.band) return cleanDisplayText(meta.band);
+  return cleanDisplayText(raw);
+}
+
+/**
+ * Resolves explicit scope ("Match goals", "Elche goals", "1st half match goals", etc.),
+ * scoped marketName, and unambiguous scoped selection title for football markets.
+ */
+export function resolveFootballMarketLabelAndScope(params: {
+  marketCode?: string;
+  optionType?: string;
+  marketCategory?: string;
+  rawMarketName?: string;
+  rawSelection: string;
+  homeTeam?: string;
+  awayTeam?: string;
+  line?: number;
+  period?: MarketPeriod | string;
+  multiGoalsMeta?: MultiGoalsMeta;
+}): ScopedMarketLabel {
+  const code = String(params.marketCode || '').toUpperCase();
+  const opt = String(params.optionType || '').toLowerCase();
+  const cat = String(params.marketCategory || '').toLowerCase();
+  const rawSel = String(params.rawSelection || '').trim();
+  const rawName = String(params.rawMarketName || '').trim();
+  const home = cleanDisplayText(displayName(params.homeTeam) || params.homeTeam || 'Home');
+  const away = cleanDisplayText(displayName(params.awayTeam) || params.awayTeam || 'Away');
+
+  const isHomeTeamCode = /_HOME_|^TEAM_.*_HOME/.test(code);
+  const isAwayTeamCode = /_AWAY_|^TEAM_.*_AWAY/.test(code);
+  const isFirstHalf =
+    params.period === 'FIRST_HALF' ||
+    opt === 'first_half_goals' ||
+    opt === 'first_half_multi_goals' ||
+    code.startsWith('FH_') ||
+    /\b1st half\b/i.test(rawSel) ||
+    params.multiGoalsMeta?.scope === 'first_half';
+
+  const detectTeamSide = (): 'home' | 'away' | null => {
+    if (isHomeTeamCode) return 'home';
+    if (isAwayTeamCode) return 'away';
+    if (params.multiGoalsMeta?.scope === 'home') return 'home';
+    if (params.multiGoalsMeta?.scope === 'away') return 'away';
+    const selLower = rawSel.toLowerCase();
+    const nameLower = rawName.toLowerCase();
+    if (home && home !== 'Home' && (selLower.startsWith(home.toLowerCase()) || nameLower.startsWith(home.toLowerCase()))) {
+      return 'home';
+    }
+    if (away && away !== 'Away' && (selLower.startsWith(away.toLowerCase()) || nameLower.startsWith(away.toLowerCase()))) {
+      return 'away';
+    }
+    return null;
+  };
+
+  // 1. Multi goals (match, team, 1st half)
+  if (
+    opt === 'multi_goals' ||
+    opt === 'team_multi_goals' ||
+    opt === 'first_half_multi_goals' ||
+    cat === 'multi_goals' ||
+    code.includes('MULTI_GOALS')
+  ) {
+    const band = extractBandClause(rawSel, params.multiGoalsMeta);
+    const side = detectTeamSide();
+    if (isFirstHalf) {
+      if (side === 'home' || side === 'away') {
+        const team = side === 'home' ? home : away;
+        return {
+          marketScope: cleanDisplayText(`1st half ${team} multi goals`),
+          marketName: cleanDisplayText(`1st half ${team} team multi goals`),
+          selection: cleanDisplayText(`1st half ${team} team multi goals: ${band}`),
+        };
+      }
+      return {
+        marketScope: '1st half match multi goals',
+        marketName: '1st half match multi goals',
+        selection: cleanDisplayText(`1st half match multi goals: ${band}`),
+      };
+    }
+    if (side === 'home' || side === 'away' || opt === 'team_multi_goals') {
+      const team = side === 'away' ? away : home;
+      return {
+        marketScope: cleanDisplayText(`${team} multi goals`),
+        marketName: cleanDisplayText(`${team} team multi goals`),
+        selection: cleanDisplayText(`${team} team multi goals: ${band}`),
+      };
+    }
+    return {
+      marketScope: 'Match multi goals',
+      marketName: 'Match multi goals',
+      selection: cleanDisplayText(`Match multi goals: ${band}`),
+    };
+  }
+
+  // 2. Goal lines (match, team, 1st half)
+  if (
+    opt === 'first_half_goals' ||
+    code.startsWith('FH_GOALS_') ||
+    (opt === 'over_under_goals' && isFirstHalf)
+  ) {
+    const ou = extractOverUnderClause(rawSel, params.line);
+    const side = detectTeamSide();
+    if (side === 'home' || side === 'away') {
+      const team = side === 'home' ? home : away;
+      return {
+        marketScope: cleanDisplayText(`1st half ${team} goals`),
+        marketName: cleanDisplayText(`1st half ${team} team goals`),
+        selection: cleanDisplayText(`1st half ${team} team goals: ${ou}`),
+      };
+    }
+    return {
+      marketScope: '1st half match goals',
+      marketName: '1st half match goals',
+      selection: cleanDisplayText(`1st half match goals: ${ou} goals`),
+    };
+  }
+
+  if (
+    cat === 'team_goals' ||
+    code.startsWith('TEAM_GOALS_') ||
+    (opt === 'over_under_goals' && (isHomeTeamCode || isAwayTeamCode))
+  ) {
+    const side = detectTeamSide();
+    const team = side === 'away' ? away : home;
+    const ou = extractOverUnderClause(rawSel, params.line);
+    return {
+      marketScope: cleanDisplayText(`${team} goals`),
+      marketName: cleanDisplayText(`${team} team goals`),
+      selection: cleanDisplayText(`${team} team goals: ${ou}`),
+    };
+  }
+
+  if (opt === 'over_under_goals' || cat === 'total_goals' || code.startsWith('TOTAL_GOALS_')) {
+    const ou = extractOverUnderClause(rawSel, params.line);
+    const pushSuffix = /push at 2/i.test(rawSel) || code.includes('PUSH') ? ' (push at 2)' : '';
+    return {
+      marketScope: 'Match goals',
+      marketName: 'Match goals',
+      selection: cleanDisplayText(`Match goals: ${ou} goals${pushSuffix}`),
+    };
+  }
+
+  // 3. Corners (corner handicap, team corners, match corners)
+  if (opt === 'corner_handicap' || code.startsWith('CORNER_HANDICAP_')) {
+    return {
+      marketScope: 'Match corner handicap',
+      marketName: 'Match corner handicap',
+      selection: cleanDisplayText(formatSelectionName(rawSel)),
+    };
+  }
+  if (
+    code.startsWith('TEAM_CORNERS_') ||
+    (cat === 'team_corners' && opt === 'corners') ||
+    (opt === 'corners' && (isHomeTeamCode || isAwayTeamCode))
+  ) {
+    const side = detectTeamSide();
+    const team = side === 'away' ? away : home;
+    const ou = extractOverUnderClause(rawSel, params.line);
+    return {
+      marketScope: cleanDisplayText(`${team} corners`),
+      marketName: cleanDisplayText(`${team} team corners`),
+      selection: cleanDisplayText(`${team} team corners: ${ou}`),
+    };
+  }
+  if (opt === 'corners' || cat === 'total_corners' || code.startsWith('TOTAL_CORNERS_') || code.startsWith('CORNERS_')) {
+    const ou = extractOverUnderClause(rawSel, params.line);
+    return {
+      marketScope: 'Match corners',
+      marketName: 'Match corners',
+      selection: cleanDisplayText(`Match corners: ${ou} corners`),
+    };
+  }
+
+  // 4. Cards (booking_points -> card points, team cards, match cards)
+  if (opt === 'booking_points' || code.startsWith('BOOKING_POINTS_')) {
+    const ou = extractOverUnderClause(rawSel, params.line);
+    return {
+      marketScope: 'Match card points',
+      marketName: 'Match card points',
+      selection: cleanDisplayText(`Match card points: ${ou}`),
+    };
+  }
+  if (opt === 'team_bookings' || code.startsWith('TEAM_CARDS_')) {
+    const side = detectTeamSide();
+    const team = side === 'away' ? away : home;
+    const ou = extractOverUnderClause(rawSel, params.line);
+    return {
+      marketScope: cleanDisplayText(`${team} cards`),
+      marketName: cleanDisplayText(`${team} team cards`),
+      selection: cleanDisplayText(`${team} team cards: ${ou}`),
+    };
+  }
+  if (opt === 'bookings' || cat === 'bookings' || code.startsWith('CARDS_')) {
+    if (code === 'CARDS_UNDER' || /^Under\s+cards$/i.test(rawSel)) {
+      return {
+        marketScope: 'Match cards',
+        marketName: 'Match cards (Under)',
+        selection: 'Match cards: Under cards',
+      };
+    }
+    const ou = extractOverUnderClause(rawSel, params.line);
+    return {
+      marketScope: 'Match cards',
+      marketName: 'Match cards',
+      selection: cleanDisplayText(`Match cards: ${ou} cards`),
+    };
+  }
+
+  // 5. Goal runs
+  if (opt === 'goal_runs' || cat === 'goal_runs' || code.startsWith('GOAL_RUN_')) {
+    return {
+      marketScope: 'Match goal runs',
+      marketName: cleanDisplayText(rawName || 'Any team scores 2 goals in a row'),
+      selection: cleanDisplayText(rawSel),
+    };
+  }
+
+  // 6. Goal bounds
+  if (opt === 'team_goal_bounds' || code.startsWith('TGB_')) {
+    const side = detectTeamSide();
+    const team = side === 'away' ? away : home;
+    const bandMatch = rawSel.match(/(\d+\s*(?:to|-)\s*\d+|\d+\+)/i);
+    const band = bandMatch ? bandMatch[1].replace(/-/g, ' to ') : cleanDisplayText(rawSel);
+    return {
+      marketScope: cleanDisplayText(`${team} goal bounds`),
+      marketName: cleanDisplayText(`${team} team goal bounds`),
+      selection: cleanDisplayText(`${team} team goal bounds: ${band}`),
+    };
+  }
+  if (opt === 'goal_bounds' || cat === 'goal_bounds' || code.startsWith('GB_')) {
+    const bandMatch = rawSel.match(/(\d+\s*(?:to|-)\s*\d+|\d+\+)/i);
+    const band = bandMatch ? bandMatch[1].replace(/-/g, ' to ') : cleanDisplayText(rawSel);
+    return {
+      marketScope: 'Match goal bounds',
+      marketName: 'Match goal bounds',
+      selection: cleanDisplayText(`Match goal bounds: ${band} goals`),
+    };
+  }
+
+  // 7. Match / other football markets
+  let scope = 'Match market';
+  if (cat === 'match_result' || opt === 'win' || opt === 'draw' || code.startsWith('1X2_')) {
+    scope = 'Match result';
+  } else if (cat === 'double_chance' || opt === 'double_chance' || code.startsWith('DC_')) {
+    scope = 'Double chance';
+  } else if (cat === 'draw_no_bet' || opt === 'draw_no_bet' || code.startsWith('DNB_')) {
+    scope = 'Draw no bet';
+  } else if (cat === 'btts' || opt === 'both_teams_to_score' || code.startsWith('BTTS_')) {
+    scope = 'Both teams to score';
+  } else if (opt === 'asian_handicap' || code.startsWith('AH_')) {
+    scope = 'Match Asian handicap';
+  } else if (opt === 'european_handicap' || code.startsWith('EH_')) {
+    scope = 'Match European handicap';
+  } else if (opt === 'highest_scoring_half' || code.startsWith('HSH_')) {
+    scope = 'Highest scoring half';
+  } else if (opt === 'second_half_result' || code.startsWith('2H_RESULT')) {
+    scope = '2nd half result';
+  } else if (cat === 'combos' || opt === 'win_draw_combo' || code.startsWith('COMBO_')) {
+    scope = 'Match combos';
+  }
+
+  return {
+    marketScope: scope,
+    marketName: cleanDisplayText(rawName || scope),
+    selection: cleanDisplayText(formatSelectionName(rawSel)),
+  };
+}
+
+/**
+ * Resolves explicit scope, marketName, and unambiguous scoped selection title for basketball markets.
+ */
+export function resolveBasketballMarketLabelAndScope(params: {
+  marketCategory: string;
+  side?: 'game' | 'home' | 'away';
+  isOver?: boolean;
+  line?: number;
+  rawSelection?: string;
+  homeTeam?: string;
+  awayTeam?: string;
+}): ScopedMarketLabel {
+  const cat = String(params.marketCategory || '').toLowerCase();
+  const home = cleanDisplayText(displayName(params.homeTeam) || params.homeTeam || 'Home');
+  const away = cleanDisplayText(displayName(params.awayTeam) || params.awayTeam || 'Away');
+  const rawSel = String(params.rawSelection || '').trim();
+
+  const inferredOver =
+    typeof params.isOver === 'boolean'
+      ? params.isOver
+      : !/\bunder\b/i.test(rawSel);
+  const lineMatch = rawSel.match(/(\d+(?:\.\d+)?)\s*(?:pts|points)?$/i) || rawSel.match(/\b(?:Over|Under)\s+(\d+(?:\.\d+)?)/i);
+  const lineVal =
+    typeof params.line === 'number' && Number.isFinite(params.line)
+      ? params.line
+      : lineMatch
+      ? Number(lineMatch[1])
+      : undefined;
+  const lineClause = lineVal !== undefined && Number.isFinite(lineVal) ? ` ${lineVal.toFixed(1)}` : '';
+  const dir = inferredOver ? 'Over' : 'Under';
+
+  if (cat === 'home_total') {
+    return {
+      marketScope: cleanDisplayText(`${home} points`),
+      marketName: cleanDisplayText(`${home} team total`),
+      selection: cleanDisplayText(`${home} team total: ${dir}${lineClause} pts`),
+    };
+  }
+  if (cat === 'away_total') {
+    return {
+      marketScope: cleanDisplayText(`${away} points`),
+      marketName: cleanDisplayText(`${away} team total`),
+      selection: cleanDisplayText(`${away} team total: ${dir}${lineClause} pts`),
+    };
+  }
+  if (cat === 'h1_team_total') {
+    const team =
+      params.side === 'away' || (away && away !== 'Away' && rawSel.toLowerCase().includes(away.toLowerCase()))
+        ? away
+        : home;
+    return {
+      marketScope: cleanDisplayText(`1st half ${team} points`),
+      marketName: cleanDisplayText(`1st half ${team} team total`),
+      selection: cleanDisplayText(`1st half ${team} team total: ${dir}${lineClause} pts`),
+    };
+  }
+  if (cat === 'h1_game_total') {
+    return {
+      marketScope: '1st half game total',
+      marketName: '1st half game total',
+      selection: cleanDisplayText(`1st half game total: ${dir}${lineClause} pts`),
+    };
+  }
+  return {
+    marketScope: 'Game total',
+    marketName: 'Game total',
+    selection: cleanDisplayText(`Game total: ${dir}${lineClause} pts`),
+  };
+}
 
 export interface ConfidenceTierGroups {
   high: MarketPrediction[];
@@ -842,7 +1206,7 @@ export function formatSelectionName(name: string): string {
     .replace(/Highest Scoring Half: 1st Half/gi, 'Highest scoring half: 1st half')
     .replace(/1st Half Over ([0-9.]+) Goals/gi, '1st half over $1 goals')
     .replace(/1st Half Under ([0-9.]+) Goals/gi, '1st half under $1 goals')
-    .replace(/(Multi goals|multi goals|1st half multi goals)\s+(\d+)-(\d+)/gi, (_m, prefix, a, b) => `${prefix} ${a} to ${b}`);
+    .replace(/(Multi goals|multi goals|1st half multi goals)(?::)?\s+(\d+)-(\d+)/gi, (_m, prefix, a, b) => `${prefix} ${a} to ${b}`);
 
   return cleanDisplayText(cleaned);
 }

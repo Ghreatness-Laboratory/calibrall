@@ -275,6 +275,7 @@ export interface FixtureContext {
 export interface WrittenMatchAlternate {
   marketCode: string;
   marketName: string;
+  marketScope?: string;
   selection: string;
   probability: number;
   confidenceTier?: ConfidenceTier;
@@ -294,6 +295,7 @@ export type MarketBoardReason =
 export interface MarketBoardEntry {
   marketCode: string;
   marketName: string;
+  marketScope?: string;
   optionType: SupportedOptionType | string;
   marketCategory: MarketCategory | string;
   selection: string;
@@ -326,6 +328,7 @@ export interface WrittenMatchExplanation {
   driverTiles?: ExplanationDriverTile[];
   headlineSelectionReason?: string;
   activePickMarketCode?: string;
+  activePickMarketScope?: string;
   activePickSelection?: string;
   activePickProbability?: number;
   activePickTier?: ConfidenceTier;
@@ -597,6 +600,7 @@ export interface MarketPrediction {
   marketCode: string;
   optionType: SupportedOptionType;
   marketCategory: MarketCategory;
+  marketScope?: string;
   marketName: string;
   selection: string;
   line?: number;

@@ -14,6 +14,7 @@ import { getLocalDatabase, isProductionRuntime } from '@/lib/supabase/client';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import { generateFootballExplanation } from './explanationGenerator';
 import { validateExplanationConsistency } from './explanationValidator';
+import { resolveFootballMarketLabelAndScope } from './marketCatalog';
 import type { EvaluatedFixtureResult } from './marketSelection';
 import { isDisabledRecommendationMarket } from '@/lib/markets';
 
@@ -94,7 +95,7 @@ export async function loadFootballPickModerationMap(
   return result;
 }
 
-const CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION = 'v2.5.4';
+const CURRENT_FOOTBALL_EXPLANATION_MODEL_VERSION = 'v2.5.5';
 
 export function loadStoredFootballExplanation(
   fixtureId: string,
@@ -167,6 +168,8 @@ export function loadStoredFootballExplanation(
       alternates = [];
     }
 
+    const homeName = cleanDisplayText(String(reasoning?.homeTeam || 'Home team'));
+    const awayName = cleanDisplayText(String(reasoning?.awayTeam || 'Away team'));
     const fullSummary = cleanDisplayText(row.summary);
     const storedTopPick = reasoning?.topPick;
     const meta = reasoning?._meta as
@@ -174,6 +177,7 @@ export function loadStoredFootballExplanation(
           driverTiles?: ExplanationDriverTile[];
           headlineSelectionReason?: string;
           marketBoard?: MarketBoardEntry[];
+          activePickMarketScope?: string;
         }
       | undefined;
     const storedTier = (storedTopPick?.confidenceTier || row.confidence_tier || undefined) as
@@ -188,11 +192,31 @@ export function loadStoredFootballExplanation(
         ? row.calibrated_probability
         : undefined;
     const activeCode = storedTopPick?.marketCode || row.market_code || undefined;
-    const activeSel = storedTopPick?.selection
+    const activeSelRaw = storedTopPick?.selection
       ? cleanDisplayText(storedTopPick.selection)
       : row.selection
       ? cleanDisplayText(row.selection)
       : undefined;
+    const resolvedScope =
+      activeCode && activeSelRaw
+        ? resolveFootballMarketLabelAndScope({
+            marketCode: activeCode,
+            rawMarketName: storedTopPick?.marketName,
+            rawSelection: activeSelRaw,
+            homeTeam: homeName,
+            awayTeam: awayName,
+            period: storedTopPick?.period,
+            side: storedTopPick?.side,
+            multiGoalsMeta: storedTopPick?.multiGoalsMeta,
+          })
+        : null;
+    const activeMarketScope = cleanDisplayText(
+      meta?.activePickMarketScope ||
+        storedTopPick?.marketScope ||
+        resolvedScope?.marketScope ||
+        ''
+    ) || undefined;
+    const activeSel = activeSelRaw;
 
     let loaded: WrittenMatchExplanation = {
       oneLineSummary: firstSentence(fullSummary),
@@ -201,6 +225,7 @@ export function loadStoredFootballExplanation(
       marketBoard: Array.isArray(meta?.marketBoard) ? meta!.marketBoard : undefined,
       headlineSelectionReason: meta?.headlineSelectionReason,
       activePickMarketCode: activeCode,
+      activePickMarketScope: activeMarketScope,
       activePickSelection: activeSel,
       activePickProbability: storedCalProb,
       activePickTier: storedTier,
@@ -216,8 +241,6 @@ export function loadStoredFootballExplanation(
       generatedAt: String(row.recorded_at || new Date().toISOString()),
     };
 
-    const homeName = cleanDisplayText(String(reasoning?.homeTeam || 'Home team'));
-    const awayName = cleanDisplayText(String(reasoning?.awayTeam || 'Away team'));
     const validation = validateExplanationConsistency({
       sport: 'football',
       homeTeam: homeName,
@@ -229,6 +252,9 @@ export function loadStoredFootballExplanation(
               selection: activeSel,
               probability: storedCalProb,
               confidenceTier: storedTier,
+              period: storedTopPick?.period,
+              side: storedTopPick?.side,
+              multiGoalsMeta: storedTopPick?.multiGoalsMeta,
             }
           : null,
       explanation: loaded,
@@ -323,7 +349,7 @@ export function persistOrLoadImmutableFootballExplanation(
             fixture.kickoffTime || null,
             top?.marketCode || null,
             top ? cleanDisplayText(top.marketName) : null,
-            top ? cleanDisplayText(top.selection) : null,
+            generated.activePickSelection || (top ? cleanDisplayText(top.selection) : null),
             top ? Number(Math.max(0, Math.min(1, top.calibratedProbability ?? top.modelProbability)).toFixed(6)) : null,
             top?.confidenceTier || null,
             top ? cleanDisplayText(top.priceSource || (top.marketOdds ? 'Verified Odds' : 'Model line, no market price')) : null,
@@ -334,6 +360,7 @@ export function persistOrLoadImmutableFootballExplanation(
                 driverTiles: generated.driverTiles || [],
                 marketBoard: generated.marketBoard || [],
                 headlineSelectionReason: generated.headlineSelectionReason || undefined,
+                activePickMarketScope: generated.activePickMarketScope || undefined,
               },
             }),
             JSON.stringify(generated.alternates || []),

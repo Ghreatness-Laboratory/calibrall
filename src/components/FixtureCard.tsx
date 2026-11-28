@@ -8,7 +8,7 @@ import { toggleStoredSavedFixture, getStoredSavedFixtures } from '@/lib/storage/
 import TeamCrest from '@/components/TeamCrest';
 import LineupChip from '@/components/LineupChip';
 import { getFixtureLineupState } from '@/lib/data/lineupsService';
-import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds } from '@/lib/prediction/marketCatalog';
+import { formatExpectedValue, formatSelectionName, getRiskTierBadge, formatOdds, resolveFootballMarketLabelAndScope } from '@/lib/prediction/marketCatalog';
 import { cleanDisplayText, displayName, formatMatchTime } from '@/lib/utils/formatText';
 import { settleMarketPrediction, extractMatchStats } from '@/lib/prediction/settlementEngine';
 import { getMarketEvidenceFamily } from '@/lib/prediction/explanationValidator';
@@ -108,6 +108,37 @@ export default function FixtureCard({
 
   const homeName = displayName(fixture.homeTeam);
   const awayName = displayName(fixture.awayTeam);
+
+  const scopedPickMeta = useMemo(() => {
+    if (!topPrediction) return null;
+    return resolveFootballMarketLabelAndScope({
+      marketCode: topPrediction.marketCode,
+      rawMarketName: topPrediction.marketName,
+      rawSelection: topPrediction.selection,
+      homeTeam: cleanDisplayText(homeName),
+      awayTeam: cleanDisplayText(awayName),
+      period: topPrediction.period,
+      side: topPrediction.side,
+      line: topPrediction.line,
+      multiGoalsMeta: topPrediction.multiGoalsMeta,
+    });
+  }, [topPrediction, homeName, awayName]);
+
+  const activeMarketScope = cleanDisplayText(
+    activeExplanation?.activePickMarketScope ||
+      topPrediction?.marketScope ||
+      scopedPickMeta?.marketScope ||
+      ''
+  );
+  const scopedPickTitle = topPrediction
+    ? cleanDisplayText(
+        formatSelectionName(
+          activeExplanation?.activePickSelection ||
+            scopedPickMeta?.selection ||
+            topPrediction.selection
+        )
+      )
+    : undefined;
 
   const staleDaysMatch = noRecommendationReason?.match(/last match (\d+) days ago/);
   const staleDays = staleDaysMatch ? staleDaysMatch[1] : null;
@@ -311,6 +342,11 @@ export default function FixtureCard({
                     : `${tierInfo.label} confidence`}
                 </span>
               )}
+              {activeMarketScope && (
+                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-[var(--surface)] text-[var(--text-2)] border border-[var(--line)]">
+                  {activeMarketScope}
+                </span>
+              )}
               {!isFinished && <LineupChip lineupState={lineupState} isPastKickoff={isPastKickoff} />}
               {topPrediction.sanityTripwire && (
                 <span className="px-2 py-0.5 rounded-full bg-[var(--danger-soft)] text-[var(--danger)] text-[10.5px] font-semibold border border-[var(--danger)]/30">
@@ -329,7 +365,7 @@ export default function FixtureCard({
           {/* Pick title + probability ± interval */}
           <div className="flex items-baseline justify-between gap-2">
             <span className="font-display text-[17px] sm:text-[18px] font-bold text-[var(--text)] leading-snug break-words min-w-0">
-              {cleanDisplayText(formatSelectionName(topPrediction.selection))}
+              {scopedPickTitle}
             </span>
             {probPercent && (
               <span className="font-display text-[15px] font-bold text-[var(--accent)] tabular-nums shrink-0">
@@ -479,7 +515,7 @@ export default function FixtureCard({
         open={whySheetOpen}
         onClose={() => setWhySheetOpen(false)}
         matchTitle={`${homeName} vs ${awayName}`}
-        pickLabel={topPrediction ? cleanDisplayText(formatSelectionName(topPrediction.selection)) : undefined}
+        pickLabel={scopedPickTitle}
         explanation={activeExplanation}
       />
     </article>

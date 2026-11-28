@@ -60,6 +60,7 @@ export interface SlipCandidateLeg {
   kickoffTime: string;
   marketCode: string;
   marketGroup: SlipMarketGroupKey;
+  marketScope?: string;
   marketName: string;
   selection: string;
   line: number | null;
@@ -168,6 +169,7 @@ export interface DailySlipLegRecord {
   competitionName: string;
   kickoffTime: string;
   marketCode: string;
+  marketScope?: string;
   marketName: string;
   selection: string;
   line: number | null;

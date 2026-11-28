@@ -292,6 +292,7 @@ function builtSlipToRecordRow(
     competitionName: l.competitionName,
     kickoffTime: l.kickoffTime,
     marketCode: l.marketCode,
+    marketScope: l.marketScope,
     marketName: l.marketName,
     selection: l.selection,
     line: l.line,

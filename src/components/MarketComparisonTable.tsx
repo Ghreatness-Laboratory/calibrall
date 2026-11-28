@@ -278,7 +278,7 @@ export default function MarketComparisonTable({
             </div>
 
             <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-2)] mt-0.5 truncate">
-              <span>{cleanDisplayText(getOptionTypeLabel(pred.optionType))}</span>
+              <span>{cleanDisplayText(pred.marketScope || getOptionTypeLabel(pred.optionType))}</span>
               <span>·</span>
               <span>{cleanDisplayText(getPeriodLabel(pred.period))}</span>
               {pred.marketOdds && pred.marketOdds > 1.0 ? (

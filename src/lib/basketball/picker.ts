@@ -17,6 +17,7 @@ import {
 } from './model';
 import { calibrateBasketballProbability } from './calibratedParams';
 import { cleanDisplayText } from '../utils/formatText';
+import { resolveBasketballMarketLabelAndScope } from '../prediction/marketCatalog';
 import type { WrittenMatchExplanation } from '@/types';
 
 export type BasketballPickTier = 'HIGH' | 'MEDIUM' | 'SPECULATIVE' | 'ABSTAIN';
@@ -41,8 +42,9 @@ export interface BasketballPickCandidate {
   kickoffUtc: string | null;
   marketCode: BasketballMarketCode;
   marketCategory: BasketballMarketCategory;
+  marketScope: string;
   side: 'game' | 'home' | 'away';
-  selection: string; // e.g. "Over 220.5 pts"
+  selection: string; // e.g. "Game total: Over 220.5 pts" or "Denver Nuggets team total: Over 116.5 pts"
   line: number;
   projectedMean: number;
   projectedStd: number;
@@ -352,6 +354,14 @@ export function evaluateBasketballGameMarkets(params: {
         chosen.ev,
         hasPrice
       );
+      const scopedLabel = resolveBasketballMarketLabelAndScope({
+        marketCategory: slot.category,
+        side: slot.side,
+        isOver: chosen.isOver,
+        line: Number(bestQuote.line),
+        homeTeam: homeName,
+        awayTeam: awayName,
+      });
 
       picks.push({
         gameId,
@@ -360,8 +370,9 @@ export function evaluateBasketballGameMarkets(params: {
         kickoffUtc,
         marketCode: getMarketCodeForCategory(slot.category, slot.side, chosen.isOver),
         marketCategory: slot.category,
+        marketScope: scopedLabel.marketScope,
         side: slot.side,
-        selection: `${slot.labelPrefix} ${chosen.isOver ? 'Over' : 'Under'} ${Number(bestQuote.line).toFixed(1)}`,
+        selection: scopedLabel.selection,
         line: Number(bestQuote.line),
         projectedMean: Math.round(dist.mean * 100) / 100,
         projectedStd: Math.round(dist.std * 100) / 100,
@@ -458,6 +469,14 @@ export function evaluateBasketballGameMarkets(params: {
         null,
         false
       );
+      const scopedLabel = resolveBasketballMarketLabelAndScope({
+        marketCategory: slot.category,
+        side: slot.side,
+        isOver: best.isOver,
+        line: best.line,
+        homeTeam: homeName,
+        awayTeam: awayName,
+      });
 
       picks.push({
         gameId,
@@ -466,8 +485,9 @@ export function evaluateBasketballGameMarkets(params: {
         kickoffUtc,
         marketCode: getMarketCodeForCategory(slot.category, slot.side, best.isOver),
         marketCategory: slot.category,
+        marketScope: scopedLabel.marketScope,
         side: slot.side,
-        selection: `${slot.labelPrefix} ${best.isOver ? 'Over' : 'Under'} ${best.line.toFixed(1)}`,
+        selection: scopedLabel.selection,
         line: best.line,
         projectedMean: Math.round(dist.mean * 100) / 100,
         projectedStd: Math.round(dist.std * 100) / 100,

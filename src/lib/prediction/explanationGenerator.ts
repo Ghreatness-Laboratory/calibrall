@@ -16,12 +16,19 @@ import {
 } from '@/types';
 import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
 import { getEquivalentCanonicalKey } from './marketMonitor';
-import { getLeagueCapabilities } from './calibratedParams';
+import { getLeagueCalibratedConfig, getLeagueCapabilities } from './calibratedParams';
+import {
+  resolveBasketballMarketLabelAndScope,
+  resolveFootballMarketLabelAndScope,
+} from './marketCatalog';
 import {
   compareFootballPicksByRank,
   getMarketEvidenceFamily,
   isEvidenceFieldAllowed,
+  resolveBasketballTargetScope,
+  resolveFootballTargetScope,
   validateExplanationConsistency,
+  type FootballTargetScope,
   type MarketEvidenceFamily,
 } from './explanationValidator';
 import type { BasketballGameEvaluation, BasketballPickCandidate } from '@/lib/basketball/picker';
@@ -206,12 +213,33 @@ export function buildFootballMarketBoard(params: {
     const calProb = getEffectiveFootballProb(p);
     const isTop = Boolean(topPick && p.marketCode === topPick.marketCode);
     const classification = classifyPredictionBoardReason(p, isTop, isThinHistory);
-    entries.push({
+    const scopedLabel = resolveFootballMarketLabelAndScope({
       marketCode: p.marketCode,
-      marketName: cleanDisplayText(p.marketName),
       optionType: p.optionType,
       marketCategory: p.marketCategory,
-      selection: cleanDisplayText(p.selection),
+      rawMarketName: p.marketName,
+      rawSelection: p.selection,
+      homeTeam: home,
+      awayTeam: away,
+      line: p.line,
+      period: p.period,
+      multiGoalsMeta: p.multiGoalsMeta,
+    });
+    const resolvedScope = p.marketScope ? cleanDisplayText(p.marketScope) : scopedLabel.marketScope;
+    const isTeamLegacy =
+      !p.selection.toLowerCase().includes('team ') &&
+      (scopedLabel.marketScope !== 'Match goals' &&
+        scopedLabel.marketScope !== 'Match multi goals' &&
+        scopedLabel.marketScope !== 'Match corners' &&
+        scopedLabel.marketScope !== 'Match cards' &&
+        scopedLabel.marketName.toLowerCase().includes('team '));
+    entries.push({
+      marketCode: p.marketCode,
+      marketName: p.marketName ? cleanDisplayText(p.marketName) : scopedLabel.marketName,
+      marketScope: resolvedScope,
+      optionType: p.optionType,
+      marketCategory: p.marketCategory,
+      selection: isTeamLegacy ? scopedLabel.selection : cleanDisplayText(p.selection),
       calibratedProbability: isFiniteNum(calProb) ? Number(calProb.toFixed(4)) : null,
       recommended: classification.recommended,
       isTopPick: classification.isTopPick,
@@ -226,10 +254,11 @@ export function buildFootballMarketBoard(params: {
     seenCodes.add('CARDS_UNDER');
     entries.push({
       marketCode: 'CARDS_UNDER',
-      marketName: 'Cards (Under)',
+      marketName: 'Match cards (Under)',
+      marketScope: 'Match cards',
       optionType: 'bookings',
       marketCategory: 'bookings',
-      selection: 'Under cards',
+      selection: 'Match cards: Under cards',
       calibratedProbability: null,
       recommended: false,
       isTopPick: false,
@@ -249,9 +278,19 @@ export function buildFootballMarketBoard(params: {
   ) => {
     if (predictions.some(predicate) || seenCodes.has(fallback.marketCode)) return;
     seenCodes.add(fallback.marketCode);
+    const fbScoped = resolveFootballMarketLabelAndScope({
+      marketCode: fallback.marketCode,
+      optionType: fallback.optionType,
+      marketCategory: fallback.marketCategory,
+      rawMarketName: fallback.marketName,
+      rawSelection: fallback.selection,
+      homeTeam: home,
+      awayTeam: away,
+    });
     entries.push({
       marketCode: fallback.marketCode,
       marketName: cleanDisplayText(fallback.marketName),
+      marketScope: fallback.marketScope || fbScoped.marketScope,
       optionType: fallback.optionType,
       marketCategory: fallback.marketCategory,
       selection: cleanDisplayText(fallback.selection),
@@ -399,8 +438,10 @@ export function buildFootballMarketBoard(params: {
 function buildBasketballMarketBoard(params: {
   evaluation: BasketballGameEvaluation;
   topPick: BasketballPickCandidate | null;
+  homeTeam?: string;
+  awayTeam?: string;
 }): MarketBoardEntry[] {
-  const { evaluation, topPick } = params;
+  const { evaluation, topPick, homeTeam, awayTeam } = params;
   const picks = evaluation.picks || [];
   const entries: MarketBoardEntry[] = [];
   const seenCodes = new Set<string>();
@@ -426,12 +467,22 @@ function buildBasketballMarketBoard(params: {
         reason = 'below the confidence threshold';
       }
     }
+    const scopedLabel = resolveBasketballMarketLabelAndScope({
+      marketCategory: p.marketCategory,
+      side: p.side,
+      isOver: !/\bunder\b/i.test(p.selection),
+      line: p.line,
+      rawSelection: p.selection,
+      homeTeam,
+      awayTeam,
+    });
     entries.push({
       marketCode: p.marketCode,
-      marketName: cleanDisplayText(p.marketCategory),
+      marketName: scopedLabel.marketName,
+      marketScope: p.marketScope || scopedLabel.marketScope,
       optionType: p.marketCategory,
       marketCategory: p.marketCategory,
-      selection: cleanDisplayText(p.selection),
+      selection: scopedLabel.selection,
       calibratedProbability: isFiniteNum(p.calibratedProbability)
         ? Number(p.calibratedProbability.toFixed(4))
         : null,
@@ -484,7 +535,7 @@ function deriveFootballHeadlineReason(
 export function selectTopFootballAlternates(
   predictions: MarketPrediction[],
   topPick: MarketPrediction | null,
-  options?: { headlineSelectionReason?: string }
+  options?: { headlineSelectionReason?: string; homeTeam?: string; awayTeam?: string }
 ): WrittenMatchAlternate[] {
   const seenCodes = new Set<string>();
   const seenSelections = new Set<string>();
@@ -511,7 +562,23 @@ export function selectTopFootballAlternates(
     if (p.isSpeculative) continue;
     if (p.marketCategory === 'multi_goals' && (p.rankingScore ?? 0) <= 0) continue;
 
-    const selClean = cleanDisplayText(p.selection);
+    const scopedLabel = resolveFootballMarketLabelAndScope({
+      marketCode: p.marketCode,
+      optionType: p.optionType,
+      marketCategory: p.marketCategory,
+      rawMarketName: p.marketName,
+      rawSelection: p.selection,
+      homeTeam: options?.homeTeam,
+      awayTeam: options?.awayTeam,
+      line: p.line,
+      period: p.period,
+      multiGoalsMeta: p.multiGoalsMeta,
+    });
+    const isTeamLegacy =
+      !p.selection.toLowerCase().includes('team ') &&
+      scopedLabel.marketName.toLowerCase().includes('team ');
+
+    const selClean = isTeamLegacy ? scopedLabel.selection : cleanDisplayText(p.selection);
     const selLower = selClean.toLowerCase();
     if (seenSelections.has(selLower)) continue;
 
@@ -532,7 +599,8 @@ export function selectTopFootballAlternates(
 
     out.push({
       marketCode: p.marketCode,
-      marketName: cleanDisplayText(p.marketName),
+      marketName: p.marketName ? cleanDisplayText(p.marketName) : scopedLabel.marketName,
+      marketScope: p.marketScope ? cleanDisplayText(p.marketScope) : scopedLabel.marketScope,
       selection: selClean,
       probability: Number(effProb.toFixed(4)),
       confidenceTier: p.confidenceTier,
@@ -543,6 +611,7 @@ export function selectTopFootballAlternates(
 
 function buildFootballDriverTiles(params: {
   family: MarketEvidenceFamily;
+  fbScope: FootballTargetScope;
   topPick: MarketPrediction | null;
   home: string;
   away: string;
@@ -556,7 +625,9 @@ function buildFootballDriverTiles(params: {
   awayXg: number | null;
   totalXg: number | null;
   rawHomeAvgScored: number | null;
+  rawHomeAvgConceded: number | null;
   rawAwayAvgScored: number | null;
+  rawAwayAvgConceded: number | null;
   h2hMeetingsCount: number;
   h2hAvgTotalGoals: number | null;
   h2hCardsMeetingsCount: number;
@@ -564,10 +635,14 @@ function buildFootballDriverTiles(params: {
   h2hCornersMeetingsCount: number;
   h2hAvgTotalCorners: number | null;
   leagueCardsBaseline: number | null;
+  firstHalfShare: number;
 }): ExplanationDriverTile[] {
   const {
     family,
+    fbScope,
     topPick,
+    home,
+    away,
     homeSamples,
     awaySamples,
     context,
@@ -578,7 +653,9 @@ function buildFootballDriverTiles(params: {
     awayXg,
     totalXg,
     rawHomeAvgScored,
+    rawHomeAvgConceded,
     rawAwayAvgScored,
+    rawAwayAvgConceded,
     h2hMeetingsCount,
     h2hAvgTotalGoals,
     h2hCardsMeetingsCount,
@@ -586,6 +663,7 @@ function buildFootballDriverTiles(params: {
     h2hCornersMeetingsCount,
     h2hAvgTotalCorners,
     leagueCardsBaseline,
+    firstHalfShare,
   } = params;
 
   const tiles: ExplanationDriverTile[] = [];
@@ -595,6 +673,54 @@ function buildFootballDriverTiles(params: {
       : null;
 
   if (family === 'cards') {
+    if (fbScope.isTeamScoped) {
+      const isHomeTarget = fbScope.scopeKind !== 'away';
+      const targetTeam = isHomeTarget ? home : away;
+      const targetAvgCards = isHomeTarget ? context?.homeAvgCardsFor : context?.awayAvgCardsFor;
+      const targetWin = isHomeTarget ? context?.homeCardsWindow : context?.awayCardsWindow;
+      const targetSamples = isHomeTarget ? homeSamples : awaySamples;
+      if (expCards !== null) {
+        const hRate = context?.homeCardForRating;
+        const aRate = context?.awayCardForRating;
+        const share =
+          isFiniteNum(hRate) && isFiniteNum(aRate) && hRate + aRate > 0
+            ? (isHomeTarget ? hRate : aRate) / (hRate + aRate)
+            : isHomeTarget
+            ? 0.48
+            : 0.52;
+        tiles.push({
+          label: `${targetTeam} cards proj`,
+          value: `${(expCards * share).toFixed(1)} cards`,
+        });
+      }
+      if (context?.refereeAnnounced && context.referee && isFiniteNum(context.refereeShrunkRate)) {
+        tiles.push({
+          label: `Ref (${cleanDisplayText(context.referee)})`,
+          value: `${context.refereeShrunkRate.toFixed(2)} cards/match`,
+        });
+      } else if (leagueCardsBaseline !== null) {
+        tiles.push({
+          label: 'Referee',
+          value: `Unannounced (${leagueCardsBaseline.toFixed(2)} avg)`,
+        });
+      } else {
+        tiles.push({ label: 'Referee', value: 'Unannounced' });
+      }
+      if (isFiniteNum(targetAvgCards)) {
+        const winSuffix = isFiniteNum(targetWin) && targetWin > 0 ? ` (${targetWin}m)` : '';
+        tiles.push({
+          label: `${targetTeam} cards${winSuffix}`,
+          value: `${targetAvgCards.toFixed(2)} / match`,
+        });
+      }
+      if (targetSamples !== null) {
+        tiles.push({ label: 'Sample depth', value: `${targetSamples} matches` });
+      } else if (sampleLabel) {
+        tiles.push({ label: 'Sample depth', value: sampleLabel });
+      }
+      return tiles.slice(0, 4);
+    }
+
     if (expCards !== null) {
       tiles.push({ label: 'Projected cards', value: `${expCards.toFixed(1)} total` });
     }
@@ -639,6 +765,37 @@ function buildFootballDriverTiles(params: {
   }
 
   if (family === 'corners') {
+    if (fbScope.isTeamScoped) {
+      const isHomeTarget = fbScope.scopeKind !== 'away';
+      const targetTeam = isHomeTarget ? home : away;
+      const oppTeam = isHomeTarget ? away : home;
+      const targetExp = isHomeTarget ? expCornersHome : expCornersAway;
+      const targetFor = isHomeTarget ? context?.homeAvgCornersFor : context?.awayAvgCornersFor;
+      const oppAgainst = isHomeTarget ? context?.awayAvgCornersAgainst : context?.homeAvgCornersAgainst;
+      if (targetExp !== null) {
+        tiles.push({
+          label: `${targetTeam} corners`,
+          value: `${targetExp.toFixed(1)} exp`,
+        });
+      }
+      if (isFiniteNum(targetFor)) {
+        tiles.push({
+          label: `${targetTeam} won avg`,
+          value: `${targetFor.toFixed(1)} / match`,
+        });
+      }
+      if (isFiniteNum(oppAgainst)) {
+        tiles.push({
+          label: `${oppTeam} conceded`,
+          value: `${oppAgainst.toFixed(1)} / match`,
+        });
+      }
+      if (sampleLabel) {
+        tiles.push({ label: 'Sample depth', value: sampleLabel });
+      }
+      return tiles.slice(0, 4);
+    }
+
     if (expCornersHome !== null && expCornersAway !== null) {
       tiles.push({
         label: 'Projected corners',
@@ -696,7 +853,89 @@ function buildFootballDriverTiles(params: {
     return tiles.slice(0, 4);
   }
 
-  // Goals, multi_goals, btts, handicap, result, half_time
+  // Team-scoped goals / team multi goals / team goal bounds
+  if (fbScope.isTeamScoped) {
+    const isHomeTarget = fbScope.scopeKind !== 'away';
+    const targetTeam = isHomeTarget ? home : away;
+    const oppTeam = isHomeTarget ? away : home;
+    const targetXg = isHomeTarget ? homeXg : awayXg;
+    const targetScored = isHomeTarget ? rawHomeAvgScored : rawAwayAvgScored;
+    const targetConceded = isHomeTarget ? rawHomeAvgConceded : rawAwayAvgConceded;
+    const oppConceded = isHomeTarget ? rawAwayAvgConceded : rawHomeAvgConceded;
+
+    if (targetXg !== null) {
+      tiles.push({
+        label: `${targetTeam} xG`,
+        value: `${targetXg.toFixed(2)} xG`,
+      });
+    }
+    if (
+      family === 'multi_goals' &&
+      topPick?.multiGoalsMeta &&
+      isFiniteNum(topPick.multiGoalsMeta.last10Hits) &&
+      isFiniteNum(topPick.multiGoalsMeta.last10Total) &&
+      topPick.multiGoalsMeta.last10Total > 0
+    ) {
+      tiles.push({
+        label: `Band ${cleanDisplayText(topPick.multiGoalsMeta.band)} hits`,
+        value: `${topPick.multiGoalsMeta.last10Hits} of ${topPick.multiGoalsMeta.last10Total} matches`,
+      });
+    } else if (targetScored !== null) {
+      tiles.push({
+        label: `${targetTeam} scoring`,
+        value:
+          targetConceded !== null
+            ? `${targetScored.toFixed(1)} for / ${targetConceded.toFixed(1)} against`
+            : `${targetScored.toFixed(1)} / match`,
+      });
+    }
+    if (oppConceded !== null) {
+      tiles.push({
+        label: `${oppTeam} defence`,
+        value: `${oppConceded.toFixed(1)} conceded / match`,
+      });
+    }
+    if (sampleLabel) {
+      tiles.push({ label: 'Sample depth', value: sampleLabel });
+    }
+    return tiles.slice(0, 4);
+  }
+
+  // First-half match-scoped goals / multi goals
+  if (fbScope.isFirstHalf) {
+    if (homeXg !== null && awayXg !== null) {
+      const fhH = Number((homeXg * firstHalfShare).toFixed(2));
+      const fhA = Number((awayXg * firstHalfShare).toFixed(2));
+      const fhTot = topPick?.multiGoalsMeta?.expectedTotalGoals ?? Number((fhH + fhA).toFixed(2));
+      tiles.push({
+        label: '1st half xG',
+        value: `${fhH.toFixed(2)} + ${fhA.toFixed(2)} (${fhTot.toFixed(2)})`,
+      });
+    }
+    if (
+      family === 'multi_goals' &&
+      topPick?.multiGoalsMeta &&
+      isFiniteNum(topPick.multiGoalsMeta.last10Hits) &&
+      isFiniteNum(topPick.multiGoalsMeta.last10Total) &&
+      topPick.multiGoalsMeta.last10Total > 0
+    ) {
+      tiles.push({
+        label: `Band ${cleanDisplayText(topPick.multiGoalsMeta.band)} hits`,
+        value: `${topPick.multiGoalsMeta.last10Hits} of ${topPick.multiGoalsMeta.last10Total} matches`,
+      });
+    } else if (rawHomeAvgScored !== null && rawAwayAvgScored !== null) {
+      tiles.push({
+        label: 'Full match scoring avg',
+        value: `${rawHomeAvgScored.toFixed(1)} vs ${rawAwayAvgScored.toFixed(1)} / match`,
+      });
+    }
+    if (sampleLabel) {
+      tiles.push({ label: 'Sample depth', value: sampleLabel });
+    }
+    return tiles.slice(0, 4);
+  }
+
+  // Match Goals, multi_goals, btts, handicap, result, 2nd half / HSH
   if (homeXg !== null && awayXg !== null && totalXg !== null) {
     tiles.push({
       label: 'Expected goals',
@@ -831,8 +1070,38 @@ export function generateFootballExplanation(params: {
       ? evaluation.topPick
       : null;
   const family: MarketEvidenceFamily = getMarketEvidenceFamily(topPick, 'football');
+  const fbScope = resolveFootballTargetScope(topPick, home, away);
+  const firstHalfShare =
+    getLeagueCalibratedConfig(context?.competitionCode || fixture.competition?.code)?.halves
+      ?.firstHalfGoalShare ?? 0.439;
   const allow = (field: Parameters<typeof isEvidenceFieldAllowed>[1]) =>
     isEvidenceFieldAllowed(family, field);
+
+  const scopedTopLabel = topPick
+    ? resolveFootballMarketLabelAndScope({
+        marketCode: topPick.marketCode,
+        optionType: topPick.optionType,
+        marketCategory: topPick.marketCategory,
+        rawMarketName: topPick.marketName,
+        rawSelection: topPick.selection,
+        homeTeam: home,
+        awayTeam: away,
+        line: topPick.line,
+        period: topPick.period,
+        multiGoalsMeta: topPick.multiGoalsMeta,
+      })
+    : null;
+  const topMarketScope = topPick
+    ? topPick.marketScope
+      ? cleanDisplayText(topPick.marketScope)
+      : scopedTopLabel?.marketScope
+    : undefined;
+  const shouldNormalizeTopSelection = Boolean(
+    topPick &&
+      scopedTopLabel &&
+      fbScope.isTeamScoped &&
+      !topPick.selection.toLowerCase().includes('team ')
+  );
 
   const headlineReason = deriveFootballHeadlineReason(
     topPick,
@@ -841,6 +1110,8 @@ export function generateFootballExplanation(params: {
   );
   const alternates = selectTopFootballAlternates(evaluation.predictions || [], topPick, {
     headlineSelectionReason: headlineReason,
+    homeTeam: home,
+    awayTeam: away,
   });
 
   const rawProb = topPick
@@ -874,7 +1145,11 @@ export function generateFootballExplanation(params: {
   }
 
   let sentence1 = '';
-  const cleanTopSel = topPick ? cleanDisplayText(topPick.selection) : '';
+  const cleanTopSel = topPick
+    ? shouldNormalizeTopSelection && scopedTopLabel
+      ? scopedTopLabel.selection
+      : cleanDisplayText(topPick.selection)
+    : '';
   if (topPick && isFiniteNum(calProb)) {
     const tierLabel = tierToDisplayLabel(topPick.confidenceTier);
     const tierClause =
@@ -955,103 +1230,165 @@ export function generateFootballExplanation(params: {
   let sentence2Body = '';
 
   if (family === 'corners' && expCornersHome !== null && expCornersAway !== null) {
-    const totalCornersProj = expCornersHome + expCornersAway;
-    const cornerAvgParts: string[] = [];
+    if (fbScope.isTeamScoped) {
+      const isHomeTarget = fbScope.scopeKind !== 'away';
+      const targetTeam = isHomeTarget ? home : away;
+      const oppTeam = isHomeTarget ? away : home;
+      const targetExp = isHomeTarget ? expCornersHome : expCornersAway;
+      const targetFor = isHomeTarget ? context?.homeAvgCornersFor : context?.awayAvgCornersFor;
+      const targetWin = isHomeTarget ? context?.homeCornersWindow : context?.awayCornersWindow;
+      const oppAgainst = isHomeTarget ? context?.awayAvgCornersAgainst : context?.homeAvgCornersAgainst;
+      const oppWin = isHomeTarget ? context?.awayCornersWindow : context?.homeCornersWindow;
 
-    if (
-      allow('homeAvgCornersFor') &&
-      isFiniteNum(context?.homeAvgCornersFor) &&
-      isFiniteNum(context?.homeCornersWindow) &&
-      context.homeCornersWindow > 0
-    ) {
-      const againstClause = isFiniteNum(context.homeAvgCornersAgainst)
-        ? ` and conceding ${context.homeAvgCornersAgainst.toFixed(1)}`
-        : '';
-      cornerAvgParts.push(
-        `${home} winning ${context.homeAvgCornersFor.toFixed(1)}${againstClause} corners per match over the last ${context.homeCornersWindow}`
-      );
-    }
+      const cornerAvgParts: string[] = [];
+      if (isFiniteNum(targetFor) && isFiniteNum(targetWin) && targetWin > 0) {
+        cornerAvgParts.push(
+          `${targetTeam} winning ${targetFor.toFixed(1)} corners per match over the last ${targetWin}`
+        );
+      }
+      if (isFiniteNum(oppAgainst) && isFiniteNum(oppWin) && oppWin > 0) {
+        cornerAvgParts.push(
+          `${oppTeam} conceding ${oppAgainst.toFixed(1)} corners per match over the last ${oppWin}`
+        );
+      }
+      const avgClause = cornerAvgParts.length > 0 ? `, with ${cornerAvgParts.join(' and ')}` : '';
+      sentence2Body = `Model projects ${targetExp.toFixed(1)} corners for ${targetTeam}${avgClause}`;
+    } else {
+      const totalCornersProj = expCornersHome + expCornersAway;
+      const cornerAvgParts: string[] = [];
 
-    if (
-      allow('awayAvgCornersFor') &&
-      isFiniteNum(context?.awayAvgCornersFor) &&
-      isFiniteNum(context?.awayCornersWindow) &&
-      context.awayCornersWindow > 0
-    ) {
-      const againstClause = isFiniteNum(context.awayAvgCornersAgainst)
-        ? ` and conceding ${context.awayAvgCornersAgainst.toFixed(1)}`
-        : '';
-      cornerAvgParts.push(
-        `${away} winning ${context.awayAvgCornersFor.toFixed(1)}${againstClause} corners per match over the last ${context.awayCornersWindow}`
-      );
-    }
+      if (
+        allow('homeAvgCornersFor') &&
+        isFiniteNum(context?.homeAvgCornersFor) &&
+        isFiniteNum(context?.homeCornersWindow) &&
+        context.homeCornersWindow > 0
+      ) {
+        const againstClause = isFiniteNum(context.homeAvgCornersAgainst)
+          ? ` and conceding ${context.homeAvgCornersAgainst.toFixed(1)}`
+          : '';
+        cornerAvgParts.push(
+          `${home} winning ${context.homeAvgCornersFor.toFixed(1)}${againstClause} corners per match over the last ${context.homeCornersWindow}`
+        );
+      }
 
-    const avgClause = cornerAvgParts.length > 0 ? `, with ${cornerAvgParts.join(' and ')}` : '';
-    sentence2Body = `Model projects ${expCornersHome.toFixed(1)} corners for ${home} and ${expCornersAway.toFixed(
-      1
-    )} for ${away} (${totalCornersProj.toFixed(1)} total corners)${avgClause}`;
+      if (
+        allow('awayAvgCornersFor') &&
+        isFiniteNum(context?.awayAvgCornersFor) &&
+        isFiniteNum(context?.awayCornersWindow) &&
+        context.awayCornersWindow > 0
+      ) {
+        const againstClause = isFiniteNum(context.awayAvgCornersAgainst)
+          ? ` and conceding ${context.awayAvgCornersAgainst.toFixed(1)}`
+          : '';
+        cornerAvgParts.push(
+          `${away} winning ${context.awayAvgCornersFor.toFixed(1)}${againstClause} corners per match over the last ${context.awayCornersWindow}`
+        );
+      }
 
-    if (allow('h2hAvgTotalCorners') && h2hCornersMeetingsCount >= 3 && h2hAvgTotalCorners !== null) {
-      sentence2Body += `; their last ${plural(
-        h2hCornersMeetingsCount,
-        'head to head meeting',
-        'head to head meetings'
-      )} averaged ${h2hAvgTotalCorners.toFixed(2)} corners`;
+      const avgClause = cornerAvgParts.length > 0 ? `, with ${cornerAvgParts.join(' and ')}` : '';
+      sentence2Body = `Model projects ${expCornersHome.toFixed(1)} corners for ${home} and ${expCornersAway.toFixed(
+        1
+      )} for ${away} (${totalCornersProj.toFixed(1)} total corners)${avgClause}`;
+
+      if (allow('h2hAvgTotalCorners') && h2hCornersMeetingsCount >= 3 && h2hAvgTotalCorners !== null) {
+        sentence2Body += `; their last ${plural(
+          h2hCornersMeetingsCount,
+          'head to head meeting',
+          'head to head meetings'
+        )} averaged ${h2hAvgTotalCorners.toFixed(2)} corners`;
+      }
     }
   } else if (family === 'cards' && expCards !== null) {
-    const teamCardParts: string[] = [];
+    if (fbScope.isTeamScoped) {
+      const isHomeTarget = fbScope.scopeKind !== 'away';
+      const targetTeam = isHomeTarget ? home : away;
+      const oppTeam = isHomeTarget ? away : home;
+      const targetFor = isHomeTarget ? context?.homeAvgCardsFor : context?.awayAvgCardsFor;
+      const targetWin = isHomeTarget ? context?.homeCardsWindow : context?.awayCardsWindow;
+      const targetYellow = isHomeTarget ? context?.homeAvgYellowCards : context?.awayAvgYellowCards;
+      const targetRed = isHomeTarget ? context?.homeAvgRedCards : context?.awayAvgRedCards;
+      const oppDrawn = isHomeTarget ? context?.awayAvgCardsAgainst : context?.homeAvgCardsAgainst;
 
-    if (
-      allow('homeAvgCardsFor') &&
-      isFiniteNum(context?.homeAvgCardsFor) &&
-      isFiniteNum(context?.homeCardsWindow) &&
-      context.homeCardsWindow > 0
-    ) {
-      const yrClause =
-        isFiniteNum(context.homeAvgYellowCards) && isFiniteNum(context.homeAvgRedCards)
-          ? ` (${context.homeAvgYellowCards.toFixed(2)} yellow, ${context.homeAvgRedCards.toFixed(2)} red)`
-          : '';
-      const drawnClause =
-        allow('homeAvgCardsAgainst') && isFiniteNum(context.homeAvgCardsAgainst)
-          ? ` and drawing ${context.homeAvgCardsAgainst.toFixed(2)}`
-          : '';
-      teamCardParts.push(
-        `${home} averages ${context.homeAvgCardsFor.toFixed(2)} cards per match over the last ${
-          context.homeCardsWindow
-        }${yrClause}${drawnClause}`
-      );
-    }
+      const hRate = context?.homeCardForRating;
+      const aRate = context?.awayCardForRating;
+      const share =
+        isFiniteNum(hRate) && isFiniteNum(aRate) && hRate + aRate > 0
+          ? (isHomeTarget ? hRate : aRate) / (hRate + aRate)
+          : isHomeTarget
+          ? 0.48
+          : 0.52;
+      const targetExpCards = expCards * share;
 
-    if (
-      allow('awayAvgCardsFor') &&
-      isFiniteNum(context?.awayAvgCardsFor) &&
-      isFiniteNum(context?.awayCardsWindow) &&
-      context.awayCardsWindow > 0
-    ) {
-      const yrClause =
-        isFiniteNum(context.awayAvgYellowCards) && isFiniteNum(context.awayAvgRedCards)
-          ? ` (${context.awayAvgYellowCards.toFixed(2)} yellow, ${context.awayAvgRedCards.toFixed(2)} red)`
-          : '';
-      const drawnClause =
-        allow('awayAvgCardsAgainst') && isFiniteNum(context.awayAvgCardsAgainst)
-          ? ` and drawing ${context.awayAvgCardsAgainst.toFixed(2)}`
-          : '';
-      teamCardParts.push(
-        `${away} averages ${context.awayAvgCardsFor.toFixed(2)} cards per match over the last ${
-          context.awayCardsWindow
-        }${yrClause}${drawnClause}`
-      );
-    }
+      const teamCardParts: string[] = [];
+      if (isFiniteNum(targetFor) && isFiniteNum(targetWin) && targetWin > 0) {
+        const yrClause =
+          isFiniteNum(targetYellow) && isFiniteNum(targetRed)
+            ? ` (${targetYellow.toFixed(2)} yellow, ${targetRed.toFixed(2)} red)`
+            : '';
+        teamCardParts.push(
+          `${targetTeam} averages ${targetFor.toFixed(2)} cards per match over the last ${targetWin}${yrClause}`
+        );
+      }
+      if (isFiniteNum(oppDrawn)) {
+        teamCardParts.push(`${oppTeam} draws ${oppDrawn.toFixed(2)} cards per match`);
+      }
+      const teamClause = teamCardParts.length > 0 ? `, as ${teamCardParts.join(' while ')}` : '';
+      sentence2Body = `Model projects ${targetExpCards.toFixed(1)} cards for ${targetTeam}${teamClause}`;
+    } else {
+      const teamCardParts: string[] = [];
 
-    const teamClause = teamCardParts.length > 0 ? `, as ${teamCardParts.join(' and ')}` : '';
-    sentence2Body = `Model projects ${expCards.toFixed(1)} total cards${teamClause}`;
+      if (
+        allow('homeAvgCardsFor') &&
+        isFiniteNum(context?.homeAvgCardsFor) &&
+        isFiniteNum(context?.homeCardsWindow) &&
+        context.homeCardsWindow > 0
+      ) {
+        const yrClause =
+          isFiniteNum(context.homeAvgYellowCards) && isFiniteNum(context.homeAvgRedCards)
+            ? ` (${context.homeAvgYellowCards.toFixed(2)} yellow, ${context.homeAvgRedCards.toFixed(2)} red)`
+            : '';
+        const drawnClause =
+          allow('homeAvgCardsAgainst') && isFiniteNum(context.homeAvgCardsAgainst)
+            ? ` and drawing ${context.homeAvgCardsAgainst.toFixed(2)}`
+            : '';
+        teamCardParts.push(
+          `${home} averages ${context.homeAvgCardsFor.toFixed(2)} cards per match over the last ${
+            context.homeCardsWindow
+          }${yrClause}${drawnClause}`
+        );
+      }
 
-    if (allow('h2hAvgTotalCards') && h2hCardsMeetingsCount >= 3 && h2hAvgTotalCards !== null) {
-      sentence2Body += `; their last ${plural(
-        h2hCardsMeetingsCount,
-        'head to head meeting',
-        'head to head meetings'
-      )} averaged ${h2hAvgTotalCards.toFixed(2)} cards`;
+      if (
+        allow('awayAvgCardsFor') &&
+        isFiniteNum(context?.awayAvgCardsFor) &&
+        isFiniteNum(context?.awayCardsWindow) &&
+        context.awayCardsWindow > 0
+      ) {
+        const yrClause =
+          isFiniteNum(context.awayAvgYellowCards) && isFiniteNum(context.awayAvgRedCards)
+            ? ` (${context.awayAvgYellowCards.toFixed(2)} yellow, ${context.awayAvgRedCards.toFixed(2)} red)`
+            : '';
+        const drawnClause =
+          allow('awayAvgCardsAgainst') && isFiniteNum(context.awayAvgCardsAgainst)
+            ? ` and drawing ${context.awayAvgCardsAgainst.toFixed(2)}`
+            : '';
+        teamCardParts.push(
+          `${away} averages ${context.awayAvgCardsFor.toFixed(2)} cards per match over the last ${
+            context.awayCardsWindow
+          }${yrClause}${drawnClause}`
+        );
+      }
+
+      const teamClause = teamCardParts.length > 0 ? `, as ${teamCardParts.join(' and ')}` : '';
+      sentence2Body = `Model projects ${expCards.toFixed(1)} total cards${teamClause}`;
+
+      if (allow('h2hAvgTotalCards') && h2hCardsMeetingsCount >= 3 && h2hAvgTotalCards !== null) {
+        sentence2Body += `; their last ${plural(
+          h2hCardsMeetingsCount,
+          'head to head meeting',
+          'head to head meetings'
+        )} averaged ${h2hAvgTotalCards.toFixed(2)} cards`;
+      }
     }
   } else if (family === 'goal_runs') {
     const grHomeXg = topPick?.goalRunsMeta?.homeXg ?? homeXg;
@@ -1070,8 +1407,56 @@ export function generateFootballExplanation(params: {
         2
       )} for ${away} (${totalXg.toFixed(2)} total xG), assuming Poisson totals with no in game score effects`;
     }
+  } else if (fbScope.isTeamScoped) {
+    // Strictly team-scoped goals / team multi goals / team goal bounds
+    const isHomeTarget = fbScope.scopeKind !== 'away';
+    const targetTeam = isHomeTarget ? home : away;
+    const oppTeam = isHomeTarget ? away : home;
+    const targetXg = isHomeTarget ? homeXg : awayXg;
+    const targetScored = isHomeTarget ? rawHomeAvgScored : rawAwayAvgScored;
+    const targetConceded = isHomeTarget ? rawHomeAvgConceded : rawAwayAvgConceded;
+    const oppConceded = isHomeTarget ? rawAwayAvgConceded : rawHomeAvgConceded;
+
+    if (targetScored !== null && oppConceded !== null) {
+      const concededClause = targetConceded !== null ? ` and ${targetConceded.toFixed(1)} conceded` : '';
+      const xgClause = targetXg !== null ? ` (${targetXg.toFixed(2)} xG)` : '';
+      sentence2Body = `${targetTeam} averages ${targetScored.toFixed(1)} scored${concededClause}${xgClause} against ${oppTeam} defence conceding ${oppConceded.toFixed(1)} goals`;
+    } else if (targetXg !== null) {
+      sentence2Body = `Dixon Coles projects ${targetXg.toFixed(2)} expected goals for ${targetTeam}`;
+    }
+
+    if (
+      allow('multiGoalsMeta') &&
+      topPick?.multiGoalsMeta &&
+      isFiniteNum(topPick.multiGoalsMeta.last10Hits) &&
+      isFiniteNum(topPick.multiGoalsMeta.last10Total) &&
+      topPick.multiGoalsMeta.last10Total > 0
+    ) {
+      const bandClause = `${targetTeam} landed in ${topPick.multiGoalsMeta.band} goals in ${topPick.multiGoalsMeta.last10Hits} of ${topPick.multiGoalsMeta.last10Total} matches`;
+      sentence2Body = sentence2Body
+        ? `${sentence2Body}; ${bandClause}`
+        : `${bandClause.charAt(0).toUpperCase() + bandClause.slice(1)}`;
+    }
+  } else if (fbScope.isFirstHalf) {
+    // Strictly 1st-half match-scoped goals / 1st-half multi goals (never full-match 90m combined xG)
+    const fhHomeXg = homeXg !== null ? Number((homeXg * firstHalfShare).toFixed(2)) : null;
+    const fhAwayXg = awayXg !== null ? Number((awayXg * firstHalfShare).toFixed(2)) : null;
+    const fhTotalXg =
+      topPick?.multiGoalsMeta?.expectedTotalGoals ??
+      (fhHomeXg !== null && fhAwayXg !== null ? Number((fhHomeXg + fhAwayXg).toFixed(2)) : null);
+    if (fhHomeXg !== null && fhAwayXg !== null && fhTotalXg !== null) {
+      sentence2Body = `Model projects ${fhTotalXg.toFixed(2)} 1st half xG (${fhHomeXg.toFixed(
+        2
+      )} for ${home} and ${fhAwayXg.toFixed(2)} for ${away})`;
+    } else if (hasTeamAverages) {
+      sentence2Body = `${home} averages ${rawHomeAvgScored!.toFixed(1)} scored and ${rawHomeAvgConceded!.toFixed(
+        1
+      )} conceded while ${away} averages ${rawAwayAvgScored!.toFixed(1)} scored and ${rawAwayAvgConceded!.toFixed(
+        1
+      )} conceded`;
+    }
   } else {
-    // Goals / Multi-goals / BTTS / AH / Result / Half-time
+    // Full-match Goals / Multi-goals / BTTS / AH / Result / 2nd Half / HSH
     if (allow('homeAvgScored') && hasTeamAverages) {
       const xgHomeClause = allow('homeXg') && homeXg !== null ? ` (${homeXg.toFixed(2)} xG)` : '';
       const xgAwayClause =
@@ -1124,7 +1509,12 @@ export function generateFootballExplanation(params: {
     stateTags.includes('fixture-congested') || stateTags.includes('high-fatigue');
   const hasKeyAbsences = stateTags.includes('key-absences');
   const isLowScoringTendency =
-    allow('lowScoringTendency') && totalXg !== null && totalXg > 0 && totalXg < 2.2;
+    !fbScope.isTeamScoped &&
+    !fbScope.isFirstHalf &&
+    allow('lowScoringTendency') &&
+    totalXg !== null &&
+    totalXg > 0 &&
+    totalXg < 2.2;
   const isModerateSample =
     homeSamples !== null && awaySamples !== null && (homeSamples < 15 || awaySamples < 15);
 
@@ -1264,6 +1654,7 @@ export function generateFootballExplanation(params: {
 
   const driverTiles = buildFootballDriverTiles({
     family,
+    fbScope,
     topPick,
     home,
     away,
@@ -1277,7 +1668,9 @@ export function generateFootballExplanation(params: {
     awayXg,
     totalXg,
     rawHomeAvgScored,
+    rawHomeAvgConceded,
     rawAwayAvgScored,
+    rawAwayAvgConceded,
     h2hMeetingsCount,
     h2hAvgTotalGoals,
     h2hCardsMeetingsCount,
@@ -1285,12 +1678,14 @@ export function generateFootballExplanation(params: {
     h2hCornersMeetingsCount,
     h2hAvgTotalCorners,
     leagueCardsBaseline,
+    firstHalfShare,
   });
 
   // Market-scoped reasoning payload (zero cross-market leakage)
   const reasoning: Record<string, any> = {
     sport: 'football',
     marketEvidenceFamily: family,
+    marketScope: topMarketScope || null,
     status: topPick ? 'recommended' : 'abstain',
     homeTeam: home,
     awayTeam: away,
@@ -1302,6 +1697,7 @@ export function generateFootballExplanation(params: {
     topPick: topPick
       ? {
           marketCode: topPick.marketCode,
+          marketScope: topMarketScope || null,
           selection: cleanTopSel,
           probability: isFiniteNum(calProb) ? Number(calProb.toFixed(4)) : null,
           rawProbability: isFiniteNum(rawProb) ? Number(rawProb.toFixed(4)) : null,
@@ -1320,15 +1716,37 @@ export function generateFootballExplanation(params: {
   };
 
   if (family === 'cards') {
-    reasoning.expectedCards = expCards !== null ? Number(expCards.toFixed(2)) : null;
-    reasoning.homeAvgCardsFor = isFiniteNum(context?.homeAvgCardsFor) ? context.homeAvgCardsFor : null;
-    reasoning.awayAvgCardsFor = isFiniteNum(context?.awayAvgCardsFor) ? context.awayAvgCardsFor : null;
-    reasoning.homeAvgYellowCards = isFiniteNum(context?.homeAvgYellowCards) ? context.homeAvgYellowCards : null;
-    reasoning.awayAvgYellowCards = isFiniteNum(context?.awayAvgYellowCards) ? context.awayAvgYellowCards : null;
-    reasoning.homeAvgRedCards = isFiniteNum(context?.homeAvgRedCards) ? context.homeAvgRedCards : null;
-    reasoning.awayAvgRedCards = isFiniteNum(context?.awayAvgRedCards) ? context.awayAvgRedCards : null;
-    reasoning.homeCardsWindow = context?.homeCardsWindow ?? null;
-    reasoning.awayCardsWindow = context?.awayCardsWindow ?? null;
+    if (fbScope.isTeamScoped) {
+      const isHomeTarget = fbScope.scopeKind !== 'away';
+      reasoning.targetTeam = isHomeTarget ? home : away;
+      const hRate = context?.homeCardForRating;
+      const aRate = context?.awayCardForRating;
+      const share =
+        isFiniteNum(hRate) && isFiniteNum(aRate) && hRate + aRate > 0
+          ? (isHomeTarget ? hRate : aRate) / (hRate + aRate)
+          : isHomeTarget
+          ? 0.48
+          : 0.52;
+      reasoning.expectedTeamCards = expCards !== null ? Number((expCards * share).toFixed(2)) : null;
+      reasoning.targetAvgCardsFor = isHomeTarget
+        ? (isFiniteNum(context?.homeAvgCardsFor) ? context.homeAvgCardsFor : null)
+        : (isFiniteNum(context?.awayAvgCardsFor) ? context.awayAvgCardsFor : null);
+      reasoning.targetCardsWindow = isHomeTarget
+        ? (context?.homeCardsWindow ?? null)
+        : (context?.awayCardsWindow ?? null);
+    } else {
+      reasoning.expectedCards = expCards !== null ? Number(expCards.toFixed(2)) : null;
+      reasoning.homeAvgCardsFor = isFiniteNum(context?.homeAvgCardsFor) ? context.homeAvgCardsFor : null;
+      reasoning.awayAvgCardsFor = isFiniteNum(context?.awayAvgCardsFor) ? context.awayAvgCardsFor : null;
+      reasoning.homeAvgYellowCards = isFiniteNum(context?.homeAvgYellowCards) ? context.homeAvgYellowCards : null;
+      reasoning.awayAvgYellowCards = isFiniteNum(context?.awayAvgYellowCards) ? context.awayAvgYellowCards : null;
+      reasoning.homeAvgRedCards = isFiniteNum(context?.homeAvgRedCards) ? context.homeAvgRedCards : null;
+      reasoning.awayAvgRedCards = isFiniteNum(context?.awayAvgRedCards) ? context.awayAvgRedCards : null;
+      reasoning.homeCardsWindow = context?.homeCardsWindow ?? null;
+      reasoning.awayCardsWindow = context?.awayCardsWindow ?? null;
+      reasoning.h2hCardsMeetingsCount = h2hCardsMeetingsCount >= 3 ? h2hCardsMeetingsCount : 0;
+      reasoning.h2hAvgTotalCards = h2hCardsMeetingsCount >= 3 ? h2hAvgTotalCards : null;
+    }
     reasoning.referee =
       context?.refereeAnnounced && context.referee ? cleanDisplayText(context.referee) : null;
     reasoning.refereeShrunkRate =
@@ -1337,26 +1755,52 @@ export function generateFootballExplanation(params: {
         : null;
     reasoning.refereeLeagueBaseline = leagueCardsBaseline;
     reasoning.isDerby = Boolean(context?.isDerby);
-    reasoning.h2hCardsMeetingsCount = h2hCardsMeetingsCount >= 3 ? h2hCardsMeetingsCount : 0;
-    reasoning.h2hAvgTotalCards = h2hCardsMeetingsCount >= 3 ? h2hAvgTotalCards : null;
   } else if (family === 'corners') {
-    reasoning.expectedCornersHome = expCornersHome !== null ? Number(expCornersHome.toFixed(2)) : null;
-    reasoning.expectedCornersAway = expCornersAway !== null ? Number(expCornersAway.toFixed(2)) : null;
-    reasoning.homeAvgCornersFor = isFiniteNum(context?.homeAvgCornersFor) ? context.homeAvgCornersFor : null;
-    reasoning.homeAvgCornersAgainst = isFiniteNum(context?.homeAvgCornersAgainst)
-      ? context.homeAvgCornersAgainst
-      : null;
-    reasoning.awayAvgCornersFor = isFiniteNum(context?.awayAvgCornersFor) ? context.awayAvgCornersFor : null;
-    reasoning.awayAvgCornersAgainst = isFiniteNum(context?.awayAvgCornersAgainst)
-      ? context.awayAvgCornersAgainst
-      : null;
-    reasoning.h2hCornersMeetingsCount = h2hCornersMeetingsCount >= 3 ? h2hCornersMeetingsCount : 0;
-    reasoning.h2hAvgTotalCorners = h2hCornersMeetingsCount >= 3 ? h2hAvgTotalCorners : null;
+    if (fbScope.isTeamScoped) {
+      const isHomeTarget = fbScope.scopeKind !== 'away';
+      reasoning.targetTeam = isHomeTarget ? home : away;
+      reasoning.expectedTeamCorners = isHomeTarget
+        ? (expCornersHome !== null ? Number(expCornersHome.toFixed(2)) : null)
+        : (expCornersAway !== null ? Number(expCornersAway.toFixed(2)) : null);
+      reasoning.targetAvgCornersFor = isHomeTarget
+        ? (isFiniteNum(context?.homeAvgCornersFor) ? context.homeAvgCornersFor : null)
+        : (isFiniteNum(context?.awayAvgCornersFor) ? context.awayAvgCornersFor : null);
+      reasoning.opponentAvgCornersAgainst = isHomeTarget
+        ? (isFiniteNum(context?.awayAvgCornersAgainst) ? context.awayAvgCornersAgainst : null)
+        : (isFiniteNum(context?.homeAvgCornersAgainst) ? context.homeAvgCornersAgainst : null);
+    } else {
+      reasoning.expectedCornersHome = expCornersHome !== null ? Number(expCornersHome.toFixed(2)) : null;
+      reasoning.expectedCornersAway = expCornersAway !== null ? Number(expCornersAway.toFixed(2)) : null;
+      reasoning.homeAvgCornersFor = isFiniteNum(context?.homeAvgCornersFor) ? context.homeAvgCornersFor : null;
+      reasoning.homeAvgCornersAgainst = isFiniteNum(context?.homeAvgCornersAgainst)
+        ? context.homeAvgCornersAgainst
+        : null;
+      reasoning.awayAvgCornersFor = isFiniteNum(context?.awayAvgCornersFor) ? context.awayAvgCornersFor : null;
+      reasoning.awayAvgCornersAgainst = isFiniteNum(context?.awayAvgCornersAgainst)
+        ? context.awayAvgCornersAgainst
+        : null;
+      reasoning.h2hCornersMeetingsCount = h2hCornersMeetingsCount >= 3 ? h2hCornersMeetingsCount : 0;
+      reasoning.h2hAvgTotalCorners = h2hCornersMeetingsCount >= 3 ? h2hAvgTotalCorners : null;
+    }
   } else if (family === 'goal_runs') {
     reasoning.homeXg = topPick?.goalRunsMeta?.homeXg ?? (homeXg !== null ? Number(homeXg.toFixed(2)) : null);
     reasoning.awayXg = topPick?.goalRunsMeta?.awayXg ?? (awayXg !== null ? Number(awayXg.toFixed(2)) : null);
     reasoning.totalXg = topPick?.goalRunsMeta?.totalXg ?? totalXg;
     reasoning.goalRunsMeta = topPick?.goalRunsMeta ?? null;
+  } else if (fbScope.isTeamScoped) {
+    const isHomeTarget = fbScope.scopeKind !== 'away';
+    reasoning.targetTeam = isHomeTarget ? home : away;
+    reasoning.targetXg = isHomeTarget
+      ? (homeXg !== null ? Number(homeXg.toFixed(2)) : null)
+      : (awayXg !== null ? Number(awayXg.toFixed(2)) : null);
+    reasoning.targetAvgScored = isHomeTarget ? rawHomeAvgScored : rawAwayAvgScored;
+    reasoning.targetAvgConceded = isHomeTarget ? rawHomeAvgConceded : rawAwayAvgConceded;
+    reasoning.opponentAvgConceded = isHomeTarget ? rawAwayAvgConceded : rawHomeAvgConceded;
+  } else if (fbScope.isFirstHalf) {
+    reasoning.firstHalfHomeXg = homeXg !== null ? Number((homeXg * firstHalfShare).toFixed(2)) : null;
+    reasoning.firstHalfAwayXg = awayXg !== null ? Number((awayXg * firstHalfShare).toFixed(2)) : null;
+    reasoning.firstHalfTotalXg =
+      homeXg !== null && awayXg !== null ? Number(((homeXg + awayXg) * firstHalfShare).toFixed(2)) : null;
   } else {
     reasoning.homeXg = homeXg !== null ? Number(homeXg.toFixed(2)) : null;
     reasoning.awayXg = awayXg !== null ? Number(awayXg.toFixed(2)) : null;
@@ -1385,6 +1829,7 @@ export function generateFootballExplanation(params: {
     marketBoard,
     headlineSelectionReason: headlineReason,
     activePickMarketCode: topPick?.marketCode,
+    activePickMarketScope: topMarketScope,
     activePickSelection: cleanTopSel || undefined,
     activePickProbability: isFiniteNum(calProb) ? Number(calProb.toFixed(4)) : undefined,
     activePickTier: topPick?.confidenceTier,
@@ -1412,6 +1857,8 @@ export function generateFootballExplanation(params: {
             optionType: topPick.optionType,
             marketCategory: topPick.marketCategory,
             marketFamily: topPick.marketFamily,
+            period: topPick.period,
+            multiGoalsMeta: topPick.multiGoalsMeta,
           }
         : null,
     explanation: output,
@@ -1532,7 +1979,7 @@ function deriveBasketballHeadlineReason(
 export function selectTopBasketballAlternates(
   picks: BasketballPickCandidate[],
   topPick: BasketballPickCandidate | null,
-  options?: { headlineSelectionReason?: string }
+  options?: { headlineSelectionReason?: string; homeTeam?: string; awayTeam?: string }
 ): WrittenMatchAlternate[] {
   const seenCodes = new Set<string>();
   const seenSelections = new Set<string>();
@@ -1563,7 +2010,16 @@ export function selectTopBasketballAlternates(
   for (const p of sorted) {
     if (out.length >= 2) break;
     if (seenCodes.has(p.marketCode)) continue;
-    const selClean = cleanDisplayText(p.selection);
+    const scopedLabel = resolveBasketballMarketLabelAndScope({
+      marketCategory: p.marketCategory,
+      side: p.side,
+      isOver: !/\bunder\b/i.test(p.selection),
+      line: p.line,
+      rawSelection: p.selection,
+      homeTeam: options?.homeTeam,
+      awayTeam: options?.awayTeam,
+    });
+    const selClean = scopedLabel.selection;
     if (seenSelections.has(selClean.toLowerCase())) continue;
     if (!isFiniteNum(p.calibratedProbability) || p.calibratedProbability <= 0) continue;
     if (!hasReason && topProb !== null && p.calibratedProbability - topProb > 0.0025) continue;
@@ -1572,7 +2028,8 @@ export function selectTopBasketballAlternates(
     seenSelections.add(selClean.toLowerCase());
     out.push({
       marketCode: p.marketCode,
-      marketName: cleanDisplayText(p.marketCategory),
+      marketName: scopedLabel.marketName,
+      marketScope: p.marketScope || scopedLabel.marketScope,
       selection: selClean,
       probability: Number(p.calibratedProbability.toFixed(4)),
       confidenceTier: p.tier === 'HIGH' ? 'HIGH' : p.tier === 'MEDIUM' ? 'MEDIUM' : 'LOW',
@@ -1619,7 +2076,7 @@ export function generateBasketballExplanation(params: {
       oneLineSummary: s1,
       fullSummary: `${s1} ${s2}`,
       driverTiles: thinTiles,
-      marketBoard: buildBasketballMarketBoard({ evaluation, topPick: null }),
+      marketBoard: buildBasketballMarketBoard({ evaluation, topPick: null, homeTeam: home, awayTeam: away }),
       validationPassed: true,
       fallbackApplied: false,
       reasoning: {
@@ -1638,12 +2095,34 @@ export function generateBasketballExplanation(params: {
   }
 
   const topPick = activePickOverride !== undefined ? activePickOverride : evaluation.topPick;
+  const bbScope = resolveBasketballTargetScope(topPick, home, away);
+  const scopedTopBb = topPick
+    ? resolveBasketballMarketLabelAndScope({
+        marketCategory: topPick.marketCategory,
+        side: topPick.side,
+        isOver: !/\bunder\b/i.test(topPick.selection),
+        line: topPick.line,
+        rawSelection: topPick.selection,
+        homeTeam: home,
+        awayTeam: away,
+      })
+    : null;
+  const topBbMarketScope = topPick
+    ? topPick.marketScope || scopedTopBb?.marketScope
+    : undefined;
+
   const bbHeadlineReason = deriveBasketballHeadlineReason(topPick, evaluation.picks || []);
   const alternates = selectTopBasketballAlternates(evaluation.picks || [], topPick, {
     headlineSelectionReason: bbHeadlineReason,
+    homeTeam: home,
+    awayTeam: away,
   });
 
-  const cleanTopSel = topPick ? cleanDisplayText(topPick.selection) : '';
+  const cleanTopSel = scopedTopBb
+    ? scopedTopBb.selection
+    : topPick
+    ? cleanDisplayText(topPick.selection)
+    : '';
   const sentence1 =
     topPick && isFiniteNum(topPick.calibratedProbability)
       ? cleanDisplayText(
@@ -1660,27 +2139,106 @@ export function generateBasketballExplanation(params: {
     isFiniteNum(proj?.awayMean) &&
     isFiniteNum(proj?.gameTotalMean);
   const hasStd = isFiniteNum(proj?.gameTotalStd);
-  const hasTeamScoring = isFiniteNum(proj?.homeAvgScored) && isFiniteNum(proj?.awayAvgAllowed);
 
+  // Scope-matched basketball sentence2 (never mixes gameTotalMean or wrong team's avg into team/1H totals)
   let sentence2 = '';
-  if (hasMeans) {
-    const stdClause = hasStd ? `, std ${proj.gameTotalStd.toFixed(1)} pts` : '';
+  if (bbScope.isTeamScoped) {
+    const isHomeTarget = bbScope.scopeKind === 'home';
+    const targetTeam = isHomeTarget ? home : away;
+    const oppTeam = isHomeTarget ? away : home;
+    const targetScored = isHomeTarget ? proj?.homeAvgScored : proj?.awayAvgScored;
+    const oppAllowed = isHomeTarget ? proj?.awayAvgAllowed : proj?.homeAvgAllowed;
+    const hasScopedScoring = isFiniteNum(targetScored) && isFiniteNum(oppAllowed);
+
+    if (bbScope.isFirstHalf) {
+      const h1TargetMean = isFiniteNum(topPick?.projectedMean)
+        ? topPick.projectedMean
+        : isHomeTarget
+        ? proj?.h1HomeMean
+        : proj?.h1AwayMean;
+      const shareClause = isFiniteNum(proj?.h1ShareApplied)
+        ? ` (${(proj.h1ShareApplied * 100).toFixed(1)}% 1st half share)`
+        : '';
+      const avgClause = hasScopedScoring
+        ? `, with ${targetTeam} averaging ${targetScored.toFixed(1)} full game pts scored vs ${oppTeam} allowing ${oppAllowed.toFixed(1)} pts`
+        : '';
+      if (isFiniteNum(h1TargetMean)) {
+        sentence2 = cleanDisplayText(
+          `Model projects ${targetTeam} 1st half at ${h1TargetMean.toFixed(1)} pts${shareClause}${avgClause}.`
+        );
+      } else if (hasScopedScoring) {
+        sentence2 = cleanDisplayText(
+          `${targetTeam} averages ${targetScored.toFixed(1)} pts scored vs ${oppTeam} allowing ${oppAllowed.toFixed(1)} pts.`
+        );
+      }
+    } else {
+      const targetMean = isFiniteNum(topPick?.projectedMean)
+        ? topPick.projectedMean
+        : isHomeTarget
+        ? proj?.homeMean
+        : proj?.awayMean;
+      const targetStd = topPick?.projectedStd;
+      const stdClause = isFiniteNum(targetStd) ? ` (std ${targetStd.toFixed(1)} pts)` : '';
+      const avgClause = hasScopedScoring
+        ? `, with ${targetTeam} averaging ${targetScored.toFixed(1)} pts scored vs ${oppTeam} allowing ${oppAllowed.toFixed(1)} pts`
+        : '';
+      if (isFiniteNum(targetMean)) {
+        sentence2 = cleanDisplayText(
+          `Model projects ${targetTeam} at ${targetMean.toFixed(1)} pts${stdClause}${avgClause}.`
+        );
+      } else if (hasScopedScoring) {
+        sentence2 = cleanDisplayText(
+          `${targetTeam} averages ${targetScored.toFixed(1)} pts scored vs ${oppTeam} allowing ${oppAllowed.toFixed(1)} pts.`
+        );
+      }
+    }
+  } else if (bbScope.isFirstHalf) {
+    const h1Home = proj?.h1HomeMean;
+    const h1Away = proj?.h1AwayMean;
+    const h1Total = isFiniteNum(proj?.h1TotalMean) ? proj.h1TotalMean : topPick?.projectedMean;
+    const h1Std = isFiniteNum(proj?.h1TotalStd) ? proj.h1TotalStd : topPick?.projectedStd;
+    const stdClause = isFiniteNum(h1Std) ? `, std ${h1Std.toFixed(1)} pts` : '';
+    const hasTeamScoring = isFiniteNum(proj?.homeAvgScored) && isFiniteNum(proj?.awayAvgAllowed);
     const avgClause = hasTeamScoring
-      ? `, with ${home} averaging ${proj.homeAvgScored.toFixed(1)} pts scored vs ${away} allowing ${proj.awayAvgAllowed.toFixed(
-          1
-        )} pts`
+      ? `, with ${home} averaging ${proj.homeAvgScored.toFixed(1)} pts scored vs ${away} allowing ${proj.awayAvgAllowed.toFixed(1)} pts`
       : '';
-    sentence2 = cleanDisplayText(
-      `Model projects ${home} ${proj.homeMean.toFixed(1)} pts and ${away} ${proj.awayMean.toFixed(
-        1
-      )} pts (${proj.gameTotalMean.toFixed(1)} total pts${stdClause})${avgClause}.`
-    );
-  } else if (hasTeamScoring) {
-    sentence2 = cleanDisplayText(
-      `${home} averages ${proj.homeAvgScored.toFixed(1)} points scored vs ${away} allowing ${proj.awayAvgAllowed.toFixed(
-        1
-      )} points.`
-    );
+    if (
+      isFiniteNum(h1Home) &&
+      isFiniteNum(h1Away) &&
+      isFiniteNum(h1Total) &&
+      Math.abs(h1Home + h1Away - h1Total) <= 3.0
+    ) {
+      sentence2 = cleanDisplayText(
+        `Model projects 1st half scoring at ${h1Home.toFixed(1)} for ${home} and ${h1Away.toFixed(
+          1
+        )} for ${away} (${h1Total.toFixed(1)} 1st half pts${stdClause})${avgClause}.`
+      );
+    } else if (isFiniteNum(h1Total)) {
+      sentence2 = cleanDisplayText(
+        `Model projects 1st half scoring at ${h1Total.toFixed(1)} pts${stdClause}${avgClause}.`
+      );
+    }
+  } else {
+    const hasTeamScoring = isFiniteNum(proj?.homeAvgScored) && isFiniteNum(proj?.awayAvgAllowed);
+    if (hasMeans) {
+      const stdClause = hasStd ? `, std ${proj.gameTotalStd.toFixed(1)} pts` : '';
+      const avgClause = hasTeamScoring
+        ? `, with ${home} averaging ${proj.homeAvgScored.toFixed(1)} pts scored vs ${away} allowing ${proj.awayAvgAllowed.toFixed(
+            1
+          )} pts`
+        : '';
+      sentence2 = cleanDisplayText(
+        `Model projects ${home} ${proj.homeMean.toFixed(1)} pts and ${away} ${proj.awayMean.toFixed(
+          1
+        )} pts (${proj.gameTotalMean.toFixed(1)} total pts${stdClause})${avgClause}.`
+      );
+    } else if (hasTeamScoring) {
+      sentence2 = cleanDisplayText(
+        `${home} averages ${proj.homeAvgScored.toFixed(1)} points scored vs ${away} allowing ${proj.awayAvgAllowed.toFixed(
+          1
+        )} points.`
+      );
+    }
   }
 
   const contextParts: string[] = [];
@@ -1691,7 +2249,9 @@ export function generateBasketballExplanation(params: {
         : `\u2212${Math.abs(proj.paceAdjustment).toFixed(1)}`;
     contextParts.push(
       Math.abs(proj.paceAdjustment) >= 0.3
-        ? `pace matchup shifts total by ${paceDeltaStr} pts`
+        ? bbScope.isTeamScoped
+          ? `pace matchup shifts team scoring by ${paceDeltaStr} pts`
+          : `pace matchup shifts total by ${paceDeltaStr} pts`
         : `neutral pace matchup (${paceDeltaStr} pts)`
     );
   }
@@ -1727,7 +2287,11 @@ export function generateBasketballExplanation(params: {
 
   let marketNote = '';
   const hasSportsbookTotal = isFiniteNum(fixture.basketballStats?.sportsbookTotal);
-  const gameTotalStr = isFiniteNum(proj?.gameTotalMean) ? ` (game total ${proj.gameTotalMean.toFixed(1)} pts)` : '';
+  const isFullGameTotal = !bbScope.isTeamScoped && !bbScope.isFirstHalf;
+  const gameTotalStr =
+    isFullGameTotal && isFiniteNum(proj?.gameTotalMean)
+      ? ` (game total ${proj.gameTotalMean.toFixed(1)} pts)`
+      : '';
 
   if (
     topPick &&
@@ -1742,7 +2306,7 @@ export function generateBasketballExplanation(params: {
     marketNote = `Model projects ${topPick.projectedMean.toFixed(1)} pts vs ${cleanDisplayText(
       topPick.priceSource
     )} line ${topPick.line.toFixed(1)} pts${gameTotalStr} at ${topPick.marketOdds.toFixed(2)} odds${evPart}.`;
-  } else if (hasSportsbookTotal && isFiniteNum(proj?.gameTotalMean)) {
+  } else if (isFullGameTotal && hasSportsbookTotal && isFiniteNum(proj?.gameTotalMean)) {
     marketNote = `Model total ${proj.gameTotalMean.toFixed(1)} pts vs ${fixture.basketballStats!.sportsbookTotal!.toFixed(
       1
     )} pts posted total; no bookmaker price is available, so this is a model line only.`;
@@ -1777,14 +2341,57 @@ export function generateBasketballExplanation(params: {
       : undefined;
 
   const bbTiles: ExplanationDriverTile[] = [];
-  if (isFiniteNum(proj?.gameTotalMean)) {
-    bbTiles.push({ label: 'Projected total', value: `${proj.gameTotalMean.toFixed(1)} pts` });
-  }
-  if (isFiniteNum(proj?.homeMean) && isFiniteNum(proj?.awayMean)) {
-    bbTiles.push({
-      label: 'Split projection',
-      value: `${proj.homeMean.toFixed(1)} / ${proj.awayMean.toFixed(1)}`,
-    });
+  if (bbScope.isTeamScoped) {
+    const isHomeTarget = bbScope.scopeKind === 'home';
+    const targetTeam = isHomeTarget ? home : away;
+    const oppTeam = isHomeTarget ? away : home;
+    const targetMean = bbScope.isFirstHalf
+      ? isFiniteNum(topPick?.projectedMean)
+        ? topPick.projectedMean
+        : isHomeTarget
+        ? proj?.h1HomeMean
+        : proj?.h1AwayMean
+      : isFiniteNum(topPick?.projectedMean)
+      ? topPick.projectedMean
+      : isHomeTarget
+      ? proj?.homeMean
+      : proj?.awayMean;
+    const targetScored = isHomeTarget ? proj?.homeAvgScored : proj?.awayAvgScored;
+    const oppAllowed = isHomeTarget ? proj?.awayAvgAllowed : proj?.homeAvgAllowed;
+
+    if (isFiniteNum(targetMean)) {
+      bbTiles.push({
+        label: bbScope.isFirstHalf ? `${targetTeam} 1H proj` : `${targetTeam} proj`,
+        value: `${targetMean.toFixed(1)} pts`,
+      });
+    }
+    if (isFiniteNum(targetScored) && isFiniteNum(oppAllowed)) {
+      bbTiles.push({
+        label: `${targetTeam} vs ${oppTeam}`,
+        value: `${targetScored.toFixed(1)} for / ${oppAllowed.toFixed(1)} allowed`,
+      });
+    }
+  } else if (bbScope.isFirstHalf) {
+    const h1Total = isFiniteNum(proj?.h1TotalMean) ? proj.h1TotalMean : topPick?.projectedMean;
+    if (isFiniteNum(h1Total)) {
+      bbTiles.push({ label: '1st half proj', value: `${h1Total.toFixed(1)} pts` });
+    }
+    if (isFiniteNum(proj?.h1HomeMean) && isFiniteNum(proj?.h1AwayMean)) {
+      bbTiles.push({
+        label: '1st half split',
+        value: `${proj.h1HomeMean.toFixed(1)} / ${proj.h1AwayMean.toFixed(1)}`,
+      });
+    }
+  } else {
+    if (isFiniteNum(proj?.gameTotalMean)) {
+      bbTiles.push({ label: 'Projected total', value: `${proj.gameTotalMean.toFixed(1)} pts` });
+    }
+    if (isFiniteNum(proj?.homeMean) && isFiniteNum(proj?.awayMean)) {
+      bbTiles.push({
+        label: 'Split projection',
+        value: `${proj.homeMean.toFixed(1)} / ${proj.awayMean.toFixed(1)}`,
+      });
+    }
   }
   if (isFiniteNum(proj?.paceAdjustment)) {
     const sign = proj.paceAdjustment >= 0 ? '+' : '\u2212';
@@ -1801,9 +2408,10 @@ export function generateBasketballExplanation(params: {
     oneLineSummary: splitFirstSentence(sentence1) || sentence1,
     fullSummary,
     driverTiles: bbTiles.slice(0, 4),
-    marketBoard: buildBasketballMarketBoard({ evaluation, topPick }),
+    marketBoard: buildBasketballMarketBoard({ evaluation, topPick, homeTeam: home, awayTeam: away }),
     headlineSelectionReason: bbHeadlineReason,
     activePickMarketCode: topPick?.marketCode,
+    activePickMarketScope: topBbMarketScope,
     activePickSelection: cleanTopSel || undefined,
     activePickProbability:
       topPick && isFiniteNum(topPick.calibratedProbability)
@@ -1823,18 +2431,44 @@ export function generateBasketballExplanation(params: {
     reasoning: {
       sport: 'basketball',
       marketEvidenceFamily: 'basketball',
+      marketScope: topBbMarketScope || null,
       status: topPick ? 'recommended' : 'abstain',
       league: evaluation.league,
       homeTeam: home,
       awayTeam: away,
       homeGamesPlayed: homeGames,
       awayGamesPlayed: awayGames,
-      homeProjected: isFiniteNum(proj?.homeMean) ? Number(proj.homeMean.toFixed(1)) : null,
-      awayProjected: isFiniteNum(proj?.awayMean) ? Number(proj.awayMean.toFixed(1)) : null,
-      projectedTotal: isFiniteNum(proj?.gameTotalMean) ? Number(proj.gameTotalMean.toFixed(1)) : null,
-      projectedTotalStd: isFiniteNum(proj?.gameTotalStd) ? Number(proj.gameTotalStd.toFixed(1)) : null,
-      homeAvgScored: isFiniteNum(proj?.homeAvgScored) ? Number(proj.homeAvgScored.toFixed(1)) : null,
-      awayAvgAllowed: isFiniteNum(proj?.awayAvgAllowed) ? Number(proj.awayAvgAllowed.toFixed(1)) : null,
+      ...(bbScope.isTeamScoped
+        ? {
+            targetTeam: bbScope.scopeKind === 'away' ? away : home,
+            targetProjected: isFiniteNum(topPick?.projectedMean)
+              ? Number(topPick.projectedMean.toFixed(1))
+              : null,
+            targetAvgScored:
+              bbScope.scopeKind === 'away'
+                ? (isFiniteNum(proj?.awayAvgScored) ? Number(proj.awayAvgScored.toFixed(1)) : null)
+                : (isFiniteNum(proj?.homeAvgScored) ? Number(proj.homeAvgScored.toFixed(1)) : null),
+            opponentAvgAllowed:
+              bbScope.scopeKind === 'away'
+                ? (isFiniteNum(proj?.homeAvgAllowed) ? Number(proj.homeAvgAllowed.toFixed(1)) : null)
+                : (isFiniteNum(proj?.awayAvgAllowed) ? Number(proj.awayAvgAllowed.toFixed(1)) : null),
+          }
+        : bbScope.isFirstHalf
+        ? {
+            h1HomeProjected: isFiniteNum(proj?.h1HomeMean) ? Number(proj.h1HomeMean.toFixed(1)) : null,
+            h1AwayProjected: isFiniteNum(proj?.h1AwayMean) ? Number(proj.h1AwayMean.toFixed(1)) : null,
+            h1ProjectedTotal: isFiniteNum(proj?.h1TotalMean) ? Number(proj.h1TotalMean.toFixed(1)) : null,
+            h1ProjectedTotalStd: isFiniteNum(proj?.h1TotalStd) ? Number(proj.h1TotalStd.toFixed(1)) : null,
+          }
+        : {
+            homeProjected: isFiniteNum(proj?.homeMean) ? Number(proj.homeMean.toFixed(1)) : null,
+            awayProjected: isFiniteNum(proj?.awayMean) ? Number(proj.awayMean.toFixed(1)) : null,
+            projectedTotal: isFiniteNum(proj?.gameTotalMean) ? Number(proj.gameTotalMean.toFixed(1)) : null,
+            projectedTotalStd: isFiniteNum(proj?.gameTotalStd) ? Number(proj.gameTotalStd.toFixed(1)) : null,
+            homeAvgScored: isFiniteNum(proj?.homeAvgScored) ? Number(proj.homeAvgScored.toFixed(1)) : null,
+            awayAvgAllowed: isFiniteNum(proj?.awayAvgAllowed) ? Number(proj.awayAvgAllowed.toFixed(1)) : null,
+            sportsbookTotal: hasSportsbookTotal ? fixture.basketballStats!.sportsbookTotal! : null,
+          }),
       homePaceDelta: isFiniteNum(proj?.homePaceDelta) ? Number(proj.homePaceDelta.toFixed(2)) : null,
       awayPaceDelta: isFiniteNum(proj?.awayPaceDelta) ? Number(proj.awayPaceDelta.toFixed(2)) : null,
       paceAdjustment: isFiniteNum(proj?.paceAdjustment) ? Number(proj.paceAdjustment.toFixed(2)) : null,
@@ -1842,10 +2476,10 @@ export function generateBasketballExplanation(params: {
       awayRestDays: isFiniteNum(proj?.awayRestDays) ? proj.awayRestDays : null,
       homeIsB2B: Boolean(proj?.homeIsB2B),
       awayIsB2B: Boolean(proj?.awayIsB2B),
-      sportsbookTotal: hasSportsbookTotal ? fixture.basketballStats!.sportsbookTotal! : null,
       topPick: topPick
         ? {
             marketCode: topPick.marketCode,
+            marketScope: topBbMarketScope || null,
             selection: cleanTopSel,
             line: topPick.line,
             probability: isFiniteNum(topPick.calibratedProbability)
@@ -1875,6 +2509,7 @@ export function generateBasketballExplanation(params: {
             probability: topPick.calibratedProbability,
             confidenceTier: bbConfidenceTier,
             marketCategory: topPick.marketCategory,
+            side: topPick.side,
           }
         : null,
     explanation: output,

@@ -38,9 +38,10 @@ import {
 import { 
   SUPPORTED_OPTIONS_CATALOGUE, 
   isOptionTypeEnabled,
-  isSubstituteOnly
+  isSubstituteOnly,
+  resolveFootballMarketLabelAndScope
 } from './marketCatalog';
-import { displayName } from '@/lib/utils/formatText';
+import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
 import { compareFootballPicksByRank, computeFootballPickRankScore } from './explanationValidator';
 import { isDisabledRecommendationMarket } from '@/lib/markets';
 export { compareFootballPicksByRank, computeFootballPickRankScore };
@@ -1604,6 +1605,18 @@ export function evaluateFixtureMarkets(
       fragilityFlags
     });
 
+    const scopedLabel = resolveFootballMarketLabelAndScope({
+      marketCode: c.marketCode,
+      optionType: c.optionType,
+      marketCategory: c.marketCategory,
+      rawMarketName: c.marketName,
+      rawSelection: c.selection,
+      homeTeam: context.homeTeamName,
+      awayTeam: context.awayTeamName,
+      line: c.line,
+      period: c.period,
+    });
+
     return {
       id: predictionId,
       fixtureId: context.fixtureId,
@@ -1611,8 +1624,9 @@ export function evaluateFixtureMarkets(
       optionType: c.optionType,
       marketCategory: c.marketCategory,
       marketFamily,
-      marketName: c.marketName,
-      selection: c.selection,
+      marketScope: scopedLabel.marketScope,
+      marketName: scopedLabel.marketName,
+      selection: scopedLabel.selection,
       line: c.line,
       period: c.period,
       settlementRule: c.settlementRule,

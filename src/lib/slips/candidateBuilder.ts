@@ -12,6 +12,10 @@ import {
   generateFootballExplanation,
   generateBasketballExplanation,
 } from '@/lib/prediction/explanationGenerator';
+import {
+  resolveBasketballMarketLabelAndScope,
+  resolveFootballMarketLabelAndScope,
+} from '@/lib/prediction/marketCatalog';
 import { isTeamNewsEnabled } from '@/lib/prediction/featureFlags';
 import { getBasketballFixturesAndEvaluations } from '@/lib/basketball/readService';
 import type {
@@ -357,7 +361,8 @@ function resolveBasketballRealQuotes(params: {
   hadStaleOnly: boolean;
 } {
   const { pick, quotes, kickoffMs, nowMs, maxPriceAgeMinutes } = params;
-  const isOver = pick.selection.toLowerCase().startsWith('over');
+  const isOver =
+    pick.marketCode.toUpperCase().endsWith('_OVER') || /\bover\b/i.test(pick.selection);
   const freshQuotes: SlipBookmakerQuote[] = [];
   let sawAnyMatching = false;
 
@@ -662,6 +667,17 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
 
         const homeClean = cleanDisplayText(displayName(fixture.homeTeam));
         const awayClean = cleanDisplayText(displayName(fixture.awayTeam));
+        const scopedMeta = resolveFootballMarketLabelAndScope({
+          marketCode: pick.marketCode,
+          rawMarketName: pick.marketName,
+          rawSelection: pick.selection,
+          homeTeam: homeClean,
+          awayTeam: awayClean,
+          period: pick.period,
+          side: pick.side,
+          line: pick.line,
+          multiGoalsMeta: pick.multiGoalsMeta,
+        });
 
         candidates.push({
           matchId: fixture.id,
@@ -677,8 +693,9 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
           kickoffTime: fixture.kickoffTime,
           marketCode: pick.marketCode,
           marketGroup,
-          marketName: cleanDisplayText(pick.marketName),
-          selection: cleanDisplayText(pick.selection),
+          marketScope: cleanDisplayText(pick.marketScope || scopedMeta.marketScope),
+          marketName: cleanDisplayText(scopedMeta.marketName),
+          selection: cleanDisplayText(scopedMeta.selection),
           line: pick.line ?? null,
           decimalOdds,
           oddsSourceType,
@@ -866,16 +883,15 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
         const homeClean = cleanDisplayText(displayName(fixture.homeTeam));
         const awayClean = cleanDisplayText(displayName(fixture.awayTeam));
 
-        const marketLabel =
-          pick.marketCategory === 'game_total'
-            ? 'Game total'
-            : pick.marketCategory === 'home_total'
-            ? 'Home team total'
-            : pick.marketCategory === 'away_total'
-            ? 'Away team total'
-            : pick.marketCategory === 'h1_game_total'
-            ? '1st half total'
-            : '1st half team total';
+        const scopedBb = resolveBasketballMarketLabelAndScope({
+          marketCode: pick.marketCode,
+          marketCategory: pick.marketCategory,
+          side: pick.side,
+          rawSelection: pick.selection,
+          line: pick.line,
+          homeTeam: homeClean,
+          awayTeam: awayClean,
+        });
 
         candidates.push({
           matchId: fixture.id,
@@ -891,8 +907,9 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
           kickoffTime: fixture.kickoffTime,
           marketCode: pick.marketCode,
           marketGroup: 'basketball_totals',
-          marketName: cleanDisplayText(marketLabel),
-          selection: cleanDisplayText(pick.selection),
+          marketScope: cleanDisplayText(pick.marketScope || scopedBb.marketScope),
+          marketName: cleanDisplayText(scopedBb.marketName),
+          selection: cleanDisplayText(scopedBb.selection),
           line: Number.isFinite(pick.line) ? pick.line : null,
           decimalOdds,
           oddsSourceType,

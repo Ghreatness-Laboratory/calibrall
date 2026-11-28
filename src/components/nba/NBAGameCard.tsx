@@ -29,6 +29,11 @@ const CATEGORY_SHORT_LABEL: Record<BasketballMarketCategory, string> = {
   h1_team_total: '1st half',
 };
 
+function formatBbSelection(sel: string): string {
+  const cleaned = cleanDisplayText(sel);
+  return /\bpts\b/i.test(cleaned) ? cleaned : `${cleaned} pts`;
+}
+
 function selectPickForFilter(
   evaluation: BasketballGameEvaluation | undefined,
   filter: BasketballMarketGroupFilter
@@ -180,6 +185,7 @@ export default function NBAGameCard({
               ...baseWrittenExplanation,
               oneLineSummary: regen.oneLineSummary,
               activePickMarketCode: regen.activePickMarketCode,
+              activePickMarketScope: regen.activePickMarketScope,
               activePickSelection: regen.activePickSelection,
               activePickProbability: regen.activePickProbability,
               activePickTier: regen.activePickTier,
@@ -209,6 +215,26 @@ export default function NBAGameCard({
     !baseNeedsHistory && !stats?.needsH1History && stats?.h1ProjectedTotal
       ? stats.h1ProjectedTotal.toFixed(1)
       : '—';
+
+  const footerProjText = (() => {
+    if (!displayPick) return `Proj ${projTotalStr} · 1H ${h1ProjStr}`;
+    if (displayPick.marketCategory === 'home_total') {
+      const val = !baseNeedsHistory && stats?.homeProjected ? stats.homeProjected.toFixed(1) : displayPick.projectedMean.toFixed(1);
+      return `Proj ${cleanDisplayText(homeName)} ${val}`;
+    }
+    if (displayPick.marketCategory === 'away_total') {
+      const val = !baseNeedsHistory && stats?.awayProjected ? stats.awayProjected.toFixed(1) : displayPick.projectedMean.toFixed(1);
+      return `Proj ${cleanDisplayText(awayName)} ${val}`;
+    }
+    if (displayPick.marketCategory === 'h1_game_total') {
+      return `1H proj ${h1ProjStr}`;
+    }
+    if (displayPick.marketCategory === 'h1_team_total') {
+      const team = displayPick.side === 'away' ? awayName : homeName;
+      return `1H ${cleanDisplayText(team)} ${displayPick.projectedMean.toFixed(1)}`;
+    }
+    return `Proj ${projTotalStr} · 1H ${h1ProjStr}`;
+  })();
 
   const hasRealPrice = Boolean(
     displayPick &&
@@ -346,7 +372,7 @@ export default function NBAGameCard({
           <div className="flex items-center justify-between text-[11px] gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-[var(--text-2)] truncate">
-                {CATEGORY_SHORT_LABEL[displayPick.marketCategory]}
+                {cleanDisplayText(displayPick.marketScope || CATEGORY_SHORT_LABEL[displayPick.marketCategory])}
               </span>
               <span
                 className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold border leading-tight ${tierBadgeClass}`}
@@ -361,7 +387,7 @@ export default function NBAGameCard({
 
           <div className="flex items-center justify-between gap-2">
             <span className="font-display text-[15px] font-bold text-[var(--text)] truncate">
-              {cleanDisplayText(displayPick.selection)} pts
+              {formatBbSelection(displayPick.selection)}
             </span>
             {probPct && (
               <span className="font-display text-[15px] font-bold text-[var(--accent)] tabular-nums shrink-0">
@@ -401,7 +427,7 @@ export default function NBAGameCard({
             )}
 
             <span className="text-[var(--text-3)] shrink-0">
-              Proj {projTotalStr} · 1H {h1ProjStr}
+              {footerProjText}
             </span>
           </div>
         </div>
@@ -441,7 +467,7 @@ export default function NBAGameCard({
         open={whySheetOpen}
         onClose={() => setWhySheetOpen(false)}
         matchTitle={`${homeName} vs ${awayName}`}
-        pickLabel={displayPick ? `${displayPick.selection} pts` : undefined}
+        pickLabel={displayPick ? formatBbSelection(displayPick.selection) : undefined}
         explanation={writtenExplanation}
       />
     </div>

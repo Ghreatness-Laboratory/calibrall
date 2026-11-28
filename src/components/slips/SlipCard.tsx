@@ -55,7 +55,7 @@ export function formatSlipAsPlainText(slip: BuiltSlip): string {
       )}, ${formatLocalKickoff(leg.kickoffTime)})`
     );
     lines.push(
-      `   Pick: ${cleanDisplayText(leg.selection)} (${cleanDisplayText(leg.marketName)})`
+      `   Pick: ${cleanDisplayText(leg.selection)} (${cleanDisplayText(leg.marketScope || leg.marketName)})`
     );
     lines.push(
       `   Price: ${leg.decimalOdds.toFixed(2)} (${cleanDisplayText(
@@ -278,7 +278,7 @@ export default function SlipCard({
                     {cleanDisplayText(leg.selection)}
                   </div>
                   <div className="text-[11px] text-[var(--text-2)]">
-                    {cleanDisplayText(leg.marketName)}
+                    {cleanDisplayText(leg.marketScope || leg.marketName)}
                   </div>
                 </div>
 

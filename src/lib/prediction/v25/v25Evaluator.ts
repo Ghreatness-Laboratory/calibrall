@@ -20,7 +20,7 @@ import { DixonColesV25Engine, V25ScorelineMatrix, COVARIATE_COEFFICIENTS } from 
 import { ConfidenceEngine } from './confidenceEngine';
 import { WhyPanelGenerator } from './whyPanel';
 import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
-import { formatSelectionName, isOptionTypeEnabled } from '../marketCatalog';
+import { formatSelectionName, isOptionTypeEnabled, resolveFootballMarketLabelAndScope } from '../marketCatalog';
 import { isMultiGoalsEnabled } from './featureFlags';
 import { getMarketBaseline } from '../baselines';
 import { marketMonitor, getEquivalentCanonicalKey } from '../marketMonitor';
@@ -558,6 +558,19 @@ export class DixonColesV25Evaluator {
         hasKeyAttackerAbsent: features.homeAbsences.missingXgShare > 0.15,
       });
 
+      const scopedCand = resolveFootballMarketLabelAndScope({
+        marketCode: cand.marketCode,
+        optionType: cand.optionType,
+        marketCategory: cand.marketCategory,
+        rawMarketName: cand.marketName,
+        rawSelection: cand.selection,
+        homeTeam: context.homeTeamName,
+        awayTeam: context.awayTeamName,
+        line: cand.line,
+        period: cand.period,
+        multiGoalsMeta: cand.multiGoalsMeta,
+      });
+
       const candThresholdPct = (candThreshold * 100).toFixed(1);
       let multiGoalsEvidenceStr: string | undefined;
       let multiGoalsMetaWithHits = cand.multiGoalsMeta ? { ...cand.multiGoalsMeta } : undefined;
@@ -566,9 +579,17 @@ export class DixonColesV25Evaluator {
         const expGoals = meta.expectedTotalGoals.toFixed(1);
         const bandText = `${meta.minGoals} to ${meta.maxGoals} goals`;
         const pPct = (calProb * 100).toFixed(1);
+        const homeNameStr = displayName(context.homeTeamName);
+        const awayNameStr = displayName(context.awayTeamName);
         const hAvg = typeof context.homeAvgScored === 'number' && context.homeAvgScored > 0
           ? context.homeAvgScored.toFixed(1)
           : lambda.toFixed(1);
+        const hCon = typeof context.homeAvgConceded === 'number' && context.homeAvgConceded > 0
+          ? context.homeAvgConceded.toFixed(1)
+          : mu.toFixed(1);
+        const aAvg = typeof context.awayAvgScored === 'number' && context.awayAvgScored > 0
+          ? context.awayAvgScored.toFixed(1)
+          : mu.toFixed(1);
         const aCon = typeof context.awayAvgConceded === 'number' && context.awayAvgConceded > 0
           ? context.awayAvgConceded.toFixed(1)
           : lambda.toFixed(1);
@@ -591,22 +612,23 @@ export class DixonColesV25Evaluator {
           const hits = hTotals.filter(g => g >= meta.minGoals && g <= meta.maxGoals).length;
           meta.last10Hits = hits;
           meta.last10Total = hTotals.length;
-          recentClause = ` ${displayName(context.homeTeamName)} scored ${bandText} in ${hits} of last ${hTotals.length} matches.`;
+          recentClause = ` ${homeNameStr} scored ${bandText} in ${hits} of last ${hTotals.length} matches.`;
         } else if (meta.scope === 'away' && hTotals.length > 0) {
           const hits = hTotals.filter(g => g >= meta.minGoals && g <= meta.maxGoals).length;
           meta.last10Hits = hits;
           meta.last10Total = hTotals.length;
-          recentClause = ` ${displayName(context.awayTeamName)} scored ${bandText} in ${hits} of last ${hTotals.length} matches.`;
+          recentClause = ` ${awayNameStr} scored ${bandText} in ${hits} of last ${hTotals.length} matches.`;
         }
-        const scopeLabel = meta.scope === 'home'
-          ? `${displayName(context.homeTeamName)} expects ${expGoals} goals`
-          : meta.scope === 'away'
-          ? `${displayName(context.awayTeamName)} expects ${expGoals} goals`
-          : meta.scope === 'first_half'
-          ? `Model expects ${expGoals} first half goals`
-          : `Model expects ${expGoals} total goals`;
         const spanLabel = `range width ${meta.span}`;
-        multiGoalsEvidenceStr = `${scopeLabel}. P(${bandText}) = ${pPct}% (${spanLabel}). Home averages ${hAvg} scored, away concedes ${aCon}.${recentClause} Model line, no market price.`;
+        if (meta.scope === 'home') {
+          multiGoalsEvidenceStr = `${homeNameStr} expects ${expGoals} goals. P(${bandText}) = ${pPct}% (${spanLabel}). ${homeNameStr} averages ${hAvg} scored and ${hCon} conceded, facing ${awayNameStr} defence conceding ${aCon}.${recentClause} Model line, no market price.`;
+        } else if (meta.scope === 'away') {
+          multiGoalsEvidenceStr = `${awayNameStr} expects ${expGoals} goals. P(${bandText}) = ${pPct}% (${spanLabel}). ${awayNameStr} averages ${aAvg} scored and ${aCon} conceded, facing ${homeNameStr} defence conceding ${hCon}.${recentClause} Model line, no market price.`;
+        } else if (meta.scope === 'first_half') {
+          multiGoalsEvidenceStr = `Model expects ${expGoals} 1st half goals. P(${bandText}) = ${pPct}% (${spanLabel}). 1st half goal expectation reflects half share of opening 45 minute play. Model line, no market price.`;
+        } else {
+          multiGoalsEvidenceStr = `Model expects ${expGoals} total goals. P(${bandText}) = ${pPct}% (${spanLabel}). Home averages ${hAvg} scored, away concedes ${aCon}.${recentClause} Model line, no market price.`;
+        }
       }
 
       let goalRunsMetaUpdated = cand.goalRunsMeta ? { ...cand.goalRunsMeta, calibratedProb: Number(calProb.toFixed(4)) } : undefined;
@@ -716,8 +738,9 @@ export class DixonColesV25Evaluator {
         optionType: cand.optionType,
         marketCategory: cand.marketCategory,
         marketFamily: fam,
-        marketName: cleanDisplayText(cand.marketName),
-        selection: formatSelectionName(cand.selection),
+        marketScope: scopedCand.marketScope,
+        marketName: scopedCand.marketName,
+        selection: scopedCand.selection,
         line: cand.line,
         period: cand.period,
         settlementRule: cleanDisplayText(cand.settlementRule),
@@ -1161,6 +1184,19 @@ export class DixonColesV25Evaluator {
     });
 
     // 3b. Team Totals Over / Under Goals (0.5, 1.5, 2.5)
+    const homeDefClause = typeof context.awayAvgConceded === 'number' && context.awayAvgConceded > 0
+      ? `, against ${away} conceding ${context.awayAvgConceded.toFixed(1)} per match`
+      : '';
+    const homeScoredClause = typeof context.homeAvgScored === 'number' && context.homeAvgScored > 0
+      ? ` (${context.homeAvgScored.toFixed(1)} scored, ${typeof context.homeAvgConceded === 'number' ? `${context.homeAvgConceded.toFixed(1)} conceded` : 'trailing rate'})`
+      : '';
+    const awayDefClause = typeof context.homeAvgConceded === 'number' && context.homeAvgConceded > 0
+      ? `, against ${home} conceding ${context.homeAvgConceded.toFixed(1)} per match`
+      : '';
+    const awayScoredClause = typeof context.awayAvgScored === 'number' && context.awayAvgScored > 0
+      ? ` (${context.awayAvgScored.toFixed(1)} scored, ${typeof context.awayAvgConceded === 'number' ? `${context.awayAvgConceded.toFixed(1)} conceded` : 'trailing rate'})`
+      : '';
+
     [0.5, 1.5, 2.5].forEach(line => {
       const codeSuffix = String(line).replace('.', '');
       const hTeam = matrix.teamGoalsOverUnder.home[line];
@@ -1169,27 +1205,27 @@ export class DixonColesV25Evaluator {
           marketCode: `TEAM_GOALS_HOME_O${codeSuffix}`,
           optionType: 'over_under_goals',
           marketCategory: 'team_goals',
-          marketName: `${home} Team Total Goals`,
-          selection: `${home} Over ${line} goals`,
+          marketName: `${home} team goals`,
+          selection: `${home} team goals: Over ${line}`,
           line,
           period: 'REGULAR_TIME',
           settlementRule: `${home} regular time goals > ${line}.`,
           rawProb: hTeam.over,
           marketOdds: undefined,
-          plainEnglishReason: `${home} projected ${lambda.toFixed(2)} xG in joint Dixon Coles distribution yields ${(hTeam.over * 100).toFixed(1)}% chance of over ${line} goals.`,
+          plainEnglishReason: `${home} expected goals ${lambda.toFixed(2)} xG${homeScoredClause}${homeDefClause} yields ${(hTeam.over * 100).toFixed(1)}% chance of over ${line}.`,
         });
         list.push({
           marketCode: `TEAM_GOALS_HOME_U${codeSuffix}`,
           optionType: 'over_under_goals',
           marketCategory: 'team_goals',
-          marketName: `${home} Team Total Goals`,
-          selection: `${home} Under ${line} goals`,
+          marketName: `${home} team goals`,
+          selection: `${home} team goals: Under ${line}`,
           line,
           period: 'REGULAR_TIME',
           settlementRule: `${home} regular time goals < ${line}.`,
           rawProb: hTeam.under,
           marketOdds: undefined,
-          plainEnglishReason: `${home} projected ${lambda.toFixed(2)} xG in joint Dixon Coles distribution yields ${(hTeam.under * 100).toFixed(1)}% chance of under ${line} goals.`,
+          plainEnglishReason: `${home} expected goals ${lambda.toFixed(2)} xG${homeScoredClause}${homeDefClause} yields ${(hTeam.under * 100).toFixed(1)}% chance of under ${line}.`,
         });
       }
 
@@ -1199,27 +1235,27 @@ export class DixonColesV25Evaluator {
           marketCode: `TEAM_GOALS_AWAY_O${codeSuffix}`,
           optionType: 'over_under_goals',
           marketCategory: 'team_goals',
-          marketName: `${away} Team Total Goals`,
-          selection: `${away} Over ${line} goals`,
+          marketName: `${away} team goals`,
+          selection: `${away} team goals: Over ${line}`,
           line,
           period: 'REGULAR_TIME',
           settlementRule: `${away} regular time goals > ${line}.`,
           rawProb: aTeam.over,
           marketOdds: undefined,
-          plainEnglishReason: `${away} projected ${mu.toFixed(2)} xG in joint Dixon Coles distribution yields ${(aTeam.over * 100).toFixed(1)}% chance of over ${line} goals.`,
+          plainEnglishReason: `${away} expected goals ${mu.toFixed(2)} xG${awayScoredClause}${awayDefClause} yields ${(aTeam.over * 100).toFixed(1)}% chance of over ${line}.`,
         });
         list.push({
           marketCode: `TEAM_GOALS_AWAY_U${codeSuffix}`,
           optionType: 'over_under_goals',
           marketCategory: 'team_goals',
-          marketName: `${away} Team Total Goals`,
-          selection: `${away} Under ${line} goals`,
+          marketName: `${away} team goals`,
+          selection: `${away} team goals: Under ${line}`,
           line,
           period: 'REGULAR_TIME',
           settlementRule: `${away} regular time goals < ${line}.`,
           rawProb: aTeam.under,
           marketOdds: undefined,
-          plainEnglishReason: `${away} projected ${mu.toFixed(2)} xG in joint Dixon Coles distribution yields ${(aTeam.under * 100).toFixed(1)}% chance of under ${line} goals.`,
+          plainEnglishReason: `${away} expected goals ${mu.toFixed(2)} xG${awayScoredClause}${awayDefClause} yields ${(aTeam.under * 100).toFixed(1)}% chance of under ${line}.`,
         });
       }
     });

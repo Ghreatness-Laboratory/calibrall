@@ -478,8 +478,13 @@ export default function MatchAnalysisPage() {
           <>
             {bbTopPick && (
               <div className="bg-[var(--surface)] border border-[var(--line)] rounded-[18px] p-4 space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-display text-[14px] font-semibold text-[var(--text)]">Model pick</span>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-display text-[14px] font-semibold text-[var(--text)]">Model pick</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)]">
+                      {cleanDisplayText(bbTopPick.marketScope || BB_CAT_TITLES[bbTopPick.marketCategory])}
+                    </span>
+                  </div>
                   <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${tierStyle(bbTopPick.tier)}`}>
                     {bbTopPick.tier === 'HIGH' ? 'High' : bbTopPick.tier === 'MEDIUM' ? 'Medium' : 'Low'}
                   </span>
@@ -586,7 +591,7 @@ export default function MatchAnalysisPage() {
                                     {cleanDisplayText(alt.selection)}
                                   </div>
                                   <div className="text-[10.5px] text-[var(--text-3)] truncate">
-                                    {cleanDisplayText(alt.marketName)}
+                                    {cleanDisplayText(alt.marketScope || alt.marketName)}
                                   </div>
                                 </div>
                                 <span className="font-display text-[13.5px] font-bold text-[var(--accent)] tabular-nums shrink-0">
@@ -624,7 +629,7 @@ export default function MatchAnalysisPage() {
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--text-2)]">
-                          <span>{BB_CAT_TITLES[p.marketCategory]}</span>
+                          <span>{cleanDisplayText(p.marketScope || BB_CAT_TITLES[p.marketCategory])}</span>
                           <span>
                             {isFinished
                               ? sett.status
@@ -665,7 +670,7 @@ export default function MatchAnalysisPage() {
                 {activeBbPick ? (
                   <div className="space-y-2 text-[12.5px]">
                     <div className="bg-[var(--surface-2)] rounded-[12px] p-3">
-                      <div className="text-[11px] text-[var(--text-2)]">{BB_CAT_TITLES[activeBbPick.marketCategory]}</div>
+                      <div className="text-[11px] text-[var(--text-2)]">{cleanDisplayText(activeBbPick.marketScope || BB_CAT_TITLES[activeBbPick.marketCategory])}</div>
                       <div className="font-display text-[15px] font-bold text-[var(--text)] mt-0.5">
                         {cleanDisplayText(activeBbPick.selection)}
                       </div>
@@ -894,7 +899,12 @@ export default function MatchAnalysisPage() {
               </h2>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(syncedFootballExplanation?.activePickMarketScope || topPick.marketScope) && (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-2)]">
+                  {cleanDisplayText(syncedFootballExplanation?.activePickMarketScope || topPick.marketScope)}
+                </span>
+              )}
               {topPickTier && (
                 <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${topPickTier.badgeClass}`}>
                   {topPickTier.label}
@@ -914,7 +924,7 @@ export default function MatchAnalysisPage() {
 
           <div className="flex items-baseline justify-between gap-3">
             <div className="font-display text-[18px] font-bold text-[var(--text)] leading-snug">
-              {formatSelectionName(topPick.selection)}
+              {cleanDisplayText(formatSelectionName(syncedFootballExplanation?.activePickSelection || topPick.selection))}
             </div>
             {topPickProb !== null && (
               <div className="text-right shrink-0">
@@ -1063,7 +1073,7 @@ export default function MatchAnalysisPage() {
                               {cleanDisplayText(alt.selection)}
                             </div>
                             <div className="text-[10.5px] text-[var(--text-3)] leading-snug">
-                              {cleanDisplayText(alt.marketName)}
+                              {cleanDisplayText(alt.marketScope || alt.marketName)}
                             </div>
                           </div>
                           <span className="font-display text-[13.5px] font-bold text-[var(--accent)] tabular-nums shrink-0">
@@ -1104,7 +1114,7 @@ export default function MatchAnalysisPage() {
                               )}
                             </div>
                             <div className="text-[10.5px] text-[var(--text-3)] leading-snug">
-                              {cleanDisplayText(entry.marketName)}
+                              {cleanDisplayText(entry.marketScope || entry.marketName)}
                             </div>
                             {!entry.recommended && entry.reasonNotRecommended && (
                               <div className="text-[10.5px] text-[var(--text-2)] leading-snug">
@@ -1328,6 +1338,7 @@ export default function MatchAnalysisPage() {
                         {cleanDisplayText(cp.selection)}
                       </div>
                       <div className="text-[11px] text-[var(--text-2)]">
+                        {cp.marketScope ? `${cleanDisplayText(cp.marketScope)} · ` : ''}
                         {cp.marketOdds && cp.marketOdds > 1.0 ? `@${formatOdds(cp.marketOdds)}` : 'Probability analysis'}
                       </div>
                     </div>
