@@ -5,7 +5,8 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
-import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
+import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { applyCanonicalTopPick } from '@/lib/prediction/canonicalHeadlinePick';
 import {
   generateFootballExplanation,
   syncSlateExplanations,
@@ -345,10 +346,14 @@ function MatchesPageInner() {
   const evaluatedFootballFixtures = useMemo(() => {
     if (isBasketball) return [];
     const footballOnly = fixtures.filter((f) => f.sport !== 'basketball');
-    const raw = footballOnly.map((fixture) => {
+    const canonical = footballOnly.map((fixture) => {
       const stats = getFixtureStatistics(fixture);
       const context = buildFixtureContextFromStats(fixture, stats);
-      const evalResult = evaluateFixtureMarkets(context);
+      const evalResult = applyCanonicalTopPick(
+        evaluateFixtureMarkets(context),
+        fixture.writtenExplanation,
+        fixture
+      );
 
       return {
         fixtureId: fixture.id,
@@ -360,7 +365,7 @@ function MatchesPageInner() {
         writtenExplanation: fixture.writtenExplanation,
       };
     });
-    return syncSlateExplanations(selectDiversifiedSlatePicks(raw, 0.4));
+    return syncSlateExplanations(canonical);
   }, [fixtures, isBasketball]);
 
   const footballEvalById = useMemo(() => {

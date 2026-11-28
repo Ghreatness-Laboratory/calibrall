@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getFootballDataProvider } from '@/lib/data/provider';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
-import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
+import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { applyCanonicalTopPick } from '@/lib/prediction/canonicalHeadlinePick';
 import {
   persistOrLoadImmutableFootballExplanation,
   loadFootballPickModerationMap,
@@ -105,10 +106,11 @@ export async function GET(request: Request) {
     .map(fixture => {
       const stats = getFixtureStatistics(fixture);
       const context = buildFixtureContextFromStats(fixture, stats);
-      const evalResult = evaluateFixtureMarkets(context);
+      const rawEval = evaluateFixtureMarkets(context);
       const expl =
         fixture.writtenExplanation ||
-        persistOrLoadImmutableFootballExplanation(fixture, evalResult, context);
+        persistOrLoadImmutableFootballExplanation(fixture, rawEval, context);
+      const evalResult = applyCanonicalTopPick(rawEval, expl, fixture);
       return {
         fixtureId: fixture.id,
         fixture,
@@ -120,8 +122,8 @@ export async function GET(request: Request) {
       };
     });
 
-  const diversified = syncSlateExplanations(selectDiversifiedSlatePicks(evaluated, 0.40));
-  const qualified = diversified
+  const canonical = syncSlateExplanations(evaluated);
+  const qualified = canonical
     .filter(item => item.topPick !== null && !isDisabledRecommendationMarket(item.topPick))
     .map((item, idx) => ({
       fixtureId: item.fixture.id,

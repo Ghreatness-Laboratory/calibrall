@@ -4,8 +4,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
-import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
-import { syncSlateExplanations } from '@/lib/prediction/explanationGenerator';
+import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { applyCanonicalTopPick } from '@/lib/prediction/canonicalHeadlinePick';
 import { MarketPrediction, Team } from '@/types';
 import CompetitionFilter from '@/components/CompetitionFilter';
 import {
@@ -194,7 +194,11 @@ export default function PredictionsPage() {
           : checkDerby(displayName(fixture.homeTeam), displayName(fixture.awayTeam));
 
       const context = buildFixtureContextFromStats(fixture, stats);
-      const evalResult = evaluateFixtureMarkets(context);
+      const evalResult = applyCanonicalTopPick(
+        evaluateFixtureMarkets(context),
+        fixture.writtenExplanation,
+        fixture
+      );
 
       footballEvaluations.push({
         fixtureId: fixture.id,
@@ -213,8 +217,7 @@ export default function PredictionsPage() {
       });
     });
 
-    const diversifiedFootball = selectDiversifiedSlatePicks(footballEvaluations, 0.4);
-    diversifiedFootball.forEach((item) => {
+    footballEvaluations.forEach((item) => {
       item.predictions.forEach((p) => {
         list.push({
           fixtureId: item.fixtureId,

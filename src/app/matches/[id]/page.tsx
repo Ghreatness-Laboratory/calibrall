@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { applyCanonicalTopPick } from '@/lib/prediction/canonicalHeadlinePick';
 import {
   generateFootballExplanation,
   generateBasketballExplanationForPick,
@@ -158,9 +159,13 @@ export default function MatchAnalysisPage() {
   }, [fixture, isBasketball, stats]);
 
   const footballEvaluation = useMemo(() => {
-    if (!footballContext) return null;
-    return evaluateFixtureMarkets(footballContext);
-  }, [footballContext]);
+    if (!footballContext || !fixture) return null;
+    return applyCanonicalTopPick(
+      evaluateFixtureMarkets(footballContext),
+      fixture.writtenExplanation,
+      fixture
+    );
+  }, [footballContext, fixture]);
 
   const matchStats = useMemo(() => {
     if (!fixture || isBasketball || fixture.status !== 'FINISHED') return null;

@@ -50,6 +50,7 @@ export function redactExplanationForTier(
     driverTiles: [],
     headlineSelectionReason: explanation.headlineSelectionReason,
     activePickMarketCode: explanation.activePickMarketCode,
+    activePickMarketScope: explanation.activePickMarketScope,
     activePickSelection: explanation.activePickSelection,
     activePickProbability: explanation.activePickProbability,
     activePickTier: explanation.activePickTier,

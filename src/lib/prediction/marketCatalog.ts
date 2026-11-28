@@ -1,8 +1,16 @@
 // MATCHMIND / CALIBRALL: Supported Options Catalogue
 // Strictly defines the 10 supported option types. Any market outside this catalogue stays disabled by configuration.
 
-import { SupportedOptionType, MarketPeriod, MarketCategory, MarketDefinition } from '@/types';
-import { cleanDisplayText } from '@/lib/utils/formatText';
+import {
+  SupportedOptionType,
+  MarketPeriod,
+  MarketCategory,
+  MarketDefinition,
+  RiskTier,
+  MarketPrediction,
+  MultiGoalsMeta,
+} from '@/types';
+import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
 
 export interface OptionTypeMetadata {
   type: SupportedOptionType;
@@ -674,8 +682,6 @@ export function getOptionTypeLabel(type: SupportedOptionType | string): string {
   }
 }
 
-import { RiskTier, MarketPrediction, MarketPeriod, MultiGoalsMeta } from '@/types';
-import { cleanDisplayText, displayName } from '@/lib/utils/formatText';
 
 export interface ScopedMarketLabel {
   marketScope: string;
@@ -718,6 +724,7 @@ export function resolveFootballMarketLabelAndScope(params: {
   rawSelection: string;
   homeTeam?: string;
   awayTeam?: string;
+  side?: string;
   line?: number;
   period?: MarketPeriod | string;
   multiGoalsMeta?: MultiGoalsMeta;
@@ -741,6 +748,8 @@ export function resolveFootballMarketLabelAndScope(params: {
     params.multiGoalsMeta?.scope === 'first_half';
 
   const detectTeamSide = (): 'home' | 'away' | null => {
+    if (params.side === 'home') return 'home';
+    if (params.side === 'away') return 'away';
     if (isHomeTeamCode) return 'home';
     if (isAwayTeamCode) return 'away';
     if (params.multiGoalsMeta?.scope === 'home') return 'home';
@@ -815,7 +824,7 @@ export function resolveFootballMarketLabelAndScope(params: {
     return {
       marketScope: '1st half match goals',
       marketName: '1st half match goals',
-      selection: cleanDisplayText(`1st half match goals: ${ou} goals`),
+      selection: cleanDisplayText(`1st half match goals: ${ou}`),
     };
   }
 
@@ -974,6 +983,7 @@ export function resolveFootballMarketLabelAndScope(params: {
  * Resolves explicit scope, marketName, and unambiguous scoped selection title for basketball markets.
  */
 export function resolveBasketballMarketLabelAndScope(params: {
+  marketCode?: string;
   marketCategory: string;
   side?: 'game' | 'home' | 'away';
   isOver?: boolean;

@@ -7,6 +7,7 @@ import { getFootballDataProvider } from '@/lib/data/provider';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { matchesStore, StoredOddsSnapshot } from '@/lib/data/matchesStore';
 import { evaluateFixtureMarkets, EvaluatedFixtureResult } from '@/lib/prediction/marketSelection';
+import { applyCanonicalTopPick } from '@/lib/prediction/canonicalHeadlinePick';
 import { loadFootballPickModerationMap } from '@/lib/prediction/footballPickPersistence';
 import {
   generateFootballExplanation,
@@ -481,7 +482,12 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
   // 1. Evaluate Football entries
   if (input.sport === 'football' || input.sport === 'all') {
     for (const entry of footballEntries) {
-      const { fixture, context, evalResult, snapshots, isModeratedOut } = entry;
+      const { fixture, context, snapshots, isModeratedOut } = entry;
+      const evalResult = applyCanonicalTopPick(
+        entry.evalResult,
+        fixture.writtenExplanation,
+        fixture
+      );
       if (isModeratedOut) continue;
 
       const compId = getFixtureCanonicalCompetitionId(fixture).toLowerCase();
@@ -708,6 +714,7 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
           marketEdge,
           expectedValue,
           confidenceTier: effectiveTier,
+          isTopPick: Boolean(pick.isTopPick || evalResult.topPick?.marketCode === pick.marketCode),
           isExperimental: isGoalRuns,
           teamNewsLowered: lowered,
           teamNewsNote: teamNewsNote ? cleanDisplayText(teamNewsNote) : null,
@@ -922,6 +929,11 @@ export function buildSlipCandidatesFromEvaluatedSlates(params: {
           marketEdge,
           expectedValue,
           confidenceTier: effectiveTier,
+          isTopPick: Boolean(
+            pick.isTopPick ||
+              (evaluation.topPick?.marketCode === pick.marketCode &&
+                Math.abs((evaluation.topPick?.line ?? pick.line) - pick.line) < 0.01)
+          ),
           teamNewsLowered: lowered,
           teamNewsNote: teamNewsNote ? cleanDisplayText(teamNewsNote) : null,
           oneLineWhy: cleanDisplayText(expl.oneLineSummary),
@@ -980,7 +992,11 @@ export async function loadAndBuildSlipCandidates(
         const isModeratedOut = Boolean(mod?.isHidden || mod?.voidedReason);
         const stats = getFixtureStatistics(fixture);
         const context = buildFixtureContextFromStats(fixture, stats);
-        const evalResult = evaluateFixtureMarkets(context);
+        const evalResult = applyCanonicalTopPick(
+          evaluateFixtureMarkets(context),
+          fixture.writtenExplanation,
+          fixture
+        );
         footballEntries.push({
           fixture,
           context,

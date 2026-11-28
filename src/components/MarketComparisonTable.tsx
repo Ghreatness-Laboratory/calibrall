@@ -200,7 +200,7 @@ export default function MarketComparisonTable({
     >
       <div className="flex-1 min-w-0">
         <div className="font-display font-semibold text-[13.5px] leading-snug text-[var(--text)]">
-          Under bookings (cards)
+          Match cards: Under cards
         </div>
         <div className="text-[11.5px] text-[var(--text-2)] mt-0.5 leading-[1.45]">
           {cleanDisplayText(UNDER_BOOKINGS_BOARD_MESSAGE)}
@@ -857,7 +857,7 @@ export default function MarketComparisonTable({
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-[var(--accent)]" />
                 <h4 className="font-display text-[14px] font-semibold text-[var(--text)]">
-                  Bookings (cards)
+                  Cards
                 </h4>
               </div>
               <span className="text-[11px] text-[var(--text-2)]">Over lines only</span>
@@ -882,10 +882,12 @@ export default function MarketComparisonTable({
                 'double_chance',
                 'handicap',
                 'total_goals',
+                'team_goals',
                 'multi_goals',
                 'goal_runs',
                 'half_time',
                 'total_corners',
+                'team_corners',
                 'bookings',
               ].map((cat) => (
                 <button
@@ -902,6 +904,14 @@ export default function MarketComparisonTable({
                     ? 'All'
                     : cat === 'bookings'
                     ? 'Cards'
+                    : cat === 'total_goals'
+                    ? 'Match goals'
+                    : cat === 'team_goals'
+                    ? 'Team goals'
+                    : cat === 'total_corners'
+                    ? 'Match corners'
+                    : cat === 'team_corners'
+                    ? 'Team corners'
                     : cat === 'goal_runs'
                     ? 'Goal runs'
                     : cleanDisplayText(cat)}

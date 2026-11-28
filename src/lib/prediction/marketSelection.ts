@@ -90,6 +90,8 @@ interface RawCandidateConfig {
   optionType: SupportedOptionType;
   marketCategory: MarketCategory;
   marketFamily?: MarketFamily;
+  side?: 'home' | 'away' | 'match';
+  multiGoalsMeta?: MarketPrediction['multiGoalsMeta'];
   marketName: string;
   selection: string;
   line?: number;
@@ -639,68 +641,84 @@ export function evaluateFixtureMarkets(
     });
 
     // Team Totals Over / Under (0.5, 1.5, 2.5)
+    const homeScoredStr = typeof context.homeAvgScored === 'number' ? context.homeAvgScored.toFixed(1) : null;
+    const awayConcededStr = typeof context.awayAvgConceded === 'number' ? context.awayAvgConceded.toFixed(1) : null;
+    const awayScoredStr = typeof context.awayAvgScored === 'number' ? context.awayAvgScored.toFixed(1) : null;
+    const homeConcededStr = typeof context.homeAvgConceded === 'number' ? context.homeAvgConceded.toFixed(1) : null;
     [0.5, 1.5, 2.5].forEach(line => {
       const codeSuffix = String(line).replace('.', '');
       const hTeam = goalDist.teamGoalsOverUnder.home[line];
       const aTeam = goalDist.teamGoalsOverUnder.away[line];
       if (hTeam) {
+        const homeReason =
+          homeScoredStr && awayConcededStr
+            ? `${homeDisplay} averages ${homeScoredStr} goals scored (${effectiveHomeXg.toFixed(2)} xG) while ${awayDisplay} concedes ${awayConcededStr} per match.`
+            : `${homeDisplay} projects ${effectiveHomeXg.toFixed(2)} team expected goals.`;
         rawCandidates.push({
           marketCode: `TEAM_GOALS_HOME_O${codeSuffix}`,
           optionType: 'over_under_goals',
           marketCategory: 'team_goals',
-          marketName: `${homeDisplay} Team Total Goals`,
-          selection: `${homeDisplay} Over ${line} goals`,
+          side: 'home',
+          marketName: `${homeDisplay} Team Goals`,
+          selection: `${homeDisplay} team goals: Over ${line}`,
           line,
           period: 'REGULAR_TIME',
           settlementRule: `${homeDisplay} regular time goals > ${line}.`,
           modelProbability: hTeam.over,
           confidence: baseConfidence,
-          plainEnglishReason: `${homeDisplay} projects ${effectiveHomeXg.toFixed(2)} xG in joint distribution.`,
-          dataPoints: [{ metricName: 'Home Team xG', value: effectiveHomeXg.toFixed(2) }]
+          plainEnglishReason: homeReason,
+          dataPoints: [{ metricName: `${homeDisplay} xG`, value: effectiveHomeXg.toFixed(2) }]
         });
         rawCandidates.push({
           marketCode: `TEAM_GOALS_HOME_U${codeSuffix}`,
           optionType: 'over_under_goals',
           marketCategory: 'team_goals',
-          marketName: `${homeDisplay} Team Total Goals`,
-          selection: `${homeDisplay} Under ${line} goals`,
+          side: 'home',
+          marketName: `${homeDisplay} Team Goals`,
+          selection: `${homeDisplay} team goals: Under ${line}`,
           line,
           period: 'REGULAR_TIME',
           settlementRule: `${homeDisplay} regular time goals < ${line}.`,
           modelProbability: hTeam.under,
           confidence: baseConfidence,
-          plainEnglishReason: `${homeDisplay} projects ${effectiveHomeXg.toFixed(2)} xG in joint distribution.`,
-          dataPoints: [{ metricName: 'Home Team xG', value: effectiveHomeXg.toFixed(2) }]
+          plainEnglishReason: homeReason,
+          dataPoints: [{ metricName: `${homeDisplay} xG`, value: effectiveHomeXg.toFixed(2) }]
         });
       }
       if (aTeam) {
+        const awayReason =
+          awayScoredStr && homeConcededStr
+            ? `${awayDisplay} averages ${awayScoredStr} goals scored (${effectiveAwayXg.toFixed(2)} xG) while ${homeDisplay} concedes ${homeConcededStr} per match.`
+            : `${awayDisplay} projects ${effectiveAwayXg.toFixed(2)} team expected goals.`;
         rawCandidates.push({
           marketCode: `TEAM_GOALS_AWAY_O${codeSuffix}`,
           optionType: 'over_under_goals',
           marketCategory: 'team_goals',
-          marketName: `${awayDisplay} Team Total Goals`,
-          selection: `${awayDisplay} Over ${line} goals`,
+          side: 'away',
+          marketName: `${awayDisplay} Team Goals`,
+          selection: `${awayDisplay} team goals: Over ${line}`,
           line,
           period: 'REGULAR_TIME',
           settlementRule: `${awayDisplay} regular time goals > ${line}.`,
           modelProbability: aTeam.over,
           confidence: baseConfidence,
-          plainEnglishReason: `${awayDisplay} projects ${effectiveAwayXg.toFixed(2)} xG in joint distribution.`,
-          dataPoints: [{ metricName: 'Away Team xG', value: effectiveAwayXg.toFixed(2) }]
+          plainEnglishReason: awayReason,
+          dataPoints: [{ metricName: `${awayDisplay} xG`, value: effectiveAwayXg.toFixed(2) }]
         });
         rawCandidates.push({
           marketCode: `TEAM_GOALS_AWAY_U${codeSuffix}`,
           optionType: 'over_under_goals',
           marketCategory: 'team_goals',
-          marketName: `${awayDisplay} Team Total Goals`,
-          selection: `${awayDisplay} Under ${line} goals`,
+          side: 'away',
+          marketName: `${awayDisplay} Team Goals`,
+          selection: `${awayDisplay} team goals: Under ${line}`,
           line,
           period: 'REGULAR_TIME',
           settlementRule: `${awayDisplay} regular time goals < ${line}.`,
           modelProbability: aTeam.under,
           confidence: baseConfidence,
-          plainEnglishReason: `${awayDisplay} projects ${effectiveAwayXg.toFixed(2)} xG in joint distribution.`,
-          dataPoints: [{ metricName: 'Away Team xG', value: effectiveAwayXg.toFixed(2) }]
+          plainEnglishReason: awayReason,
+          dataPoints: [{ metricName: `${awayDisplay} xG`, value: effectiveAwayXg.toFixed(2) }]
         });
       }
     });
@@ -1615,6 +1633,8 @@ export function evaluateFixtureMarkets(
       awayTeam: context.awayTeamName,
       line: c.line,
       period: c.period,
+      side: c.side,
+      multiGoalsMeta: c.multiGoalsMeta,
     });
 
     return {
@@ -1624,6 +1644,7 @@ export function evaluateFixtureMarkets(
       optionType: c.optionType,
       marketCategory: c.marketCategory,
       marketFamily,
+      side: c.side,
       marketScope: scopedLabel.marketScope,
       marketName: scopedLabel.marketName,
       selection: scopedLabel.selection,

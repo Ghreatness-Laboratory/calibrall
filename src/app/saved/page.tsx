@@ -4,7 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
-import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
+import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { applyCanonicalTopPick } from '@/lib/prediction/canonicalHeadlinePick';
 import { syncSlateExplanations } from '@/lib/prediction/explanationGenerator';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
@@ -42,12 +43,16 @@ export default function SavedMatchesPage() {
 
   const savedFixtures = useMemo(() => {
     if (sport === 'basketball') return [];
-    const raw = fixtures
+    const canonical = fixtures
       .filter((f) => f.sport !== 'basketball' && savedIds.includes(f.id))
       .map((fixture) => {
         const stats = getFixtureStatistics(fixture);
         const context = buildFixtureContextFromStats(fixture, stats);
-        const evalResult = evaluateFixtureMarkets(context);
+        const evalResult = applyCanonicalTopPick(
+          evaluateFixtureMarkets(context),
+          fixture.writtenExplanation,
+          fixture
+        );
 
         return {
           fixtureId: fixture.id,
@@ -59,7 +64,7 @@ export default function SavedMatchesPage() {
           writtenExplanation: fixture.writtenExplanation,
         };
       });
-    return syncSlateExplanations(selectDiversifiedSlatePicks(raw, 0.4));
+    return syncSlateExplanations(canonical);
   }, [fixtures, savedIds, sport]);
 
   const handleClearAll = () => {

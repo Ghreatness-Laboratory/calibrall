@@ -26,6 +26,8 @@ import {
   BASKETBALL_MODEL_VERSION,
 } from './picker';
 import { generateBasketballExplanation } from '@/lib/prediction/explanationGenerator';
+import { resolveBasketballMarketLabelAndScope } from '@/lib/prediction/marketCatalog';
+import { cleanDisplayText } from '@/lib/utils/formatText';
 import type { Fixture, WrittenMatchAlternate } from '@/types';
 
 export interface BasketballForwardLeagueBreakdown {
@@ -840,20 +842,40 @@ export async function getBasketballForwardRecords(limit = 50): Promise<Basketbal
         alternatesArr = undefined;
       }
 
+      const side =
+        p.market_category === 'home_total'
+          ? 'home'
+          : p.market_category === 'away_total'
+          ? 'away'
+          : /home|1st half .*home/i.test(String(p.market_code || ''))
+          ? 'home'
+          : /away/i.test(String(p.market_code || ''))
+          ? 'away'
+          : 'game';
+      const scopedBb = resolveBasketballMarketLabelAndScope({
+        marketCode: String(p.market_code || ''),
+        marketCategory: p.market_category as BasketballMarketCategory,
+        side,
+        rawSelection: String(p.selection || ''),
+        line: Number(p.line),
+        homeTeam: cleanDisplayText(homeName),
+        awayTeam: cleanDisplayText(awayName),
+      });
+
       return {
         id: String(p.id),
         gameId: String(p.game_id),
         sport: 'basketball',
         league: p.league as BasketballLeague,
         season: String(p.season),
-        matchLabel: `${homeName} vs ${awayName}`,
-        homeTeamName: homeName,
-        awayTeamName: awayName,
+        matchLabel: cleanDisplayText(`${homeName} vs ${awayName}`),
+        homeTeamName: cleanDisplayText(homeName),
+        awayTeamName: cleanDisplayText(awayName),
         kickoffUtc: p.kickoff_utc || null,
         recordedAt: String(p.recorded_at || ''),
         marketCode: p.market_code as BasketballMarketCode,
         marketCategory: p.market_category as BasketballMarketCategory,
-        selection: String(p.selection),
+        selection: cleanDisplayText(scopedBb.selection || String(p.selection)),
         line: Number(p.line),
         projectedMean: p.projected_mean !== null && p.projected_mean !== undefined ? Number(p.projected_mean) : null,
         projectedStd: p.projected_std !== null && p.projected_std !== undefined ? Number(p.projected_std) : null,

@@ -14,8 +14,10 @@ import { matchesDayFilter } from '@/lib/utils/dateWindow';
 import { cleanDisplayText } from '@/lib/utils/formatText';
 import { Competition, Fixture, MatchStatus, Team, WrittenMatchAlternate, WrittenMatchExplanation } from '@/types';
 import { generateBasketballExplanation } from '@/lib/prediction/explanationGenerator';
+import { resolveBasketballMarketLabelAndScope } from '@/lib/prediction/marketCatalog';
 import {
   BasketballLeague,
+  BasketballMarketCategory,
   CURRENT_BASKETBALL_SEASON,
 } from './markets';
 import { StoredBbGame } from './store';
@@ -192,7 +194,11 @@ function createSeededLeagueState(league: BasketballLeague): LeagueBaselineState 
   return state;
 }
 
-function parseStoredBasketballExplanation(row: any): WrittenMatchExplanation | undefined {
+function parseStoredBasketballExplanation(
+  row: any,
+  homeName?: string,
+  awayName?: string
+): WrittenMatchExplanation | undefined {
   if (!row || !row.summary) return undefined;
   const fullSummary = cleanDisplayText(String(row.summary));
   if (!fullSummary) return undefined;
@@ -211,13 +217,78 @@ function parseStoredBasketballExplanation(row: any): WrittenMatchExplanation | u
   } catch {
     alternates = [];
   }
+  const storedTop = reasoning?.topPick;
+  const code = storedTop?.marketCode || row.market_code || undefined;
+  const rawSel = storedTop?.selection || row.selection || undefined;
+  const cat = (row.market_category || (code?.includes('HOME_TOTAL') ? 'home_total' : code?.includes('AWAY_TOTAL') ? 'away_total' : code?.includes('H1_GAME') ? 'h1_game_total' : code?.includes('H1_TEAM') ? 'h1_team_total' : 'game_total')) as BasketballMarketCategory;
+  const side =
+    cat === 'home_total' || /HOME/i.test(String(code || ''))
+      ? 'home'
+      : cat === 'away_total' || /AWAY/i.test(String(code || ''))
+      ? 'away'
+      : 'game';
+  let scopedSel = rawSel ? cleanDisplayText(String(rawSel)) : undefined;
+  let scopedMarketScope = storedTop?.marketScope ? cleanDisplayText(String(storedTop.marketScope)) : undefined;
+
+  if (code && rawSel && homeName && awayName) {
+    const resolved = resolveBasketballMarketLabelAndScope({
+      marketCode: code,
+      marketCategory: cat,
+      side,
+      rawSelection: String(rawSel),
+      line: Number(row.line ?? storedTop?.line ?? 0),
+      homeTeam: cleanDisplayText(homeName),
+      awayTeam: cleanDisplayText(awayName),
+    });
+    scopedSel = resolved.selection || scopedSel;
+    scopedMarketScope = scopedMarketScope || resolved.marketScope;
+  }
+
+  const calProb =
+    typeof storedTop?.probability === 'number'
+      ? storedTop.probability
+      : typeof row.model_probability === 'number'
+      ? row.model_probability
+      : undefined;
+  const tier = (storedTop?.tier || row.confidence_tier || undefined) as WrittenMatchExplanation['activePickTier'];
+
   return {
     oneLineSummary,
     fullSummary,
+    activePickMarketCode: code,
+    activePickMarketScope: scopedMarketScope,
+    activePickSelection: scopedSel,
+    activePickProbability: calProb,
+    activePickTier: tier,
+    confidenceTier: tier,
+    calibratedProbability: calProb,
     reasoning,
     alternates,
     generatedAt: String(row.recorded_at || new Date().toISOString()),
   };
+}
+
+export function reconcileBasketballEvaluationWithStoredPick(
+  ev: BasketballGameEvaluation,
+  pickRow: any | undefined
+): void {
+  if (!pickRow || ev.needsHistory) return;
+  const code = String(pickRow.market_code || '');
+  if (!code) return;
+  const line = Number(pickRow.line);
+  const matched =
+    ev.picks.find(
+      (p) =>
+        p.marketCode === code &&
+        (!Number.isFinite(line) || Math.abs(p.line - line) < 0.01)
+    ) || ev.picks.find((p) => p.marketCode === code);
+  if (matched) {
+    for (const p of ev.picks) {
+      p.isTopPick = p === matched;
+    }
+    ev.topPick = matched;
+    ev.abstentionReason = null;
+  }
 }
 
 function buildFixtureFromEvaluation(
@@ -475,11 +546,12 @@ export async function buildEvaluatedBasketballSlate(forceRefresh = false): Promi
   }
 
   const storedExplByGameId = new Map<string, WrittenMatchExplanation>();
+  const storedTopRowByGameId = new Map<string, any>();
   const hiddenOrVoidedGameIds = new Set<string>();
   for (const idChunk of chunkArray(windowIds, 200)) {
     const { data: pickRows } = await supabase
       .from('bb_picks')
-      .select('game_id, summary, reasoning_json, alternates_json, recorded_at, is_top_pick, is_hidden, voided_reason, qualification_status')
+      .select('game_id, market_code, market_category, line, selection, model_probability, confidence_tier, summary, reasoning_json, alternates_json, recorded_at, is_top_pick, is_hidden, voided_reason, qualification_status')
       .in('game_id', idChunk);
     for (const pr of pickRows || []) {
       const gid = String(pr.game_id || '');
@@ -495,7 +567,13 @@ export async function buildEvaluatedBasketballSlate(forceRefresh = false): Promi
         }
         continue;
       }
-      const parsed = parseStoredBasketballExplanation(pr);
+      const g = gamesById[gid];
+      const homeName = g ? (teamMap.get(g.home_id)?.name || g.home_id) : undefined;
+      const awayName = g ? (teamMap.get(g.away_id)?.name || g.away_id) : undefined;
+      if (pr.is_top_pick === 1 || pr.is_top_pick === true) {
+        storedTopRowByGameId.set(gid, pr);
+      }
+      const parsed = parseStoredBasketballExplanation(pr, homeName, awayName);
       if (parsed && (!storedExplByGameId.has(gid) || pr.is_top_pick === 1 || pr.is_top_pick === true)) {
         storedExplByGameId.set(gid, parsed);
       }
@@ -510,7 +588,10 @@ export async function buildEvaluatedBasketballSlate(forceRefresh = false): Promi
     if (!ev) continue;
     if (hiddenOrVoidedGameIds.has(g.id)) {
       ev.topPick = null;
+      for (const p of ev.picks) p.isTopPick = false;
       ev.abstentionReason = 'Pick hidden or voided by system administration.';
+    } else if (storedTopRowByGameId.has(g.id)) {
+      reconcileBasketballEvaluationWithStoredPick(ev, storedTopRowByGameId.get(g.id));
     }
     evaluationsById[g.id] = ev;
     emptyCounts[g.league].windowCount++;
@@ -700,7 +781,7 @@ export async function getBasketballFixtureByIdFromDb(gameId: string): Promise<{
   const [{ data: teamRows }, { data: oddsRows }, { data: pickRows }, { data: priorRawGames }] = await Promise.all([
     supabase.from('bb_teams').select('id, league, name, aliases').in('id', [game.home_id, game.away_id]),
     supabase.from('bb_odds_snapshots').select('*').eq('game_id', game.id),
-    supabase.from('bb_picks').select('game_id, summary, reasoning_json, alternates_json, recorded_at, is_top_pick, is_hidden, voided_reason, qualification_status').eq('game_id', game.id),
+    supabase.from('bb_picks').select('game_id, market_code, market_category, line, selection, model_probability, confidence_tier, summary, reasoning_json, alternates_json, recorded_at, is_top_pick, is_hidden, voided_reason, qualification_status').eq('game_id', game.id),
     fetchAllRows<any>((from, to) =>
       supabase
         .from('bb_games')
@@ -760,13 +841,16 @@ export async function getBasketballFixtureByIdFromDb(gameId: string): Promise<{
       (pr.is_top_pick === 1 || pr.is_top_pick === true || pr.qualification_status === 'VOID') &&
       (pr.is_hidden === 1 || pr.is_hidden === true || pr.qualification_status === 'VOID' || Boolean(pr.voided_reason))
   );
+  const topPickRow = activePickRows.find((pr: any) => pr.summary && (pr.is_top_pick === 1 || pr.is_top_pick === true)) || activePickRows.find((pr: any) => pr.summary);
   if (hasModeratedVoid) {
     evaluation.topPick = null;
+    for (const p of evaluation.picks) p.isTopPick = false;
     evaluation.abstentionReason = 'Pick hidden or voided by system administration.';
+  } else if (topPickRow && (topPickRow.is_top_pick === 1 || topPickRow.is_top_pick === true)) {
+    reconcileBasketballEvaluationWithStoredPick(evaluation, topPickRow);
   }
 
-  const topPickRow = activePickRows.find((pr: any) => pr.summary && (pr.is_top_pick === 1 || pr.is_top_pick === true)) || activePickRows.find((pr: any) => pr.summary);
-  const storedExpl = parseStoredBasketballExplanation(topPickRow);
+  const storedExpl = parseStoredBasketballExplanation(topPickRow, homeTeam?.name || game.home_id, awayTeam?.name || game.away_id);
 
   return {
     fixture: buildFixtureFromEvaluation(game, evaluation, homeTeam, awayTeam, quotes, storedExpl),

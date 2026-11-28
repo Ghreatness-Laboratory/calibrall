@@ -39,21 +39,22 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
     const homeTeam = cleanDisplayText(String(reasoning.homeTeam || 'Home'));
     const awayTeam = cleanDisplayText(String(reasoning.awayTeam || 'Away'));
     const fbScope = reasoning.topPick?.marketCode
-      ? resolveFootballTargetScope({
-          marketCode: reasoning.topPick.marketCode,
-          selection: reasoning.topPick.selection,
+      ? resolveFootballTargetScope(
+          {
+            marketCode: reasoning.topPick.marketCode,
+            selection: reasoning.topPick.selection,
+            period: reasoning.topPick.period,
+            multiGoalsMeta: reasoning.topPick.multiGoalsMeta,
+          },
           homeTeam,
-          awayTeam,
-          period: reasoning.topPick.period,
-          side: reasoning.topPick.side,
-          multiGoalsMeta: reasoning.topPick.multiGoalsMeta,
-        })
-      : { scope: 'match' as const, period: 'regular' as const, isTeamScoped: false };
+          awayTeam
+        )
+      : { scopeKind: 'match' as const, isFirstHalf: false, isTeamScoped: false };
 
     if (family === 'cards') {
-      if (fbScope.scope === 'home' && typeof reasoning.expectedCardsHome === 'number') {
+      if (fbScope.scopeKind === 'home' && typeof reasoning.expectedCardsHome === 'number') {
         items.push({ label: `${homeTeam} expected cards`, value: `${reasoning.expectedCardsHome.toFixed(2)} cards` });
-      } else if (fbScope.scope === 'away' && typeof reasoning.expectedCardsAway === 'number') {
+      } else if (fbScope.scopeKind === 'away' && typeof reasoning.expectedCardsAway === 'number') {
         items.push({ label: `${awayTeam} expected cards`, value: `${reasoning.expectedCardsAway.toFixed(2)} cards` });
       } else if (!fbScope.isTeamScoped && typeof reasoning.expectedCards === 'number') {
         items.push({ label: 'Projected total cards', value: `${reasoning.expectedCards.toFixed(2)} cards` });
@@ -83,12 +84,12 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
         });
       }
     } else if (family === 'corners') {
-      if (fbScope.scope === 'home' && typeof reasoning.expectedCornersHome === 'number') {
+      if (fbScope.scopeKind === 'home' && typeof reasoning.expectedCornersHome === 'number') {
         items.push({
           label: `${homeTeam} expected corners`,
           value: `${reasoning.expectedCornersHome.toFixed(1)} corners`,
         });
-      } else if (fbScope.scope === 'away' && typeof reasoning.expectedCornersAway === 'number') {
+      } else if (fbScope.scopeKind === 'away' && typeof reasoning.expectedCornersAway === 'number') {
         items.push({
           label: `${awayTeam} expected corners`,
           value: `${reasoning.expectedCornersAway.toFixed(1)} corners`,
@@ -115,18 +116,18 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
         });
       }
     } else {
-      if (fbScope.scope === 'home' && typeof reasoning.homeXg === 'number') {
+      if (fbScope.scopeKind === 'home' && typeof reasoning.homeXg === 'number') {
         items.push({
           label: `${homeTeam} expected goals`,
           value: `${reasoning.homeXg.toFixed(2)} xG`,
         });
-      } else if (fbScope.scope === 'away' && typeof reasoning.awayXg === 'number') {
+      } else if (fbScope.scopeKind === 'away' && typeof reasoning.awayXg === 'number') {
         items.push({
           label: `${awayTeam} expected goals`,
           value: `${reasoning.awayXg.toFixed(2)} xG`,
         });
       } else if (
-        fbScope.period === 'first_half' &&
+        fbScope.isFirstHalf &&
         typeof reasoning.homeXg === 'number' &&
         typeof reasoning.awayXg === 'number'
       ) {
@@ -142,7 +143,7 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
       }
       if (
         !fbScope.isTeamScoped &&
-        fbScope.period !== 'first_half' &&
+        !fbScope.isFirstHalf &&
         typeof reasoning.h2hMeetingsCount === 'number' &&
         reasoning.h2hMeetingsCount >= 3 &&
         typeof reasoning.h2hAvgTotalGoals === 'number'
@@ -160,12 +161,12 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
       }
     }
 
-    if (fbScope.scope === 'home' && typeof reasoning.homeSampleMatches === 'number') {
+    if (fbScope.scopeKind === 'home' && typeof reasoning.homeSampleMatches === 'number') {
       items.push({
         label: 'Sample depth',
         value: `${reasoning.homeSampleMatches} ${homeTeam} matches`,
       });
-    } else if (fbScope.scope === 'away' && typeof reasoning.awaySampleMatches === 'number') {
+    } else if (fbScope.scopeKind === 'away' && typeof reasoning.awaySampleMatches === 'number') {
       items.push({
         label: 'Sample depth',
         value: `${reasoning.awaySampleMatches} ${awayTeam} matches`,
@@ -179,22 +180,27 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
   } else if (reasoning.sport === 'basketball') {
     const homeTeam = cleanDisplayText(String(reasoning.homeTeam || 'Home'));
     const awayTeam = cleanDisplayText(String(reasoning.awayTeam || 'Away'));
-    const bbScope = resolveBasketballTargetScope({
-      marketCode: reasoning.topPick?.marketCode,
-      marketCategory: reasoning.topPick?.marketCategory,
-      side: reasoning.topPick?.side,
-    });
-    if (bbScope.scope === 'home_total' && typeof reasoning.homeProjected === 'number') {
+    const bbScope = resolveBasketballTargetScope(
+      {
+        marketCode: reasoning.topPick?.marketCode,
+        marketCategory: reasoning.topPick?.marketCategory,
+        side: reasoning.topPick?.side,
+        selection: reasoning.topPick?.selection,
+      },
+      homeTeam,
+      awayTeam
+    );
+    if (!bbScope.isFirstHalf && bbScope.scopeKind === 'home' && typeof reasoning.homeProjected === 'number') {
       items.push({ label: `${homeTeam} projected`, value: `${reasoning.homeProjected.toFixed(1)} pts` });
-    } else if (bbScope.scope === 'away_total' && typeof reasoning.awayProjected === 'number') {
+    } else if (!bbScope.isFirstHalf && bbScope.scopeKind === 'away' && typeof reasoning.awayProjected === 'number') {
       items.push({ label: `${awayTeam} projected`, value: `${reasoning.awayProjected.toFixed(1)} pts` });
-    } else if (bbScope.scope === 'h1_team_total') {
-      const targetTeam = bbScope.side === 'away' ? awayTeam : homeTeam;
+    } else if (bbScope.isFirstHalf && bbScope.isTeamScoped) {
+      const targetTeam = bbScope.scopeKind === 'away' ? awayTeam : homeTeam;
       const mean = typeof reasoning.topPick?.projectedMean === 'number' ? reasoning.topPick.projectedMean : undefined;
       if (mean !== undefined) {
         items.push({ label: `1st half ${targetTeam}`, value: `${mean.toFixed(1)} pts` });
       }
-    } else if (bbScope.scope === 'h1_game_total') {
+    } else if (bbScope.isFirstHalf && !bbScope.isTeamScoped) {
       const mean = typeof reasoning.h1ProjectedTotal === 'number' ? reasoning.h1ProjectedTotal : reasoning.topPick?.projectedMean;
       if (typeof mean === 'number') {
         items.push({ label: '1st half projected total', value: `${mean.toFixed(1)} pts` });
@@ -210,9 +216,9 @@ function resolveDriverTiles(explanation: WrittenMatchExplanation): ExplanationDr
         });
       }
     }
-    if (bbScope.targetSide === 'home' && typeof reasoning.homeGamesPlayed === 'number') {
+    if (bbScope.scopeKind === 'home' && typeof reasoning.homeGamesPlayed === 'number') {
       items.push({ label: 'Sample depth', value: `${reasoning.homeGamesPlayed} ${homeTeam} games` });
-    } else if (bbScope.targetSide === 'away' && typeof reasoning.awayGamesPlayed === 'number') {
+    } else if (bbScope.scopeKind === 'away' && typeof reasoning.awayGamesPlayed === 'number') {
       items.push({ label: 'Sample depth', value: `${reasoning.awayGamesPlayed} ${awayTeam} games` });
     } else if (typeof reasoning.homeGamesPlayed === 'number' && typeof reasoning.awayGamesPlayed === 'number') {
       items.push({

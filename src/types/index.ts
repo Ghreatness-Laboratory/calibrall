@@ -603,6 +603,7 @@ export interface MarketPrediction {
   marketScope?: string;
   marketName: string;
   selection: string;
+  side?: 'home' | 'away' | 'match' | string;
   line?: number;
   period: MarketPeriod;
   settlementRule: string;

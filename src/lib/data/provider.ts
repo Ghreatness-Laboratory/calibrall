@@ -8,9 +8,13 @@
 // - Real odds snapshots only (bookmaker, price, timestamp). Never fabricates fake prices.
 // - Demo data is strictly gated behind process.env.USE_DEMO_DATA === 'true' (defaults to false).
 
-import { Competition, Fixture, FixtureContext, Team, VerifiedMatchOdds, MatchStatus } from '@/types';
+import { Competition, Fixture, FixtureContext, Team, VerifiedMatchOdds, MatchStatus, WrittenMatchExplanation } from '@/types';
 import { getFixtureStatistics, buildFixtureContextFromStats } from './seedData';
 import { evaluateFixtureMarkets } from '../prediction/marketSelection';
+import {
+  applyCanonicalTopPick,
+  evaluateCanonicalFootballSlate,
+} from '../prediction/canonicalHeadlinePick';
 import {
   loadStoredFootballExplanation,
   persistOrLoadImmutableFootballExplanation,
@@ -827,7 +831,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
     return res.competitions;
   }
 
-  private enrichFixtureWithDbStats(fixture: Fixture): Fixture {
+  private buildBaseEnrichedFixture(fixture: Fixture): Fixture {
     const liveMeta = this.liveMetaById.get(fixture.id);
     const compCode = fixture.competition?.code;
     const homeStats = matchesStore.getTeamStatsSync(fixture.homeTeam, fixture.kickoffTime, compCode);
@@ -902,33 +906,141 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       };
     }
 
+    return updatedFixture;
+  }
+
+  private enrichFixtureWithDbStats(fixture: Fixture): Fixture {
+    const updatedFixture = this.buildBaseEnrichedFixture(fixture);
+    const stats = updatedFixture.serverStats || getFixtureStatistics(updatedFixture);
+
     try {
-      const isUpcoming = updatedFixture.status === 'TIMED' || updatedFixture.status === 'SCHEDULED';
-      const kickoffMs = Date.parse(updatedFixture.kickoffTime);
-      const isPreKickoff = isUpcoming && Number.isFinite(kickoffMs) && kickoffMs > Date.now();
-      const storedExpl = loadStoredFootballExplanation(updatedFixture.id, {
-        requireCurrentVersion: isPreKickoff,
-      });
-      const isStaleThinHistory =
-        isPreKickoff &&
-        storedExpl?.reasoning?.status === 'thin_history' &&
-        !stats.insufficientData;
-      if (storedExpl && !isStaleThinHistory) {
-        updatedFixture.writtenExplanation = storedExpl;
+      const canonicalExpl = this.canonicalSlateCache?.explanations.get(updatedFixture.id);
+      if (canonicalExpl) {
+        updatedFixture.writtenExplanation = canonicalExpl;
       } else {
-        const ctx = buildFixtureContextFromStats(updatedFixture, stats);
-        const evaluated = evaluateFixtureMarkets(ctx);
-        updatedFixture.writtenExplanation = persistOrLoadImmutableFootballExplanation(
-          updatedFixture,
-          evaluated,
-          ctx
-        );
+        const isUpcoming = updatedFixture.status === 'TIMED' || updatedFixture.status === 'SCHEDULED';
+        const kickoffMs = Date.parse(updatedFixture.kickoffTime);
+        const isPreKickoff = isUpcoming && Number.isFinite(kickoffMs) && kickoffMs > Date.now();
+        const storedExpl = loadStoredFootballExplanation(updatedFixture.id, {
+          requireCurrentVersion: isPreKickoff,
+        });
+        const isStaleThinHistory =
+          isPreKickoff &&
+          storedExpl?.reasoning?.status === 'thin_history' &&
+          !stats.insufficientData;
+        if (storedExpl && !isStaleThinHistory) {
+          updatedFixture.writtenExplanation = storedExpl;
+        } else {
+          const ctx = buildFixtureContextFromStats(updatedFixture, stats);
+          const evaluated = evaluateFixtureMarkets(ctx);
+          updatedFixture.writtenExplanation = persistOrLoadImmutableFootballExplanation(
+            updatedFixture,
+            evaluated,
+            ctx
+          );
+        }
       }
     } catch {
       // Non-fatal explanation attachment failure
     }
 
     return updatedFixture;
+  }
+
+  private canonicalSlateCache: {
+    expiresAt: number;
+    explanations: Map<string, WrittenMatchExplanation>;
+  } | null = null;
+  private inFlightCanonicalSlate: Promise<Map<string, WrittenMatchExplanation>> | null = null;
+
+  public bustCanonicalSlateCache(): void {
+    this.canonicalSlateCache = null;
+  }
+
+  /**
+   * Single Source of Truth for football headline picks:
+   * Always evaluates the full unfiltered DB football slate deterministically once,
+   * reconciles with immutable/current-version `football_picks` rows, and persists any
+   * missing pre-kickoff rows so every list, filter, detail, saved, and slip surface agrees.
+   */
+  public async ensureCanonicalFootballSlate(
+    forceRefresh = false
+  ): Promise<Map<string, WrittenMatchExplanation>> {
+    if (!forceRefresh && this.canonicalSlateCache && Date.now() < this.canonicalSlateCache.expiresAt) {
+      return this.canonicalSlateCache.explanations;
+    }
+    if (!forceRefresh && this.inFlightCanonicalSlate) {
+      return this.inFlightCanonicalSlate;
+    }
+
+    const work = (async () => {
+      const out = new Map<string, WrittenMatchExplanation>();
+      let allDbFixtures: Fixture[] = [];
+      if (isSupabaseConfigured && supabase) {
+        try {
+          allDbFixtures = await getFixturesFromDatabase({ sport: 'football' });
+        } catch {
+          allDbFixtures = [];
+        }
+      }
+      if (allDbFixtures.length === 0 && this.lastGoodCachedFixtures.length > 0) {
+        allDbFixtures = this.lastGoodCachedFixtures.filter((f) => f.sport !== 'basketball');
+      }
+      if (allDbFixtures.length === 0) {
+        this.canonicalSlateCache = { expiresAt: Date.now() + 30_000, explanations: out };
+        return out;
+      }
+
+      await matchesStore.preloadForFixtures(allDbFixtures);
+
+      const inputs = allDbFixtures.map((raw) => {
+        const fixture = this.buildBaseEnrichedFixture(raw);
+        const stats = fixture.serverStats || getFixtureStatistics(fixture);
+        const context = buildFixtureContextFromStats(fixture, stats);
+
+        const isUpcoming = fixture.status === 'TIMED' || fixture.status === 'SCHEDULED';
+        const kickoffMs = Date.parse(fixture.kickoffTime);
+        const isPreKickoff = isUpcoming && Number.isFinite(kickoffMs) && kickoffMs > Date.now();
+        const stored = loadStoredFootballExplanation(fixture.id, {
+          requireCurrentVersion: isPreKickoff,
+        });
+        const isStaleThin =
+          isPreKickoff && stored?.reasoning?.status === 'thin_history' && !stats.insufficientData;
+
+        return {
+          fixture,
+          context,
+          lockedWrittenExplanation: stored && !isStaleThin ? stored : null,
+        };
+      });
+
+      const canonicalSlate = evaluateCanonicalFootballSlate(inputs, 0.40);
+      for (const item of canonicalSlate) {
+        try {
+          const expl = persistOrLoadImmutableFootballExplanation(
+            item.fixture,
+            item.evaluation,
+            item.context
+          );
+          out.set(item.fixtureId, expl);
+        } catch {
+          // Non-fatal
+        }
+      }
+
+      this.canonicalSlateCache = {
+        expiresAt: Date.now() + 60_000,
+        explanations: out,
+      };
+      return out;
+    })();
+
+    this.inFlightCanonicalSlate = work;
+    try {
+      return await work;
+    } finally {
+      this.inFlightCanonicalSlate = null;
+    }
   }
 
   private applyLiveFilters(fixtures: Fixture[], params?: { competitionId?: string; status?: string; day?: string }): Fixture[] {
@@ -1296,6 +1408,7 @@ export class LiveFootballDataProvider implements FootballDataProvider {
           const ttl = Math.min(900, serverCache.computeFixtureTTL(integrityReport.validFixtures));
           await serverCache.set(syncCacheKey, { count: integrityReport.validFixtures.length, rowsWrittenToFixtures: dbWrite.upserted, providerUsed: providerNameUsed }, ttl);
           matchesStore.clearPreloadCache();
+          this.bustCanonicalSlateCache();
           await serverCache.bust('live_fixtures:');
 
           return {
@@ -1468,7 +1581,10 @@ export class LiveFootballDataProvider implements FootballDataProvider {
         const hasAnyStoredFootball = dbFixtures.length > 0 || freshness.fixtureCount > 0;
 
         if (hasAnyStoredFootball) {
-          await matchesStore.preloadForFixtures(dbFixtures);
+          await Promise.all([
+            matchesStore.preloadForFixtures(dbFixtures),
+            this.ensureCanonicalFootballSlate(),
+          ]);
           const isStaleBeyondLimit = freshness.isStaleBeyondLimit;
           const staleError = isStaleBeyondLimit
             ? `Stored fixtures are older than 3 days. Last updated ${lastUpdatedStr}`
@@ -1552,7 +1668,10 @@ export class LiveFootballDataProvider implements FootballDataProvider {
       try {
         const dbMatch = await getFixtureFromDatabaseById(id);
         if (dbMatch && dbMatch.sport !== 'basketball') {
-          await matchesStore.preloadForFixtures([dbMatch]);
+          await Promise.all([
+            matchesStore.preloadForFixtures([dbMatch]),
+            this.ensureCanonicalFootballSlate(),
+          ]);
           return this.enrichFixtureWithDbStats(dbMatch);
         }
       } catch (_) {}
@@ -1611,14 +1730,17 @@ export function getFootballDataProvider(): LiveFootballDataProvider {
 
 export async function getEvaluatedFixture(fixtureId: string) {
   const provider = getFootballDataProvider();
+  await provider.ensureCanonicalFootballSlate();
   const fixture = await provider.getFixtureById(fixtureId);
   if (!fixture) return null;
 
-  const context = await provider.getFixtureContext(fixtureId);
-  if (!context) return null;
-
-  const evaluated = evaluateFixtureMarkets(context);
-  const writtenExplanation = persistOrLoadImmutableFootballExplanation(fixture, evaluated, context);
+  const stats = fixture.serverStats || getFixtureStatistics(fixture);
+  const context = buildFixtureContextFromStats(fixture, stats);
+  const rawEvaluated = evaluateFixtureMarkets(context);
+  const writtenExplanation =
+    fixture.writtenExplanation ||
+    persistOrLoadImmutableFootballExplanation(fixture, rawEvaluated, context);
+  const evaluated = applyCanonicalTopPick(rawEvaluated, writtenExplanation, fixture);
   fixture.writtenExplanation = writtenExplanation;
   if (evaluated.topPick) {
     evaluated.topPick.writtenExplanation = writtenExplanation;

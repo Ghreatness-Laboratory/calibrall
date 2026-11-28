@@ -223,6 +223,7 @@ export function buildFootballMarketBoard(params: {
       awayTeam: away,
       line: p.line,
       period: p.period,
+      side: p.side,
       multiGoalsMeta: p.multiGoalsMeta,
     });
     const resolvedScope = p.marketScope ? cleanDisplayText(p.marketScope) : scopedLabel.marketScope;
@@ -289,11 +290,11 @@ export function buildFootballMarketBoard(params: {
     });
     entries.push({
       marketCode: fallback.marketCode,
-      marketName: cleanDisplayText(fallback.marketName),
+      marketName: cleanDisplayText(fbScoped.marketName || fallback.marketName),
       marketScope: fallback.marketScope || fbScoped.marketScope,
       optionType: fallback.optionType,
       marketCategory: fallback.marketCategory,
-      selection: cleanDisplayText(fallback.selection),
+      selection: cleanDisplayText(fbScoped.selection || fallback.selection),
       calibratedProbability: null,
       recommended: false,
       isTopPick: false,
@@ -572,6 +573,7 @@ export function selectTopFootballAlternates(
       awayTeam: options?.awayTeam,
       line: p.line,
       period: p.period,
+      side: p.side,
       multiGoalsMeta: p.multiGoalsMeta,
     });
     const isTeamLegacy =
@@ -1088,6 +1090,7 @@ export function generateFootballExplanation(params: {
         awayTeam: away,
         line: topPick.line,
         period: topPick.period,
+        side: topPick.side,
         multiGoalsMeta: topPick.multiGoalsMeta,
       })
     : null;
@@ -1099,8 +1102,8 @@ export function generateFootballExplanation(params: {
   const shouldNormalizeTopSelection = Boolean(
     topPick &&
       scopedTopLabel &&
-      fbScope.isTeamScoped &&
-      !topPick.selection.toLowerCase().includes('team ')
+      ((fbScope.isTeamScoped && !topPick.selection.toLowerCase().includes('team ')) ||
+        (fbScope.isFirstHalf && !topPick.selection.includes(':')))
   );
 
   const headlineReason = deriveFootballHeadlineReason(
@@ -1858,6 +1861,7 @@ export function generateFootballExplanation(params: {
             marketCategory: topPick.marketCategory,
             marketFamily: topPick.marketFamily,
             period: topPick.period,
+            side: topPick.side,
             multiGoalsMeta: topPick.multiGoalsMeta,
           }
         : null,

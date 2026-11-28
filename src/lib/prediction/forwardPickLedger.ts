@@ -471,6 +471,14 @@ class ForwardPickLedgerService {
     return [...this.ledger];
   }
 
+  public getRecordForFixture(fixtureId: string): ForwardPickRecord | null {
+    return (
+      this.ledger.find((r) => r.fixtureId === fixtureId && !r.parentPickId && r.revisionNumber !== 2) ||
+      this.ledger.find((r) => r.fixtureId === fixtureId) ||
+      null
+    );
+  }
+
   /**
    * Records an immutable pick strictly BEFORE kickoff.
    * Enforces that kickoffTime > current time or pre-kickoff entry.
@@ -495,9 +503,9 @@ class ForwardPickLedgerService {
     reasoning?: Record<string, any>;
     alternates?: { marketCode: string; marketName: string; selection: string; probability: number; confidenceTier?: string }[];
   }): ForwardPickRecord {
-    // Check if pick already recorded for this fixture and market code
+    // Enforce ONE canonical pre-kickoff headline pick per fixture
     const existing = this.ledger.find(
-      r => r.fixtureId === input.fixtureId && r.marketCode === input.marketCode
+      (r) => r.fixtureId === input.fixtureId && !r.parentPickId && r.revisionNumber !== 2
     );
     if (existing) {
       // Existing records are strictly immutable and cannot be updated

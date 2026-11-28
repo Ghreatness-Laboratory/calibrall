@@ -179,31 +179,102 @@ export default function ExplanationCard({ prediction, noRecommendationReason }: 
                     ? 'Corners model inputs: '
                     : 'Fitted strengths: '}
                 </span>
-                {marketFamily === 'cards' ? (
-                  <span>
-                    {prediction.evidence.fittedStrengths.expectedCards !== undefined &&
-                    prediction.evidence.fittedStrengths.expectedCards > 0
-                      ? cleanDisplayText(
-                          `Projected total ${prediction.evidence.fittedStrengths.expectedCards.toFixed(2)} cards`
-                        )
-                      : 'Disciplinary rate estimates applied'}
-                  </span>
-                ) : marketFamily === 'corners' ? (
-                  <span>
-                    {prediction.evidence.fittedStrengths.expectedCornersHome !== undefined &&
-                    prediction.evidence.fittedStrengths.expectedCornersHome > 0
-                      ? cleanDisplayText(
-                          `Home ${(prediction.evidence.fittedStrengths.expectedCornersHome).toFixed(1)} + Away ${(prediction.evidence.fittedStrengths.expectedCornersAway ?? 0).toFixed(1)} expected corners`
-                        )
-                      : 'Corner volume estimates applied'}
-                  </span>
-                ) : (
-                  <span>
-                    {cleanDisplayText(
-                      `Home Att ${prediction.evidence.fittedStrengths.homeAttack.toFixed(2)} / Def ${prediction.evidence.fittedStrengths.homeDefense.toFixed(2)} (${prediction.evidence.fittedStrengths.homeXg.toFixed(2)} xG) | Away Att ${prediction.evidence.fittedStrengths.awayAttack.toFixed(2)} / Def ${prediction.evidence.fittedStrengths.awayDefense.toFixed(2)} (${prediction.evidence.fittedStrengths.awayXg.toFixed(2)} xG)`
-                    )}
-                  </span>
-                )}
+                {(() => {
+                  const isTeamCards =
+                    prediction.optionType === 'team_bookings' ||
+                    prediction.marketCode.startsWith('TEAM_CARDS_');
+                  const isTeamCorners =
+                    prediction.marketCategory === 'team_corners' ||
+                    prediction.marketCode.startsWith('TEAM_CORNERS_');
+                  const isTeamGoals =
+                    prediction.marketCategory === 'team_goals' ||
+                    prediction.optionType === 'team_multi_goals' ||
+                    prediction.optionType === 'team_goal_bounds' ||
+                    prediction.marketCode.startsWith('TEAM_GOALS_') ||
+                    prediction.marketCode.startsWith('TEAM_MULTI_GOALS_') ||
+                    prediction.marketCode.startsWith('TGB_');
+                  const isAwayTarget =
+                    prediction.side === 'away' ||
+                    prediction.marketCode.includes('_AWAY_') ||
+                    prediction.multiGoalsMeta?.scope === 'away';
+                  const scopeLabel = prediction.marketScope
+                    ? cleanDisplayText(prediction.marketScope)
+                    : isAwayTarget
+                    ? 'Away team'
+                    : 'Home team';
+
+                  if (marketFamily === 'cards') {
+                    if (
+                      isTeamCards &&
+                      prediction.evidence?.fittedStrengths.expectedCards !== undefined &&
+                      prediction.evidence.fittedStrengths.expectedCards > 0
+                    ) {
+                      return (
+                        <span>
+                          {cleanDisplayText(`${scopeLabel} disciplinary rate estimate applied`)}
+                        </span>
+                      );
+                    }
+                    return (
+                      <span>
+                        {prediction.evidence?.fittedStrengths.expectedCards !== undefined &&
+                        prediction.evidence.fittedStrengths.expectedCards > 0
+                          ? cleanDisplayText(
+                              `Projected total ${prediction.evidence.fittedStrengths.expectedCards.toFixed(2)} cards`
+                            )
+                          : 'Disciplinary rate estimates applied'}
+                      </span>
+                    );
+                  }
+
+                  if (marketFamily === 'corners') {
+                    const homeCorners = prediction.evidence?.fittedStrengths.expectedCornersHome;
+                    const awayCorners = prediction.evidence?.fittedStrengths.expectedCornersAway;
+                    if (isTeamCorners) {
+                      const targetCorners = isAwayTarget ? awayCorners : homeCorners;
+                      return (
+                        <span>
+                          {targetCorners !== undefined && targetCorners > 0
+                            ? cleanDisplayText(
+                                `${scopeLabel}: ${targetCorners.toFixed(1)} expected corners`
+                              )
+                            : 'Team corner volume estimate applied'}
+                        </span>
+                      );
+                    }
+                    return (
+                      <span>
+                        {homeCorners !== undefined && homeCorners > 0
+                          ? cleanDisplayText(
+                              `Home ${homeCorners.toFixed(1)} + Away ${(awayCorners ?? 0).toFixed(1)} expected corners`
+                            )
+                          : 'Corner volume estimates applied'}
+                      </span>
+                    );
+                  }
+
+                  if (isTeamGoals && prediction.evidence) {
+                    const fs = prediction.evidence.fittedStrengths;
+                    const teamAtt = isAwayTarget ? fs.awayAttack : fs.homeAttack;
+                    const teamXg = isAwayTarget ? fs.awayXg : fs.homeXg;
+                    const oppDef = isAwayTarget ? fs.homeDefense : fs.awayDefense;
+                    return (
+                      <span>
+                        {cleanDisplayText(
+                          `${scopeLabel}: Attack ${teamAtt.toFixed(2)} (${teamXg.toFixed(2)} xG) vs Opponent Def ${oppDef.toFixed(2)}`
+                        )}
+                      </span>
+                    );
+                  }
+
+                  return (
+                    <span>
+                      {cleanDisplayText(
+                        `Home Att ${prediction.evidence!.fittedStrengths.homeAttack.toFixed(2)} / Def ${prediction.evidence!.fittedStrengths.homeDefense.toFixed(2)} (${prediction.evidence!.fittedStrengths.homeXg.toFixed(2)} xG) | Away Att ${prediction.evidence!.fittedStrengths.awayAttack.toFixed(2)} / Def ${prediction.evidence!.fittedStrengths.awayDefense.toFixed(2)} (${prediction.evidence!.fittedStrengths.awayXg.toFixed(2)} xG)`
+                      )}
+                    </span>
+                  );
+                })()}
               </div>
 
               <div className="bg-[var(--surface)] px-2.5 py-2 rounded-[10px] border border-[var(--line)]">

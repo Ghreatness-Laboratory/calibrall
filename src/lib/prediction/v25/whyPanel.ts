@@ -156,7 +156,15 @@ export class WhyPanelGenerator {
     if (features.weatherCondition && features.weatherCondition.isAvailable) {
       factorsFor.push(cleanDisplayText(`Kickoff weather: ${features.weatherCondition.summary}`));
     }
-    if (!isCards && !isCorners && features.h2hContext && features.h2hContext.filteredRecentCount >= 3) {
+    if (
+      !isCards &&
+      !isCorners &&
+      !isTeamGoalsScope &&
+      !isTeamMultiGoals &&
+      !isFirstHalfScope &&
+      features.h2hContext &&
+      features.h2hContext.filteredRecentCount >= 3
+    ) {
       factorsFor.push(cleanDisplayText(features.h2hContext.summaryText));
     }
     if (features.externalBenchmark) {

@@ -251,26 +251,22 @@ export async function sweepAndRecordExplanationIssues(
     try {
       const { getFootballDataProvider } = await import('@/lib/data/provider');
       const { getFixtureStatistics, buildFixtureContextFromStats } = await import('@/lib/data/seedData');
-      const { evaluateFixtureMarkets, selectDiversifiedSlatePicks } = await import('./marketSelection');
+      const { evaluateCanonicalFootballSlate } = await import('./canonicalHeadlinePick');
       const { syncSlateExplanations } = await import('./explanationGenerator');
 
       const { fixtures } = await getFootballDataProvider().getLiveFixtures({ status: 'ALL' });
-      const evalItems = fixtures.map((f) => {
+      const slateInputs = fixtures.map((f) => {
         const stats = f.serverStats || getFixtureStatistics(f);
         const ctx = buildFixtureContextFromStats(f, stats);
-        const ev = evaluateFixtureMarkets(ctx);
         return {
-          fixtureId: f.id,
           fixture: f,
           context: ctx,
-          topPick: ev.topPick,
-          predictions: ev.predictions,
-          noRecommendationReason: ev.noRecommendationReason,
+          lockedWrittenExplanation: f.writtenExplanation || null,
         };
       });
 
-      const diversified = selectDiversifiedSlatePicks(evalItems, 0.40);
-      const synced = syncSlateExplanations(diversified);
+      const canonical = evaluateCanonicalFootballSlate(slateInputs, 0.40);
+      const synced = syncSlateExplanations(canonical);
 
       for (const item of synced) {
         checkedFootball++;

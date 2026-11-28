@@ -75,6 +75,7 @@ export interface SlipCandidateLeg {
   marketEdge: number | null;
   expectedValue: number | null;
   confidenceTier: 'HIGH' | 'MEDIUM';
+  isTopPick?: boolean;
   isExperimental?: boolean;
   teamNewsLowered: boolean;
   teamNewsNote: string | null;

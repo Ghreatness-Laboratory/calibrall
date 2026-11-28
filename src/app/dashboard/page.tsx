@@ -4,7 +4,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { getFixtureStatistics, buildFixtureContextFromStats } from '@/lib/data/seedData';
 import { useSport } from '@/lib/context/SportContext';
 import { useLiveFixtures } from '@/lib/hooks/useLiveFixtures';
-import { evaluateFixtureMarkets, selectDiversifiedSlatePicks } from '@/lib/prediction/marketSelection';
+import { evaluateFixtureMarkets } from '@/lib/prediction/marketSelection';
+import { applyCanonicalTopPick } from '@/lib/prediction/canonicalHeadlinePick';
 import { syncSlateExplanations } from '@/lib/prediction/explanationGenerator';
 import FixtureCard from '@/components/FixtureCard';
 import NBAGameCard from '@/components/nba/NBAGameCard';
@@ -97,12 +98,16 @@ export default function DashboardPage() {
 
   const evaluatedFixtures = useMemo(() => {
     if (isBasketball) return [];
-    const raw = fixtures
+    const canonical = fixtures
       .filter((f) => f.sport !== 'basketball')
       .map((fixture) => {
         const stats = getFixtureStatistics(fixture);
         const context = buildFixtureContextFromStats(fixture, stats);
-        const evalResult = evaluateFixtureMarkets(context);
+        const evalResult = applyCanonicalTopPick(
+          evaluateFixtureMarkets(context),
+          fixture.writtenExplanation,
+          fixture
+        );
 
         return {
           fixtureId: fixture.id,
@@ -114,7 +119,7 @@ export default function DashboardPage() {
           writtenExplanation: fixture.writtenExplanation,
         };
       });
-    return syncSlateExplanations(selectDiversifiedSlatePicks(raw, 0.4));
+    return syncSlateExplanations(canonical);
   }, [fixtures, isBasketball]);
 
   const footballEvalById = useMemo(() => {
@@ -127,7 +132,7 @@ export default function DashboardPage() {
 
   const filteredList = useMemo(() => {
     if (isBasketball || isMultiSport) return [];
-    const subset = evaluatedFixtures.filter(({ fixture }) => {
+    return evaluatedFixtures.filter(({ fixture }) => {
       if (selectedCompSet.size > 0 && !selectedCompSet.has(getFixtureCanonicalCompetitionId(fixture))) {
         return false;
       }
@@ -141,7 +146,6 @@ export default function DashboardPage() {
       }
       return fixture.status !== 'FINISHED';
     });
-    return syncSlateExplanations(selectDiversifiedSlatePicks(subset, 0.4));
   }, [evaluatedFixtures, selectedCompSet, debouncedSearchQuery, activeTab, isBasketball, isMultiSport]);
 
   const filteredBasketball = useMemo(() => {

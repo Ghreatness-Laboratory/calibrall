@@ -92,7 +92,7 @@ export interface BasketballTargetScope {
 export function resolveBasketballTargetScope(pick?: {
   marketCode?: string;
   marketCategory?: string;
-  side?: 'game' | 'home' | 'away';
+  side?: 'game' | 'home' | 'away' | 'match' | string;
   selection?: string;
 } | null, homeTeam?: string, awayTeam?: string): BasketballTargetScope {
   if (!pick) return { scopeKind: 'game', isFirstHalf: false, isTeamScoped: false };
@@ -597,7 +597,7 @@ export function validateExplanationConsistency(params: {
     marketFamily?: string;
     period?: MarketPeriod | string;
     multiGoalsMeta?: MultiGoalsMeta;
-    side?: 'game' | 'home' | 'away';
+    side?: 'game' | 'home' | 'away' | 'match' | string;
   } | null;
   explanation: WrittenMatchExplanation;
   isThinHistory?: boolean;
